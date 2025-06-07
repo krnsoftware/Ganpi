@@ -9,6 +9,11 @@ import Cocoa
 
 final class KTextView: NSView {
 
+    private enum KTextEditDirection : Int {
+        case forward = 1
+        case backward = -1
+    }
+    
     // MARK: - Properties
 
     private var textStorage: KTextStorage
@@ -16,7 +21,12 @@ final class KTextView: NSView {
     private let caretView = KCaretView()
 
     private var caretBlinkTimer: Timer?
-    private var verticalCaretX: CGFloat?
+    private var verticalCaretX: CGFloat?        // 縦方向にキャレットを移動する際の基準X。
+    private var horizontalSelectionBase: Int?   // 横方向に選択範囲を拡縮する際の基準点。
+    private var lastActionSelector: Selector?   // 前回受け取ったセレクタ。
+    private var currentActionSelector: Selector? { // 今回受け取ったセレクタ。
+        willSet { lastActionSelector = currentActionSelector }
+    }
 
     private let lineHeight: CGFloat = 18
     private let leftPadding: CGFloat = 10
@@ -32,6 +42,24 @@ final class KTextView: NSView {
     var caretIndex: Int {
         get { selectedRange.upperBound }
         set { selectedRange = newValue..<newValue }
+    }
+    
+    // 前回のセレクタが垂直方向にキャレット・選択範囲を動かすものだったか返す。
+    private var wasVerticalAction: Bool {
+        guard let sel = lastActionSelector else { return false }
+        return sel == #selector(moveUp(_:)) ||
+                sel == #selector(moveDown(_:)) ||
+                sel == #selector(moveUpAndModifySelection(_:)) ||
+                sel == #selector(moveDownAndModifySelection(_:))
+    }
+
+    // 前回のセレクタが水平方向にキャレット・選択範囲を動かすものだったか返す。
+    private var wasHorizontalAction: Bool {
+        guard let sel = lastActionSelector else { return false }
+        return //sel == #selector(moveLeft(_:)) ||
+                //sel == #selector(moveRight(_:)) ||
+                sel == #selector(moveLeftAndModifySelection(_:)) ||
+                sel == #selector(moveRightAndModifySelection(_:))
     }
 
     override var acceptsFirstResponder: Bool { true }
@@ -150,27 +178,35 @@ final class KTextView: NSView {
 
     override func keyDown(with event: NSEvent) {
         let isShift = event.modifierFlags.contains(.shift)
+        let selector: Selector?
 
         switch event.keyCode {
         case 123: // ←
-            isShift ? moveLeftAndModifySelection(nil) : moveLeft(nil)
+            selector = isShift ? #selector(moveLeftAndModifySelection(_:)) : #selector(moveLeft(_:))
         case 124: // →
-            isShift ? moveRightAndModifySelection(nil) : moveRight(nil)
+            selector = isShift ? #selector(moveRightAndModifySelection(_:)) : #selector(moveRight(_:))
         case 125: // ↓
-            isShift ? moveDownAndModifySelection(nil) : moveDown(nil)
+            selector = isShift ? #selector(moveDownAndModifySelection(_:)) : #selector(moveDown(_:))
         case 126: // ↑
-            isShift ? moveUpAndModifySelection(nil) : moveUp(nil)
+            selector = isShift ? #selector(moveUpAndModifySelection(_:)) : #selector(moveUp(_:))
         case 51: // delete
-            deleteBackward(nil)
+            selector = #selector(deleteBackward(_:))
         default:
-            if let characters = event.characters, !characters.isEmpty, !event.modifierFlags.contains(.control) {
-                insertDirectText(characters)
-            } else {
-                interpretKeyEvents([event])
-            }
+            selector = nil
+        }
+
+        if let sel = selector {
+            doCommand(by: sel)
+        } else if let characters = event.characters, !characters.isEmpty, !event.modifierFlags.contains(.control) {
+            // 文字入力（直接挿入）用のロジック
+            insertDirectText(characters)
+        } else {
+            interpretKeyEvents([event])
         }
     }
 
+    
+    // テキスト入力に関する実装が済むまでの簡易入力メソッド
     private func insertDirectText(_ text: String) {
         if !selectedRange.isEmpty {
             textStorage.replaceCharacters(in: selectedRange, with: [])
@@ -181,7 +217,7 @@ final class KTextView: NSView {
         caretIndex += text.count
 
         layoutManager.rebuildLayout()
-        verticalCaretX = nil
+        //verticalCaretX = nil
         updateCaretPosition()
         needsDisplay = true
     }
@@ -189,51 +225,55 @@ final class KTextView: NSView {
     // MARK: - Horizontal Movement (NSResponder methods)
 
     override func moveLeft(_ sender: Any?) {
-        guard caretIndex > 0 else { return }
-        caretIndex -= 1
-        verticalCaretX = nil
-        updateCaretPosition()
+        
+        moveCaretHorizontally(to: .backward, extendSelection: false)
     }
 
     override func moveRight(_ sender: Any?) {
-        guard caretIndex < textStorage.count else { return }
-        caretIndex += 1
-        verticalCaretX = nil
-        updateCaretPosition()
+        
+        moveCaretHorizontally(to: .forward, extendSelection: false)
     }
 
     override func moveRightAndModifySelection(_ sender: Any?) {
-        guard caretIndex < textStorage.count else { return }
-        // 右方向にキャレットを1文字右に移動
-        let newCaretIndex = caretIndex + 1
-
-        // 選択範囲の lowerBound は固定して、upperBound を新しい caret に合わせる
-        if newCaretIndex < selectedRange.lowerBound {
-            selectedRange = newCaretIndex..<selectedRange.lowerBound
-        } else {
-            selectedRange = selectedRange.lowerBound..<newCaretIndex
-        }
-
-        verticalCaretX = nil
-        updateCaretPosition()
+        
+        moveCaretHorizontally(to: .forward, extendSelection: true)
     }
 
     override func moveLeftAndModifySelection(_ sender: Any?) {
-        guard caretIndex > 0 else { return }
-        /*
-        let newCaretIndex = caretIndex - 1
-
-        // 同様に lowerBound/upperBound を自然に調整
-        if newCaretIndex < selectedRange.lowerBound {
-            selectedRange = newCaretIndex..<selectedRange.lowerBound
+        
+        moveCaretHorizontally(to: .backward, extendSelection: true)
+    }
+    
+    private func moveCaretHorizontally(to direction: KTextEditDirection, extendSelection: Bool) {
+        
+        if !wasHorizontalAction && extendSelection {
+            horizontalSelectionBase = selectedRange.lowerBound
+        }
+        
+        if extendSelection {
+            if horizontalSelectionBase! == selectedRange.lowerBound {
+                let newBound = selectedRange.upperBound + direction.rawValue
+                
+                guard newBound <= textStorage.count && newBound >= 0 else { return }
+                
+                selectedRange = min(newBound, horizontalSelectionBase!)..<max(newBound, horizontalSelectionBase!)
+            } else {
+                let newBound = selectedRange.lowerBound + direction.rawValue
+                
+                guard newBound <= textStorage.count && newBound >= 0 else { return }
+                
+                selectedRange = min(newBound, horizontalSelectionBase!)..<max(newBound, horizontalSelectionBase!)
+            }
         } else {
-            selectedRange = selectedRange.lowerBound..<newCaretIndex
-        }*/
+            if direction == .forward {
+                guard caretIndex < textStorage.count else { return }
+                caretIndex += 1
+            } else {
+                guard caretIndex > 0 else { return }
+                caretIndex -= 1
+            }
+        }
         
-        
-        print(selectedRange)
-
-        verticalCaretX = nil
         updateCaretPosition()
     }
 
@@ -266,7 +306,9 @@ final class KTextView: NSView {
         let attrString = NSAttributedString(string: newLine.text, attributes: [.font: font])
         let ctLine = CTLineCreateWithAttributedString(attrString)
 
-        if verticalCaretX == nil {
+        // 前回のアクションが垂直方向のキャレット移動を伴わないものの場合は今回のXを保存しておく。
+        if !wasVerticalAction {
+            
             let currentAttrString = NSAttributedString(string: currentLine.text, attributes: [.font: font])
             let currentCtLine = CTLineCreateWithAttributedString(currentAttrString)
             let indexInLine = caretIndex - currentLine.range.lowerBound
@@ -305,6 +347,13 @@ final class KTextView: NSView {
         verticalCaretX = nil
         updateCaretPosition()
         needsDisplay = true
+    }
+    
+    // 前回のアクションのセレクタを保存するために実装
+    override func doCommand(by selector: Selector) {
+        currentActionSelector = selector
+        super.doCommand(by: selector)
+        //print(selector)
     }
 
     // MARK: - Mouse Interaction (NSView methods)
@@ -345,4 +394,6 @@ final class KTextView: NSView {
         }
         return nil
     }
+    
+    
 }
