@@ -11,13 +11,16 @@ final class KTextView: NSView {
 
     // MARK: - Properties
 
-    var textStorage: KTextStorage
-    var layoutManager: KLayoutManager
+    private var textStorage: KTextStorage
+    private var layoutManager: KLayoutManager
     private let caretView = KCaretView()
 
+    private var caretBlinkTimer: Timer?
+    private var verticalCaretX: CGFloat?
+
+    private let lineHeight: CGFloat = 18
     private let leftPadding: CGFloat = 10
     private let topPadding: CGFloat = 30
-    private let lineHeight: CGFloat = 18
 
     var selectedRange: Range<Int> = 0..<0 {
         didSet {
@@ -31,15 +34,14 @@ final class KTextView: NSView {
         set { selectedRange = newValue..<newValue }
     }
 
-    private var caretBlinkTimer: Timer?
-    private var verticalCaretX: CGFloat?
+    override var acceptsFirstResponder: Bool { true }
 
-    // MARK: - Init
+    // MARK: - Initialization (KTextView methods)
 
-    override init(frame frameRect: NSRect) {
+    override init(frame: NSRect) {
         self.textStorage = KTextStorage()
         self.layoutManager = KLayoutManager(textStorage: textStorage)
-        super.init(frame: frameRect)
+        super.init(frame: frame)
         commonInit()
     }
 
@@ -61,11 +63,53 @@ final class KTextView: NSView {
         caretBlinkTimer?.invalidate()
     }
 
-    // MARK: - Drawing
+    // MARK: - Caret (KTextView methods)
+
+    private func updateCaretPosition(isVerticalMove: Bool = false) {
+        guard let (lineInfo, lineIndex) = findCurrentLineInfo() else { return }
+
+        let font = textStorage.baseFont
+        let attrString = NSAttributedString(string: lineInfo.text, attributes: [.font: font])
+        let ctLine = CTLineCreateWithAttributedString(attrString)
+
+        let indexInLine = caretIndex - lineInfo.range.lowerBound
+        let xOffset = CTLineGetOffsetForStringIndex(ctLine, indexInLine, nil)
+
+        let y = bounds.height - (topPadding + CGFloat(lineIndex) * lineHeight + 2)
+        let x = leftPadding + xOffset
+
+        let height = font.ascender + abs(font.descender)
+        caretView.updateFrame(x: x, y: y, height: height)
+        caretView.alphaValue = 1.0
+
+        if !isVerticalMove { verticalCaretX = x }
+        restartCaretBlinkTimer()
+        scrollCaretToVisible()
+    }
+
+    private func startCaretBlinkTimer() {
+        caretBlinkTimer?.invalidate()
+        caretBlinkTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            self.caretView.alphaValue = (self.caretView.alphaValue < 0.5) ? 1.0 : 0.0
+        }
+    }
+
+    private func restartCaretBlinkTimer() {
+        caretBlinkTimer?.invalidate()
+        startCaretBlinkTimer()
+    }
+
+    private func scrollCaretToVisible() {
+        guard let scrollView = self.enclosingScrollView else { return }
+        let caretRect = caretView.frame.insetBy(dx: -10, dy: -10)
+        scrollView.contentView.scrollToVisible(caretRect)
+    }
+
+    // MARK: - Drawing (NSView methods)
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
-
         NSColor.white.setFill()
         dirtyRect.fill()
 
@@ -77,7 +121,6 @@ final class KTextView: NSView {
         for (i, line) in layoutManager.lines.enumerated() {
             let y = bounds.height - (topPadding + CGFloat(i) * lineHeight)
 
-            // ✅ 選択範囲の描画
             let lineRange = line.range
             let selection = selectedRange.clamped(to: lineRange)
             if !selection.isEmpty {
@@ -98,210 +141,185 @@ final class KTextView: NSView {
                 selectionRect.fill()
             }
 
-            // ✅ テキスト描画
             let attributedLine = NSAttributedString(string: line.text, attributes: attributes)
             attributedLine.draw(at: NSPoint(x: leftPadding, y: y))
         }
     }
 
-    // MARK: - Private Methods
-
-    private func updateCaretPosition(isVerticalMove: Bool = false) {
-        guard let (lineInfo, lineIndex) = findCurrentLineInfo() else { return }
-
-        let font = textStorage.baseFont
-        let attrString = NSAttributedString(string: lineInfo.text, attributes: [.font: font])
-        let ctLine = CTLineCreateWithAttributedString(attrString)
-
-        let indexInLine = caretIndex - lineInfo.range.lowerBound
-        let xOffset = CTLineGetOffsetForStringIndex(ctLine, indexInLine, nil)
-
-        let y = bounds.height - (topPadding + CGFloat(lineIndex) * lineHeight + 2)
-        let x = leftPadding + xOffset
-
-        let height = font.ascender + abs(font.descender)
-        caretView.updateFrame(x: x, y: y, height: height)
-        caretView.fadeIn(duration: 0.25)
-
-        if !isVerticalMove {
-            verticalCaretX = x
-        }
-    }
-
-    private func findCurrentLineInfo() -> (line: LineInfo, index: Int)? {
-        for (i, line) in layoutManager.lines.enumerated() {
-            if line.range.contains(caretIndex) || caretIndex == line.range.upperBound {
-                return (line, i)
-            }
-        }
-        return nil
-    }
-
-    private func startCaretBlinkTimer() {
-        caretBlinkTimer?.invalidate()
-        caretBlinkTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-            guard let self = self else { return }
-            if self.caretView.alphaValue < 0.5 {
-                self.caretView.fadeIn(duration: 0.25)
-            } else {
-                self.caretView.fadeOut(duration: 0.25)
-            }
-        }
-    }
-
-    private func restartCaretBlinkTimer() {
-        caretBlinkTimer?.invalidate()
-        startCaretBlinkTimer()
-    }
-
-    // MARK: - Public API
-
-    override var acceptsFirstResponder: Bool { true }
+    // MARK: - Keyboard Input (NSResponder methods)
 
     override func keyDown(with event: NSEvent) {
         let isShift = event.modifierFlags.contains(.shift)
 
         switch event.keyCode {
         case 123: // ←
-            moveCaretLeft(extendSelection: isShift)
+            isShift ? moveLeftAndModifySelection(nil) : moveLeft(nil)
         case 124: // →
-            moveCaretRight(extendSelection: isShift)
+            isShift ? moveRightAndModifySelection(nil) : moveRight(nil)
         case 125: // ↓
-            moveCaretDown(extendSelection: isShift)
+            isShift ? moveDownAndModifySelection(nil) : moveDown(nil)
         case 126: // ↑
-            moveCaretUp(extendSelection: isShift)
+            isShift ? moveUpAndModifySelection(nil) : moveUp(nil)
+        case 51: // delete
+            deleteBackward(nil)
         default:
-            interpretKeyEvents([event])
+            if let characters = event.characters, !characters.isEmpty, !event.modifierFlags.contains(.control) {
+                insertDirectText(characters)
+            } else {
+                interpretKeyEvents([event])
+            }
+        }
+    }
+
+    private func insertDirectText(_ text: String) {
+        if !selectedRange.isEmpty {
+            textStorage.replaceCharacters(in: selectedRange, with: [])
+            caretIndex = selectedRange.lowerBound
         }
 
-        restartCaretBlinkTimer()
+        textStorage.insertString(text, at: caretIndex)
+        caretIndex += text.count
+
+        layoutManager.rebuildLayout()
+        verticalCaretX = nil
+        updateCaretPosition()
         needsDisplay = true
     }
 
-    override func insertText(_ insertString: Any) {
-        guard let text = insertString as? String else { return }
+    // MARK: - Horizontal Movement (NSResponder methods)
 
-        if textStorage.insertString(text, at: caretIndex) {
-            caretIndex += text.count
-            layoutManager.rebuildLayout()
-            verticalCaretX = nil
-            updateCaretPosition()
-            needsDisplay = true
-        }
+    override func moveLeft(_ sender: Any?) {
+        guard caretIndex > 0 else { return }
+        caretIndex -= 1
+        verticalCaretX = nil
+        updateCaretPosition()
     }
 
+    override func moveRight(_ sender: Any?) {
+        guard caretIndex < textStorage.count else { return }
+        caretIndex += 1
+        verticalCaretX = nil
+        updateCaretPosition()
+    }
+
+    override func moveRightAndModifySelection(_ sender: Any?) {
+        guard caretIndex < textStorage.count else { return }
+        // 右方向にキャレットを1文字右に移動
+        let newCaretIndex = caretIndex + 1
+
+        // 選択範囲の lowerBound は固定して、upperBound を新しい caret に合わせる
+        if newCaretIndex < selectedRange.lowerBound {
+            selectedRange = newCaretIndex..<selectedRange.lowerBound
+        } else {
+            selectedRange = selectedRange.lowerBound..<newCaretIndex
+        }
+
+        verticalCaretX = nil
+        updateCaretPosition()
+    }
+
+    override func moveLeftAndModifySelection(_ sender: Any?) {
+        guard caretIndex > 0 else { return }
+        /*
+        let newCaretIndex = caretIndex - 1
+
+        // 同様に lowerBound/upperBound を自然に調整
+        if newCaretIndex < selectedRange.lowerBound {
+            selectedRange = newCaretIndex..<selectedRange.lowerBound
+        } else {
+            selectedRange = selectedRange.lowerBound..<newCaretIndex
+        }*/
+        
+        
+        print(selectedRange)
+
+        verticalCaretX = nil
+        updateCaretPosition()
+    }
+
+
+    // MARK: - Vertical Movement (NSResponder methods)
+
+    override func moveUp(_ sender: Any?) {
+        moveCaretVertically(to: -1, extendSelection: false)
+    }
+
+    override func moveDown(_ sender: Any?) {
+        moveCaretVertically(to: 1, extendSelection: false)
+    }
+
+    override func moveUpAndModifySelection(_ sender: Any?) {
+        moveCaretVertically(to: -1, extendSelection: true)
+    }
+
+    override func moveDownAndModifySelection(_ sender: Any?) {
+        moveCaretVertically(to: 1, extendSelection: true)
+    }
+
+    private func moveCaretVertically(to direction: Int, extendSelection: Bool) {
+        guard let (currentLine, currentLineIndex) = findCurrentLineInfo() else { return }
+        let newLineIndex = currentLineIndex + direction
+        guard newLineIndex >= 0 && newLineIndex < layoutManager.lines.count else { return }
+
+        let newLine = layoutManager.lines[newLineIndex]
+        let font = textStorage.baseFont
+        let attrString = NSAttributedString(string: newLine.text, attributes: [.font: font])
+        let ctLine = CTLineCreateWithAttributedString(attrString)
+
+        if verticalCaretX == nil {
+            let currentAttrString = NSAttributedString(string: currentLine.text, attributes: [.font: font])
+            let currentCtLine = CTLineCreateWithAttributedString(currentAttrString)
+            let indexInLine = caretIndex - currentLine.range.lowerBound
+            verticalCaretX = CTLineGetOffsetForStringIndex(currentCtLine, indexInLine, nil) + leftPadding
+        }
+
+        let relativeX = verticalCaretX! - leftPadding
+        let targetIndexInLine = CTLineGetStringIndexForPosition(ctLine, CGPoint(x: relativeX, y: 0))
+        let newCaretIndex = newLine.range.lowerBound + targetIndexInLine
+
+        if extendSelection {
+            let lower = min(selectedRange.lowerBound, newCaretIndex)
+            let upper = max(selectedRange.lowerBound, newCaretIndex)
+            selectedRange = lower..<upper
+        } else {
+            selectedRange = newCaretIndex..<newCaretIndex
+        }
+
+        updateCaretPosition(isVerticalMove: true)
+    }
+
+    // MARK: - Deletion (NSResponder methods)
+
+    override func deleteBackward(_ sender: Any?) {
+        guard caretIndex > 0 else { return }
+
+        if !selectedRange.isEmpty {
+            textStorage.replaceCharacters(in: selectedRange, with: [])
+            caretIndex = selectedRange.lowerBound
+        } else {
+            textStorage.replaceCharacters(in: caretIndex - 1..<caretIndex, with: [])
+            caretIndex -= 1
+        }
+
+        layoutManager.rebuildLayout()
+        verticalCaretX = nil
+        updateCaretPosition()
+        needsDisplay = true
+    }
+
+    // MARK: - Mouse Interaction (NSView methods)
+
     override func mouseDown(with event: NSEvent) {
+        window?.makeFirstResponder(self)
         let location = convert(event.locationInWindow, from: nil)
         caretIndex = caretIndexForClickedPoint(location)
         selectedRange = caretIndex..<caretIndex
         verticalCaretX = nil
         updateCaretPosition()
-        caretView.fadeIn(duration: 0)
-        restartCaretBlinkTimer()
+        scrollCaretToVisible()
     }
 
-    // MARK: - Caret Movement
-
-    private func moveCaretLeft(extendSelection: Bool) {
-        guard caretIndex > 0 else { return }
-        let newIndex = caretIndex - 1
-
-        if extendSelection {
-            /*
-            // 起点 = 選択範囲の反対側
-            let anchor = (selectedRange.lowerBound == caretIndex) ? selectedRange.upperBound : selectedRange.lowerBound
-            selectedRange = newIndex..<anchor
-            // caretIndex = selectedRange.upperBound なので自然に整合する
-            */
-            selectedRange = selectedRange.lowerBound - 1..<selectedRange.upperBound
-        } else {
-            selectedRange = newIndex..<newIndex
-        }
-
-        verticalCaretX = nil
-        updateCaretPosition()
-    }
-
-
-    private func moveCaretRight(extendSelection: Bool) {
-        guard caretIndex < textStorage.count else { return }
-        let newIndex = caretIndex + 1
-
-        if extendSelection {
-            if selectedRange.isEmpty {
-                selectedRange = caretIndex..<newIndex
-            } else if caretIndex == selectedRange.lowerBound {
-                selectedRange = newIndex..<selectedRange.upperBound
-            } else {
-                selectedRange = selectedRange.lowerBound..<newIndex
-            }
-        } else {
-            selectedRange = newIndex..<newIndex
-        }
-
-        verticalCaretX = nil
-        updateCaretPosition()
-    }
-
-    private func moveCaretUp(extendSelection: Bool) {
-        guard let (currentLine, currentLineIndex) = findCurrentLineInfo() else { return }
-        let newLineIndex = currentLineIndex - 1
-        guard newLineIndex >= 0 else { return }
-
-        let newLine = layoutManager.lines[newLineIndex]
-        let font = textStorage.baseFont
-        let attrString = NSAttributedString(string: newLine.text, attributes: [.font: font])
-        let ctLine = CTLineCreateWithAttributedString(attrString)
-
-        if verticalCaretX == nil {
-            let currentAttrString = NSAttributedString(string: currentLine.text, attributes: [.font: font])
-            let currentCtLine = CTLineCreateWithAttributedString(currentAttrString)
-            let indexInLine = caretIndex - currentLine.range.lowerBound
-            verticalCaretX = CTLineGetOffsetForStringIndex(currentCtLine, indexInLine, nil) + leftPadding
-        }
-
-        let relativeX = verticalCaretX! - leftPadding
-        let targetIndexInLine = CTLineGetStringIndexForPosition(ctLine, CGPoint(x: relativeX, y: 0))
-        let newCaretIndex = newLine.range.lowerBound + targetIndexInLine
-
-        if extendSelection {
-            selectedRange = newCaretIndex..<selectedRange.upperBound
-        } else {
-            selectedRange = newCaretIndex..<newCaretIndex
-        }
-
-        updateCaretPosition(isVerticalMove: true)
-    }
-
-    private func moveCaretDown(extendSelection: Bool) {
-        guard let (currentLine, currentLineIndex) = findCurrentLineInfo() else { return }
-        let newLineIndex = currentLineIndex + 1
-        guard newLineIndex < layoutManager.lines.count else { return }
-
-        let newLine = layoutManager.lines[newLineIndex]
-        let font = textStorage.baseFont
-        let attrString = NSAttributedString(string: newLine.text, attributes: [.font: font])
-        let ctLine = CTLineCreateWithAttributedString(attrString)
-
-        if verticalCaretX == nil {
-            let currentAttrString = NSAttributedString(string: currentLine.text, attributes: [.font: font])
-            let currentCtLine = CTLineCreateWithAttributedString(currentAttrString)
-            let indexInLine = caretIndex - currentLine.range.lowerBound
-            verticalCaretX = CTLineGetOffsetForStringIndex(currentCtLine, indexInLine, nil) + leftPadding
-        }
-
-        let relativeX = verticalCaretX! - leftPadding
-        let targetIndexInLine = CTLineGetStringIndexForPosition(ctLine, CGPoint(x: relativeX, y: 0))
-        let newCaretIndex = newLine.range.lowerBound + targetIndexInLine
-
-        if extendSelection {
-            selectedRange = selectedRange.lowerBound..<newCaretIndex
-        } else {
-            selectedRange = newCaretIndex..<newCaretIndex
-        }
-
-        updateCaretPosition(isVerticalMove: true)
-    }
+    // MARK: - KTextView methods (helpers)
 
     private func caretIndexForClickedPoint(_ point: NSPoint) -> Int {
         for (i, line) in layoutManager.lines.enumerated() {
@@ -317,5 +335,14 @@ final class KTextView: NSView {
             }
         }
         return textStorage.count
+    }
+
+    private func findCurrentLineInfo() -> (LineInfo, Int)? {
+        for (i, line) in layoutManager.lines.enumerated() {
+            if line.range.contains(caretIndex) || caretIndex == line.range.upperBound {
+                return (line, i)
+            }
+        }
+        return nil
     }
 }
