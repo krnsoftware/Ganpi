@@ -45,6 +45,15 @@ final class KTextView: NSView {
         set { selectedRange = newValue..<newValue }
     }
     
+    // 今回のセレクタが垂直方向にキャレット選択範囲を動かすものであるか返す。
+    private var isVerticalAction: Bool {
+        guard let sel = currentActionSelector else { return false }
+        return sel == #selector(moveUp(_:)) ||
+        sel == #selector(moveDown(_:)) ||
+        sel == #selector(moveUpAndModifySelection(_:)) ||
+        sel == #selector(moveDownAndModifySelection(_:))
+    }
+    
     // 前回のセレクタが垂直方向にキャレット・選択範囲を動かすものだったか返す。
     private var wasVerticalAction: Bool {
         guard let sel = lastActionSelector else { return false }
@@ -53,13 +62,18 @@ final class KTextView: NSView {
                 sel == #selector(moveUpAndModifySelection(_:)) ||
                 sel == #selector(moveDownAndModifySelection(_:))
     }
-
-    // 前回のセレクタが水平方向にキャレット・選択範囲を動かすものだったか返す。
-    private var wasHorizontalAction: Bool {
+    
+    // 前回のセレクタが垂直方向の選択範囲を動かすものだったか返す。
+    private var wasVerticalActionWithModifySelection: Bool {
         guard let sel = lastActionSelector else { return false }
-        return //sel == #selector(moveLeft(_:)) ||
-                //sel == #selector(moveRight(_:)) ||
-                sel == #selector(moveLeftAndModifySelection(_:)) ||
+        return sel == #selector(moveUpAndModifySelection(_:)) ||
+                sel == #selector(moveDownAndModifySelection(_:))
+    }
+
+    // 前回のセレクタが水平方向に選択範囲を動かすものだったか返す。
+    private var wasHorizontalActionWithModifySelection: Bool {
+        guard let sel = lastActionSelector else { return false }
+        return sel == #selector(moveLeftAndModifySelection(_:)) ||
                 sel == #selector(moveRightAndModifySelection(_:))
     }
 
@@ -95,7 +109,7 @@ final class KTextView: NSView {
     // MARK: - Caret (KTextView methods)
 
     private func updateCaretPosition(isVerticalMove: Bool = false) {
-        guard let (lineInfo, lineIndex) = findCurrentLineInfo() else { return }
+        guard let (lineInfo, lineIndex) = findLineInfo(containing: caretIndex) else { return }
 
         let font = textStorage.baseFont
         let attrString = NSAttributedString(string: lineInfo.text, attributes: [.font: font])
@@ -247,7 +261,7 @@ final class KTextView: NSView {
     
     private func moveCaretHorizontally(to direction: KTextEditDirection, extendSelection: Bool) {
         
-        if !wasHorizontalAction && extendSelection {
+        if !wasHorizontalActionWithModifySelection && extendSelection {
             horizontalSelectionBase = selectedRange.lowerBound
         }
         
@@ -290,82 +304,66 @@ final class KTextView: NSView {
     // MARK: - Vertical Movement (NSResponder methods)
 
     override func moveUp(_ sender: Any?) {
-        moveCaretVertically(to: -1, extendSelection: false)
+        moveCaretVertically(to: .backward, extendSelection: false)
     }
 
     override func moveDown(_ sender: Any?) {
-        moveCaretVertically(to: 1, extendSelection: false)
+        moveCaretVertically(to: .forward, extendSelection: false)
     }
 
     override func moveUpAndModifySelection(_ sender: Any?) {
-        moveCaretVertically(to: -1, extendSelection: true)
+        moveCaretVertically(to: .backward, extendSelection: true)
     }
 
     override func moveDownAndModifySelection(_ sender: Any?) {
-        moveCaretVertically(to: 1, extendSelection: true)
+        moveCaretVertically(to: .forward, extendSelection: true)
     }
 
-    /*
-    private func moveCaretVertically(to direction: Int, extendSelection: Bool) {
-        guard let (currentLine, currentLineIndex) = findCurrentLineInfo() else { return }
-        let newLineIndex = currentLineIndex + direction
-        guard newLineIndex >= 0 && newLineIndex < layoutManager.lines.count else { return }
-
-        let newLine = layoutManager.lines[newLineIndex]
-        let font = textStorage.baseFont
-        let attrString = NSAttributedString(string: newLine.text, attributes: [.font: font])
-        let ctLine = CTLineCreateWithAttributedString(attrString)
-
-        // 前回のアクションが垂直方向のキャレット移動を伴わないものの場合は今回のXを保存しておく。
-        if !wasVerticalAction {
-            
-            let currentAttrString = NSAttributedString(string: currentLine.text, attributes: [.font: font])
-            let currentCtLine = CTLineCreateWithAttributedString(currentAttrString)
-            let indexInLine = caretIndex - currentLine.range.lowerBound
-            verticalCaretX = CTLineGetOffsetForStringIndex(currentCtLine, indexInLine, nil) + leftPadding
-        }
-
-        let relativeX = verticalCaretX! - leftPadding
-        let targetIndexInLine = CTLineGetStringIndexForPosition(ctLine, CGPoint(x: relativeX, y: 0))
-        let newCaretIndex = newLine.range.lowerBound + targetIndexInLine
-
-        if extendSelection {
-            let lower = min(selectedRange.lowerBound, newCaretIndex)
-            let upper = max(selectedRange.lowerBound, newCaretIndex)
-            selectedRange = lower..<upper
-        } else {
-            selectedRange = newCaretIndex..<newCaretIndex
-        }
-
-        updateCaretPosition(isVerticalMove: true)
-    }
-     */
     
-    // KTextView.swift
-
-    private func moveCaretVertically(to direction: Int, extendSelection: Bool) {
-        guard let (currentLine, currentLineIndex) = findCurrentLineInfo() else { return }
-        let newLineIndex = currentLineIndex + direction
-        guard newLineIndex >= 0 && newLineIndex < layoutManager.lines.count else { return }
-
-        let newLine = layoutManager.lines[newLineIndex]
-        let font = textStorage.baseFont
-        let attrString = NSAttributedString(string: newLine.text, attributes: [.font: font])
-        let ctLine = CTLineCreateWithAttributedString(attrString)
-
+/*
+    private func moveCaretVertically(to direction: KTextEditDirection, extendSelection: Bool) {
         // 垂直方向の領域選択基準をセット
-        if !wasVerticalAction && extendSelection {
+        if !wasVerticalActionWithModifySelection && extendSelection {
             verticalSelectionBase = selectedRange.lowerBound
         }
+        
+        /*
+         A. lowerBound..<base
+         B. base..<upperBound
+         の場合があって、
+         X. 上 - Aの場合lowerBoundを基準に上の行。Bの場合upperBoundを基準に上の行。
+         Y. 下 - A lowerBoundを基準に下の行。B upperBoundを基準に下の行。
+         AかBかはlowerBound<Baseの真理値で評価。
+         XやYかはdirectionで評価。
+         -> 結果として、lowerBound<verticalSelectionBaseならlowerBound,そうでなければupperでよい。
+         */
+        
+        let indexForLineSearch: Int = selectedRange.lowerBound < verticalSelectionBase! ? selectedRange.lowerBound : selectedRange.upperBound
+        
+    
+        
+        // 基準行を探す
+        guard let (currentLine, currentLineIndex) = findLineInfo(containing: indexForLineSearch) else { return }
 
-        // キャレットのX座標
-        if verticalCaretX == nil {
+        let newLineIndex = currentLineIndex + direction.rawValue
+        guard newLineIndex >= 0 && newLineIndex < layoutManager.lines.count else { return }
+
+
+        let newLine = layoutManager.lines[newLineIndex]
+        let font = textStorage.baseFont
+        let attrString = NSAttributedString(string: newLine.text, attributes: [.font: font])
+        let ctLine = CTLineCreateWithAttributedString(attrString)
+        
+        
+        // verticalCaretXは、前回が上下方向ではなく、今回が上下方向であった時にセットされる。
+        if isVerticalAction && !wasVerticalAction {
             let currentAttrString = NSAttributedString(string: currentLine.text, attributes: [.font: font])
             let currentCtLine = CTLineCreateWithAttributedString(currentAttrString)
             let indexInLine = caretIndex - currentLine.range.lowerBound
             verticalCaretX = CTLineGetOffsetForStringIndex(currentCtLine, indexInLine, nil) + leftPadding
         }
-
+        
+        // キャレットのX座標
         let relativeX = verticalCaretX! - leftPadding
         let targetIndexInLine = CTLineGetStringIndexForPosition(ctLine, CGPoint(x: relativeX, y: 0))
         let newCaretIndex = newLine.range.lowerBound + targetIndexInLine
@@ -375,12 +373,66 @@ final class KTextView: NSView {
             let lower = min(base, newCaretIndex)
             let upper = max(base, newCaretIndex)
             selectedRange = lower..<upper
+            print("lower: \(lower), upper: \(upper), newCaretIndex: \(newCaretIndex), base: \(base)")
         } else {
             selectedRange = newCaretIndex..<newCaretIndex
         }
 
         updateCaretPosition(isVerticalMove: true)
     }
+ */
+    private func moveCaretVertically(to direction: KTextEditDirection, extendSelection: Bool) {
+        // anchor（verticalSelectionBase）を初回のみセット
+        if !wasVerticalActionWithModifySelection && extendSelection {
+            verticalSelectionBase = selectedRange.lowerBound
+        }
+
+        // 基準インデックス決定（A/Bパターンに基づく）
+        let indexForLineSearch: Int = (selectedRange.lowerBound < verticalSelectionBase!) ? selectedRange.lowerBound : selectedRange.upperBound
+
+        // 基準行情報取得
+        guard let (currentLine, currentLineIndex) = findLineInfo(containing: indexForLineSearch) else { return }
+
+        let newLineIndex = currentLineIndex + direction.rawValue
+        guard newLineIndex >= 0 && newLineIndex < layoutManager.lines.count else { return }
+
+        let newLine = layoutManager.lines[newLineIndex]
+        let font = textStorage.baseFont
+        let attrString = NSAttributedString(string: newLine.text, attributes: [.font: font])
+        let ctLine = CTLineCreateWithAttributedString(attrString)
+
+        // 初回のみ verticalCaretX をセット
+        if isVerticalAction && !wasVerticalAction {
+            let currentAttrString = NSAttributedString(string: currentLine.text, attributes: [.font: font])
+            let currentCtLine = CTLineCreateWithAttributedString(currentAttrString)
+            let indexInLine = caretIndex - currentLine.range.lowerBound
+            verticalCaretX = CTLineGetOffsetForStringIndex(currentCtLine, indexInLine, nil) + leftPadding
+        }
+
+        // 行末補正
+        let lineWidth = CGFloat(CTLineGetTypographicBounds(ctLine, nil, nil, nil))
+        let adjustedX = min(verticalCaretX! - leftPadding, lineWidth)
+        var targetIndexInLine = CTLineGetStringIndexForPosition(ctLine, CGPoint(x: adjustedX, y: 0))
+
+        // 行末にいる場合の補正
+        if caretIndex == currentLine.range.upperBound {
+            targetIndexInLine = newLine.text.count
+        }
+
+        let newCaretIndex = newLine.range.lowerBound + targetIndexInLine
+
+        // 選択範囲更新（verticalSelectionBaseは常に基準点として使用）
+        if extendSelection {
+            let lower = min(verticalSelectionBase!, newCaretIndex)
+            let upper = max(verticalSelectionBase!, newCaretIndex)
+            selectedRange = lower..<upper
+        } else {
+            selectedRange = newCaretIndex..<newCaretIndex
+        }
+
+        updateCaretPosition(isVerticalMove: true)
+    }
+
 
 
     // MARK: - Deletion (NSResponder methods)
@@ -439,14 +491,15 @@ final class KTextView: NSView {
         return textStorage.count
     }
 
-    private func findCurrentLineInfo() -> (LineInfo, Int)? {
+    private func findLineInfo(containing index: Int) -> (LineInfo, Int)? {
         for (i, line) in layoutManager.lines.enumerated() {
-            if line.range.contains(caretIndex) || caretIndex == line.range.upperBound {
+            if line.range.contains(index) || index == line.range.upperBound {
                 return (line, i)
             }
         }
         return nil
     }
+
     
     
 }
