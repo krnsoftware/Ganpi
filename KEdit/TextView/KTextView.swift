@@ -386,6 +386,45 @@ final class KTextView: NSView {
 
         updateCaretPosition(isVerticalMove: true)
     }
+    
+    // MARK: - COPY and Paste (NSResponder method)
+    
+    @IBAction func cut(_ sender: Any?) {
+        copy(sender)
+
+        textStorage.replaceCharacters(in: selectedRange, with: [])
+        caretIndex = selectedRange.lowerBound
+        
+        layoutManager.rebuildLayout()
+        updateCaretPosition()
+        needsDisplay = true
+    }
+    
+    @IBAction func copy(_ sender: Any?) {
+        guard !selectedRange.isEmpty else { return }
+        guard let slicedCharacters = textStorage.characters(in: selectedRange) else { return }
+        let selectedText = String(slicedCharacters)
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(selectedText, forType: .string)
+    }
+
+    @IBAction func paste(_ sender: Any?) {
+        let pasteboard = NSPasteboard.general
+        guard let string = pasteboard.string(forType: .string) else { return }
+
+        textStorage.replaceCharacters(in: selectedRange, with: Array(string))
+        caretIndex = selectedRange.lowerBound + string.count
+
+        layoutManager.rebuildLayout()
+        updateCaretPosition()
+        needsDisplay = true
+    }
+
+    @IBAction override func selectAll(_ sender: Any?) {
+        selectedRange = 0..<textStorage.count
+        
+    }
 
 
 
