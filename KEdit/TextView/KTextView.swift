@@ -386,6 +386,9 @@ final class KTextView: NSView {
         if !wasVerticalActionWithModifySelection && extendSelection {
             verticalSelectionBase = selectedRange.lowerBound
         }
+        
+        // 初回使用時に問題が出ないように。
+        if verticalSelectionBase == nil { verticalSelectionBase = caretIndex }
 
         // 基準インデックス決定（A/Bパターンに基づく）
         let indexForLineSearch: Int = (selectedRange.lowerBound < verticalSelectionBase!) ? selectedRange.lowerBound : selectedRange.upperBound
@@ -394,7 +397,15 @@ final class KTextView: NSView {
         guard let (currentLine, currentLineIndex) = findLineInfo(containing: indexForLineSearch) else { return }
 
         let newLineIndex = currentLineIndex + direction.rawValue
-        guard newLineIndex >= 0 && newLineIndex < layoutManager.lines.count else { return }
+        // newLineIndexがTextStorageインスタンスのcharacterの領域を越えている場合には両端まで広げる。
+        if newLineIndex < 0 {
+            selectedRange = 0..<selectedRange.upperBound
+            return
+        }
+        if newLineIndex >= layoutManager.lines.count {
+            selectedRange = selectedRange.lowerBound..<textStorage.count
+            return
+        }
 
         let newLine = layoutManager.lines[newLineIndex]
         let font = textStorage.baseFont
@@ -426,6 +437,8 @@ final class KTextView: NSView {
             let lower = min(verticalSelectionBase!, newCaretIndex)
             let upper = max(verticalSelectionBase!, newCaretIndex)
             selectedRange = lower..<upper
+            
+            
         } else {
             selectedRange = newCaretIndex..<newCaretIndex
         }

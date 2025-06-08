@@ -22,10 +22,12 @@ final class KTextStorage {
 
     var string: String {
         get { String(characters) }
-        set {
-            characters = Array(newValue)
-            notifyObservers()
-        }
+        set { characters = Array(newValue); notifyObservers() }
+    }
+    
+    var chars: [Character] {
+        get { characters }
+        set { characters = newValue; notifyObservers()}
     }
 
     var baseFont: NSFont {
@@ -75,6 +77,17 @@ final class KTextStorage {
     @discardableResult
     func deleteCharacters(in range: Range<Int>) -> Bool {
         replaceCharacters(in: range, with: [])
+    }
+    
+
+    func characters(in range: Range<Int>) -> ArraySlice<Character>? {
+        guard range.lowerBound >= 0,
+              range.upperBound <= characters.count,
+              range.lowerBound <= range.upperBound else {
+            return nil
+        }
+        
+        return characters[range]
     }
 
     func addObserver(_ observer: @escaping () -> Void) {
