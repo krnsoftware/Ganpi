@@ -80,18 +80,18 @@ final class KTextStorage {
     }
     
 
-    func characters(in range: Range<Int>) -> ArraySlice<Character>? {
-        guard range.lowerBound >= 0,
-              range.upperBound <= characters.count,
-              range.lowerBound <= range.upperBound else {
-            return nil
-        }
-        
-        return characters[range]
-    }
-
     func addObserver(_ observer: @escaping () -> Void) {
         observers.append(observer)
+    }
+    
+    subscript(index: Int) -> Character? {
+        guard index >= 0, index < characters.count else { return nil }
+        return characters[index]
+    }
+    
+    subscript(range: Range<Int>) -> ArraySlice<Character>? {
+        guard range.lowerBound >= 0 && range.upperBound <= characters.count else { return nil }
+        return characters[range]
     }
 
     // MARK: - Private

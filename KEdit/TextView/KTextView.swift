@@ -172,12 +172,21 @@ final class KTextView: NSView {
                 let ctLine = CTLineCreateWithAttributedString(attrString)
 
                 let startOffset = CTLineGetOffsetForStringIndex(ctLine, selection.lowerBound - lineRange.lowerBound, nil)
-                let endOffset = CTLineGetOffsetForStringIndex(ctLine, selection.upperBound - lineRange.lowerBound, nil)
-
+                 let endOffset = CTLineGetOffsetForStringIndex(ctLine, selection.upperBound - lineRange.lowerBound, nil)
+                
+                // その行における選択部分の横幅。
+                var selectionWidth = endOffset - startOffset
+                
+                // もしその行の最後の文字が改行文字であり、その文字が選択されているなら右端まで塗り潰す。
+                let lastCharIndex = line.range.upperBound
+                if let lastChar = textStorage[lastCharIndex], lastChar == "\n", selectedRange.contains(lastCharIndex){
+                    selectionWidth = bounds.width - leftPadding - startOffset
+                }                
+                
                 let selectionRect = CGRect(
                     x: leftPadding + startOffset,
                     y: y,
-                    width: endOffset - startOffset,
+                    width: selectionWidth,
                     height: lineHeight
                 )
                 NSColor.selectedTextBackgroundColor.setFill()
@@ -402,7 +411,8 @@ final class KTextView: NSView {
     
     @IBAction func copy(_ sender: Any?) {
         guard !selectedRange.isEmpty else { return }
-        guard let slicedCharacters = textStorage.characters(in: selectedRange) else { return }
+        //guard let slicedCharacters = textStorage.characters(in: selectedRange) else { return }
+        guard let slicedCharacters = textStorage[selectedRange] else { return }
         let selectedText = String(slicedCharacters)
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
