@@ -126,6 +126,17 @@ final class KTextView: NSView {
             )
         }
     }
+    
+    override func becomeFirstResponder() -> Bool {
+        updateActiveState()
+        return super.becomeFirstResponder()
+    }
+
+    override func resignFirstResponder() -> Bool {
+        updateActiveState()
+        return super.resignFirstResponder()
+    }
+
 
     deinit {
         caretBlinkTimer?.invalidate()
@@ -523,11 +534,11 @@ final class KTextView: NSView {
     // MARK: - KTextView methods (notification)
     
     @objc private func windowBecameKey(_ notification: Notification) {
-        needsDisplay = true
+        updateActiveState()
     }
         
     @objc private func windowResignedKey(_ notification: Notification) {
-        needsDisplay = true
+        updateActiveState()
     }
 
     // MARK: - KTextView methods (helpers)
@@ -557,6 +568,11 @@ final class KTextView: NSView {
         return nil
     }
 
-    
+    private func updateActiveState() {
+        let isActive = (window?.isKeyWindow == true) && (window?.firstResponder === self)
+        caretView.isHidden = !isActive
+        needsDisplay = true
+    }
+
     
 }
