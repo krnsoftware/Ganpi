@@ -100,11 +100,39 @@ final class KTextView: NSView {
         wantsLayer = true
         updateCaretPosition()
         startCaretBlinkTimer()
+        
+    }
+    
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+    
+        // 古い監視を解除
+        NotificationCenter.default.removeObserver(self)
+        
+        // 新しい window があれば監視を開始
+        if let window = self.window {
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(windowBecameKey),
+                name: NSWindow.didBecomeKeyNotification,
+                object: window
+            )
+                
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(windowResignedKey),
+                name: NSWindow.didResignKeyNotification,
+                object: window
+            )
+        }
     }
 
     deinit {
         caretBlinkTimer?.invalidate()
+        
+        NotificationCenter.default.removeObserver(self)
     }
+    
 
     // MARK: - Caret (KTextView methods)
 
@@ -153,8 +181,14 @@ final class KTextView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
+        
+        // 背景色の塗り潰し
         NSColor.white.setFill()
         dirtyRect.fill()
+        
+        let isWindowActive = window?.isKeyWindow == true
+        
+        let selectedTextBGColor = window?.isKeyWindow == true ? NSColor.selectedTextBackgroundColor : NSColor.unemphasizedSelectedTextBackgroundColor
 
         let attributes: [NSAttributedString.Key: Any] = [
             .font: textStorage.baseFont,
@@ -189,7 +223,7 @@ final class KTextView: NSView {
                     width: selectionWidth,
                     height: lineHeight
                 )
-                NSColor.selectedTextBackgroundColor.setFill()
+                selectedTextBGColor.setFill()
                 selectionRect.fill()
             }
 
@@ -484,6 +518,16 @@ final class KTextView: NSView {
         let upper = max(horizontalSelectionBase!, index)
         selectedRange = lower..<upper
         updateCaretPosition(isVerticalMove: true)
+    }
+    
+    // MARK: - KTextView methods (notification)
+    
+    @objc private func windowBecameKey(_ notification: Notification) {
+        needsDisplay = true
+    }
+        
+    @objc private func windowResignedKey(_ notification: Notification) {
+        needsDisplay = true
     }
 
     // MARK: - KTextView methods (helpers)
