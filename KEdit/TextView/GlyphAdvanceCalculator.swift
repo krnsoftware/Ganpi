@@ -13,7 +13,7 @@ final class GlyphAdvanceCalculator {
     private let ctFont: CTFont
 
     init(font: NSFont) {
-        self.ctFont = font as CTFont // ← これで安全に変換
+        self.ctFont = font as CTFont
     }
 
     func advanceForCharacter(_ char: Character) -> CGFloat {
@@ -21,22 +21,21 @@ final class GlyphAdvanceCalculator {
             return cached
         }
 
-        guard let uniScalar = char.unicodeScalars.first else {
-            cache[char] = 0
-            return 0
-        }
+        let utf16Units = Array(char.utf16)
+        var glyphs = [CGGlyph](repeating: 0, count: utf16Units.count)
 
-        let characters: [UniChar] = [UniChar(uniScalar.value)]
-        var glyphs: [CGGlyph] = [0]
-        let success = CTFontGetGlyphsForCharacters(ctFont, characters, &glyphs, 1)
-        let glyph = glyphs[0]
+        let success = CTFontGetGlyphsForCharacters(ctFont, utf16Units, &glyphs, utf16Units.count)
+        var totalAdvance: CGFloat = 0
 
-        var advance = CGSize.zero
         if success {
-            CTFontGetAdvancesForGlyphs(ctFont, .horizontal, [glyph], &advance, 1)
+            var advances = [CGSize](repeating: .zero, count: utf16Units.count)
+            CTFontGetAdvancesForGlyphs(ctFont, .horizontal, glyphs, &advances, utf16Units.count)
+
+            totalAdvance = advances.reduce(0) { $0 + $1.width }
         }
 
-        cache[char] = advance.width
-        return advance.width
+        cache[char] = totalAdvance
+        return totalAdvance
     }
+
 }
