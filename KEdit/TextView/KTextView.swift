@@ -78,6 +78,7 @@ final class KTextView: NSView {
     }
 
     override var acceptsFirstResponder: Bool { true }
+    override var isFlipped: Bool { true }
 
     // MARK: - Initialization (KTextView methods)
 
@@ -196,9 +197,7 @@ final class KTextView: NSView {
         // 背景色の塗り潰し
         NSColor.white.setFill()
         dirtyRect.fill()
-        
-        let isWindowActive = window?.isKeyWindow == true
-        
+                
         let selectedTextBGColor = window?.isKeyWindow == true ? NSColor.selectedTextBackgroundColor : NSColor.unemphasizedSelectedTextBackgroundColor
 
         let attributes: [NSAttributedString.Key: Any] = [
@@ -207,8 +206,9 @@ final class KTextView: NSView {
         ]
 
         for (i, line) in layoutManager.lines.enumerated() {
-            let y = bounds.height - (topPadding + CGFloat(i) * lineHeight)
-
+            //let y = bounds.height - (topPadding + CGFloat(i) * lineHeight)
+            let y = topPadding + CGFloat(i) * lineHeight
+            
             let lineRange = line.range
             let selection = selectedRange.clamped(to: lineRange)
             if !selection.isEmpty {

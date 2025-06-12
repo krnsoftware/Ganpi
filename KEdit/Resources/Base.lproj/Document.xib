@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <document type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="3.0" toolsVersion="23727" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none" useAutolayout="YES" customObjectInstantitationMethod="direct">
     <dependencies>
+        <deployment identifier="macosx"/>
         <plugIn identifier="com.apple.InterfaceBuilder.CocoaPlugin" version="23727"/>
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
     </dependencies>
@@ -18,7 +19,7 @@
             <rect key="contentRect" x="133" y="235" width="507" height="413"/>
             <rect key="screenRect" x="0.0" y="0.0" width="2560" height="1415"/>
             <value key="minSize" type="size" width="94" height="86"/>
-            <view key="contentView" id="gIp-Ho-8D9" customClass="KTextView" customModule="KEdit" customModuleProvider="target">
+            <view key="contentView" id="gIp-Ho-8D9">
                 <rect key="frame" x="0.0" y="0.0" width="507" height="413"/>
                 <autoresizingMask key="autoresizingMask"/>
             </view>
@@ -27,5 +28,10 @@
             </connections>
             <point key="canvasLocation" x="56" y="-83"/>
         </window>
+        <viewController id="oeb-f6-4KT" customClass="KViewController" customModule="KEdit" customModuleProvider="target">
+            <connections>
+                <outlet property="view" destination="gIp-Ho-8D9" id="isV-BI-cZq"/>
+            </connections>
+        </viewController>
     </objects>
 </document>
