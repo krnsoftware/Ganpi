@@ -156,7 +156,7 @@ final class KTextView: NSView {
     
 
     // MARK: - Caret (KTextView methods)
-
+    /*
     private func updateCaretPosition(isVerticalMove: Bool = false) {
         guard let (lineInfo, lineIndex) = findLineInfo(containing: caretIndex) else { return }
 
@@ -166,14 +166,7 @@ final class KTextView: NSView {
 
         let indexInLine = caretIndex - lineInfo.range.lowerBound
         let xOffset = CTLineGetOffsetForStringIndex(ctLine, indexInLine, nil)
-
-        /*
-        let y = bounds.height - (topPadding + CGFloat(lineIndex) * lineHeight + 2)
-        let x = leftPadding + xOffset
-
-        let height = font.ascender + abs(font.descender)
-        caretView.updateFrame(x: x, y: y, height: height)
-        */
+        
         let x = leftPadding + xOffset
         let y = topPadding + CGFloat(lineIndex) * lineHeight
         let height = font.ascender + abs(font.descender)
@@ -185,6 +178,25 @@ final class KTextView: NSView {
         if !isVerticalMove { verticalCaretX = x }
         restartCaretBlinkTimer()
         scrollCaretToVisible()
+    }*/
+    
+    private func updateCaretPosition(isVerticalMove: Bool = false) {
+        guard let (lineInfo, lineIndex) = findLineInfo(containing: caretIndex) else { return }
+
+        let font = textStorage.baseFont
+        let attrString = NSAttributedString(string: lineInfo.text, attributes: [.font: font])
+        let ctLine = CTLineCreateWithAttributedString(attrString)
+
+        let indexInLine = caretIndex - lineInfo.range.lowerBound
+        let xOffset = CTLineGetOffsetForStringIndex(ctLine, indexInLine, nil)
+
+        let rects = LayoutRects(bounds: bounds)
+        let x = rects.textRegion.rect.origin.x + xOffset
+        let y = rects.textRegion.rect.origin.y + CGFloat(lineIndex) * (font.ascender + abs(font.descender))
+
+        let height = font.ascender + abs(font.descender)
+        caretView.updateFrame(x: x, y: y, height: height)
+        caretView.alphaValue = 1.0
     }
 
     private func startCaretBlinkTimer() {
@@ -207,7 +219,7 @@ final class KTextView: NSView {
     }
 
     // MARK: - Drawing (NSView methods)
-
+    /*
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
         
@@ -259,7 +271,67 @@ final class KTextView: NSView {
             attributedLine.draw(at: NSPoint(x: leftPadding, y: y))
         }
     }
+     */
+    
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
 
+        let ctx = NSGraphicsContext.current?.cgContext
+        let rects = LayoutRects(bounds: bounds)
+
+        // 背景色の塗り潰し
+        NSColor.white.setFill()
+        dirtyRect.fill()
+
+        let selectedTextBGColor = window?.isKeyWindow == true
+            ? NSColor.selectedTextBackgroundColor
+            : NSColor.unemphasizedSelectedTextBackgroundColor
+
+        let font = textStorage.baseFont
+        let lineHeight = font.ascender + abs(font.descender)
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: NSColor.textColor
+        ]
+
+        for (i, line) in layoutManager.lines.enumerated() {
+            let lineRange = line.range
+            let selection = selectedRange.clamped(to: lineRange)
+
+            let y = rects.textRegion.rect.origin.y + CGFloat(i) * lineHeight
+
+            if !selection.isEmpty {
+                let attrString = NSAttributedString(string: line.text, attributes: [.font: font])
+                let ctLine = CTLineCreateWithAttributedString(attrString)
+
+                let startOffset = CTLineGetOffsetForStringIndex(ctLine, selection.lowerBound - lineRange.lowerBound, nil)
+                let endOffset = CTLineGetOffsetForStringIndex(ctLine, selection.upperBound - lineRange.lowerBound, nil)
+
+                var selectionWidth = endOffset - startOffset
+
+                // 改行文字を選択している場合、行末まで塗り潰す
+                let lastCharIndex = line.range.upperBound
+                if let lastChar = textStorage[lastCharIndex],
+                   lastChar == "\n",
+                   selectedRange.contains(lastCharIndex) {
+                    selectionWidth = rects.textRegion.rect.width - startOffset
+                }
+
+                let selectionRect = CGRect(
+                    x: rects.textRegion.rect.origin.x + startOffset,
+                    y: y,
+                    width: selectionWidth,
+                    height: lineHeight
+                )
+                selectedTextBGColor.setFill()
+                selectionRect.fill()
+            }
+
+            let attributedLine = NSAttributedString(string: line.text, attributes: attributes)
+            attributedLine.draw(at: NSPoint(x: rects.textRegion.rect.origin.x, y: y))
+        }
+    }
+    
     // MARK: - Keyboard Input (NSResponder methods)
 
     override func keyDown(with event: NSEvent) {
@@ -527,48 +599,76 @@ final class KTextView: NSView {
     }
 
     // MARK: - Mouse Interaction (NSView methods)
-    /*
+    
     override func mouseDown(with event: NSEvent) {
-        
         window?.makeFirstResponder(self)
+
         let location = convert(event.locationInWindow, from: nil)
-        caretIndex = caretIndexForClickedPoint(location)
-        selectedRange = caretIndex..<caretIndex
-        horizontalSelectionBase = caretIndex
-        updateCaretPosition()
-        scrollCaretToVisible()
-        
-    }*/
-    override func mouseDown(with event: NSEvent) {
-        window?.makeFirstResponder(self)
+        let rects = LayoutRects(bounds: bounds)
 
-        let locationInWindow = event.locationInWindow
-        let pointInSelf = convert(locationInWindow, from: nil)
+        // テキスト表示領域外なら無視
+        guard rects.textRegion.rect.contains(location) else { return }
 
-        print("↓ DEBUG")
-        print("window location: \(locationInWindow)")
-        print("KTextView frame: \(self.frame)")
-        print("converted point: \(pointInSelf)")
-        print("bounds: \(self.bounds)")
-        print("↑ DEBUG")
+        // クリック位置をもとに caretIndex を決定
+        let relativePoint = CGPoint(
+            x: location.x - rects.textRegion.rect.origin.x,
+            y: location.y - rects.textRegion.rect.origin.y
+        )
 
-        caretIndex = caretIndexForClickedPoint(pointInSelf)
-        selectedRange = caretIndex..<caretIndex
-        horizontalSelectionBase = caretIndex
+        // 行のインデックスを計算
+        let font = textStorage.baseFont
+        let lineHeight = font.ascender + abs(font.descender)
+        let lineIndex = Int(relativePoint.y / lineHeight)
+
+        guard lineIndex >= 0 && lineIndex < layoutManager.lines.count else { return }
+        let line = layoutManager.lines[lineIndex]
+
+        let attrString = NSAttributedString(string: line.text, attributes: [.font: font])
+        let ctLine = CTLineCreateWithAttributedString(attrString)
+
+        let indexInLine = CTLineGetStringIndexForPosition(ctLine, CGPoint(x: relativePoint.x, y: 0))
+        let newCaretIndex = line.range.lowerBound + indexInLine
+
+        caretIndex = newCaretIndex
+        selectedRange = newCaretIndex..<newCaretIndex
+        horizontalSelectionBase = newCaretIndex
+
         updateCaretPosition()
         scrollCaretToVisible()
     }
-
-
-    
     
     override func mouseDragged(with event: NSEvent) {
         let location = convert(event.locationInWindow, from: nil)
-        let index = caretIndexForClickedPoint(location)
-        let lower = min(horizontalSelectionBase!, index)
-        let upper = max(horizontalSelectionBase!, index)
+        let rects = LayoutRects(bounds: bounds)
+
+        guard rects.textRegion.rect.contains(location) else { return }
+
+        let relativePoint = CGPoint(
+            x: location.x - rects.textRegion.rect.origin.x,
+            y: location.y - rects.textRegion.rect.origin.y
+        )
+
+        let font = textStorage.baseFont
+        let lineHeight = font.ascender + abs(font.descender)
+        let lineIndex = Int(relativePoint.y / lineHeight)
+
+        guard lineIndex >= 0 && lineIndex < layoutManager.lines.count else { return }
+        let line = layoutManager.lines[lineIndex]
+
+        let attrString = NSAttributedString(string: line.text, attributes: [.font: font])
+        let ctLine = CTLineCreateWithAttributedString(attrString)
+
+        let indexInLine = CTLineGetStringIndexForPosition(ctLine, CGPoint(x: relativePoint.x, y: 0))
+        let dragCaretIndex = line.range.lowerBound + indexInLine
+
+        // selectionBase を基準に選択範囲を構築
+        let base = horizontalSelectionBase ?? caretIndex
+        let lower = min(base, dragCaretIndex)
+        let upper = max(base, dragCaretIndex)
         selectedRange = lower..<upper
-        updateCaretPosition(isVerticalMove: true)
+
+        updateCaretPosition()
+        scrollCaretToVisible()
     }
     
     // MARK: - KTextView methods (notification)
