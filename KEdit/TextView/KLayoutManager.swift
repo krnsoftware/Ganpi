@@ -19,6 +19,13 @@ final class KLayoutManager {
 
     private(set) var lines: [LineInfo] = []
     private let textStorage: KTextStorage
+    
+    var lineSpacing: CGFloat = 2.0
+    
+    var lineHeight: CGFloat {
+        let font = textStorage.baseFont
+        return font.ascender + abs(font.descender) + lineSpacing
+    }
 
     // MARK: - Init
 

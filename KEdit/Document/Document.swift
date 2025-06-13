@@ -23,6 +23,31 @@ class Document: NSDocument {
         // If you need to use a subclass of NSWindowController or if your document supports multiple NSWindowControllers, you should remove this property and override -makeWindowControllers instead.
         return NSNib.Name("Document")
     }
+    
+    override func makeWindowControllers() {
+        let viewController = KViewController()
+
+        let window = NSWindow(
+            contentRect: NSMakeRect(0, 0, 800, 600),
+            styleMask: [.titled, .closable, .resizable, .miniaturizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "Untitled"
+        window.contentViewController = viewController
+        window.titlebarAppearsTransparent = false
+        window.backgroundColor = .windowBackgroundColor
+        window.isOpaque = true
+
+        let windowController = NSWindowController(window: window)
+        self.addWindowController(windowController)
+
+        // 🌙 表示を遅延させることで描画タイミングを明確化
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            window.makeKeyAndOrderFront(nil)
+            window.display()
+        }
+    }
 
     override func data(ofType typeName: String) throws -> Data {
         // Insert code here to write your document to data of the specified type, throwing an error in case of failure.

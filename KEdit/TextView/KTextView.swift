@@ -272,7 +272,7 @@ final class KTextView: NSView {
         }
     }
      */
-    
+    /*
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
 
@@ -329,6 +329,64 @@ final class KTextView: NSView {
 
             let attributedLine = NSAttributedString(string: line.text, attributes: attributes)
             attributedLine.draw(at: NSPoint(x: rects.textRegion.rect.origin.x, y: y))
+        }
+    }*/
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+
+        let layoutRects = self.layoutRects
+        let lineHeight = layoutManager.lineHeight
+        let leftX = layoutRects.lineNumberRegion.rect.maxX
+        let top = layoutRects.edgePadding.top
+
+        // 背景塗りつぶし
+        NSColor.white.setFill()
+        dirtyRect.fill()
+
+        let selectedTextBGColor = window?.isKeyWindow == true
+            ? NSColor.selectedTextBackgroundColor
+            : NSColor.unemphasizedSelectedTextBackgroundColor
+
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: textStorage.baseFont,
+            .foregroundColor: NSColor.textColor
+        ]
+
+        for (i, line) in layoutManager.lines.enumerated() {
+            let y = top + CGFloat(i) * lineHeight
+            let lineRange = line.range
+            let selection = selectedRange.clamped(to: lineRange)
+
+            if !selection.isEmpty {
+                let font = textStorage.baseFont
+                let attrString = NSAttributedString(string: line.text, attributes: [.font: font])
+                let ctLine = CTLineCreateWithAttributedString(attrString)
+
+                let startOffset = CTLineGetOffsetForStringIndex(ctLine, selection.lowerBound - lineRange.lowerBound, nil)
+                let endOffset = CTLineGetOffsetForStringIndex(ctLine, selection.upperBound - lineRange.lowerBound, nil)
+                var selectionWidth = endOffset - startOffset
+
+                // 行末の改行文字を含む場合は、右端まで塗りつぶす
+                let lastCharIndex = line.range.upperBound
+                if let lastChar = textStorage[lastCharIndex],
+                   lastChar == "\n",
+                   selectedRange.contains(lastCharIndex) {
+                    selectionWidth = layoutRects.textRegion.visibleWidth - startOffset
+                }
+
+                let selectionRect = CGRect(
+                    x: leftX + startOffset,
+                    y: y,
+                    width: selectionWidth,
+                    height: lineHeight
+                )
+                selectedTextBGColor.setFill()
+                selectionRect.fill()
+            }
+
+            // テキスト描画
+            let attributedLine = NSAttributedString(string: line.text, attributes: attributes)
+            attributedLine.draw(at: NSPoint(x: leftX, y: y))
         }
     }
     
@@ -717,4 +775,71 @@ final class KTextView: NSView {
     }
 
     
+}
+
+
+extension KTextView {
+    struct LayoutRects {
+        struct EdgePadding {
+            let top: CGFloat
+            let bottom: CGFloat
+            let left: CGFloat
+            let right: CGFloat
+        }
+
+        struct LineNumberRegion {
+            let rect: CGRect
+            let isVisible: Bool
+
+            var width: CGFloat {
+                return isVisible ? rect.width : 0
+            }
+        }
+
+        struct TextRegion {
+            let rect: CGRect
+
+            var visibleWidth: CGFloat {
+                return rect.width
+            }
+
+            var visibleHeight: CGFloat {
+                return rect.height
+            }
+        }
+
+        let bounds: CGRect
+        let edgePadding: EdgePadding
+        let lineNumberRegion: LineNumberRegion
+        let textRegion: TextRegion
+
+        init(bounds: CGRect) {
+            self.bounds = bounds
+            self.edgePadding = KTextView.LayoutRects.EdgePadding(top: 4, bottom: 4, left: 8, right: 8)
+
+            let lineNumberWidth: CGFloat = 40
+            let showLineNumber = true
+
+            let lineRect = CGRect(
+                x: edgePadding.left,
+                y: edgePadding.bottom,
+                width: showLineNumber ? lineNumberWidth : 0,
+                height: bounds.height - edgePadding.top - edgePadding.bottom
+            )
+
+            let textRect = CGRect(
+                x: lineRect.maxX,
+                y: edgePadding.bottom,
+                width: bounds.width - edgePadding.left - edgePadding.right - lineRect.width,
+                height: bounds.height - edgePadding.top - edgePadding.bottom
+            )
+
+            self.lineNumberRegion = KTextView.LayoutRects.LineNumberRegion(rect: lineRect, isVisible: showLineNumber)
+            self.textRegion = KTextView.LayoutRects.TextRegion(rect: textRect)
+        }
+    }
+
+    fileprivate var layoutRects: LayoutRects {
+        LayoutRects(bounds: self.bounds)
+    }
 }
