@@ -192,7 +192,8 @@ final class KTextView: NSView {
 
         let rects = LayoutRects(bounds: bounds)
         let x = rects.textRegion.rect.origin.x + xOffset
-        let y = rects.textRegion.rect.origin.y + CGFloat(lineIndex) * (font.ascender + abs(font.descender))
+        //let y = rects.textRegion.rect.origin.y + CGFloat(lineIndex) * (font.ascender + abs(font.descender))
+        let y = layoutRects.textRegion.rect.origin.y + CGFloat(lineIndex) * layoutManager.lineHeight
 
         let height = font.ascender + abs(font.descender)
         caretView.updateFrame(x: x, y: y, height: height)
@@ -658,7 +659,7 @@ final class KTextView: NSView {
 
     // MARK: - Mouse Interaction (NSView methods)
     
-    override func mouseDown(with event: NSEvent) {
+    /*override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
 
         let location = convert(event.locationInWindow, from: nil)
@@ -691,6 +692,46 @@ final class KTextView: NSView {
         selectedRange = newCaretIndex..<newCaretIndex
         horizontalSelectionBase = newCaretIndex
 
+        updateCaretPosition()
+        scrollCaretToVisible()
+    }*/
+    override func mouseDown(with event: NSEvent) {
+        window?.makeFirstResponder(self)
+
+        let location = convert(event.locationInWindow, from: nil)
+        let rects = LayoutRects(bounds: bounds)
+
+        // 相対位置（行矩形との比較のため）
+        let relativePoint = CGPoint(
+            x: location.x - rects.textRegion.rect.origin.x,
+            y: location.y - rects.textRegion.rect.origin.y
+        )
+
+        // 行ごとの位置を確認
+        var newCaretIndex: Int?
+
+        for (i, line) in layoutManager.lines.enumerated() {
+            let y = CGFloat(i) * layoutManager.lineHeight
+            let lineRect = CGRect(x: 0, y: y, width: rects.textRegion.visibleWidth, height: layoutManager.lineHeight)
+            if lineRect.contains(relativePoint) {
+                let attrString = NSAttributedString(string: line.text, attributes: [.font: textStorage.baseFont])
+                let ctLine = CTLineCreateWithAttributedString(attrString)
+                let xInLine = relativePoint.x
+                let indexInLine = CTLineGetStringIndexForPosition(ctLine, CGPoint(x: xInLine, y: 0))
+                newCaretIndex = line.range.lowerBound + indexInLine
+                break
+            }
+        }
+
+        // 行にヒットしなかったら末尾にキャレット
+        if newCaretIndex == nil {
+            newCaretIndex = textStorage.count
+        }
+
+        // 選択・キャレット設定
+        caretIndex = newCaretIndex!
+        selectedRange = caretIndex..<caretIndex
+        horizontalSelectionBase = caretIndex
         updateCaretPosition()
         scrollCaretToVisible()
     }
