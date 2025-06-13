@@ -79,6 +79,8 @@ final class KTextView: NSView {
 
     override var acceptsFirstResponder: Bool { true }
     override var isFlipped: Bool { true }
+    override var isOpaque: Bool { true }
+
 
     // MARK: - Initialization (KTextView methods)
 
@@ -137,6 +139,13 @@ final class KTextView: NSView {
         updateActiveState()
         return super.resignFirstResponder()
     }
+    
+    //testing.
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        print("hitTest: \(point)")
+        return super.hitTest(point)
+    }
+
 
 
     deinit {
@@ -158,11 +167,19 @@ final class KTextView: NSView {
         let indexInLine = caretIndex - lineInfo.range.lowerBound
         let xOffset = CTLineGetOffsetForStringIndex(ctLine, indexInLine, nil)
 
+        /*
         let y = bounds.height - (topPadding + CGFloat(lineIndex) * lineHeight + 2)
         let x = leftPadding + xOffset
 
         let height = font.ascender + abs(font.descender)
         caretView.updateFrame(x: x, y: y, height: height)
+        */
+        let x = leftPadding + xOffset
+        let y = topPadding + CGFloat(lineIndex) * lineHeight
+        let height = font.ascender + abs(font.descender)
+        caretView.updateFrame(x: x, y: y, height: height)
+
+        
         caretView.alphaValue = 1.0
 
         if !isVerticalMove { verticalCaretX = x }
@@ -510,8 +527,9 @@ final class KTextView: NSView {
     }
 
     // MARK: - Mouse Interaction (NSView methods)
-
+    /*
     override func mouseDown(with event: NSEvent) {
+        
         window?.makeFirstResponder(self)
         let location = convert(event.locationInWindow, from: nil)
         caretIndex = caretIndexForClickedPoint(location)
@@ -519,7 +537,29 @@ final class KTextView: NSView {
         horizontalSelectionBase = caretIndex
         updateCaretPosition()
         scrollCaretToVisible()
+        
+    }*/
+    override func mouseDown(with event: NSEvent) {
+        window?.makeFirstResponder(self)
+
+        let locationInWindow = event.locationInWindow
+        let pointInSelf = convert(locationInWindow, from: nil)
+
+        print("↓ DEBUG")
+        print("window location: \(locationInWindow)")
+        print("KTextView frame: \(self.frame)")
+        print("converted point: \(pointInSelf)")
+        print("bounds: \(self.bounds)")
+        print("↑ DEBUG")
+
+        caretIndex = caretIndexForClickedPoint(pointInSelf)
+        selectedRange = caretIndex..<caretIndex
+        horizontalSelectionBase = caretIndex
+        updateCaretPosition()
+        scrollCaretToVisible()
     }
+
+
     
     
     override func mouseDragged(with event: NSEvent) {
@@ -545,7 +585,9 @@ final class KTextView: NSView {
 
     private func caretIndexForClickedPoint(_ point: NSPoint) -> Int {
         for (i, line) in layoutManager.lines.enumerated() {
-            let lineY = bounds.height - (topPadding + CGFloat(i) * lineHeight)
+            //let lineY = bounds.height - (topPadding + CGFloat(i) * lineHeight)
+            let lineY = topPadding + CGFloat(i) * lineHeight
+
             let lineRect = CGRect(x: 0, y: lineY, width: bounds.width, height: lineHeight)
             if lineRect.contains(point) {
                 let font = textStorage.baseFont
