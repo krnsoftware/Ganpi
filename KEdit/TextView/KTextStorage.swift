@@ -12,7 +12,7 @@ final class KTextStorage {
 
     // MARK: - Properties
 
-    private var characters: [Character] = []
+    private(set) var characters: [Character] = []
     private var observers: [() -> Void] = []
     private var font: NSFont = .monospacedSystemFont(ofSize: 12, weight: .regular)
 

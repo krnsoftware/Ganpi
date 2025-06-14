@@ -18,6 +18,7 @@ final class KLayoutManager {
     // MARK: - Properties
 
     private(set) var lines: [LineInfo] = []
+    private(set) var maxLineWidth: CGFloat = 0
     private let textStorage: KTextStorage
     
     var lineSpacing: CGFloat = 2.0
@@ -36,7 +37,7 @@ final class KLayoutManager {
     }
 
     // MARK: - Layout
-
+    /*
     func rebuildLayout() {
         lines.removeAll()
         var currentIndex = 0
@@ -56,6 +57,41 @@ final class KLayoutManager {
             currentIndex += lineText.count
             if i < lineTexts.count - 1 {
                 currentIndex += 1 // 改行文字
+            }
+        }
+    }*/
+    
+    func rebuildLayout() {
+        lines.removeAll()
+        maxLineWidth = 0
+
+        var currentIndex = 0
+        let characters = textStorage.characters
+        let font = textStorage.baseFont
+
+        while currentIndex < characters.count {
+            var lineEndIndex = currentIndex
+
+            // 改行まで進める（改行文字は含めない）
+            while lineEndIndex < characters.count && characters[lineEndIndex] != "\n" {
+                lineEndIndex += 1
+            }
+
+            let lineRange = currentIndex..<lineEndIndex
+            let lineText = String(characters[lineRange])
+
+            let attrString = NSAttributedString(string: lineText, attributes: [.font: font])
+            let ctLine = CTLineCreateWithAttributedString(attrString)
+            let width = CGFloat(CTLineGetTypographicBounds(ctLine, nil, nil, nil))
+            if width > maxLineWidth {
+                maxLineWidth = width
+            }
+
+            lines.append(LineInfo(text: lineText, glyphAdvances: [], range: lineRange))
+
+            currentIndex = lineEndIndex
+            if currentIndex < characters.count && characters[currentIndex] == "\n" {
+                currentIndex += 1 // 改行をスキップ
             }
         }
     }

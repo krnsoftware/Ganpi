@@ -332,7 +332,7 @@ final class KTextView: NSView {
             attributedLine.draw(at: NSPoint(x: rects.textRegion.rect.origin.x, y: y))
         }
     }*/
-    override func draw(_ dirtyRect: NSRect) {
+    /*override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
 
         let layoutRects = self.layoutRects
@@ -388,6 +388,62 @@ final class KTextView: NSView {
             // テキスト描画
             let attributedLine = NSAttributedString(string: line.text, attributes: attributes)
             attributedLine.draw(at: NSPoint(x: leftX, y: y))
+        }
+    }*/
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+
+        NSColor.white.setFill()
+        dirtyRect.fill()
+
+        let selectedTextBGColor = window?.isKeyWindow == true
+            ? NSColor.selectedTextBackgroundColor
+            : NSColor.unemphasizedSelectedTextBackgroundColor
+
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: textStorage.baseFont,
+            .foregroundColor: NSColor.textColor
+        ]
+
+        for (i, line) in layoutManager.lines.enumerated() {
+            let y = CGFloat(i) * layoutManager.lineHeight
+
+            let lineRange = line.range
+            let selection = selectedRange.clamped(to: lineRange)
+            if !selection.isEmpty {
+                let attrString = NSAttributedString(string: line.text, attributes: [.font: textStorage.baseFont])
+                let ctLine = CTLineCreateWithAttributedString(attrString)
+
+                let startOffset = CTLineGetOffsetForStringIndex(ctLine, selection.lowerBound - lineRange.lowerBound, nil)
+                var endOffset = CTLineGetOffsetForStringIndex(ctLine, selection.upperBound - lineRange.lowerBound, nil)
+
+                // 改行が line の後ろにある場合
+                let newlineIndex = lineRange.upperBound
+                if newlineIndex < textStorage.count,
+                   let char = textStorage[newlineIndex],
+                   char == "\n",
+                   selectedRange.contains(newlineIndex) {
+                    endOffset = bounds.width - layoutRects.textRegion.rect.origin.x - startOffset
+                } else {
+                    endOffset -= startOffset
+                }
+
+                let selectionRect = CGRect(
+                    x: layoutRects.textRegion.rect.origin.x + startOffset,
+                    y: layoutRects.textRegion.rect.origin.y + y,
+                    width: endOffset,
+                    height: layoutManager.lineHeight
+                )
+                selectedTextBGColor.setFill()
+                selectionRect.fill()
+            }
+
+            let attributedLine = NSAttributedString(string: line.text, attributes: attributes)
+            let drawPoint = CGPoint(
+                x: layoutRects.textRegion.rect.origin.x,
+                y: layoutRects.textRegion.rect.origin.y + y
+            )
+            attributedLine.draw(at: drawPoint)
         }
     }
     
