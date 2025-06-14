@@ -699,66 +699,19 @@ final class KTextView: NSView {
         window?.makeFirstResponder(self)
 
         let location = convert(event.locationInWindow, from: nil)
-        let rects = LayoutRects(bounds: bounds)
+        let index = caretIndexForClickedPoint(location)
 
-        // 相対位置（行矩形との比較のため）
-        let relativePoint = CGPoint(
-            x: location.x - rects.textRegion.rect.origin.x,
-            y: location.y - rects.textRegion.rect.origin.y
-        )
+        caretIndex = index
+        selectedRange = index..<index
+        horizontalSelectionBase = index
 
-        // 行ごとの位置を確認
-        var newCaretIndex: Int?
-
-        for (i, line) in layoutManager.lines.enumerated() {
-            let y = CGFloat(i) * layoutManager.lineHeight
-            let lineRect = CGRect(x: 0, y: y, width: rects.textRegion.visibleWidth, height: layoutManager.lineHeight)
-            if lineRect.contains(relativePoint) {
-                let attrString = NSAttributedString(string: line.text, attributes: [.font: textStorage.baseFont])
-                let ctLine = CTLineCreateWithAttributedString(attrString)
-                let xInLine = relativePoint.x
-                let indexInLine = CTLineGetStringIndexForPosition(ctLine, CGPoint(x: xInLine, y: 0))
-                newCaretIndex = line.range.lowerBound + indexInLine
-                break
-            }
-        }
-
-        // 行にヒットしなかったら末尾にキャレット
-        if newCaretIndex == nil {
-            newCaretIndex = textStorage.count
-        }
-
-        // 選択・キャレット設定
-        caretIndex = newCaretIndex!
-        selectedRange = caretIndex..<caretIndex
-        horizontalSelectionBase = caretIndex
         updateCaretPosition()
         scrollCaretToVisible()
     }
     
     override func mouseDragged(with event: NSEvent) {
         let location = convert(event.locationInWindow, from: nil)
-        let rects = LayoutRects(bounds: bounds)
-
-        guard rects.textRegion.rect.contains(location) else { return }
-
-        let relativePoint = CGPoint(
-            x: location.x - rects.textRegion.rect.origin.x,
-            y: location.y - rects.textRegion.rect.origin.y
-        )
-
-        let font = textStorage.baseFont
-        let lineHeight = font.ascender + abs(font.descender)
-        let lineIndex = Int(relativePoint.y / lineHeight)
-
-        guard lineIndex >= 0 && lineIndex < layoutManager.lines.count else { return }
-        let line = layoutManager.lines[lineIndex]
-
-        let attrString = NSAttributedString(string: line.text, attributes: [.font: font])
-        let ctLine = CTLineCreateWithAttributedString(attrString)
-
-        let indexInLine = CTLineGetStringIndexForPosition(ctLine, CGPoint(x: relativePoint.x, y: 0))
-        let dragCaretIndex = line.range.lowerBound + indexInLine
+        let dragCaretIndex = caretIndexForClickedPoint(location)
 
         // selectionBase を基準に選択範囲を構築
         let base = horizontalSelectionBase ?? caretIndex
@@ -781,24 +734,48 @@ final class KTextView: NSView {
     }
 
     // MARK: - KTextView methods (helpers)
-
+    
     private func caretIndexForClickedPoint(_ point: NSPoint) -> Int {
-        for (i, line) in layoutManager.lines.enumerated() {
-            //let lineY = bounds.height - (topPadding + CGFloat(i) * lineHeight)
-            let lineY = topPadding + CGFloat(i) * lineHeight
+        let relativePoint = CGPoint(
+            x: point.x - layoutRects.textRegion.rect.origin.x,
+            y: point.y - layoutRects.textRegion.rect.origin.y
+        )
 
-            let lineRect = CGRect(x: 0, y: lineY, width: bounds.width, height: lineHeight)
-            if lineRect.contains(point) {
-                let font = textStorage.baseFont
-                let attrString = NSAttributedString(string: line.text, attributes: [.font: font])
-                let ctLine = CTLineCreateWithAttributedString(attrString)
-                let relativeX = point.x - leftPadding
-                let indexInLine = CTLineGetStringIndexForPosition(ctLine, CGPoint(x: relativeX, y: 0))
-                return line.range.lowerBound + indexInLine
-            }
+        let lineHeight = layoutManager.lineHeight
+        let lines = layoutManager.lines
+        let lineCount = lines.count
+
+        // 上方向に外れている場合：最初の行で X 座標に近い index を返す
+        if relativePoint.y < 0,
+           let firstLine = lines.first {
+            let attrString = NSAttributedString(string: firstLine.text, attributes: [.font: textStorage.baseFont])
+            let ctLine = CTLineCreateWithAttributedString(attrString)
+            let relativeX = max(0, relativePoint.x)
+            let indexInLine = CTLineGetStringIndexForPosition(ctLine, CGPoint(x: relativeX, y: 0))
+            return firstLine.range.lowerBound + indexInLine
         }
-        return textStorage.count
+
+        // 下方向に外れている場合：最終行で X 座標に近い index を返す
+        if relativePoint.y >= CGFloat(lineCount) * lineHeight,
+           let lastLine = lines.last {
+            let attrString = NSAttributedString(string: lastLine.text, attributes: [.font: textStorage.baseFont])
+            let ctLine = CTLineCreateWithAttributedString(attrString)
+            let relativeX = max(0, relativePoint.x)
+            let indexInLine = CTLineGetStringIndexForPosition(ctLine, CGPoint(x: relativeX, y: 0))
+            return lastLine.range.lowerBound + indexInLine
+        }
+
+        // 通常の行内クリック
+        let lineIndex = Int(relativePoint.y / lineHeight)
+        let line = lines[lineIndex]
+        let attrString = NSAttributedString(string: line.text, attributes: [.font: textStorage.baseFont])
+        let ctLine = CTLineCreateWithAttributedString(attrString)
+        let relativeX = max(0, relativePoint.x)
+        let indexInLine = CTLineGetStringIndexForPosition(ctLine, CGPoint(x: relativeX, y: 0))
+        return line.range.lowerBound + indexInLine
     }
+     
+     
 
     private func findLineInfo(containing index: Int) -> (LineInfo, Int)? {
         for (i, line) in layoutManager.lines.enumerated() {
