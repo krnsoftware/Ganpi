@@ -15,7 +15,9 @@ final class KTextView: NSView {
     }
     
     // MARK: - Properties
-
+    
+    static let defaultEdgePadding = LayoutRects.EdgeInsets(top: 4, bottom: 4, left: 8, right: 8)
+    
     private var textStorage: KTextStorage
     private var layoutManager: KLayoutManager
     private let caretView = KCaretView()
@@ -43,6 +45,18 @@ final class KTextView: NSView {
     var caretIndex: Int {
         get { selectedRange.upperBound }
         set { selectedRange = newValue..<newValue }
+    }
+    
+    fileprivate var layoutRects: LayoutRects {
+        let digitCount = max(3, "\(layoutManager.lines.count)".count)
+        let font = textStorage.baseFont
+        let digitWidth = CTLineCreateWithAttributedString(NSAttributedString(string: "0", attributes: [.font: font]))
+        let charWidth = CTLineGetTypographicBounds(digitWidth, nil, nil, nil)
+
+        let padding: CGFloat = 8
+        let lineNumberWidth = CGFloat(digitCount) * CGFloat(charWidth) + padding
+
+        return LayoutRects(bounds: bounds, lineNumberWidth: lineNumberWidth)
     }
     
     // 今回のセレクタが垂直方向にキャレット選択範囲を動かすものであるか返す。
@@ -190,10 +204,9 @@ final class KTextView: NSView {
         let indexInLine = caretIndex - lineInfo.range.lowerBound
         let xOffset = CTLineGetOffsetForStringIndex(ctLine, indexInLine, nil)
 
-        let rects = LayoutRects(bounds: bounds)
+        let rects = self.layoutRects
         let x = rects.textRegion.rect.origin.x + xOffset
-        //let y = rects.textRegion.rect.origin.y + CGFloat(lineIndex) * (font.ascender + abs(font.descender))
-        let y = layoutRects.textRegion.rect.origin.y + CGFloat(lineIndex) * layoutManager.lineHeight
+        let y = rects.textRegion.rect.origin.y + CGFloat(lineIndex) * layoutManager.lineHeight
 
         let height = font.ascender + abs(font.descender)
         caretView.updateFrame(x: x, y: y, height: height)
@@ -220,177 +233,8 @@ final class KTextView: NSView {
     }
 
     // MARK: - Drawing (NSView methods)
-    /*
-    override func draw(_ dirtyRect: NSRect) {
-        super.draw(dirtyRect)
-        
-        // 背景色の塗り潰し
-        NSColor.white.setFill()
-        dirtyRect.fill()
-                
-        let selectedTextBGColor = window?.isKeyWindow == true ? NSColor.selectedTextBackgroundColor : NSColor.unemphasizedSelectedTextBackgroundColor
-
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: textStorage.baseFont,
-            .foregroundColor: NSColor.textColor
-        ]
-
-        for (i, line) in layoutManager.lines.enumerated() {
-            //let y = bounds.height - (topPadding + CGFloat(i) * lineHeight)
-            let y = topPadding + CGFloat(i) * lineHeight
-            
-            let lineRange = line.range
-            let selection = selectedRange.clamped(to: lineRange)
-            if !selection.isEmpty {
-                let font = textStorage.baseFont
-                let attrString = NSAttributedString(string: line.text, attributes: [.font: font])
-                let ctLine = CTLineCreateWithAttributedString(attrString)
-
-                let startOffset = CTLineGetOffsetForStringIndex(ctLine, selection.lowerBound - lineRange.lowerBound, nil)
-                 let endOffset = CTLineGetOffsetForStringIndex(ctLine, selection.upperBound - lineRange.lowerBound, nil)
-                
-                // その行における選択部分の横幅。
-                var selectionWidth = endOffset - startOffset
-                
-                // もしその行の最後の文字が改行文字であり、その文字が選択されているなら右端まで塗り潰す。
-                let lastCharIndex = line.range.upperBound
-                if let lastChar = textStorage[lastCharIndex], lastChar == "\n", selectedRange.contains(lastCharIndex){
-                    selectionWidth = bounds.width - leftPadding - startOffset
-                }                
-                
-                let selectionRect = CGRect(
-                    x: leftPadding + startOffset,
-                    y: y,
-                    width: selectionWidth,
-                    height: lineHeight
-                )
-                selectedTextBGColor.setFill()
-                selectionRect.fill()
-            }
-
-            let attributedLine = NSAttributedString(string: line.text, attributes: attributes)
-            attributedLine.draw(at: NSPoint(x: leftPadding, y: y))
-        }
-    }
-     */
-    /*
-    override func draw(_ dirtyRect: NSRect) {
-        super.draw(dirtyRect)
-
-        let ctx = NSGraphicsContext.current?.cgContext
-        let rects = LayoutRects(bounds: bounds)
-
-        // 背景色の塗り潰し
-        NSColor.white.setFill()
-        dirtyRect.fill()
-
-        let selectedTextBGColor = window?.isKeyWindow == true
-            ? NSColor.selectedTextBackgroundColor
-            : NSColor.unemphasizedSelectedTextBackgroundColor
-
-        let font = textStorage.baseFont
-        let lineHeight = font.ascender + abs(font.descender)
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: font,
-            .foregroundColor: NSColor.textColor
-        ]
-
-        for (i, line) in layoutManager.lines.enumerated() {
-            let lineRange = line.range
-            let selection = selectedRange.clamped(to: lineRange)
-
-            let y = rects.textRegion.rect.origin.y + CGFloat(i) * lineHeight
-
-            if !selection.isEmpty {
-                let attrString = NSAttributedString(string: line.text, attributes: [.font: font])
-                let ctLine = CTLineCreateWithAttributedString(attrString)
-
-                let startOffset = CTLineGetOffsetForStringIndex(ctLine, selection.lowerBound - lineRange.lowerBound, nil)
-                let endOffset = CTLineGetOffsetForStringIndex(ctLine, selection.upperBound - lineRange.lowerBound, nil)
-
-                var selectionWidth = endOffset - startOffset
-
-                // 改行文字を選択している場合、行末まで塗り潰す
-                let lastCharIndex = line.range.upperBound
-                if let lastChar = textStorage[lastCharIndex],
-                   lastChar == "\n",
-                   selectedRange.contains(lastCharIndex) {
-                    selectionWidth = rects.textRegion.rect.width - startOffset
-                }
-
-                let selectionRect = CGRect(
-                    x: rects.textRegion.rect.origin.x + startOffset,
-                    y: y,
-                    width: selectionWidth,
-                    height: lineHeight
-                )
-                selectedTextBGColor.setFill()
-                selectionRect.fill()
-            }
-
-            let attributedLine = NSAttributedString(string: line.text, attributes: attributes)
-            attributedLine.draw(at: NSPoint(x: rects.textRegion.rect.origin.x, y: y))
-        }
-    }*/
+    
     /*override func draw(_ dirtyRect: NSRect) {
-        super.draw(dirtyRect)
-
-        let layoutRects = self.layoutRects
-        let lineHeight = layoutManager.lineHeight
-        let leftX = layoutRects.lineNumberRegion.rect.maxX
-        let top = layoutRects.edgePadding.top
-
-        // 背景塗りつぶし
-        NSColor.white.setFill()
-        dirtyRect.fill()
-
-        let selectedTextBGColor = window?.isKeyWindow == true
-            ? NSColor.selectedTextBackgroundColor
-            : NSColor.unemphasizedSelectedTextBackgroundColor
-
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: textStorage.baseFont,
-            .foregroundColor: NSColor.textColor
-        ]
-
-        for (i, line) in layoutManager.lines.enumerated() {
-            let y = top + CGFloat(i) * lineHeight
-            let lineRange = line.range
-            let selection = selectedRange.clamped(to: lineRange)
-
-            if !selection.isEmpty {
-                let font = textStorage.baseFont
-                let attrString = NSAttributedString(string: line.text, attributes: [.font: font])
-                let ctLine = CTLineCreateWithAttributedString(attrString)
-
-                let startOffset = CTLineGetOffsetForStringIndex(ctLine, selection.lowerBound - lineRange.lowerBound, nil)
-                let endOffset = CTLineGetOffsetForStringIndex(ctLine, selection.upperBound - lineRange.lowerBound, nil)
-                var selectionWidth = endOffset - startOffset
-
-                // 行末の改行文字を含む場合は、右端まで塗りつぶす
-                let lastCharIndex = line.range.upperBound
-                if let lastChar = textStorage[lastCharIndex],
-                   lastChar == "\n",
-                   selectedRange.contains(lastCharIndex) {
-                    selectionWidth = layoutRects.textRegion.visibleWidth - startOffset
-                }
-
-                let selectionRect = CGRect(
-                    x: leftX + startOffset,
-                    y: y,
-                    width: selectionWidth,
-                    height: lineHeight
-                )
-                selectedTextBGColor.setFill()
-                selectionRect.fill()
-            }
-
-            // テキスト描画
-            let attributedLine = NSAttributedString(string: line.text, attributes: attributes)
-            attributedLine.draw(at: NSPoint(x: leftX, y: y))
-        }
-    }*/
-    override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
 
         NSColor.white.setFill()
@@ -445,6 +289,78 @@ final class KTextView: NSView {
             )
             attributedLine.draw(at: drawPoint)
         }
+    }*/
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+
+        NSColor.white.setFill()
+        dirtyRect.fill()
+
+        let rects = layoutRects
+        let lines = layoutManager.lines
+        let font = textStorage.baseFont
+
+        let selectedTextBGColor = window?.isKeyWindow == true
+            ? NSColor.selectedTextBackgroundColor
+            : NSColor.unemphasizedSelectedTextBackgroundColor
+
+        let textAttributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: NSColor.textColor
+        ]
+
+        let lineNumberAttributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.monospacedDigitSystemFont(ofSize: font.pointSize * 0.95, weight: .regular),
+            .foregroundColor: NSColor.gray
+        ]
+
+        for (i, line) in lines.enumerated() {
+            let y = rects.textRegion.rect.origin.y + CGFloat(i) * layoutManager.lineHeight
+
+            // 選択範囲の描画
+            let lineRange = line.range
+            let selection = selectedRange.clamped(to: lineRange)
+            if !selection.isEmpty {
+                let attrString = NSAttributedString(string: line.text, attributes: [.font: font])
+                let ctLine = CTLineCreateWithAttributedString(attrString)
+
+                let startOffset = CTLineGetOffsetForStringIndex(ctLine, selection.lowerBound - lineRange.lowerBound, nil)
+                var endOffset = CTLineGetOffsetForStringIndex(ctLine, selection.upperBound - lineRange.lowerBound, nil)
+
+                // 改行選択補正
+                let newlineIndex = lineRange.upperBound
+                if newlineIndex < textStorage.count,
+                   let char = textStorage[newlineIndex],
+                   char == "\n",
+                   selectedRange.contains(newlineIndex) {
+                    endOffset = bounds.width - rects.textRegion.rect.origin.x - startOffset
+                } else {
+                    endOffset -= startOffset
+                }
+
+                let selectionRect = CGRect(
+                    x: rects.textRegion.rect.origin.x + startOffset,
+                    y: y,
+                    width: endOffset,
+                    height: layoutManager.lineHeight
+                )
+                selectedTextBGColor.setFill()
+                selectionRect.fill()
+            }
+
+            // テキスト描画
+            let attributedLine = NSAttributedString(string: line.text, attributes: textAttributes)
+            let textPoint = CGPoint(x: rects.textRegion.rect.origin.x, y: y)
+            attributedLine.draw(at: textPoint)
+
+            // 行番号描画
+            let lineNumberString = "\(i + 1)"
+            let lineNumberAttrStr = NSAttributedString(string: lineNumberString, attributes: lineNumberAttributes)
+            let numberSize = lineNumberAttrStr.size()
+            let numberX = rects.lineNumberRegion.rect.maxX - numberSize.width - 4
+            let numberY = y + (layoutManager.lineHeight - numberSize.height) / 2
+            lineNumberAttrStr.draw(at: CGPoint(x: numberX, y: numberY))
+        }
     }
     
     // MARK: - Keyboard Input (NSResponder methods)
@@ -490,7 +406,7 @@ final class KTextView: NSView {
         caretIndex += text.count
 
         layoutManager.rebuildLayout()
-        //verticalCaretX = nil
+        updateFrameSizeToFitContent() // ← これを追加
         updateCaretPosition()
         needsDisplay = true
     }
@@ -653,7 +569,7 @@ final class KTextView: NSView {
         textStorage.replaceCharacters(in: selectedRange, with: [])
         caretIndex = selectedRange.lowerBound
         
-        layoutManager.rebuildLayout()
+        updateFrameSizeToFitContent()
         updateCaretPosition()
         needsDisplay = true
     }
@@ -675,7 +591,7 @@ final class KTextView: NSView {
         textStorage.replaceCharacters(in: selectedRange, with: Array(string))
         caretIndex = selectedRange.lowerBound + string.count
 
-        layoutManager.rebuildLayout()
+        updateFrameSizeToFitContent()
         updateCaretPosition()
         needsDisplay = true
     }
@@ -700,7 +616,7 @@ final class KTextView: NSView {
             caretIndex -= 1
         }
 
-        layoutManager.rebuildLayout()
+        updateFrameSizeToFitContent()
         verticalCaretX = nil
         updateCaretPosition()
         needsDisplay = true
@@ -715,42 +631,6 @@ final class KTextView: NSView {
 
     // MARK: - Mouse Interaction (NSView methods)
     
-    /*override func mouseDown(with event: NSEvent) {
-        window?.makeFirstResponder(self)
-
-        let location = convert(event.locationInWindow, from: nil)
-        let rects = LayoutRects(bounds: bounds)
-
-        // テキスト表示領域外なら無視
-        guard rects.textRegion.rect.contains(location) else { return }
-
-        // クリック位置をもとに caretIndex を決定
-        let relativePoint = CGPoint(
-            x: location.x - rects.textRegion.rect.origin.x,
-            y: location.y - rects.textRegion.rect.origin.y
-        )
-
-        // 行のインデックスを計算
-        let font = textStorage.baseFont
-        let lineHeight = font.ascender + abs(font.descender)
-        let lineIndex = Int(relativePoint.y / lineHeight)
-
-        guard lineIndex >= 0 && lineIndex < layoutManager.lines.count else { return }
-        let line = layoutManager.lines[lineIndex]
-
-        let attrString = NSAttributedString(string: line.text, attributes: [.font: font])
-        let ctLine = CTLineCreateWithAttributedString(attrString)
-
-        let indexInLine = CTLineGetStringIndexForPosition(ctLine, CGPoint(x: relativePoint.x, y: 0))
-        let newCaretIndex = line.range.lowerBound + indexInLine
-
-        caretIndex = newCaretIndex
-        selectedRange = newCaretIndex..<newCaretIndex
-        horizontalSelectionBase = newCaretIndex
-
-        updateCaretPosition()
-        scrollCaretToVisible()
-    }*/
     override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
 
@@ -847,14 +727,38 @@ final class KTextView: NSView {
         caretView.isHidden = !isActive
         needsDisplay = true
     }
+    
+    private func updateFrameSizeToFitContent() {
+        layoutManager.rebuildLayout()
 
+        let totalLines = layoutManager.lines.count
+        let lineHeight = layoutManager.lineHeight
+
+        let edgePadding = KTextView.defaultEdgePadding
+        let showLineNumber = true
+        let lineNumberWidth: CGFloat = showLineNumber ? 40 : 0
+
+        let height = CGFloat(totalLines) * lineHeight * 4 / 3
+
+        let width = layoutManager.maxLineWidth
+                    + lineNumberWidth
+                    + edgePadding.left
+                    + edgePadding.right
+
+        self.frame.size = CGSize(width: width, height: height)
+
+        enclosingScrollView?.contentView.needsLayout = true
+        enclosingScrollView?.reflectScrolledClipView(enclosingScrollView!.contentView)
+        enclosingScrollView?.tile()
+
+    }
     
 }
 
 
 extension KTextView {
     struct LayoutRects {
-        struct EdgePadding {
+        struct EdgeInsets {
             let top: CGFloat
             let bottom: CGFloat
             let left: CGFloat
@@ -863,57 +767,49 @@ extension KTextView {
 
         struct LineNumberRegion {
             let rect: CGRect
-            let isVisible: Bool
 
-            var width: CGFloat {
-                return isVisible ? rect.width : 0
-            }
+            var width: CGFloat { rect.width }
         }
 
         struct TextRegion {
             let rect: CGRect
 
-            var visibleWidth: CGFloat {
-                return rect.width
-            }
-
-            var visibleHeight: CGFloat {
-                return rect.height
-            }
+            var width: CGFloat { rect.width }
+            var height: CGFloat { rect.height }
         }
 
-        let bounds: CGRect
-        let edgePadding: EdgePadding
+        let edgeInsets: EdgeInsets
         let lineNumberRegion: LineNumberRegion
         let textRegion: TextRegion
 
-        init(bounds: CGRect) {
-            self.bounds = bounds
-            self.edgePadding = KTextView.LayoutRects.EdgePadding(top: 4, bottom: 4, left: 8, right: 8)
+        init(bounds: CGRect, lineNumberWidth: CGFloat, padding: EdgeInsets = .default) {
+            self.edgeInsets = padding
 
-            let lineNumberWidth: CGFloat = 40
-            let showLineNumber = true
+            let usableWidth = bounds.width - padding.left - padding.right
+            let usableHeight = bounds.height - padding.top - padding.bottom
 
-            let lineRect = CGRect(
-                x: edgePadding.left,
-                y: edgePadding.bottom,
-                width: showLineNumber ? lineNumberWidth : 0,
-                height: bounds.height - edgePadding.top - edgePadding.bottom
+            let lineNumberRect = CGRect(
+                x: padding.left,
+                y: padding.bottom,
+                width: lineNumberWidth,
+                height: usableHeight
             )
 
             let textRect = CGRect(
-                x: lineRect.maxX,
-                y: edgePadding.bottom,
-                width: bounds.width - edgePadding.left - edgePadding.right - lineRect.width,
-                height: bounds.height - edgePadding.top - edgePadding.bottom
+                x: lineNumberRect.maxX,
+                y: padding.bottom,
+                width: usableWidth - lineNumberWidth,
+                height: usableHeight
             )
 
-            self.lineNumberRegion = KTextView.LayoutRects.LineNumberRegion(rect: lineRect, isVisible: showLineNumber)
-            self.textRegion = KTextView.LayoutRects.TextRegion(rect: textRect)
+            self.lineNumberRegion = LineNumberRegion(rect: lineNumberRect)
+            self.textRegion = TextRegion(rect: textRect)
         }
     }
+}
 
-    fileprivate var layoutRects: LayoutRects {
-        LayoutRects(bounds: self.bounds)
+extension KTextView.LayoutRects.EdgeInsets {
+    static var `default`: KTextView.LayoutRects.EdgeInsets {
+        .init(top: 4, bottom: 4, left: 8, right: 8)
     }
 }
