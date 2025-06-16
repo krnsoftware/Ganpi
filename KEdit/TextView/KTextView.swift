@@ -48,7 +48,7 @@ final class KTextView: NSView {
     }
     
     fileprivate var layoutRects: LayoutRects {
-        let digitCount = max(3, "\(layoutManager.lines.count)".count)
+        let digitCount = max(3, "\(layoutManager._lines.count)".count)
         let font = textStorage.baseFont
         let digitWidth = CTLineCreateWithAttributedString(NSAttributedString(string: "0", attributes: [.font: font]))
         let charWidth = CTLineGetTypographicBounds(digitWidth, nil, nil, nil)
@@ -297,7 +297,7 @@ final class KTextView: NSView {
         dirtyRect.fill()
 
         let rects = layoutRects
-        let lines = layoutManager.lines
+        let lines = layoutManager._lines
         let font = textStorage.baseFont
 
         let selectedTextBGColor = window?.isKeyWindow == true
@@ -517,12 +517,12 @@ final class KTextView: NSView {
             selectedRange = 0..<selectedRange.upperBound
             return
         }
-        if newLineIndex >= layoutManager.lines.count {
+        if newLineIndex >= layoutManager._lines.count {
             selectedRange = selectedRange.lowerBound..<textStorage.count
             return
         }
 
-        let newLine = layoutManager.lines[newLineIndex]
+        let newLine = layoutManager._lines[newLineIndex]
         let font = textStorage.baseFont
         let attrString = NSAttributedString(string: newLine.text, attributes: [.font: font])
         let ctLine = CTLineCreateWithAttributedString(attrString)
@@ -678,7 +678,7 @@ final class KTextView: NSView {
         )
 
         let lineHeight = layoutManager.lineHeight
-        let lines = layoutManager.lines
+        let lines = layoutManager._lines
         let lineCount = lines.count
 
         // 上方向に外れている場合：最初の行で X 座標に近い index を返す
@@ -714,7 +714,7 @@ final class KTextView: NSView {
      
 
     private func findLineInfo(containing index: Int) -> (LineInfo, Int)? {
-        for (i, line) in layoutManager.lines.enumerated() {
+        for (i, line) in layoutManager._lines.enumerated() {
             if line.range.contains(index) || index == line.range.upperBound {
                 return (line, i)
             }
@@ -731,7 +731,7 @@ final class KTextView: NSView {
     private func updateFrameSizeToFitContent() {
         layoutManager.rebuildLayout()
 
-        let totalLines = layoutManager.lines.count
+        let totalLines = layoutManager._lines.count
         let lineHeight = layoutManager.lineHeight
 
         let edgePadding = KTextView.defaultEdgePadding
@@ -740,7 +740,7 @@ final class KTextView: NSView {
 
         let height = CGFloat(totalLines) * lineHeight * 4 / 3
 
-        let width = layoutManager.maxLineWidth
+        let width = layoutManager._maxLineWidth
                     + lineNumberWidth
                     + edgePadding.left
                     + edgePadding.right
