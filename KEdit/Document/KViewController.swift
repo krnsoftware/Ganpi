@@ -14,7 +14,7 @@ class KViewController: NSViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        
+        print("KViewController.viewDidLoad()")
         // scrollView を生成
         scrollView = NSScrollView()
         scrollView.hasVerticalScroller = true

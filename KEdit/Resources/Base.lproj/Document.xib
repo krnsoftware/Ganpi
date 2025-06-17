@@ -19,7 +19,7 @@
             <rect key="contentRect" x="133" y="235" width="507" height="413"/>
             <rect key="screenRect" x="0.0" y="0.0" width="2560" height="1415"/>
             <value key="minSize" type="size" width="94" height="86"/>
-            <view key="contentView" id="gIp-Ho-8D9" customClass="KTextContainerView" customModule="KEdit" customModuleProvider="target">
+            <view key="contentView" id="gIp-Ho-8D9" customClass="KTextViewContainerView" customModule="KEdit" customModuleProvider="target">
                 <rect key="frame" x="0.0" y="0.0" width="507" height="413"/>
                 <autoresizingMask key="autoresizingMask"/>
             </view>

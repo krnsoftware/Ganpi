@@ -50,7 +50,7 @@ typealias KTextStorageProtocol = KTextStorageReadable & KTextStorageWritable
 
 // MARK: - KTextStorage
 
-/// KEdit用軽量テキストストレージ（[Character]ベース）
+// KEdit用軽量テキストストレージ
 final class KTextStorage {
 
     // MARK: - Properties
@@ -68,7 +68,7 @@ final class KTextStorage {
         set { _characters = Array(newValue); notifyObservers() }
     }
     
-    var characters: [Character] {
+    var characters: [Character] { // 将来的に内部データが[Character]でなくなる可能性あり。
         get { _characters }
         set { _characters = newValue; notifyObservers()}
     }
