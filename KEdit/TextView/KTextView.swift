@@ -18,7 +18,7 @@ final class KTextView: NSView {
     
     static let defaultEdgePadding = LayoutRects.EdgeInsets(top: 4, bottom: 4, left: 8, right: 8)
     
-    private var textStorage: KTextStorage
+    private var textStorageRef: KTextStorageProtocol = KTextStorage()
     private var layoutManager: KLayoutManager
     private let caretView = KCaretView()
 
@@ -49,7 +49,7 @@ final class KTextView: NSView {
     
     fileprivate var layoutRects: LayoutRects {
         let digitCount = max(3, "\(layoutManager._lines.count)".count)
-        let font = textStorage.baseFont
+        let font = textStorageRef.baseFont
         let digitWidth = CTLineCreateWithAttributedString(NSAttributedString(string: "0", attributes: [.font: font]))
         let charWidth = CTLineGetTypographicBounds(digitWidth, nil, nil, nil)
 
@@ -98,16 +98,38 @@ final class KTextView: NSView {
 
     // MARK: - Initialization (KTextView methods)
 
+    // Designated Initializer #1（既定: 新規生成）
     override init(frame: NSRect) {
-        self.textStorage = KTextStorage()
-        self.layoutManager = KLayoutManager(textStorage: textStorage)
+        let storage:KTextStorageProtocol = KTextStorage()
+        self.textStorageRef = storage
+        layoutManager = KLayoutManager(textStorageRef: storage)
+        super.init(frame: frame)
+        
+        self.wantsLayer = false
+        commonInit()
+    }
+
+    // Designated Initializer #2（外部からストレージ注入）
+    init(frame: NSRect, textStorageRef: KTextStorageProtocol) {
+        self.textStorageRef = textStorageRef
+        self.layoutManager = KLayoutManager(textStorageRef: textStorageRef)
         super.init(frame: frame)
         commonInit()
     }
 
+    // Designated Initializer #3（完全注入: 将来用）
+    init(frame: NSRect, textStorageRef: KTextStorageProtocol, layoutManager: KLayoutManager) {
+        self.textStorageRef = textStorageRef
+        self.layoutManager = layoutManager
+        super.init(frame: frame)
+        commonInit()
+    }
+
+    // Interface Builder用
     required init?(coder: NSCoder) {
-        self.textStorage = KTextStorage()
-        self.layoutManager = KLayoutManager(textStorage: textStorage)
+        let storage = KTextStorage()
+        self.textStorageRef = storage
+        self.layoutManager = KLayoutManager(textStorageRef: storage)
         super.init(coder: coder)
         commonInit()
     }
@@ -156,11 +178,20 @@ final class KTextView: NSView {
     
     //testing.
     override func hitTest(_ point: NSPoint) -> NSView? {
-        print("hitTest: \(point)")
-        return super.hitTest(point)
+        let localPoint = convert(point, from: superview)
+        //print("🧭 Global point: \(point), Local point: \(localPoint), Bounds: \(bounds)")
+        //print("scrollview.contentView.frame: \(String(describing: enclosingScrollView?.contentView.frame))")
+        //print("self.frame: \(String(describing: frame))")
+        let width = frame.size.width
+        frame.size = NSSize(width: width+10, height: frame.size.height)
+        if bounds.contains(localPoint) {
+            print("✅ Returning self")
+            return self
+        } else {
+            print("❌ Returning nil")
+            return nil
+        }
     }
-
-
 
     deinit {
         caretBlinkTimer?.invalidate()
@@ -197,7 +228,7 @@ final class KTextView: NSView {
     private func updateCaretPosition(isVerticalMove: Bool = false) {
         guard let (lineInfo, lineIndex) = findLineInfo(containing: caretIndex) else { return }
 
-        let font = textStorage.baseFont
+        let font = textStorageRef.baseFont
         let attrString = NSAttributedString(string: lineInfo.text, attributes: [.font: font])
         let ctLine = CTLineCreateWithAttributedString(attrString)
 
@@ -298,7 +329,7 @@ final class KTextView: NSView {
 
         let rects = layoutRects
         let lines = layoutManager._lines
-        let font = textStorage.baseFont
+        let font = textStorageRef.baseFont
 
         let selectedTextBGColor = window?.isKeyWindow == true
             ? NSColor.selectedTextBackgroundColor
@@ -308,11 +339,11 @@ final class KTextView: NSView {
             .font: font,
             .foregroundColor: NSColor.textColor
         ]
-
+        /*
         let lineNumberAttributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.monospacedDigitSystemFont(ofSize: font.pointSize * 0.95, weight: .regular),
             .foregroundColor: NSColor.gray
-        ]
+        ]*/
 
         for (i, line) in lines.enumerated() {
             let y = rects.textRegion.rect.origin.y + CGFloat(i) * layoutManager.lineHeight
@@ -329,8 +360,8 @@ final class KTextView: NSView {
 
                 // 改行選択補正
                 let newlineIndex = lineRange.upperBound
-                if newlineIndex < textStorage.count,
-                   let char = textStorage[newlineIndex],
+                if newlineIndex < textStorageRef.count,
+                   let char = textStorageRef[newlineIndex],
                    char == "\n",
                    selectedRange.contains(newlineIndex) {
                     endOffset = bounds.width - rects.textRegion.rect.origin.x - startOffset
@@ -353,13 +384,6 @@ final class KTextView: NSView {
             let textPoint = CGPoint(x: rects.textRegion.rect.origin.x, y: y)
             attributedLine.draw(at: textPoint)
 
-            // 行番号描画
-            let lineNumberString = "\(i + 1)"
-            let lineNumberAttrStr = NSAttributedString(string: lineNumberString, attributes: lineNumberAttributes)
-            let numberSize = lineNumberAttrStr.size()
-            let numberX = rects.lineNumberRegion.rect.maxX - numberSize.width - 4
-            let numberY = y + (layoutManager.lineHeight - numberSize.height) / 2
-            lineNumberAttrStr.draw(at: CGPoint(x: numberX, y: numberY))
         }
     }
     
@@ -398,11 +422,11 @@ final class KTextView: NSView {
     // テキスト入力に関する実装が済むまでの簡易入力メソッド
     private func insertDirectText(_ text: String) {
         if !selectedRange.isEmpty {
-            textStorage.replaceCharacters(in: selectedRange, with: [])
+            textStorageRef.replaceCharacters(in: selectedRange, with: [])
             caretIndex = selectedRange.lowerBound
         }
 
-        textStorage.insertString(text, at: caretIndex)
+        textStorageRef.insertString(text, at: caretIndex)
         caretIndex += text.count
 
         layoutManager.rebuildLayout()
@@ -445,20 +469,20 @@ final class KTextView: NSView {
             if horizontalSelectionBase! == selectedRange.lowerBound {
                 let newBound = selectedRange.upperBound + direction.rawValue
                 
-                guard newBound <= textStorage.count && newBound >= 0 else { return }
+                guard newBound <= textStorageRef.count && newBound >= 0 else { return }
                 
                 selectedRange = min(newBound, horizontalSelectionBase!)..<max(newBound, horizontalSelectionBase!)
             } else {
                 let newBound = selectedRange.lowerBound + direction.rawValue
                 
-                guard newBound <= textStorage.count && newBound >= 0 else { return }
+                guard newBound <= textStorageRef.count && newBound >= 0 else { return }
                 
                 selectedRange = min(newBound, horizontalSelectionBase!)..<max(newBound, horizontalSelectionBase!)
             }
         } else {
             if direction == .forward {
                 if selectedRange.isEmpty {
-                    guard caretIndex < textStorage.count else { return }
+                    guard caretIndex < textStorageRef.count else { return }
                     caretIndex += 1
                 } else {
                     caretIndex = selectedRange.upperBound
@@ -518,12 +542,12 @@ final class KTextView: NSView {
             return
         }
         if newLineIndex >= layoutManager._lines.count {
-            selectedRange = selectedRange.lowerBound..<textStorage.count
+            selectedRange = selectedRange.lowerBound..<textStorageRef.count
             return
         }
 
         let newLine = layoutManager._lines[newLineIndex]
-        let font = textStorage.baseFont
+        let font = textStorageRef.baseFont
         let attrString = NSAttributedString(string: newLine.text, attributes: [.font: font])
         let ctLine = CTLineCreateWithAttributedString(attrString)
 
@@ -566,7 +590,7 @@ final class KTextView: NSView {
     @IBAction func cut(_ sender: Any?) {
         copy(sender)
 
-        textStorage.replaceCharacters(in: selectedRange, with: [])
+        textStorageRef.replaceCharacters(in: selectedRange, with: [])
         caretIndex = selectedRange.lowerBound
         
         updateFrameSizeToFitContent()
@@ -577,7 +601,7 @@ final class KTextView: NSView {
     @IBAction func copy(_ sender: Any?) {
         guard !selectedRange.isEmpty else { return }
         //guard let slicedCharacters = textStorage.characters(in: selectedRange) else { return }
-        guard let slicedCharacters = textStorage[selectedRange] else { return }
+        guard let slicedCharacters = textStorageRef[selectedRange] else { return }
         let selectedText = String(slicedCharacters)
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
@@ -588,7 +612,7 @@ final class KTextView: NSView {
         let pasteboard = NSPasteboard.general
         guard let string = pasteboard.string(forType: .string) else { return }
 
-        textStorage.replaceCharacters(in: selectedRange, with: Array(string))
+        textStorageRef.replaceCharacters(in: selectedRange, with: Array(string))
         caretIndex = selectedRange.lowerBound + string.count
 
         updateFrameSizeToFitContent()
@@ -597,7 +621,7 @@ final class KTextView: NSView {
     }
 
     @IBAction override func selectAll(_ sender: Any?) {
-        selectedRange = 0..<textStorage.count
+        selectedRange = 0..<textStorageRef.count
         
     }
 
@@ -609,10 +633,10 @@ final class KTextView: NSView {
         guard caretIndex > 0 else { return }
 
         if !selectedRange.isEmpty {
-            textStorage.replaceCharacters(in: selectedRange, with: [])
+            textStorageRef.replaceCharacters(in: selectedRange, with: [])
             caretIndex = selectedRange.lowerBound
         } else {
-            textStorage.replaceCharacters(in: caretIndex - 1..<caretIndex, with: [])
+            textStorageRef.replaceCharacters(in: caretIndex - 1..<caretIndex, with: [])
             caretIndex -= 1
         }
 
@@ -633,6 +657,7 @@ final class KTextView: NSView {
     
     override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
+        print("\(#function)")
 
         let location = convert(event.locationInWindow, from: nil)
         let index = caretIndexForClickedPoint(location)
@@ -643,6 +668,7 @@ final class KTextView: NSView {
 
         updateCaretPosition()
         scrollCaretToVisible()
+        
     }
     
     override func mouseDragged(with event: NSEvent) {
@@ -684,7 +710,7 @@ final class KTextView: NSView {
         // 上方向に外れている場合：最初の行で X 座標に近い index を返す
         if relativePoint.y < 0,
            let firstLine = lines.first {
-            let attrString = NSAttributedString(string: firstLine.text, attributes: [.font: textStorage.baseFont])
+            let attrString = NSAttributedString(string: firstLine.text, attributes: [.font: textStorageRef.baseFont])
             let ctLine = CTLineCreateWithAttributedString(attrString)
             let relativeX = max(0, relativePoint.x)
             let indexInLine = CTLineGetStringIndexForPosition(ctLine, CGPoint(x: relativeX, y: 0))
@@ -694,7 +720,7 @@ final class KTextView: NSView {
         // 下方向に外れている場合：最終行で X 座標に近い index を返す
         if relativePoint.y >= CGFloat(lineCount) * lineHeight,
            let lastLine = lines.last {
-            let attrString = NSAttributedString(string: lastLine.text, attributes: [.font: textStorage.baseFont])
+            let attrString = NSAttributedString(string: lastLine.text, attributes: [.font: textStorageRef.baseFont])
             let ctLine = CTLineCreateWithAttributedString(attrString)
             let relativeX = max(0, relativePoint.x)
             let indexInLine = CTLineGetStringIndexForPosition(ctLine, CGPoint(x: relativeX, y: 0))
@@ -704,7 +730,7 @@ final class KTextView: NSView {
         // 通常の行内クリック
         let lineIndex = Int(relativePoint.y / lineHeight)
         let line = lines[lineIndex]
-        let attrString = NSAttributedString(string: line.text, attributes: [.font: textStorage.baseFont])
+        let attrString = NSAttributedString(string: line.text, attributes: [.font: textStorageRef.baseFont])
         let ctLine = CTLineCreateWithAttributedString(attrString)
         let relativeX = max(0, relativePoint.x)
         let indexInLine = CTLineGetStringIndexForPosition(ctLine, CGPoint(x: relativeX, y: 0))
@@ -729,6 +755,7 @@ final class KTextView: NSView {
     }
     
     private func updateFrameSizeToFitContent() {
+        print("func name = \(#function)")
         layoutManager.rebuildLayout()
 
         let totalLines = layoutManager._lines.count
@@ -739,13 +766,16 @@ final class KTextView: NSView {
         let lineNumberWidth: CGFloat = showLineNumber ? 40 : 0
 
         let height = CGFloat(totalLines) * lineHeight * 4 / 3
+        
+        //print("layoutManager._maxLineWidth = \(layoutManager._maxLineWidth)")
 
-        let width = layoutManager._maxLineWidth
+        let width = layoutManager.maxLineWidth
                     + lineNumberWidth
                     + edgePadding.left
                     + edgePadding.right
 
-        self.frame.size = CGSize(width: width, height: height)
+        //self.frame.size = CGSize(width: width, height: height)
+        self.setFrameSize(CGSize(width: width, height: height))
 
         enclosingScrollView?.contentView.needsLayout = true
         enclosingScrollView?.reflectScrolledClipView(enclosingScrollView!.contentView)

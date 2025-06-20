@@ -25,6 +25,7 @@ class Document: NSDocument {
     }
     
     override func makeWindowControllers() {
+        /*
         let viewController = KViewController()
 
         let window = NSWindow(
@@ -46,7 +47,9 @@ class Document: NSDocument {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
             window.makeKeyAndOrderFront(nil)
             window.display()
-        }
+        }*/
+        let wc = NSWindowController(windowNibName: "Document")
+            self.addWindowController(wc)
     }
 
     override func data(ofType typeName: String) throws -> Data {

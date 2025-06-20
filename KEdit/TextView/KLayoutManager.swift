@@ -19,30 +19,43 @@ protocol KLayoutManagerReadable: AnyObject {
     var lineCount: Int { get }
     var lineHeight: CGFloat { get }
     var lineSpacing: CGFloat { get }
+    var maxLineWidth: CGFloat { get }
 }
 
 // MARK: - KLayoutManager
 
-final class KLayoutManager {
+final class KLayoutManager: KLayoutManagerReadable {
 
     // MARK: - Properties
 
     private(set) var _lines: [LineInfo] = []
-    private(set) var _maxLineWidth: CGFloat = 0
-    private let _textStorage: KTextStorage
+    private var _maxLineWidth: CGFloat = 0
+    private let _textStorageRef: KTextStorageProtocol
     
     var lineSpacing: CGFloat = 2.0
     
     var lineHeight: CGFloat {
-        let font = _textStorage.baseFont
+        let font = _textStorageRef.baseFont
         return font.ascender + abs(font.descender) + lineSpacing
+    }
+    
+    var lineCount: Int {
+        return _lines.count
+    }
+    
+    var maxLineWidth: CGFloat {
+        return _maxLineWidth
+    }
+    
+    var lines: ArraySlice<LineInfo> {
+        return ArraySlice(_lines)
     }
 
     // MARK: - Init
 
-    init(textStorage: KTextStorage) {
-        self._textStorage = textStorage
-        textStorage.string = "abcde日本語の文章でも問題ないか確認。\n複数行ではどうなるかな。\nこれは3行目。ちゃんと表示されてほしい。"
+    init(textStorageRef: KTextStorageProtocol) {
+        _textStorageRef = textStorageRef 
+        textStorageRef.string = "abcde日本語の文章でも問題ないか確認。\n複数行ではどうなるかな。\nこれは3行目。ちゃんと表示されてほしい。"
         rebuildLayout()
     }
 
@@ -53,8 +66,8 @@ final class KLayoutManager {
         _maxLineWidth = 0
 
         var currentIndex = 0
-        let characters = _textStorage._characters
-        let font = _textStorage.baseFont
+        let characters = _textStorageRef.characterSlice
+        let font = _textStorageRef.baseFont
 
         while currentIndex < characters.count {
             var lineEndIndex = currentIndex
@@ -81,5 +94,6 @@ final class KLayoutManager {
                 currentIndex += 1 // 改行をスキップ
             }
         }
+        
     }
 }

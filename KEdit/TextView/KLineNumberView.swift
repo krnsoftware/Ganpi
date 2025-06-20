@@ -12,18 +12,18 @@ final class KLineNumberView: NSView {
 
     // MARK: - References
 
-    private weak var _textStorage: KTextStorageReadable?
-    private weak var _layoutManager: KLayoutManagerReadable?
+    private weak var _textStorageRef: KTextStorageReadable?
+    private weak var _layoutManagerRef: KLayoutManagerReadable?
 
     // MARK: - Init
 
     init(
         frame: NSRect,
-        textStorage: KTextStorageReadable,
-        layoutManager: KLayoutManagerReadable
+        textStorageRef: KTextStorageReadable,
+        layoutManagerRef: KLayoutManagerReadable
     ) {
-        _textStorage = textStorage
-        _layoutManager = layoutManager
+        _textStorageRef = textStorageRef
+        _layoutManagerRef = layoutManagerRef
         super.init(frame: frame)
         wantsLayer = true
     }
@@ -36,12 +36,12 @@ final class KLineNumberView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         guard let context = NSGraphicsContext.current?.cgContext else { return }
-
+        print("🖌️ drawing lineNumberView at frame \(self.frame)")
         // 背景
         context.setFillColor(NSColor.controlBackgroundColor.cgColor)
         context.fill(dirtyRect)
 
-        guard let layoutManager = _layoutManager else { return }
+        guard let layoutManager = _layoutManagerRef else { return }
         let lineHeight = layoutManager.lineHeight
 
         let paragraphStyle = NSMutableParagraphStyle()
@@ -73,5 +73,9 @@ final class KLineNumberView: NSView {
     func syncScrollOrigin(to origin: NSPoint) {
         setBoundsOrigin(origin)
         needsDisplay = true
+    }
+    
+    override var isFlipped: Bool {
+        return true
     }
 }

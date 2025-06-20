@@ -51,7 +51,7 @@ typealias KTextStorageProtocol = KTextStorageReadable & KTextStorageWritable
 // MARK: - KTextStorage
 
 // KEdit用軽量テキストストレージ
-final class KTextStorage {
+final class KTextStorage: KTextStorageProtocol {
 
     // MARK: - Properties
 
@@ -87,6 +87,10 @@ final class KTextStorage {
             _baseFont = _baseFont.withSize(newValue)
             notifyObservers()
         }
+    }
+    
+    var characterSlice: ArraySlice<Character> {
+        _characters[_characters.indices]
     }
 
     @discardableResult
