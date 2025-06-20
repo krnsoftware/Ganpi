@@ -405,6 +405,18 @@ final class KTextView: NSView {
         }
     }*/
     
+    override func setFrameSize(_ newSize: NSSize) {
+        let edgeInsets = layoutRects.edgeInsets
+        let lineNumberWidth = layoutRects.lineNumberRegion.width
+
+        let width = layoutManager.maxLineWidth
+                  + lineNumberWidth
+                  + edgeInsets.left
+                  + edgeInsets.right
+
+        super.setFrameSize(NSSize(width: width, height: newSize.height))
+    }
+    
     // MARK: - Keyboard Input (NSResponder methods)
 
     override func keyDown(with event: NSEvent) {
@@ -775,7 +787,7 @@ final class KTextView: NSView {
     
     // 現在のところinternalとしているが、将来的に公開レベルを変更する可能性あり。
     func updateFrameSizeToFitContent() {
-        //print("func name = \(#function)")
+        print("func name = \(#function)")
         layoutManager.rebuildLayout()
 
         let totalLines = layoutManager._lines.count
@@ -787,7 +799,7 @@ final class KTextView: NSView {
 
         let height = CGFloat(totalLines) * lineHeight * 4 / 3
         
-        //print("layoutManager._maxLineWidth = \(layoutManager._maxLineWidth)")
+        print("layoutManager.maxLineWidth = \(layoutManager.maxLineWidth)")
 
         let width = layoutManager.maxLineWidth
                     + lineNumberWidth
