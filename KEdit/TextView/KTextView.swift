@@ -265,47 +265,57 @@ final class KTextView: NSView {
 
     // MARK: - Drawing (NSView methods)
     
-    /*override func draw(_ dirtyRect: NSRect) {
+    override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
 
         NSColor.white.setFill()
         dirtyRect.fill()
 
+        let rects = layoutRects
+        let lines = layoutManager._lines
+        let font = textStorageRef.baseFont
+
         let selectedTextBGColor = window?.isKeyWindow == true
             ? NSColor.selectedTextBackgroundColor
             : NSColor.unemphasizedSelectedTextBackgroundColor
 
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: textStorage.baseFont,
+        let textAttributes: [NSAttributedString.Key: Any] = [
+            .font: font,
             .foregroundColor: NSColor.textColor
         ]
 
-        for (i, line) in layoutManager.lines.enumerated() {
-            let y = CGFloat(i) * layoutManager.lineHeight
+        let lineNumberAttributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.monospacedDigitSystemFont(ofSize: font.pointSize * 0.95, weight: .regular),
+            .foregroundColor: NSColor.gray
+        ]
 
+        for (i, line) in lines.enumerated() {
+            let y = rects.textRegion.rect.origin.y + CGFloat(i) * layoutManager.lineHeight
+
+            // 選択範囲の描画
             let lineRange = line.range
             let selection = selectedRange.clamped(to: lineRange)
             if !selection.isEmpty {
-                let attrString = NSAttributedString(string: line.text, attributes: [.font: textStorage.baseFont])
+                let attrString = NSAttributedString(string: line.text, attributes: [.font: font])
                 let ctLine = CTLineCreateWithAttributedString(attrString)
 
                 let startOffset = CTLineGetOffsetForStringIndex(ctLine, selection.lowerBound - lineRange.lowerBound, nil)
                 var endOffset = CTLineGetOffsetForStringIndex(ctLine, selection.upperBound - lineRange.lowerBound, nil)
 
-                // 改行が line の後ろにある場合
+                // 改行選択補正
                 let newlineIndex = lineRange.upperBound
-                if newlineIndex < textStorage.count,
-                   let char = textStorage[newlineIndex],
+                if newlineIndex < textStorageRef.count,
+                   let char = textStorageRef[newlineIndex],
                    char == "\n",
                    selectedRange.contains(newlineIndex) {
-                    endOffset = bounds.width - layoutRects.textRegion.rect.origin.x - startOffset
+                    endOffset = bounds.width - rects.textRegion.rect.origin.x - startOffset
                 } else {
                     endOffset -= startOffset
                 }
 
                 let selectionRect = CGRect(
-                    x: layoutRects.textRegion.rect.origin.x + startOffset,
-                    y: layoutRects.textRegion.rect.origin.y + y,
+                    x: rects.textRegion.rect.origin.x + startOffset,
+                    y: y,
                     width: endOffset,
                     height: layoutManager.lineHeight
                 )
@@ -313,14 +323,22 @@ final class KTextView: NSView {
                 selectionRect.fill()
             }
 
-            let attributedLine = NSAttributedString(string: line.text, attributes: attributes)
-            let drawPoint = CGPoint(
-                x: layoutRects.textRegion.rect.origin.x,
-                y: layoutRects.textRegion.rect.origin.y + y
+            // 行番号の描画
+            let lineNumberString = "\(i + 1)" as NSString
+            let lineNumberSize = lineNumberString.size(withAttributes: lineNumberAttributes)
+            let numberOrigin = CGPoint(
+                x: rects.lineNumberRegion.rect.maxX - lineNumberSize.width - 6,
+                y: y + (layoutManager.lineHeight - lineNumberSize.height) / 2
             )
-            attributedLine.draw(at: drawPoint)
+            lineNumberString.draw(at: numberOrigin, withAttributes: lineNumberAttributes)
+
+            // 本文描画
+            let attributedLine = NSAttributedString(string: line.text, attributes: textAttributes)
+            let textPoint = CGPoint(x: rects.textRegion.rect.origin.x, y: y)
+            attributedLine.draw(at: textPoint)
         }
-    }*/
+    }
+    /*
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
 
@@ -385,7 +403,7 @@ final class KTextView: NSView {
             attributedLine.draw(at: textPoint)
 
         }
-    }
+    }*/
     
     // MARK: - Keyboard Input (NSResponder methods)
 
@@ -754,8 +772,10 @@ final class KTextView: NSView {
         needsDisplay = true
     }
     
-    private func updateFrameSizeToFitContent() {
-        print("func name = \(#function)")
+    
+    // 現在のところinternalとしているが、将来的に公開レベルを変更する可能性あり。
+    func updateFrameSizeToFitContent() {
+        //print("func name = \(#function)")
         layoutManager.rebuildLayout()
 
         let totalLines = layoutManager._lines.count
