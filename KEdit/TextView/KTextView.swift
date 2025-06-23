@@ -152,6 +152,13 @@ final class KTextView: NSView {
     
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+        
+        /*print("\(#function): bounds: \(bounds), frame: \(frame)")
+        let sview = self.superview
+        print("sview.bounds: \(String(describing: sview?.bounds)), sview.frame: \(String(describing: sview?.frame))")
+         */
+        //bounds = CGRect(x:0,y:0,width:layoutManager.maxLineWidth,height:bounds.size.height)
+        //setFrameSize(CGSize(width: layoutManager.maxLineWidth, height: bounds.size.height))
     
         // 古い監視を解除
         NotificationCenter.default.removeObserver(self)
@@ -184,6 +191,7 @@ final class KTextView: NSView {
                )
            }
     }
+    
     
     
     
@@ -255,7 +263,12 @@ final class KTextView: NSView {
         let ctLine = CTLineCreateWithAttributedString(attrString)
 
         let indexInLine = caretIndex - lineInfo.range.lowerBound
-        let layoutRects = makeLayoutRects(bounds: bounds)
+        
+        guard let layoutRects = makeLayoutRects(bounds: bounds) else {
+            print("\(#function): updateCaretPosition() failed to make layoutRects")
+            return
+        }
+        
         let xOffset = CTLineGetOffsetForStringIndex(ctLine, indexInLine, nil)
         //print("xOffset: \(xOffset), layoutRect.horizontalInsets: \(layoutRects.horizontalInsets)")
         print("\(#function): updateCaretPosition() caretIndex = \(caretIndex), lineIndex = \(lineIndex), lineInfo.text = \(lineInfo.text)")
@@ -293,8 +306,13 @@ final class KTextView: NSView {
     
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
+        
+        
 
-        let rect = makeLayoutRects(bounds: bounds)
+        guard let rect = makeLayoutRects(bounds: bounds) else {
+            print("\(#function): failed to make layout rects")
+            return
+        }
         rect.draw(layoutManagerRef: layoutManager, textStorageRef: textStorageRef,baseFont: textStorageRef.baseFont )
     }
 
@@ -441,27 +459,12 @@ final class KTextView: NSView {
     }*/
     
     override func setFrameSize(_ newSize: NSSize) {
-        /*let edgeInsets = layoutRects.edgeInsets
-        let lineNumberWidth = layoutRects.lineNumberRegion.width
-
-        let width = layoutManager.maxLineWidth
-                  + lineNumberWidth
-                  + edgeInsets.left
-                  + edgeInsets.right
-
-        super.setFrameSize(NSSize(width: width, height: newSize.height))
-         */
-        var width : CGFloat = 0
-        if bounds.width > 0 {
-            let layoutRects = makeLayoutRects(bounds: bounds)
-            width =  layoutRects.textRegion.rect.width
-        } else {
-            width = newSize.width
+        guard let rects = makeLayoutRects(bounds: bounds) else {
+            print("\(#function) error")
+            return
         }
         
-        print("setFrameSize: width: \(width)")
-        
-        super.setFrameSize(NSSize(width: width, height: newSize.height))
+        super.setFrameSize(NSSize(width: rects.textRegion.rect.width, height: newSize.height))
     }
     
     // MARK: - Keyboard Input (NSResponder methods)
@@ -623,7 +626,11 @@ final class KTextView: NSView {
             return
         }
         
-        let layoutRects = makeLayoutRects(bounds: bounds)
+        guard let layoutRects = makeLayoutRects(bounds: bounds) else {
+            print("\(#function) makeLayoutRects error")
+            return
+        }
+        
         let newLine = layoutManager._lines[newLineIndex]
         let font = textStorageRef.baseFont
         let attrString = NSAttributedString(string: newLine.text, attributes: [.font: font])
@@ -747,7 +754,11 @@ final class KTextView: NSView {
         horizontalSelectionBase = index
         */
         
-        let layoutRects = makeLayoutRects(bounds: bounds)
+        guard let layoutRects = makeLayoutRects(bounds: bounds) else {
+            print("\(#function): layoutRects is nil")
+            return
+        }
+        
         let location = convert(event.locationInWindow, from: nil)
         switch layoutRects.regionType(for: location, layoutManager: layoutManager, textStorage: textStorageRef){
         case .text(let index):
@@ -796,7 +807,10 @@ final class KTextView: NSView {
     // MARK: - KTextView methods (helpers)
     
     private func caretIndexForClickedPoint(_ point: NSPoint) -> Int {
-        let layoutRects = makeLayoutRects(bounds: bounds)
+        guard let layoutRects = makeLayoutRects(bounds: bounds) else {
+            print("\(#function) failed to make layoutRects")
+            return 0
+        }
         let relativePoint = CGPoint(
             x: point.x - layoutRects.textRegion.rect.origin.x,
             y: point.y - layoutRects.textRegion.rect.origin.y
@@ -869,7 +883,10 @@ final class KTextView: NSView {
         let height = CGFloat(totalLines) * lineHeight * 4 / 3
         
         print("layoutManager.maxLineWidth = \(layoutManager.maxLineWidth)")
-        let layoutRects = makeLayoutRects(bounds: bounds)
+        guard let layoutRects = makeLayoutRects(bounds: bounds) else {
+            print("\(#function): makeLayoutRects failed.")
+            return
+        }
         let width = layoutManager.maxLineWidth
                     + lineNumberWidth
         + layoutRects.padding * 2
@@ -885,9 +902,10 @@ final class KTextView: NSView {
 
     }
     
-    private func makeLayoutRects(bounds: CGRect) -> LayoutRects {
+    private func makeLayoutRects(bounds: CGRect) -> LayoutRects? {
         guard let clipBounds = enclosingScrollView?.contentView.bounds else {
-            return LayoutRects.zero
+            //return LayoutRects.zero
+            return nil
         }
         
         let lineCount = layoutManager.lineCount
@@ -900,6 +918,8 @@ final class KTextView: NSView {
         let padding: CGFloat = 8
 
         return LayoutRects(
+            layoutManagerRef: layoutManager,
+            textStorageRef: textStorageRef,
             bounds: clipBounds,
             visibleRect: visibleRect,
             lineNumberWidth: lineNumberRectWidth,

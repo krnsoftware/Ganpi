@@ -8,6 +8,7 @@
 
 import AppKit
 
+/*
 extension LayoutRects {
     static let zero = LayoutRects(
         bounds: .zero,
@@ -16,48 +17,64 @@ extension LayoutRects {
         padding: 0,
         showLineNumbers: false
     )
-}
+}*/
 
 struct LayoutRects {
     struct Region {
         let rect: CGRect
-        let lineRange: Range<Int>?
     }
     
     private let bounds: CGRect
     private let visibleRect: CGRect
+    private let layoutManagerRef: KLayoutManagerReadable
+    private let textStorageRef: KTextStorageReadable
     
     let textRegion: Region
     let lineNumberRegion: Region?
     let padding: CGFloat
     let showLineNumbers: Bool
 
+    // LineNumberRegionが表示されている場合のテキスト表示の右オフセット
     var horizontalInsets: CGFloat {
-        (lineNumberRegion?.rect.width ?? 0) + padding
+        if let width = lineNumberRegion?.rect.width {
+            return width + padding
+        }
+        return 0
+        //(lineNumberRegion?.rect.width ?? 0) + padding
     }
     
     
     // paddingはLineNumberRegionの右端と、TextRegionのテキスト表示部分の左端の間のスペース。
-    init(bounds: CGRect, visibleRect: CGRect, lineNumberWidth: CGFloat, padding: CGFloat, showLineNumbers: Bool) {
+    init(layoutManagerRef: KLayoutManagerReadable, textStorageRef: KTextStorageReadable, bounds: CGRect, visibleRect: CGRect, lineNumberWidth: CGFloat, padding: CGFloat, showLineNumbers: Bool) {
         self.bounds = bounds
         self.visibleRect = visibleRect
         self.padding = padding
         self.showLineNumbers = showLineNumbers
+        self.layoutManagerRef = layoutManagerRef
+        self.textStorageRef = textStorageRef
         
-        print("layoutrects, init: bounds: \(bounds), lineNumberWidth: \(lineNumberWidth), padding: \(padding), showLineNumbers: \(showLineNumbers)")
+        //print("layoutrects, init: bounds: \(bounds), lineNumberWidth: \(lineNumberWidth), padding: \(padding), showLineNumbers: \(showLineNumbers)")
 
         let lineNumberRect: CGRect? = showLineNumbers ?
         CGRect(x: visibleRect.origin.x, y: visibleRect.origin.y, width: lineNumberWidth, height: visibleRect.height) :
             nil
+        
+        
+        self.lineNumberRegion = lineNumberRect.map { Region(rect: $0) }
 
        // let textOriginX = (lineNumberRect?.width ?? 0)
+        /*
         let textRect = CGRect(x: 0, //textOriginX,
                               y: 0,
                               width: bounds.width,// - textOriginX,
                               height: bounds.height)
+         */
+        let textRect = CGRect(x: 0,
+                              y: 0,
+                              width: CGFloat(layoutManagerRef.maxLineWidth) + padding + lineNumberWidth,
+                              height: CGFloat(layoutManagerRef.lineCount) * layoutManagerRef.lineHeight)
 
-        self.lineNumberRegion = lineNumberRect.map { Region(rect: $0, lineRange: nil) }
-        self.textRegion = Region(rect: textRect, lineRange: nil)
+        self.textRegion = Region(rect: textRect)
     }
 
     enum RegionType {
@@ -103,7 +120,18 @@ struct LayoutRects {
     func draw(layoutManagerRef: KLayoutManagerReadable, textStorageRef: KTextStorageReadable, baseFont: NSFont) {
         let lines = layoutManagerRef.lines
         let lineHeight = layoutManagerRef.lineHeight
-
+        
+        /*let bgColor: NSColor = .textBackgroundColor.withAlphaComponent(1.0)
+        bgColor.setFill()
+        bounds.fill()*/
+        // 背景透け対策。
+        let bgColor = NSColor.textBackgroundColor.usingColorSpace(.deviceRGB)?.withAlphaComponent(1.0) ?? .red
+        bgColor.setFill()
+        bounds.fill()
+        
+        //print("bgColor: \(bgColor.toHexString(includeAlpha: true))")
+        
+        // テキストを上から1行ずつ描画していくが、その後に行番号部分も描画する形式。
         for (i, line) in lines.enumerated() {
             let y = CGFloat(i) * lineHeight
             let textPoint = CGPoint(x: textRegion.rect.origin.x + horizontalInsets ,
@@ -117,8 +145,10 @@ struct LayoutRects {
                 //NSColor.textBackgroundColor.setFill()
                 //lnRect.fill()
                 let subrect = CGRect(x: lineNumberRegion!.rect.origin.x, y: lineNumberRegion!.rect.origin.y + y, width: lineNumberRegion!.rect.width, height: lineHeight)
-                NSColor.textBackgroundColor.setFill()
+                bgColor.setFill()
                 subrect.fill()
+                
+                //print("textBackgroundColor: \(NSColor.textBackgroundColor.toHexString(includeAlpha: true)!)")
                 
                 let number = "\(i + 1)"
                 let attrs: [NSAttributedString.Key: Any] = [
@@ -134,5 +164,9 @@ struct LayoutRects {
             }
             
         }
+        let path = NSBezierPath(rect: textRegion.rect)
+        NSColor.red.setStroke()
+        path.lineWidth = 2
+        path.stroke()
     }
 }

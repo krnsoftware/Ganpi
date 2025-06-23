@@ -278,6 +278,33 @@ extension String {
 //MARK: - NSColor Extension for String
 
 // Stringに関するNSColor extension
+
+extension NSColor {
+    /// NSColor を #RRGGBB または #RRGGBBAA 形式の16進数文字列として返す
+    func toHexString(includeAlpha: Bool = false) -> String? {
+        guard let rgbColor = usingColorSpace(.sRGB) else {
+            return nil // sRGBへの変換失敗
+        }
+
+        func to255(_ component: CGFloat) -> Int {
+            return Int(round(min(max(component, 0), 1) * 255))
+        }
+
+        let r = to255(rgbColor.redComponent)
+        let g = to255(rgbColor.greenComponent)
+        let b = to255(rgbColor.blueComponent)
+
+        var hexString = String(format: "#%02X%02X%02X", r, g, b)
+
+        if includeAlpha {
+            let a = to255(rgbColor.alphaComponent)
+            hexString += String(format: "%02X", a)
+        }
+
+        return hexString
+    }
+}
+/*
 extension NSColor {
     
     // NSColorを文字列に変化して返す。
@@ -290,7 +317,7 @@ extension NSColor {
         
         return colorString
     }
-}
+}*/
 
 
 extension String.Encoding {
