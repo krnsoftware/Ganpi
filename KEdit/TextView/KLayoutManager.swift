@@ -16,6 +16,7 @@ struct LineInfo {
 // MARK: - protocol KLayoutManagerReadable
 
 protocol KLayoutManagerReadable: AnyObject {
+    var lines: ArraySlice<LineInfo> { get }
     var lineCount: Int { get }
     var lineHeight: CGFloat { get }
     var lineSpacing: CGFloat { get }

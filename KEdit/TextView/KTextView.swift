@@ -16,7 +16,7 @@ final class KTextView: NSView {
     
     // MARK: - Properties
     
-    static let defaultEdgePadding = LayoutRects.EdgeInsets(top: 4, bottom: 4, left: 8, right: 8)
+    //static let defaultEdgePadding = LayoutRects.EdgeInsets(top: 4, bottom: 4, left: 8, right: 8)
     
     private var textStorageRef: KTextStorageProtocol = KTextStorage()
     private var layoutManager: KLayoutManager
@@ -30,10 +30,16 @@ final class KTextView: NSView {
     private var currentActionSelector: Selector? { // 今回受け取ったセレクタ。
         willSet { lastActionSelector = currentActionSelector }
     }
-
+    
+    private let showLineNumbers: Bool = true
+    private let textPadding: CGFloat = 8
+    
+    
+    /*
     private let lineHeight: CGFloat = 18
     private let leftPadding: CGFloat = 10
     private let topPadding: CGFloat = 30
+    */
 
     var selectedRange: Range<Int> = 0..<0 {
         didSet {
@@ -46,7 +52,7 @@ final class KTextView: NSView {
         get { selectedRange.upperBound }
         set { selectedRange = newValue..<newValue }
     }
-    
+    /*
     fileprivate var layoutRects: LayoutRects {
         let digitCount = max(3, "\(layoutManager._lines.count)".count)
         let font = textStorageRef.baseFont
@@ -58,6 +64,8 @@ final class KTextView: NSView {
 
         return LayoutRects(bounds: bounds, lineNumberWidth: lineNumberWidth)
     }
+     */
+    //fileprivate var layoutRects: LayoutRects = .zero
     
     // 今回のセレクタが垂直方向にキャレット選択範囲を動かすものであるか返す。
     private var isVerticalAction: Bool {
@@ -163,8 +171,21 @@ final class KTextView: NSView {
                 name: NSWindow.didResignKeyNotification,
                 object: window
             )
+            
+           
         }
+        
+        if let clipView = enclosingScrollView?.contentView {
+               NotificationCenter.default.addObserver(
+                   self,
+                   selector: #selector(clipViewBoundsDidChange(_:)),
+                   name: NSView.boundsDidChangeNotification,
+                   object: clipView
+               )
+           }
     }
+    
+    
     
     override func becomeFirstResponder() -> Bool {
         updateActiveState()
@@ -226,6 +247,7 @@ final class KTextView: NSView {
     }*/
     
     private func updateCaretPosition(isVerticalMove: Bool = false) {
+        
         guard let (lineInfo, lineIndex) = findLineInfo(containing: caretIndex) else { return }
 
         let font = textStorageRef.baseFont
@@ -233,15 +255,19 @@ final class KTextView: NSView {
         let ctLine = CTLineCreateWithAttributedString(attrString)
 
         let indexInLine = caretIndex - lineInfo.range.lowerBound
+        let layoutRects = makeLayoutRects(bounds: bounds)
         let xOffset = CTLineGetOffsetForStringIndex(ctLine, indexInLine, nil)
+        //print("xOffset: \(xOffset), layoutRect.horizontalInsets: \(layoutRects.horizontalInsets)")
+        print("\(#function): updateCaretPosition() caretIndex = \(caretIndex), lineIndex = \(lineIndex), lineInfo.text = \(lineInfo.text)")
+        
+        let x = layoutRects.textRegion.rect.origin.x + layoutRects.padding + xOffset
+        let y = layoutRects.textRegion.rect.origin.y + CGFloat(lineIndex) * layoutManager.lineHeight
 
-        let rects = self.layoutRects
-        let x = rects.textRegion.rect.origin.x + xOffset
-        let y = rects.textRegion.rect.origin.y + CGFloat(lineIndex) * layoutManager.lineHeight
-
-        let height = font.ascender + abs(font.descender)
+        let height = layoutManager.lineHeight//font.ascender + abs(font.descender)
+        
         caretView.updateFrame(x: x, y: y, height: height)
         caretView.alphaValue = 1.0
+        
     }
 
     private func startCaretBlinkTimer() {
@@ -265,6 +291,14 @@ final class KTextView: NSView {
 
     // MARK: - Drawing (NSView methods)
     
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+
+        let rect = makeLayoutRects(bounds: bounds)
+        rect.draw(layoutManagerRef: layoutManager, textStorageRef: textStorageRef,baseFont: textStorageRef.baseFont )
+    }
+
+    /*
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
 
@@ -338,6 +372,7 @@ final class KTextView: NSView {
             attributedLine.draw(at: textPoint)
         }
     }
+     */
     /*
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
@@ -406,7 +441,7 @@ final class KTextView: NSView {
     }*/
     
     override func setFrameSize(_ newSize: NSSize) {
-        let edgeInsets = layoutRects.edgeInsets
+        /*let edgeInsets = layoutRects.edgeInsets
         let lineNumberWidth = layoutRects.lineNumberRegion.width
 
         let width = layoutManager.maxLineWidth
@@ -414,6 +449,18 @@ final class KTextView: NSView {
                   + edgeInsets.left
                   + edgeInsets.right
 
+        super.setFrameSize(NSSize(width: width, height: newSize.height))
+         */
+        var width : CGFloat = 0
+        if bounds.width > 0 {
+            let layoutRects = makeLayoutRects(bounds: bounds)
+            width =  layoutRects.textRegion.rect.width
+        } else {
+            width = newSize.width
+        }
+        
+        print("setFrameSize: width: \(width)")
+        
         super.setFrameSize(NSSize(width: width, height: newSize.height))
     }
     
@@ -575,7 +622,8 @@ final class KTextView: NSView {
             selectedRange = selectedRange.lowerBound..<textStorageRef.count
             return
         }
-
+        
+        let layoutRects = makeLayoutRects(bounds: bounds)
         let newLine = layoutManager._lines[newLineIndex]
         let font = textStorageRef.baseFont
         let attrString = NSAttributedString(string: newLine.text, attributes: [.font: font])
@@ -586,12 +634,14 @@ final class KTextView: NSView {
             let currentAttrString = NSAttributedString(string: currentLine.text, attributes: [.font: font])
             let currentCtLine = CTLineCreateWithAttributedString(currentAttrString)
             let indexInLine = caretIndex - currentLine.range.lowerBound
-            verticalCaretX = CTLineGetOffsetForStringIndex(currentCtLine, indexInLine, nil) + leftPadding
+            //verticalCaretX = CTLineGetOffsetForStringIndex(currentCtLine, indexInLine, nil) + leftPadding
+            verticalCaretX = CTLineGetOffsetForStringIndex(currentCtLine, indexInLine, nil) + layoutRects.padding
         }
 
         // 行末補正
         let lineWidth = CGFloat(CTLineGetTypographicBounds(ctLine, nil, nil, nil))
-        let adjustedX = min(verticalCaretX! - leftPadding, lineWidth)
+        //let adjustedX = min(verticalCaretX! - leftPadding, lineWidth)
+        let adjustedX = min(verticalCaretX! - layoutRects.padding, lineWidth)
         var targetIndexInLine = CTLineGetStringIndexForPosition(ctLine, CGPoint(x: adjustedX, y: 0))
 
         // 行末にいる場合の補正
@@ -687,14 +737,28 @@ final class KTextView: NSView {
     
     override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
-        print("\(#function)")
-
+        //print("\(#function)")
+        /*
         let location = convert(event.locationInWindow, from: nil)
         let index = caretIndexForClickedPoint(location)
 
         caretIndex = index
         selectedRange = index..<index
         horizontalSelectionBase = index
+        */
+        
+        let layoutRects = makeLayoutRects(bounds: bounds)
+        let location = convert(event.locationInWindow, from: nil)
+        switch layoutRects.regionType(for: location, layoutManager: layoutManager, textStorage: textStorageRef){
+        case .text(let index):
+            caretIndex = index
+            selectedRange = index..<index
+            horizontalSelectionBase = index
+        case .lineNumber(let line):
+            print("linenumber clicekd:  \(line)")
+        case .outside:
+            break
+        }
 
         updateCaretPosition()
         scrollCaretToVisible()
@@ -724,17 +788,22 @@ final class KTextView: NSView {
     @objc private func windowResignedKey(_ notification: Notification) {
         updateActiveState()
     }
+    
+    @objc private func clipViewBoundsDidChange(_ notification: Notification) {
+        needsDisplay = true
+    }
 
     // MARK: - KTextView methods (helpers)
     
     private func caretIndexForClickedPoint(_ point: NSPoint) -> Int {
+        let layoutRects = makeLayoutRects(bounds: bounds)
         let relativePoint = CGPoint(
             x: point.x - layoutRects.textRegion.rect.origin.x,
             y: point.y - layoutRects.textRegion.rect.origin.y
         )
 
         let lineHeight = layoutManager.lineHeight
-        let lines = layoutManager._lines
+        let lines = layoutManager.lines
         let lineCount = lines.count
 
         // 上方向に外れている場合：最初の行で X 座標に近い index を返す
@@ -768,7 +837,7 @@ final class KTextView: NSView {
     }
      
      
-
+    
     private func findLineInfo(containing index: Int) -> (LineInfo, Int)? {
         for (i, line) in layoutManager._lines.enumerated() {
             if line.range.contains(index) || index == line.range.upperBound {
@@ -793,18 +862,19 @@ final class KTextView: NSView {
         let totalLines = layoutManager._lines.count
         let lineHeight = layoutManager.lineHeight
 
-        let edgePadding = KTextView.defaultEdgePadding
+        //let edgePadding = KTextView.defaultEdgePadding
         let showLineNumber = true
         let lineNumberWidth: CGFloat = showLineNumber ? 40 : 0
 
         let height = CGFloat(totalLines) * lineHeight * 4 / 3
         
         print("layoutManager.maxLineWidth = \(layoutManager.maxLineWidth)")
-
+        let layoutRects = makeLayoutRects(bounds: bounds)
         let width = layoutManager.maxLineWidth
                     + lineNumberWidth
-                    + edgePadding.left
-                    + edgePadding.right
+        + layoutRects.padding * 2
+        //+ edgePadding.left
+                    //+ edgePadding.right
 
         //self.frame.size = CGSize(width: width, height: height)
         self.setFrameSize(CGSize(width: width, height: height))
@@ -815,63 +885,89 @@ final class KTextView: NSView {
 
     }
     
-}
-
-
-extension KTextView {
-    struct LayoutRects {
-        struct EdgeInsets {
-            let top: CGFloat
-            let bottom: CGFloat
-            let left: CGFloat
-            let right: CGFloat
+    private func makeLayoutRects(bounds: CGRect) -> LayoutRects {
+        guard let clipBounds = enclosingScrollView?.contentView.bounds else {
+            return LayoutRects.zero
         }
+        
+        let lineCount = layoutManager.lineCount
+        let digitCount = max(5, "\(lineCount)".count)
+        let attrStr = NSAttributedString(string: "0", attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: textStorageRef.baseFont.pointSize * 0.95, weight: .regular)])
+        let ctLine = CTLineCreateWithAttributedString(attrStr)
+        let charWidth = CGFloat(CTLineGetTypographicBounds(ctLine, nil, nil, nil))
+        let lineNumberRectWidth = CGFloat(digitCount) * charWidth
 
-        struct LineNumberRegion {
-            let rect: CGRect
+        let padding: CGFloat = 8
 
-            var width: CGFloat { rect.width }
-        }
-
-        struct TextRegion {
-            let rect: CGRect
-
-            var width: CGFloat { rect.width }
-            var height: CGFloat { rect.height }
-        }
-
-        let edgeInsets: EdgeInsets
-        let lineNumberRegion: LineNumberRegion
-        let textRegion: TextRegion
-
-        init(bounds: CGRect, lineNumberWidth: CGFloat, padding: EdgeInsets = .default) {
-            self.edgeInsets = padding
-
-            let usableWidth = bounds.width - padding.left - padding.right
-            let usableHeight = bounds.height - padding.top - padding.bottom
-
-            let lineNumberRect = CGRect(
-                x: padding.left,
-                y: padding.bottom,
-                width: lineNumberWidth,
-                height: usableHeight
-            )
-
-            let textRect = CGRect(
-                x: lineNumberRect.maxX,
-                y: padding.bottom,
-                width: usableWidth - lineNumberWidth,
-                height: usableHeight
-            )
-
-            self.lineNumberRegion = LineNumberRegion(rect: lineNumberRect)
-            self.textRegion = TextRegion(rect: textRect)
-        }
+        return LayoutRects(
+            bounds: clipBounds,
+            visibleRect: visibleRect,
+            lineNumberWidth: lineNumberRectWidth,
+            padding: padding,
+            showLineNumbers: showLineNumbers
+        )
     }
+    
 }
 
-extension KTextView.LayoutRects.EdgeInsets {
-    static var `default`: KTextView.LayoutRects.EdgeInsets {
-        .init(top: 4, bottom: 4, left: 8, right: 8)
-    }
-}
+
+
+/*
+ extension KTextView {
+ struct LayoutRects {
+ struct EdgeInsets {
+ let top: CGFloat
+ let bottom: CGFloat
+ let left: CGFloat
+ let right: CGFloat
+ }
+ 
+ struct LineNumberRegion {
+ let rect: CGRect
+ 
+ var width: CGFloat { rect.width }
+ }
+ 
+ struct TextRegion {
+ let rect: CGRect
+ 
+ var width: CGFloat { rect.width }
+ var height: CGFloat { rect.height }
+ }
+ 
+ let edgeInsets: EdgeInsets
+ let lineNumberRegion: LineNumberRegion
+ let textRegion: TextRegion
+ 
+ init(bounds: CGRect, lineNumberWidth: CGFloat, padding: EdgeInsets = .default) {
+ self.edgeInsets = padding
+ 
+ let usableWidth = bounds.width - padding.left - padding.right
+ let usableHeight = bounds.height - padding.top - padding.bottom
+ 
+ let lineNumberRect = CGRect(
+ x: padding.left,
+ y: padding.bottom,
+ width: lineNumberWidth,
+ height: usableHeight
+ )
+ 
+ let textRect = CGRect(
+ x: lineNumberRect.maxX,
+ y: padding.bottom,
+ width: usableWidth - lineNumberWidth,
+ height: usableHeight
+ )
+ 
+ self.lineNumberRegion = LineNumberRegion(rect: lineNumberRect)
+ self.textRegion = TextRegion(rect: textRect)
+ }
+ }
+ }
+ 
+ extension KTextView.LayoutRects.EdgeInsets {
+ static var `default`: KTextView.LayoutRects.EdgeInsets {
+ .init(top: 4, bottom: 4, left: 8, right: 8)
+ }
+ }
+ */
