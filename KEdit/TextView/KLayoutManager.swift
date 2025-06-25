@@ -9,7 +9,7 @@ import Cocoa
 
 struct LineInfo {
     let text: String
-    let glyphAdvances: [CGFloat]
+    let ctLine: CTLine
     let range: Range<Int>
 }
 
@@ -88,7 +88,7 @@ final class KLayoutManager: KLayoutManagerReadable {
                 _maxLineWidth = width
             }
 
-            _lines.append(LineInfo(text: lineText, glyphAdvances: [], range: lineRange))
+            _lines.append(LineInfo(text: lineText, ctLine: ctLine, range: lineRange))
 
             currentIndex = lineEndIndex
             if currentIndex < characters.count && characters[currentIndex] == "\n" {
