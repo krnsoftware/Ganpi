@@ -123,8 +123,9 @@ struct LayoutRects {
             }
 
             let line = lines[lineIndex]
-            let attrString = NSAttributedString(string: line.text, attributes: [.font: textStorage.baseFont])
-            let ctLine = CTLineCreateWithAttributedString(attrString)
+            //let attrString = NSAttributedString(string: line.text, attributes: [.font: textStorage.baseFont])
+            //let ctLine = CTLineCreateWithAttributedString(attrString)
+            let ctLine = line.ctLine
             let relativeX = max(0, relativePoint.x)
             let indexInLine = CTLineGetStringIndexForPosition(ctLine, CGPoint(x: relativeX, y: 0))
             

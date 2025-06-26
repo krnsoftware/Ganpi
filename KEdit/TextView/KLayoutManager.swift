@@ -8,7 +8,6 @@
 import Cocoa
 
 struct LineInfo {
-    let text: String
     let ctLine: CTLine
     let range: Range<Int>
 }
@@ -69,6 +68,10 @@ final class KLayoutManager: KLayoutManagerReadable {
         var currentIndex = 0
         let characters = _textStorageRef.characterSlice
         let font = _textStorageRef.baseFont
+        
+        if _textStorageRef.count == 0 {
+            _lines.append(LineInfo(ctLine: CTLineCreateWithAttributedString(NSAttributedString(string: "")), range: 0..<0))
+        }
 
         while currentIndex < characters.count {
             var lineEndIndex = currentIndex
@@ -78,6 +81,7 @@ final class KLayoutManager: KLayoutManagerReadable {
                 lineEndIndex += 1
             }
 
+            
             let lineRange = currentIndex..<lineEndIndex
             let lineText = String(characters[lineRange])
 
@@ -88,13 +92,21 @@ final class KLayoutManager: KLayoutManagerReadable {
                 _maxLineWidth = width
             }
 
-            _lines.append(LineInfo(text: lineText, ctLine: ctLine, range: lineRange))
+            _lines.append(LineInfo(ctLine: ctLine, range: lineRange))
 
             currentIndex = lineEndIndex
+            
+            
             if currentIndex < characters.count && characters[currentIndex] == "\n" {
+                //_lines.append(makeEmptyLine(index: currentIndex))
                 currentIndex += 1 // 改行をスキップ
             }
+            
         }
         
+    }
+    
+    private func makeEmptyLine(index: Int) -> LineInfo {
+        return LineInfo(ctLine: CTLineCreateWithAttributedString(NSAttributedString(string: "")), range: index..<index)
     }
 }
