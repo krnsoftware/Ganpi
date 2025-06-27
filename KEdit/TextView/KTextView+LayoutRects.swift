@@ -108,7 +108,7 @@ struct LayoutRects {
             
             let lineIndex = Int(relativePoint.y / lineHeight)
             
-
+            // TextRegion内だがLineに含まれない場合
             guard lines.indices.contains(lineIndex) else {
                 return .outside
             }

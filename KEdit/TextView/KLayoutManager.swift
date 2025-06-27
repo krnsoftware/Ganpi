@@ -69,8 +69,10 @@ final class KLayoutManager: KLayoutManagerReadable {
         let characters = _textStorageRef.characterSlice
         let font = _textStorageRef.baseFont
         
+        // storageが空だった場合、空行を1つ追加する。
         if _textStorageRef.count == 0 {
-            _lines.append(LineInfo(ctLine: CTLineCreateWithAttributedString(NSAttributedString(string: "")), range: 0..<0))
+            _lines.append(makeEmptyLine(index: 0))
+            return
         }
 
         while currentIndex < characters.count {
@@ -81,7 +83,6 @@ final class KLayoutManager: KLayoutManagerReadable {
                 lineEndIndex += 1
             }
 
-            
             let lineRange = currentIndex..<lineEndIndex
             let lineText = String(characters[lineRange])
 
@@ -98,10 +99,14 @@ final class KLayoutManager: KLayoutManagerReadable {
             
             
             if currentIndex < characters.count && characters[currentIndex] == "\n" {
-                //_lines.append(makeEmptyLine(index: currentIndex))
                 currentIndex += 1 // 改行をスキップ
             }
             
+        }
+        
+        //最後の文字が改行だった場合、空行を1つ追加する。
+        if _textStorageRef.characterSlice.last == "\n" {
+            _lines.append(makeEmptyLine(index: _textStorageRef.count))
         }
         
     }

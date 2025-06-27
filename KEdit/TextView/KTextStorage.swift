@@ -52,6 +52,11 @@ typealias KTextStorageProtocol = KTextStorageReadable & KTextStorageWritable
 
 // KEdit用軽量テキストストレージ
 final class KTextStorage: KTextStorageProtocol {
+    // MARK: - Enum and Struct
+    enum KDirection: Int {
+        case forward = 1
+        case backward = -1
+    }
 
     // MARK: - Properties
 
@@ -139,6 +144,21 @@ final class KTextStorage: KTextStorageProtocol {
     subscript(range: Range<Int>) -> ArraySlice<Character>? {
         guard range.lowerBound >= 0 && range.upperBound <= _characters.count else { return nil }
         return _characters[range]
+    }
+    
+    // MARK: - Utilities
+    
+    // 試しに実装したもの。
+    func characterIndex(c: Character, from: Int, direction: KDirection = .forward) -> Int? {
+        guard from >= 0 && from < characterSlice.count else { return nil }
+        
+        switch direction {
+        case .forward:
+            return characterSlice[from...].firstIndex(of: c)
+        case .backward:
+            return characterSlice[..<from].lastIndex(of: c)
+        }
+        
     }
 
     // MARK: - Private
