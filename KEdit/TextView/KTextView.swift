@@ -257,9 +257,9 @@ final class KTextView: NSView, NSTextInputClient {
     
     private func updateCaretPosition(isVerticalMove: Bool = false) {
         
-        guard let (lineInfo, lineIndex) = findLineInfo(containing: caretIndex) else { return }
+        guard let (lineInfo, lineIndex) = lineInfoFor(index: caretIndex) else { return }
 
-        let font = textStorageRef.baseFont
+        //let font = textStorageRef.baseFont
         //let attrString = NSAttributedString(string: lineInfo.text, attributes: [.font: font])
         //let ctLine = CTLineCreateWithAttributedString(attrString)
         let ctLine = lineInfo.ctLine
@@ -351,10 +351,10 @@ final class KTextView: NSView, NSTextInputClient {
             if !selection.isEmpty {
                 //let attrString = NSAttributedString(string: line.text, attributes: [.font: textStorageRef.baseFont])
                 //let ctLine = CTLineCreateWithAttributedString(attrString)
-                let ctLine = line.ctLine
+                //let ctLine = line.ctLine
                 
-                let startOffset = CTLineGetOffsetForStringIndex(ctLine, selection.lowerBound - lineRange.lowerBound, nil)
-                var endOffset = CTLineGetOffsetForStringIndex(ctLine, selection.upperBound - lineRange.lowerBound, nil)
+                let startOffset = CTLineGetOffsetForStringIndex(line.ctLine, selection.lowerBound - lineRange.lowerBound, nil)
+                var endOffset = CTLineGetOffsetForStringIndex(line.ctLine, selection.upperBound - lineRange.lowerBound, nil)
 
                 // 改行選択補正
                 let newlineIndex = lineRange.upperBound
@@ -648,8 +648,8 @@ final class KTextView: NSView, NSTextInputClient {
         interpretKeyEvents( [event] )
          */
         
-        print("\(#function) - keyDown()")
-        print("inputContext = \(inputContext?.debugDescription ?? "nil")")
+        //print("\(#function) - keyDown()")
+        //print("inputContext = \(inputContext?.debugDescription ?? "nil")")
         interpretKeyEvents( [event] )
     }
 
@@ -756,6 +756,16 @@ final class KTextView: NSView, NSTextInputClient {
 
     
     private func moveCaretVertically(to direction: KTextEditDirection, extendSelection: Bool) {
+        /*
+         private var isVerticalAction: 今回のセレクタが垂直方向にキャレット・選択範囲を動かすか否か。
+         private var wasVerticalAction: 前回のセレクタが垂直方向にキャレット・選択範囲を動かしたか否か。
+         private var wasVerticalActionWithModifySelection: 前回のセレクタが垂直方向の選択範囲を動かしたか否か。
+         private var wasHorizontalActionWithModifySelection: 全体のセレクタが水平方向に選択範囲を動かしたか否か。
+         private var verticalCaretX: CGFloat?        // 縦方向にキャレットを移動する際の基準X。
+         private var verticalSelectionBase: Int?     // 縦方向に選択範囲を拡縮する際の基準点。
+         private var horizontalSelectionBase: Int?   // 横方向に選択範囲を拡縮する際の基準点。
+         */
+        
         // anchor（verticalSelectionBase）を初回のみセット
         if !wasVerticalActionWithModifySelection && extendSelection {
             verticalSelectionBase = selectionRange.lowerBound
@@ -768,16 +778,24 @@ final class KTextView: NSView, NSTextInputClient {
         let indexForLineSearch: Int = (selectionRange.lowerBound < verticalSelectionBase!) ? selectionRange.lowerBound : selectionRange.upperBound
 
         // 基準行情報取得
-        guard let (currentLine, currentLineIndex) = findLineInfo(containing: indexForLineSearch) else { return }
+        guard let (currentLine, currentLineIndex) = lineInfoFor(index: indexForLineSearch) else { return }
 
         let newLineIndex = currentLineIndex + direction.rawValue
         // newLineIndexがTextStorageインスタンスのcharacterの領域を越えている場合には両端まで広げる。
         if newLineIndex < 0 {
-            selectionRange = 0..<selectionRange.upperBound
+            if extendSelection {
+                selectionRange = 0..<selectionRange.upperBound
+            } else {
+                caretIndex = 0
+            }
             return
         }
-        if newLineIndex >= layoutManager._lines.count {
-            selectionRange = selectionRange.lowerBound..<textStorageRef.count
+        if newLineIndex >= layoutManager.lines.count {
+            if extendSelection {
+                selectionRange = selectionRange.lowerBound..<textStorageRef.count
+            } else {
+                caretIndex = textStorageRef.count
+            }
             return
         }
         
@@ -786,36 +804,36 @@ final class KTextView: NSView, NSTextInputClient {
             return
         }
         
-        //let newLine = layoutManager._lines[newLineIndex]
         let newLineInfo = layoutManager.lines[newLineIndex]
-        let font = textStorageRef.baseFont
-        //let attrString = NSAttributedString(string: newLine.text, attributes: [.font: font])
-        //let ctLine = CTLineCreateWithAttributedString(attrString)
         let ctLine = newLineInfo.ctLine
 
         // 初回のみ verticalCaretX をセット
         if isVerticalAction && !wasVerticalAction {
-            //let currentAttrString = NSAttributedString(string: currentLine.text, attributes: [.font: font])
-            //let currentCtLine = CTLineCreateWithAttributedString(currentAttrString)
             let currentCtLine = currentLine.ctLine
             let indexInLine = caretIndex - currentLine.range.lowerBound
-            //verticalCaretX = CTLineGetOffsetForStringIndex(currentCtLine, indexInLine, nil) + leftPadding
-            verticalCaretX = CTLineGetOffsetForStringIndex(currentCtLine, indexInLine, nil) + layoutRects.textEdgeInsets.left
+            //verticalCaretX = CTLineGetOffsetForStringIndex(currentCtLine, indexInLine, nil) + layoutRects.textEdgeInsets.left
+            verticalCaretX = CTLineGetOffsetForStringIndex(currentCtLine, indexInLine, nil) + layoutRects.horizontalInsets
+            //print("first time verticalaction. verticalCaretX:\(verticalCaretX!)")
         }
 
         // 行末補正
+        // 次の行のテキストの横幅より右にキャレットが移動する場合、キャレットはテキストの右端へ。
         let lineWidth = CGFloat(CTLineGetTypographicBounds(ctLine, nil, nil, nil))
-        //let adjustedX = min(verticalCaretX! - leftPadding, lineWidth)
-        let adjustedX = min(verticalCaretX! - layoutRects.textEdgeInsets.left, lineWidth)
-        var targetIndexInLine = CTLineGetStringIndexForPosition(ctLine, CGPoint(x: adjustedX, y: 0))
+        //let adjustedX = min(verticalCaretX! - layoutRects.textEdgeInsets.left, lineWidth)
+        let adjustedX = min(verticalCaretX! - layoutRects.horizontalInsets, lineWidth)
+        //print("adjustedX:\(adjustedX)")
+        let targetIndexInLine = CTLineGetStringIndexForPosition(ctLine, CGPoint(x: adjustedX, y: 0))
+        
+        //print("\(#function): targetIndexInLine:\(targetIndexInLine)")
 
         // 行末にいる場合の補正
+        /*
         if caretIndex == currentLine.range.upperBound {
-            //targetIndexInLine = newLine.text.count
-            targetIndexInLine = newLineInfo.range.upperBound
-        }
+            //targetIndexInLine = newLineInfo.range.upperBound
+            targetIndexInLine = newLineInfo.range.count
+            //print("targetIndexInLine=\(targetIndexInLine)")
+        }*/
 
-        //let newCaretIndex = newLine.range.lowerBound + targetIndexInLine
         let newCaretIndex = newLineInfo.range.lowerBound + targetIndexInLine
 
         // 選択範囲更新（verticalSelectionBaseは常に基準点として使用）
@@ -828,8 +846,21 @@ final class KTextView: NSView, NSTextInputClient {
         } else {
             selectionRange = newCaretIndex..<newCaretIndex
         }
+        
+        //print("newCaretIndex:\(newCaretIndex), selectionRange:\(selectionRange), verticalCaretX:\(verticalCaretX!), verticalSelectionBase:\(verticalSelectionBase!), targetIndexInLine:\(targetIndexInLine), total:\(textStorageRef.count), ")
 
         updateCaretPosition(isVerticalMove: true)
+    }
+    
+    // MARK: - Text Editing
+    
+    override func insertNewline(_ sender: Any?) {
+        textStorageRef.insertCharacter(String.ReturnCharacter.lf.rawValue, at: caretIndex)
+        caretIndex += 1
+        
+        updateFrameSizeToFitContent()
+        updateCaretPosition()
+        needsDisplay = true
     }
     
     // MARK: - COPY and Paste (NSResponder method)
@@ -904,15 +935,9 @@ final class KTextView: NSView, NSTextInputClient {
     
     override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
-        //print("\(#function)")
-        /*
-        let location = convert(event.locationInWindow, from: nil)
-        let index = caretIndexForClickedPoint(location)
-
-        caretIndex = index
-        selectedRange = index..<index
-        horizontalSelectionBase = index
-        */
+        
+        //キャレット移動のセレクタ記録に残すためのダミーセレクタ。
+        doCommand(by: #selector(clearCaretContext(_:)))
         
         guard let layoutRects = makeLayoutRects(bounds: bounds) else {
             print("\(#function): layoutRects is nil")
@@ -1157,8 +1182,9 @@ final class KTextView: NSView, NSTextInputClient {
      
      
     
-    private func findLineInfo(containing index: Int) -> (LineInfo, Int)? {
-        for (i, line) in layoutManager._lines.enumerated() {
+    private func lineInfoFor(index: Int) -> (LineInfo, Int)? {
+        for (i, line) in layoutManager.lines.enumerated() {
+            // lineのrangeがindexを含むか、あるいは後端(改行)であった場合はその行を返す。
             if line.range.contains(index) || index == line.range.upperBound {
                 return (line, i)
             }
@@ -1223,66 +1249,8 @@ final class KTextView: NSView, NSTextInputClient {
         )
     }
     
+    // mouseDown()などのセレクター履歴を残すためのダミー。
+    @objc func clearCaretContext(_ sender: Any?) { }
+    
 }
 
-
-
-/*
- extension KTextView {
- struct LayoutRects {
- struct EdgeInsets {
- let top: CGFloat
- let bottom: CGFloat
- let left: CGFloat
- let right: CGFloat
- }
- 
- struct LineNumberRegion {
- let rect: CGRect
- 
- var width: CGFloat { rect.width }
- }
- 
- struct TextRegion {
- let rect: CGRect
- 
- var width: CGFloat { rect.width }
- var height: CGFloat { rect.height }
- }
- 
- let edgeInsets: EdgeInsets
- let lineNumberRegion: LineNumberRegion
- let textRegion: TextRegion
- 
- init(bounds: CGRect, lineNumberWidth: CGFloat, padding: EdgeInsets = .default) {
- self.edgeInsets = padding
- 
- let usableWidth = bounds.width - padding.left - padding.right
- let usableHeight = bounds.height - padding.top - padding.bottom
- 
- let lineNumberRect = CGRect(
- x: padding.left,
- y: padding.bottom,
- width: lineNumberWidth,
- height: usableHeight
- )
- 
- let textRect = CGRect(
- x: lineNumberRect.maxX,
- y: padding.bottom,
- width: usableWidth - lineNumberWidth,
- height: usableHeight
- )
- 
- self.lineNumberRegion = LineNumberRegion(rect: lineNumberRect)
- self.textRegion = TextRegion(rect: textRect)
- }
- }
- }
- 
- extension KTextView.LayoutRects.EdgeInsets {
- static var `default`: KTextView.LayoutRects.EdgeInsets {
- .init(top: 4, bottom: 4, left: 8, right: 8)
- }
- }
- */

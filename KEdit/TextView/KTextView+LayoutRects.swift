@@ -114,12 +114,13 @@ struct LayoutRects {
             }
 
             let line = lines[lineIndex]
-            let ctLine = line.ctLine
             let relativeX = max(0, relativePoint.x)
-            let indexInLine = CTLineGetStringIndexForPosition(ctLine, CGPoint(x: relativeX, y: 0))
+            let indexInLine = CTLineGetStringIndexForPosition(line.ctLine, CGPoint(x: relativeX, y: 0))
             
-            print("regionType - in textRegion, lineIndex=\(lineIndex), indexInLine=\(indexInLine)")
+            //print("regionType - in textRegion, lineIndex=\(lineIndex), indexInLine=\(indexInLine)")
             
+            // CTLineGetStringIndexForPosition()は、ドキュメントにはないが、空行の場合に-1を返す仕様らしい。
+            // 空行の場合はindexは0で問題ないことから、-1の場合には0を返す。
             return .text(index: line.range.lowerBound + (indexInLine >= 0 ? indexInLine : 0))
         }
 
