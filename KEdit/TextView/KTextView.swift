@@ -328,7 +328,7 @@ final class KTextView: NSView, NSTextInputClient {
             : NSColor.unemphasizedSelectedTextBackgroundColor
         
         //print("bgColor: \(bgColor.toHexString(includeAlpha: true))")
-        
+        //print("layoutManager.maxLineWidth: \(layoutManager.maxLineWidth)")
         
         for (i, line) in lines.enumerated() {
             //let y = CGFloat(i) * lineHeight
@@ -340,21 +340,33 @@ final class KTextView: NSView, NSTextInputClient {
             // 選択範囲の描画
             let lineRange = line.range
             let selection = selectionRange.clamped(to: lineRange)
-            if !selection.isEmpty {
+            //if !selection.isEmpty {
                 
                 let startOffset = CTLineGetOffsetForStringIndex(line.ctLine, selection.lowerBound - lineRange.lowerBound, nil)
                 var endOffset = CTLineGetOffsetForStringIndex(line.ctLine, selection.upperBound - lineRange.lowerBound, nil)
+                //print("startOffset \(startOffset) endOffset \(endOffset)")
 
                 // 改行選択補正
+                /*
                 let newlineIndex = lineRange.upperBound
                 if newlineIndex < textStorageRef.count,
                    let char = textStorageRef[newlineIndex],
                    char == "\n",
-                   selectionRange.contains(newlineIndex) {
+                   selection.isEmpty,
+                   selectionRange.contains(newlineIndex){
+                    print("char")
                     endOffset = bounds.width - textRect.origin.x - startOffset
                 } else {
                     endOffset -= startOffset
                 }
+                 */
+            
+            // 改行が選択範囲に含まれている場合、その行はboundsの右端まで選択描画。
+            if selectionRange.contains(lineRange.upperBound) {
+                endOffset = bounds.width - textRect.origin.x - startOffset
+            } else {
+                endOffset -= startOffset
+            }
 
                 let selectionRect = CGRect(
                     x: textRect.origin.x + startOffset + layoutRects.horizontalInsets,
@@ -364,7 +376,7 @@ final class KTextView: NSView, NSTextInputClient {
                 )
                 selectedTextBGColor.setFill()
                 selectionRect.fill()
-            }
+            //}
             
             // テキスト部分を描画。
             // 見えている範囲をy方向にlineHeightだけ拡大したもの。見えていない場所は描画しない。
