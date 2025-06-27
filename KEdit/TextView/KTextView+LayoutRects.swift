@@ -69,8 +69,10 @@ struct LayoutRects {
         
         self.lineNumberRegion = lineNumberRect.map { Region(rect: $0) }
 
-        let textWidth = CGFloat(layoutManagerRef.maxLineWidth) + textEdgeInsets.left + lineNumberWidth + textEdgeInsets.right
-        let textHeight = CGFloat(layoutManagerRef.lineCount) * layoutManagerRef.lineHeight + textEdgeInsets.top + textEdgeInsets.bottom + visibleRect.height * 0.67 // 見えている領域の2/3くらいの高さを余分に設定する。
+        //let textWidth = CGFloat(layoutManagerRef.maxLineWidth) + textEdgeInsets.left + lineNumberWidth + textEdgeInsets.right
+        let textWidth = max(CGFloat(layoutManagerRef.maxLineWidth) + textEdgeInsets.left + lineNumberWidth + textEdgeInsets.right, visibleRect.width)
+        //let textHeight = CGFloat(layoutManagerRef.lineCount) * layoutManagerRef.lineHeight + textEdgeInsets.top + textEdgeInsets.bottom + visibleRect.height * 0.67 // 見えている領域の2/3くらいの高さを余分に設定する。
+        let textHeight = max(CGFloat(layoutManagerRef.lineCount) * layoutManagerRef.lineHeight + textEdgeInsets.top + textEdgeInsets.bottom + visibleRect.height * 0.67,visibleRect.height)
        
         let textRect = CGRect(x: 0, y: 0, width: textWidth, height: textHeight)
 
