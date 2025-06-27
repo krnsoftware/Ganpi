@@ -341,9 +341,6 @@ final class KTextView: NSView, NSTextInputClient {
             let lineRange = line.range
             let selection = selectionRange.clamped(to: lineRange)
             if !selection.isEmpty {
-                //let attrString = NSAttributedString(string: line.text, attributes: [.font: textStorageRef.baseFont])
-                //let ctLine = CTLineCreateWithAttributedString(attrString)
-                //let ctLine = line.ctLine
                 
                 let startOffset = CTLineGetOffsetForStringIndex(line.ctLine, selection.lowerBound - lineRange.lowerBound, nil)
                 var endOffset = CTLineGetOffsetForStringIndex(line.ctLine, selection.upperBound - lineRange.lowerBound, nil)
@@ -417,17 +414,20 @@ final class KTextView: NSView, NSTextInputClient {
                 let numberPointX = lnRect.maxX - size.width - layoutRects.textEdgeInsets.left
                 let numberPointY = lnRect.origin.y + y - visibleRect.origin.y
                 let numberPoint = CGPoint(x: numberPointX, y: numberPointY)
-                /*let numberPoint = CGPoint(x: lnRect.maxX - size.width - layoutRects.textEdgeInsets.left,
-                                          y: lnRect.origin.y + y - visibleRect.origin.y)*/
                 
                 // 見えている範囲をy方向にlineHeightだけ拡大したもの。見えていない場所は描画しない。
-                if verticalRange.contains(numberPoint.y) {
-                    if lines[i].range.overlaps(selectionRange) || lines[i].range.contains(caretIndex) ||
-                        lines[i].range.upperBound == caretIndex {
-                        number.draw(at: numberPoint, withAttributes: attrs_emphasized)
-                    } else {
-                        number.draw(at: numberPoint, withAttributes: attrs)
-                    }
+                let lineRange = lines[i].range
+                let caretIsInLine = lineRange.contains(caretIndex) || caretIndex == lineRange.upperBound
+                let selectionOverlapsLine =
+                    selectionRange.overlaps(lineRange) ||
+                    (!selectionRange.isEmpty &&
+                     selectionRange.lowerBound <= lineRange.lowerBound &&
+                     selectionRange.upperBound >= lineRange.upperBound)
+                
+                if caretIsInLine || selectionOverlapsLine {
+                    number.draw(at: numberPoint, withAttributes: attrs_emphasized)
+                } else {
+                    number.draw(at: numberPoint, withAttributes: attrs)
                 }
                 
             }
