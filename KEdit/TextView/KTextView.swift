@@ -303,6 +303,14 @@ final class KTextView: NSView, NSTextInputClient {
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
         
+        // test. TextRegionの外枠を赤で描く。
+        /*
+        let path = NSBezierPath(rect: layoutRects.textRegion.rect)
+        NSColor.red.setStroke()
+        path.lineWidth = 1
+        path.stroke()
+         */
+        
         guard let layoutRects = makeLayoutRects(bounds: bounds) else {
             print("\(#function): layoutRects is nil")
             return
@@ -444,13 +452,6 @@ final class KTextView: NSView, NSTextInputClient {
                 
             }
         }
-        // test. TextRegionの外枠を赤で描く。
-        /*
-        let path = NSBezierPath(rect: layoutRects.textRegion.rect)
-        NSColor.red.setStroke()
-        path.lineWidth = 1
-        path.stroke()
-         */
         
     }
     /*
@@ -1005,8 +1006,18 @@ final class KTextView: NSView, NSTextInputClient {
             let lower = min(base, dragCaretIndex)
             let upper = max(base, dragCaretIndex)
             selectionRange = lower..<upper
+            
         case .lineNumber(let line):
-            print("linenumber dragged:  \(line)")
+            //現在の選択範囲から、指定れた行の最後(改行含む)までを選択する。
+            //horizontalSelectionBaseより前であれば、行頭までを選択する。
+            let lineRange = layoutManager.lines[line].range
+            let base = horizontalSelectionBase ?? caretIndex
+            if lineRange.upperBound > base {
+                selectionRange = base..<lineRange.upperBound
+            } else {
+                selectionRange = lineRange.lowerBound..<base
+            }
+            
         case .outside:
             // textRegionより上なら文頭まで、下なら文末まで選択する。
             let textRect = layoutRects.textRegion.rect
