@@ -955,16 +955,34 @@ final class KTextView: NSView, NSTextInputClient {
             return
         }
         
+        
         let location = convert(event.locationInWindow, from: nil)
-        switch layoutRects.regionType(for: location, layoutManager: layoutManager, textStorage: textStorageRef){
+        switch layoutRects.regionType(for: location, layoutManagerRef: layoutManager, textStorageRef: textStorageRef){
         case .text(let index):
-            caretIndex = index
-            //selectedRange = index..<index
-            horizontalSelectionBase = index
+            switch event.clickCount {
+            case 1: // シングルクリック - クリック位置にキャレットを移動。
+                caretIndex = index
+                horizontalSelectionBase = index
+            case 2: // ダブルクリック - クリックした部分を単語選択。
+                if let wordRange = textStorageRef.wordRange(at: index) {
+                    selectionRange = wordRange
+                } else {
+                    caretIndex = index
+                }
+                horizontalSelectionBase = selectionRange.lowerBound
+            case 3: // トリプルクリック - クリックした部分の行全体を選択。
+                if let lineInfo = layoutManager.lineInfo(at: index) {
+                    let isLastLine = lineInfo.range.upperBound == textStorageRef.count
+                    selectionRange = lineInfo.range.lowerBound..<lineInfo.range.upperBound + (isLastLine ? 0 : 1)
+                }
+                horizontalSelectionBase = selectionRange.lowerBound
+            default:
+                break
+            }
         case .lineNumber(let line):
-            //print("linenumber clicekd:  \(line)")
             let lineInfo = layoutManager.lines[line]
             selectionRange = lineInfo.range
+            horizontalSelectionBase = lineInfo.range.lowerBound
         case .outside:
             break
         }
@@ -999,7 +1017,7 @@ final class KTextView: NSView, NSTextInputClient {
         
         let location = convert(event.locationInWindow, from: nil)
         
-        switch layoutRects.regionType(for: location, layoutManager: layoutManager, textStorage: textStorageRef){
+        switch layoutRects.regionType(for: location, layoutManagerRef: layoutManager, textStorageRef: textStorageRef){
         case .text(let index):
             let dragCaretIndex = index
             let base = horizontalSelectionBase ?? caretIndex

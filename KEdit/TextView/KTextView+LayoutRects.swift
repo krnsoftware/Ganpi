@@ -86,11 +86,11 @@ struct LayoutRects {
     }
 
     func regionType(for point: CGPoint,
-                    layoutManager: KLayoutManagerReadable,
-                    textStorage: KTextStorageReadable) -> RegionType {
+                    layoutManagerRef: KLayoutManagerReadable,
+                    textStorageRef: KTextStorageReadable) -> RegionType {
         
-        let lineHeight = layoutManager.lineHeight
-        let lines = layoutManager.lines
+        let lineHeight = layoutManagerRef.lineHeight
+        let lines = layoutManagerRef.lines
         let lineCount = lines.count
 
         // LineNumberRegionの場合
@@ -110,20 +110,27 @@ struct LayoutRects {
             
             let lineIndex = Int(relativePoint.y / lineHeight)
             
-            // TextRegion内だがLineに含まれない場合
-            guard lines.indices.contains(lineIndex) else {
-                return .outside
+            // TextRegion内でLineに含まれる場合
+            if lines.indices.contains(lineIndex) {
+                let line = lines[lineIndex]
+                let relativeX = max(0, relativePoint.x)
+                let indexInLine = CTLineGetStringIndexForPosition(line.ctLine, CGPoint(x: relativeX, y: 0))
+                
+                //print("regionType - in textRegion, lineIndex=\(lineIndex), indexInLine=\(indexInLine)")
+                
+                // CTLineGetStringIndexForPosition()は、ドキュメントにはないが、空行の場合に-1を返す仕様らしい。
+                // 空行の場合はindexは0で問題ないことから、-1の場合には0を返す。
+                return .text(index: line.range.lowerBound + (indexInLine >= 0 ? indexInLine : 0))
+                
+            } else {
+                // 1行目より上の場合は0を、下の場合は文末のindexを返す。
+                if relativePoint.y < textEdgeInsets.top {
+                    return .text(index: 0)
+                } else if relativePoint.y >= (CGFloat(lineCount) * lineHeight - textEdgeInsets.bottom) {
+                    return .text(index: textStorageRef.count)
+                }
+                
             }
-
-            let line = lines[lineIndex]
-            let relativeX = max(0, relativePoint.x)
-            let indexInLine = CTLineGetStringIndexForPosition(line.ctLine, CGPoint(x: relativeX, y: 0))
-            
-            //print("regionType - in textRegion, lineIndex=\(lineIndex), indexInLine=\(indexInLine)")
-            
-            // CTLineGetStringIndexForPosition()は、ドキュメントにはないが、空行の場合に-1を返す仕様らしい。
-            // 空行の場合はindexは0で問題ないことから、-1の場合には0を返す。
-            return .text(index: line.range.lowerBound + (indexInLine >= 0 ? indexInLine : 0))
         }
 
         return .outside

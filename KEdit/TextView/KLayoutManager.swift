@@ -10,6 +10,8 @@ import Cocoa
 struct LineInfo {
     let ctLine: CTLine
     let range: Range<Int>
+    let hardLineIndex: Int
+    let softLineIndex: Int
 }
 
 // MARK: - protocol KLayoutManagerReadable
@@ -66,6 +68,7 @@ final class KLayoutManager: KLayoutManagerReadable {
         _maxLineWidth = 0
 
         var currentIndex = 0
+        var currentLineNumber = 0
         let characters = _textStorageRef.characterSlice
         let font = _textStorageRef.baseFont
         
@@ -93,9 +96,10 @@ final class KLayoutManager: KLayoutManagerReadable {
                 _maxLineWidth = width
             }
 
-            _lines.append(LineInfo(ctLine: ctLine, range: lineRange))
+            _lines.append(LineInfo(ctLine: ctLine, range: lineRange, hardLineIndex: currentLineNumber, softLineIndex: currentLineNumber))
 
             currentIndex = lineEndIndex
+            currentLineNumber += 1
             
             
             if currentIndex < characters.count && characters[currentIndex] == "\n" {
@@ -112,6 +116,18 @@ final class KLayoutManager: KLayoutManagerReadable {
     }
     
     private func makeEmptyLine(index: Int) -> LineInfo {
-        return LineInfo(ctLine: CTLineCreateWithAttributedString(NSAttributedString(string: "")), range: index..<index)
+        return LineInfo(ctLine: CTLineCreateWithAttributedString(NSAttributedString(string: "")),
+                        range: index..<index,
+                        hardLineIndex: 0,
+                        softLineIndex: 0)
+    }
+    
+    func lineInfo(at index: Int) -> LineInfo? {
+        for line in lines {
+            if line.range.contains(index) || index == line.range.upperBound {
+                    return line
+            }
+        }
+        return nil
     }
 }

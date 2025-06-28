@@ -167,3 +167,47 @@ final class KTextStorage: KTextStorageProtocol {
         _observers.forEach { $0() }
     }
 }
+
+// MARK: - TextStorageReadable extension
+
+
+
+extension KTextStorageReadable {
+    
+    // TextStorageのindexを含む単語を返す。
+    func wordRange(at index: Int) -> Range<Int>? {
+
+        guard index >= 0 && index < count else { return nil }
+
+        // Characterベース → String → NSString → UTF16でのインデックス位置を取得
+        let characterArray = Array(characterSlice)
+        let prefixString = String(characterArray.prefix(index))
+        let utf16Offset = prefixString.utf16.count
+        
+        // NSStringでトークンを取得
+        let nsString = NSString(string: String(characterArray))
+        let cfTokenizer = CFStringTokenizerCreate(nil, nsString, CFRangeMake(0, nsString.length), kCFStringTokenizerUnitWord, nil)
+        CFStringTokenizerGoToTokenAtIndex(cfTokenizer, utf16Offset)
+        let tokenRange = CFStringTokenizerGetCurrentTokenRange(cfTokenizer)
+        
+        // tokenRangeが存在しない場合にはnilを返す
+        guard tokenRange.location != kCFNotFound else { return nil }
+        
+        // 範囲の変換（UTF-16 → Characterインデックス）
+        let utf16View = nsString as String
+        guard let fromUTF16 = utf16View.utf16.index(utf16View.utf16.startIndex, offsetBy: tokenRange.location, limitedBy: utf16View.utf16.endIndex),
+              let toUTF16 = utf16View.utf16.index(fromUTF16, offsetBy: tokenRange.length, limitedBy: utf16View.utf16.endIndex),
+              let start = fromUTF16.samePosition(in: utf16View),
+              let end = toUTF16.samePosition(in: utf16View)
+        else {
+            return nil
+        }
+
+        let startIndex = utf16View.distance(from: utf16View.startIndex, to: start)
+        let endIndex = utf16View.distance(from: utf16View.startIndex, to: end)
+        return startIndex..<endIndex
+    }
+}
+
+
+
