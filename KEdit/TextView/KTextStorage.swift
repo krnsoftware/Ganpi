@@ -23,6 +23,9 @@ protocol KTextStorageCommon: AnyObject {
 // 読み取り専用プロトコル
 protocol KTextStorageReadable: KTextStorageCommon {
     var string: String { get }
+    //func attributedString(for range: Range<Int>) -> NSAttributedString?
+    //func wordRange(at index: Int) -> Range<Int>?
+    
 }
 
 // 書き込み可能プロトコル（読み取り継承なし）
@@ -56,6 +59,12 @@ final class KTextStorage: KTextStorageProtocol {
     enum KDirection: Int {
         case forward = 1
         case backward = -1
+    }
+    
+    // attribute runの仮実装
+    struct AttributeRun {
+        let range: Range<Int>
+        let attributes: [NSAttributedString.Key: Any]
     }
 
     // MARK: - Properties
@@ -206,6 +215,39 @@ extension KTextStorageReadable {
         let startIndex = utf16View.distance(from: utf16View.startIndex, to: start)
         let endIndex = utf16View.distance(from: utf16View.startIndex, to: end)
         return startIndex..<endIndex
+    }
+    
+    
+    // 与えられたRangeの範囲のテキストをNSAttributedStringとして返す。
+    // 現在仮実装。最終的にtree-sitterによる色分けを行う予定。
+    func attributedString(for range: Range<Int>) -> NSAttributedString? {
+            guard let slice = self[range] else { return nil }
+
+        // 仮実装：全体に一律の属性を与える
+        let attributes: [NSAttributedString.Key: Any] = [.font: baseFont, .foregroundColor: NSColor.black]
+        let attributeRun = KTextStorage.AttributeRun(
+            range: characterSlice.startIndex..<characterSlice.endIndex,
+            attributes: attributes
+        )
+        let attributeRuns = [attributeRun]
+
+        let result = NSMutableAttributedString()
+        for run in attributeRuns {
+            let overlap = run.range.clamped(to: range)
+            if overlap.count == 0 { continue }
+            
+            // ArraySliceのstartIndex補正
+            let lowerOffset = overlap.lowerBound - range.lowerBound
+            let upperOffset = overlap.upperBound - range.lowerBound
+
+            let lowerIndex = slice.index(slice.startIndex, offsetBy: lowerOffset)
+            let upperIndex = slice.index(slice.startIndex, offsetBy: upperOffset)
+            let subSlice = slice[lowerIndex..<upperIndex]
+            let string = String(subSlice)
+
+            result.append(NSAttributedString(string: string, attributes: run.attributes))
+        }
+        return result
     }
 }
 

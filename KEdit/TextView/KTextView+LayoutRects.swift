@@ -66,7 +66,6 @@ struct LayoutRects {
         CGRect(x: visibleRect.origin.x, y: visibleRect.origin.y, width: lineNumberWidth, height: visibleRect.height) :
             nil
         
-        
         self.lineNumberRegion = lineNumberRect.map { Region(rect: $0) }
 
         //let textWidth = CGFloat(layoutManagerRef.maxLineWidth) + textEdgeInsets.left + lineNumberWidth + textEdgeInsets.right
