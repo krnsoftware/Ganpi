@@ -33,6 +33,7 @@ final class KLayoutManager: KLayoutManagerReadable {
     private(set) var _lines: [LineInfo] = []
     private var _maxLineWidth: CGFloat = 0
     private let _textStorageRef: KTextStorageProtocol
+    private weak var _textView: KTextView?
     
     var lineSpacing: CGFloat = 2.0
     
@@ -52,14 +53,27 @@ final class KLayoutManager: KLayoutManagerReadable {
     var lines: ArraySlice<LineInfo> {
         return ArraySlice(_lines)
     }
+    
+    var textView: KTextView? {
+        get { return _textView }
+        set { _textView = newValue }
+    }
 
     // MARK: - Init
 
     init(textStorageRef: KTextStorageProtocol) {
-        _textStorageRef = textStorageRef 
-        //textStorageRef.string = "abcde日本語の文章でも問題ないか確認。\n複数行ではどうなるかな。\nこれは3行目。ちゃんと表示されてほしい。"
+        _textStorageRef = textStorageRef
+        /*
+        textStorageRef.addObserver { [weak self] in
+            self?.textStorageDidChange()
+        }
+         */
+        
+        textStorageRef.addObserver { [weak self] modification in
+            self?.textStorageDidModify(modification)
+        }
+        
         rebuildLayout()
-        print("\(#function) - Layoutmanager initialized. and rebuild.")
     }
 
     // MARK: - Layout
@@ -76,7 +90,6 @@ final class KLayoutManager: KLayoutManagerReadable {
         // storageが空だった場合、空行を1つ追加する。
         if _textStorageRef.count == 0 {
             _lines.append(makeEmptyLine(index: 0, hardLineIndex: 0))
-            print("\(#function) - textStorage is empty. add empty line.")
             return
         }
 
@@ -90,10 +103,6 @@ final class KLayoutManager: KLayoutManagerReadable {
 
             let lineRange = currentIndex..<lineEndIndex
             
-            /*
-            let lineText = String(characters[lineRange])
-            let attrString = NSAttributedString(string: lineText, attributes: [.font: font])
-            */
             guard let attrString = _textStorageRef.attributedString(for: lineRange) else { print("\(#function) - attrString is nil"); return }
             
             let ctLine = CTLineCreateWithAttributedString(attrString)
@@ -118,10 +127,34 @@ final class KLayoutManager: KLayoutManagerReadable {
         if _textStorageRef.characterSlice.last == "\n" {
             _lines.append(makeEmptyLine(index: _textStorageRef.count, hardLineIndex: _lines.count))
         }
-        
-        print("✅ lines.count = \(lines.count)")
-        
+                
     }
+    
+    // textStorageが変更された際に呼び出される。
+    /*private func textStorageDidChange() {
+        guard let view = textView else { print("KLayoutManager - textStorageDidChange - textView is nil"); return }
+        
+        rebuildLayout()
+        
+        view.textStorageDidChange()
+        
+    }*/
+    func textStorageDidModify(_ modification: KStorageModified) {
+        guard let view = textView else { print("KLayoutManager - textStorageDidChange - textView is nil"); return }
+        
+        switch modification {
+        case let .textChanged(range, insertedCount):
+            print("🔧 テキスト変更: range = \(range), inserted = \(insertedCount)")
+            rebuildLayout()
+            view.textStorageDidModify(modification)
+            
+
+        case let .colorChanged(range):
+            print("🎨 カラー変更: range = \(range)")
+            
+        }
+    }
+    
     
     private func makeEmptyLine(index: Int, hardLineIndex: Int) -> LineInfo {
         return LineInfo(ctLine: CTLineCreateWithAttributedString(NSAttributedString(string: "")),
@@ -132,6 +165,7 @@ final class KLayoutManager: KLayoutManagerReadable {
     
     
     func lineInfo(at index: Int) -> LineInfo? {
+        //print("lineInfo(at: \(index))")
         for line in lines {
             if line.range.contains(index) || index == line.range.upperBound {
                     return line

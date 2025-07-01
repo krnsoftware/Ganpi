@@ -7,6 +7,14 @@
 
 import Cocoa
 
+// MARK: - General enum and struct
+
+// Observingに使用するenum
+enum KStorageModified {
+    case textChanged(range: Range<Int>, insertedCount: Int)
+    case colorChanged(range: Range<Int>)
+}
+
 // MARK: - KTextStorageProtocol
 // read-onlyとして利用する場合にはKTextStorageReadableを使用。
 // read & writeとして利用する場合にはKTextStorageProtocolを使用。
@@ -18,13 +26,15 @@ protocol KTextStorageCommon: AnyObject {
     var characterSlice: ArraySlice<Character> { get }
     subscript(index: Int) -> Character? { get }
     subscript(range: Range<Int>) -> ArraySlice<Character>? { get }
+    
+    //func addObserver(_ observer: @escaping () -> Void)
+    func addObserver(_ observer: @escaping (KStorageModified) -> Void)
 }
 
 // 読み取り専用プロトコル
 protocol KTextStorageReadable: KTextStorageCommon {
     var string: String { get }
-    //func attributedString(for range: Range<Int>) -> NSAttributedString?
-    //func wordRange(at index: Int) -> Range<Int>?
+    
     
 }
 
@@ -66,11 +76,13 @@ final class KTextStorage: KTextStorageProtocol {
         let range: Range<Int>
         let attributes: [NSAttributedString.Key: Any]
     }
+    
 
     // MARK: - Properties
 
     private(set) var _characters: [Character] = []
-    private var _observers: [() -> Void] = []
+    //private var _observers: [() -> Void] = []
+    private var _observers: [(KStorageModified) -> Void] = []
     private var _baseFont: NSFont = .monospacedSystemFont(ofSize: 12, weight: .regular)
 
     // MARK: - Public API
@@ -79,19 +91,23 @@ final class KTextStorage: KTextStorageProtocol {
 
     var string: String {
         get { String(_characters) }
-        set { _characters = Array(newValue); notifyObservers() }
+        //set { _characters = Array(newValue); notifyObservers() }
+        set { _characters = Array(newValue) }
     }
     
     var characters: [Character] { // 将来的に内部データが[Character]でなくなる可能性あり。
         get { _characters }
-        set { _characters = newValue; notifyObservers()}
+        //set { _characters = newValue; notifyObservers()}
+        set {
+            replaceCharacters(in: 0..<newValue.count, with: newValue)
+        }
     }
 
     var baseFont: NSFont {
         get { _baseFont }
         set {
             _baseFont = newValue
-            notifyObservers()
+            notifyColoringChanged(in: 0..<_characters.count)
         }
     }
 
@@ -99,7 +115,7 @@ final class KTextStorage: KTextStorageProtocol {
         get { _baseFont.pointSize }
         set {
             _baseFont = _baseFont.withSize(newValue)
-            notifyObservers()
+            notifyColoringChanged(in: 0..<_characters.count)
         }
     }
     
@@ -116,7 +132,9 @@ final class KTextStorage: KTextStorageProtocol {
         }
 
         _characters.replaceSubrange(range, with: newCharacters)
-        notifyObservers()
+        //notifyObservers()
+        //print("replaceCharacters()")
+        notifyObservers(.textChanged(range: range, insertedCount: newCharacters.count))
         return true
     }
 
@@ -141,7 +159,9 @@ final class KTextStorage: KTextStorageProtocol {
     }
     
 
-    func addObserver(_ observer: @escaping () -> Void) {
+    //func addObserver(_ observer: @escaping () -> Void) {
+    func addObserver(_ observer: @escaping ((KStorageModified) -> Void)){
+        print("\(#function)")
         _observers.append(observer)
     }
     
@@ -171,10 +191,18 @@ final class KTextStorage: KTextStorageProtocol {
     }
 
     // MARK: - Private
-
+/*
     private func notifyObservers() {
         _observers.forEach { $0() }
+    }*/
+    private func notifyObservers(_ event: KStorageModified) {
+        _observers.forEach { $0(event) }
     }
+    
+    // attributeの変更についてはテキストの変更ではなくattributeの変更の際に手動で送信する。
+    func notifyColoringChanged(in range: Range<Int>) {
+            notifyObservers(.colorChanged(range: range))
+        }
 }
 
 // MARK: - TextStorageReadable extension
