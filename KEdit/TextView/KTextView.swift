@@ -313,11 +313,8 @@ final class KTextView: NSView, NSTextInputClient {
             ? NSColor.selectedTextBackgroundColor
             : NSColor.unemphasizedSelectedTextBackgroundColor
         
-        //print("bgColor: \(bgColor.toHexString(includeAlpha: true))")
-        //print("layoutManager.maxLineWidth: \(layoutManager.maxLineWidth)")
         
         for (i, line) in lines.enumerated() {
-            //let y = CGFloat(i) * lineHeight
             let y = CGFloat(i) * lineHeight + layoutRects.textEdgeInsets.top
             
             let textPoint = CGPoint(x: textRect.origin.x + layoutRects.horizontalInsets ,
@@ -328,24 +325,9 @@ final class KTextView: NSView, NSTextInputClient {
             let selection = selectionRange.clamped(to: lineRange)
             //if !selection.isEmpty {
                 
-                let startOffset = CTLineGetOffsetForStringIndex(line.ctLine, selection.lowerBound - lineRange.lowerBound, nil)
-                var endOffset = CTLineGetOffsetForStringIndex(line.ctLine, selection.upperBound - lineRange.lowerBound, nil)
-                //print("startOffset \(startOffset) endOffset \(endOffset)")
-
-                // 改行選択補正
-                /*
-                let newlineIndex = lineRange.upperBound
-                if newlineIndex < textStorageRef.count,
-                   let char = textStorageRef[newlineIndex],
-                   char == "\n",
-                   selection.isEmpty,
-                   selectionRange.contains(newlineIndex){
-                    print("char")
-                    endOffset = bounds.width - textRect.origin.x - startOffset
-                } else {
-                    endOffset -= startOffset
-                }
-                 */
+            let startOffset = CTLineGetOffsetForStringIndex(line.ctLine, selection.lowerBound - lineRange.lowerBound, nil)
+            var endOffset = CTLineGetOffsetForStringIndex(line.ctLine, selection.upperBound - lineRange.lowerBound, nil)
+                
             
             // 改行が選択範囲に含まれている場合、その行はboundsの右端まで選択描画。
             if selectionRange.contains(lineRange.upperBound) {
@@ -354,15 +336,14 @@ final class KTextView: NSView, NSTextInputClient {
                 endOffset -= startOffset
             }
 
-                let selectionRect = CGRect(
-                    x: textRect.origin.x + startOffset + layoutRects.horizontalInsets,
-                    y: y,
-                    width: endOffset,
-                    height: layoutManager.lineHeight
-                )
-                selectedTextBGColor.setFill()
-                selectionRect.fill()
-            //}
+            let selectionRect = CGRect(
+                x: textRect.origin.x + startOffset + layoutRects.horizontalInsets,
+                y: y,
+                width: endOffset,
+                height: layoutManager.lineHeight
+            )
+            selectedTextBGColor.setFill()
+            selectionRect.fill()
             
             // テキスト部分を描画。
             // 見えている範囲をy方向にlineHeightだけ拡大したもの。見えていない場所は描画しない。
@@ -432,160 +413,7 @@ final class KTextView: NSView, NSTextInputClient {
         }
         
     }
-    /*
-    override func draw(_ dirtyRect: NSRect) {
-        super.draw(dirtyRect)
-        
-        
-
-        guard let rect = makeLayoutRects(bounds: bounds) else {
-            print("\(#function): failed to make layout rects")
-            return
-        }
-        rect.draw(layoutManagerRef: layoutManager, textStorageRef: textStorageRef,baseFont: textStorageRef.baseFont )
-    }*/
-
-    /*
-    override func draw(_ dirtyRect: NSRect) {
-        super.draw(dirtyRect)
-
-        NSColor.white.setFill()
-        dirtyRect.fill()
-
-        let rects = layoutRects
-        let lines = layoutManager._lines
-        let font = textStorageRef.baseFont
-
-        let selectedTextBGColor = window?.isKeyWindow == true
-            ? NSColor.selectedTextBackgroundColor
-            : NSColor.unemphasizedSelectedTextBackgroundColor
-
-        let textAttributes: [NSAttributedString.Key: Any] = [
-            .font: font,
-            .foregroundColor: NSColor.textColor
-        ]
-
-        let lineNumberAttributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.monospacedDigitSystemFont(ofSize: font.pointSize * 0.95, weight: .regular),
-            .foregroundColor: NSColor.gray
-        ]
-
-        for (i, line) in lines.enumerated() {
-            let y = rects.textRegion.rect.origin.y + CGFloat(i) * layoutManager.lineHeight
-
-            // 選択範囲の描画
-            let lineRange = line.range
-            let selection = selectedRange.clamped(to: lineRange)
-            if !selection.isEmpty {
-                let attrString = NSAttributedString(string: line.text, attributes: [.font: font])
-                let ctLine = CTLineCreateWithAttributedString(attrString)
-
-                let startOffset = CTLineGetOffsetForStringIndex(ctLine, selection.lowerBound - lineRange.lowerBound, nil)
-                var endOffset = CTLineGetOffsetForStringIndex(ctLine, selection.upperBound - lineRange.lowerBound, nil)
-
-                // 改行選択補正
-                let newlineIndex = lineRange.upperBound
-                if newlineIndex < textStorageRef.count,
-                   let char = textStorageRef[newlineIndex],
-                   char == "\n",
-                   selectedRange.contains(newlineIndex) {
-                    endOffset = bounds.width - rects.textRegion.rect.origin.x - startOffset
-                } else {
-                    endOffset -= startOffset
-                }
-
-                let selectionRect = CGRect(
-                    x: rects.textRegion.rect.origin.x + startOffset,
-                    y: y,
-                    width: endOffset,
-                    height: layoutManager.lineHeight
-                )
-                selectedTextBGColor.setFill()
-                selectionRect.fill()
-            }
-
-            // 行番号の描画
-            let lineNumberString = "\(i + 1)" as NSString
-            let lineNumberSize = lineNumberString.size(withAttributes: lineNumberAttributes)
-            let numberOrigin = CGPoint(
-                x: rects.lineNumberRegion.rect.maxX - lineNumberSize.width - 6,
-                y: y + (layoutManager.lineHeight - lineNumberSize.height) / 2
-            )
-            lineNumberString.draw(at: numberOrigin, withAttributes: lineNumberAttributes)
-
-            // 本文描画
-            let attributedLine = NSAttributedString(string: line.text, attributes: textAttributes)
-            let textPoint = CGPoint(x: rects.textRegion.rect.origin.x, y: y)
-            attributedLine.draw(at: textPoint)
-        }
-    }
-     */
-    /*
-    override func draw(_ dirtyRect: NSRect) {
-        super.draw(dirtyRect)
-
-        NSColor.white.setFill()
-        dirtyRect.fill()
-
-        let rects = layoutRects
-        let lines = layoutManager._lines
-        let font = textStorageRef.baseFont
-
-        let selectedTextBGColor = window?.isKeyWindow == true
-            ? NSColor.selectedTextBackgroundColor
-            : NSColor.unemphasizedSelectedTextBackgroundColor
-
-        let textAttributes: [NSAttributedString.Key: Any] = [
-            .font: font,
-            .foregroundColor: NSColor.textColor
-        ]
-        /*
-        let lineNumberAttributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.monospacedDigitSystemFont(ofSize: font.pointSize * 0.95, weight: .regular),
-            .foregroundColor: NSColor.gray
-        ]*/
-
-        for (i, line) in lines.enumerated() {
-            let y = rects.textRegion.rect.origin.y + CGFloat(i) * layoutManager.lineHeight
-
-            // 選択範囲の描画
-            let lineRange = line.range
-            let selection = selectedRange.clamped(to: lineRange)
-            if !selection.isEmpty {
-                let attrString = NSAttributedString(string: line.text, attributes: [.font: font])
-                let ctLine = CTLineCreateWithAttributedString(attrString)
-
-                let startOffset = CTLineGetOffsetForStringIndex(ctLine, selection.lowerBound - lineRange.lowerBound, nil)
-                var endOffset = CTLineGetOffsetForStringIndex(ctLine, selection.upperBound - lineRange.lowerBound, nil)
-
-                // 改行選択補正
-                let newlineIndex = lineRange.upperBound
-                if newlineIndex < textStorageRef.count,
-                   let char = textStorageRef[newlineIndex],
-                   char == "\n",
-                   selectedRange.contains(newlineIndex) {
-                    endOffset = bounds.width - rects.textRegion.rect.origin.x - startOffset
-                } else {
-                    endOffset -= startOffset
-                }
-
-                let selectionRect = CGRect(
-                    x: rects.textRegion.rect.origin.x + startOffset,
-                    y: y,
-                    width: endOffset,
-                    height: layoutManager.lineHeight
-                )
-                selectedTextBGColor.setFill()
-                selectionRect.fill()
-            }
-
-            // テキスト描画
-            let attributedLine = NSAttributedString(string: line.text, attributes: textAttributes)
-            let textPoint = CGPoint(x: rects.textRegion.rect.origin.x, y: y)
-            attributedLine.draw(at: textPoint)
-
-        }
-    }*/
+   
     
     override func setFrameSize(_ newSize: NSSize) {
         guard let rects = makeLayoutRects(bounds: bounds) else {
@@ -636,23 +464,6 @@ final class KTextView: NSView, NSTextInputClient {
         //print("\(#function) - keyDown()")
         //print("inputContext = \(inputContext?.debugDescription ?? "nil")")
         interpretKeyEvents( [event] )
-    }
-
-    
-    // テキスト入力に関する実装が済むまでの簡易入力メソッド
-    private func insertDirectText(_ text: String) {
-        if !selectionRange.isEmpty {
-            textStorageRef.replaceCharacters(in: selectionRange, with: [])
-            caretIndex = selectionRange.lowerBound
-        }
-
-        textStorageRef.insertString(text, at: caretIndex)
-        caretIndex += text.count
-
-        layoutManager.rebuildLayout()
-        updateFrameSizeToFitContent() // ← これを追加
-        updateCaretPosition()
-        needsDisplay = true
     }
 
 
@@ -830,13 +641,13 @@ final class KTextView: NSView, NSTextInputClient {
     // MARK: - Text Editing
     
     override func insertNewline(_ sender: Any?) {
-        textStorageRef.insertCharacter(String.ReturnCharacter.lf.rawValue, at: caretIndex)
-        //caretIndex += 1
-        //print("caretIndex: \(caretIndex)")
-        /*
-        updateFrameSizeToFitContent()
-        updateCaretPosition()
-        needsDisplay = true*/
+        //textStorageRef.insertCharacter(String.ReturnCharacter.lf.rawValue, at: caretIndex)
+        //textStorageRef.replaceCharacters(in: selectionRange, with: ["\n"])
+        textStorageRef.replaceString(in: selectionRange, with: String.ReturnCharacter.lf.rawValue)
+    }
+    
+    override func insertTab(_ sender: Any?) {
+        textStorageRef.replaceString(in: selectionRange, with: "\t")
     }
     
     // MARK: - COPY and Paste (NSResponder method)
@@ -845,11 +656,7 @@ final class KTextView: NSView, NSTextInputClient {
         copy(sender)
 
         textStorageRef.replaceCharacters(in: selectionRange, with: [])
-        /*caretIndex = selectionRange.lowerBound
         
-        updateFrameSizeToFitContent()
-        updateCaretPosition()
-        needsDisplay = true*/
     }
     
     @IBAction func copy(_ sender: Any?) {
@@ -867,11 +674,7 @@ final class KTextView: NSView, NSTextInputClient {
         guard let string = pasteboard.string(forType: .string) else { return }
 
         textStorageRef.replaceCharacters(in: selectionRange, with: Array(string))
-        /*caretIndex = selectionRange.lowerBound + string.count
-
-        updateFrameSizeToFitContent()
-        updateCaretPosition()
-        needsDisplay = true*/
+        
     }
 
     @IBAction override func selectAll(_ sender: Any?) {
@@ -888,16 +691,11 @@ final class KTextView: NSView, NSTextInputClient {
 
         if !selectionRange.isEmpty {
             textStorageRef.replaceCharacters(in: selectionRange, with: [])
-            //caretIndex = selectionRange.lowerBound
         } else {
             textStorageRef.replaceCharacters(in: caretIndex - 1..<caretIndex, with: [])
-            //caretIndex -= 1
         }
 
-        //updateFrameSizeToFitContent()
         verticalCaretX = nil
-        //updateCaretPosition()
-        //needsDisplay = true
     }
     
     // 前回のアクションのセレクタを保存するために実装
@@ -1043,31 +841,15 @@ final class KTextView: NSView, NSTextInputClient {
         } else {
             return
         }
-
-        /*
-        let range = Range(replacementRange) ?? selectionRange
-        textStorageRef.replaceCharacters(in: range, with: Array(text))
-        let insertionPoint = range.lowerBound + text.count
-        selectionRange = insertionPoint..<insertionPoint
-         */
         
         
         let range = Range(replacementRange) ?? selectionRange
-        
-        /*let insertionPoint = range.lowerBound + text.count
-        selectionRange = insertionPoint..<insertionPoint
-        */
         
         textStorageRef.replaceCharacters(in: range, with: Array(text))
        
         markedTextRange = nil
         markedText = NSAttributedString()
-        /*
-        layoutManager.rebuildLayout()
-        updateFrameSizeToFitContent() // ← これを追加
-        updateCaretPosition()
-        needsDisplay = true
-         */
+        
     }
     
     func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
@@ -1181,7 +963,8 @@ final class KTextView: NSView, NSTextInputClient {
     // 現在のところinternalとしているが、将来的に公開レベルを変更する可能性あり。
     func updateFrameSizeToFitContent() {
         //print("func name = \(#function)")
-        layoutManager.rebuildLayout()
+        
+        //layoutManager.rebuildLayout()
 
         let totalLines = layoutManager._lines.count
         let lineHeight = layoutManager.lineHeight

@@ -35,7 +35,8 @@ protocol KTextStorageCommon: AnyObject {
 protocol KTextStorageReadable: KTextStorageCommon {
     var string: String { get }
     
-    
+    func wordRange(at index: Int) -> Range<Int>?
+    func attributedString(for range: Range<Int>, tabWidth: Int?) -> NSAttributedString?
 }
 
 // 書き込み可能プロトコル（読み取り継承なし）
@@ -44,6 +45,9 @@ protocol KTextStorageWritable: KTextStorageCommon {
 
     @discardableResult
     func replaceCharacters(in range: Range<Int>, with characters: [Character]) -> Bool
+    
+    @discardableResult
+    func replaceString(in range: Range<Int>, with newString: String) -> Bool
 
     @discardableResult
     func insertCharacters(_ characters: [Character], at index: Int) -> Bool
@@ -84,6 +88,7 @@ final class KTextStorage: KTextStorageProtocol {
     //private var _observers: [() -> Void] = []
     private var _observers: [(KStorageModified) -> Void] = []
     private var _baseFont: NSFont = .monospacedSystemFont(ofSize: 12, weight: .regular)
+    private var _tabWidthCache: CGFloat?
 
     // MARK: - Public API
 
@@ -107,6 +112,7 @@ final class KTextStorage: KTextStorageProtocol {
         get { _baseFont }
         set {
             _baseFont = newValue
+            _tabWidthCache = nil
             notifyColoringChanged(in: 0..<_characters.count)
         }
     }
@@ -118,6 +124,7 @@ final class KTextStorage: KTextStorageProtocol {
             notifyColoringChanged(in: 0..<_characters.count)
         }
     }
+    
     
     var characterSlice: ArraySlice<Character> {
         _characters[_characters.indices]
@@ -136,6 +143,11 @@ final class KTextStorage: KTextStorageProtocol {
         //print("replaceCharacters()")
         notifyObservers(.textChanged(range: range, insertedCount: newCharacters.count))
         return true
+    }
+    
+    @discardableResult
+    func replaceString(in range: Range<Int>, with newString: String) -> Bool {
+        replaceCharacters(in: range, with: Array(newString))
     }
 
     @discardableResult
@@ -161,7 +173,7 @@ final class KTextStorage: KTextStorageProtocol {
 
     //func addObserver(_ observer: @escaping () -> Void) {
     func addObserver(_ observer: @escaping ((KStorageModified) -> Void)){
-        print("\(#function)")
+        //print("\(#function)")
         _observers.append(observer)
     }
     
@@ -190,28 +202,15 @@ final class KTextStorage: KTextStorageProtocol {
         
     }
 
-    // MARK: - Private
-/*
-    private func notifyObservers() {
-        _observers.forEach { $0() }
-    }*/
-    private func notifyObservers(_ event: KStorageModified) {
-        _observers.forEach { $0(event) }
-    }
     
-    // attributeの変更についてはテキストの変更ではなくattributeの変更の際に手動で送信する。
+    // attributeの変更についてはテキストの変更時に自動ではなくattributeの変更の際に手動で送信する。
     func notifyColoringChanged(in range: Range<Int>) {
-            notifyObservers(.colorChanged(range: range))
-        }
-}
+        notifyObservers(.colorChanged(range: range))
+    }
 
-// MARK: - TextStorageReadable extension
-
-
-
-extension KTextStorageReadable {
     
     // TextStorageのindexを含む単語を返す。
+    // 現在の実装では一般的な英単語に準じた単語判定だが、将来的には開発言語毎に調整した方がよいと思われる。
     func wordRange(at index: Int) -> Range<Int>? {
 
         guard index >= 0 && index < count else { return nil }
@@ -248,11 +247,22 @@ extension KTextStorageReadable {
     
     // 与えられたRangeの範囲のテキストをNSAttributedStringとして返す。
     // 現在仮実装。最終的にtree-sitterによる色分けを行う予定。
-    func attributedString(for range: Range<Int>) -> NSAttributedString? {
-            guard let slice = self[range] else { return nil }
+    func attributedString(for range: Range<Int>, tabWidth: Int? = nil) -> NSAttributedString? {
+        guard let slice = self[range] else { return nil }
+        
+        if _tabWidthCache == nil {
+            //_tabWidthCache = baseFont.advancement(forGlyph: baseFont.glyph(withName: "space")).width
+            _tabWidthCache = " ".size(withAttributes: [.font: baseFont]).width
+        }
 
         // 仮実装：全体に一律の属性を与える
-        let attributes: [NSAttributedString.Key: Any] = [.font: baseFont, .foregroundColor: NSColor.black]
+        var attributes: [NSAttributedString.Key: Any] = [.font: baseFont, .foregroundColor: NSColor.black]
+        if tabWidth != nil {
+            let paragraphStyle = NSMutableParagraphStyle()
+            paragraphStyle.defaultTabInterval = CGFloat(tabWidth!) * _tabWidthCache!
+            attributes[.paragraphStyle] = paragraphStyle
+        }
+        
         let attributeRun = KTextStorage.AttributeRun(
             range: characterSlice.startIndex..<characterSlice.endIndex,
             attributes: attributes
@@ -276,6 +286,13 @@ extension KTextStorageReadable {
             result.append(NSAttributedString(string: string, attributes: run.attributes))
         }
         return result
+    }
+    
+    
+    // MARK: - Private
+
+    private func notifyObservers(_ event: KStorageModified) {
+        _observers.forEach { $0(event) }
     }
 }
 

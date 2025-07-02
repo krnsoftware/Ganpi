@@ -59,15 +59,13 @@ final class KLayoutManager: KLayoutManagerReadable {
         set { _textView = newValue }
     }
 
+    var tabWidth: Int = 4 // baseFontの現在のサイズにおけるspaceの幅の何倍かで指定する。
+    
+    
     // MARK: - Init
 
     init(textStorageRef: KTextStorageProtocol) {
         _textStorageRef = textStorageRef
-        /*
-        textStorageRef.addObserver { [weak self] in
-            self?.textStorageDidChange()
-        }
-         */
         
         textStorageRef.addObserver { [weak self] modification in
             self?.textStorageDidModify(modification)
@@ -85,7 +83,6 @@ final class KLayoutManager: KLayoutManagerReadable {
         var currentIndex = 0
         var currentLineNumber = 0
         let characters = _textStorageRef.characterSlice
-        //let font = _textStorageRef.baseFont
         
         // storageが空だった場合、空行を1つ追加する。
         if _textStorageRef.count == 0 {
@@ -103,7 +100,7 @@ final class KLayoutManager: KLayoutManagerReadable {
 
             let lineRange = currentIndex..<lineEndIndex
             
-            guard let attrString = _textStorageRef.attributedString(for: lineRange) else { print("\(#function) - attrString is nil"); return }
+            guard let attrString = _textStorageRef.attributedString(for: lineRange, tabWidth: tabWidth) else { print("\(#function) - attrString is nil"); return }
             
             let ctLine = CTLineCreateWithAttributedString(attrString)
             let width = CGFloat(CTLineGetTypographicBounds(ctLine, nil, nil, nil))
@@ -130,21 +127,14 @@ final class KLayoutManager: KLayoutManagerReadable {
                 
     }
     
-    // textStorageが変更された際に呼び出される。
-    /*private func textStorageDidChange() {
-        guard let view = textView else { print("KLayoutManager - textStorageDidChange - textView is nil"); return }
-        
-        rebuildLayout()
-        
-        view.textStorageDidChange()
-        
-    }*/
+    
+    // TextStorageが変更された際に呼び出される。
     func textStorageDidModify(_ modification: KStorageModified) {
         guard let view = textView else { print("KLayoutManager - textStorageDidChange - textView is nil"); return }
         
         switch modification {
         case let .textChanged(range, insertedCount):
-            print("🔧 テキスト変更: range = \(range), inserted = \(insertedCount)")
+            //print("🔧 テキスト変更: range = \(range), inserted = \(insertedCount)")
             rebuildLayout()
             view.textStorageDidModify(modification)
             
@@ -155,7 +145,7 @@ final class KLayoutManager: KLayoutManagerReadable {
         }
     }
     
-    
+    // 表示用に空行を作成する。
     private func makeEmptyLine(index: Int, hardLineIndex: Int) -> LineInfo {
         return LineInfo(ctLine: CTLineCreateWithAttributedString(NSAttributedString(string: "")),
                         range: index..<index,
