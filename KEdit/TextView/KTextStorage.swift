@@ -15,6 +15,11 @@ enum KStorageModified {
     case colorChanged(range: Range<Int>)
 }
 
+enum KDirection: Int {
+    case forward = 1
+    case backward = -1
+}
+
 // MARK: - KTextStorageProtocol
 // read-onlyとして利用する場合にはKTextStorageReadableを使用。
 // read & writeとして利用する場合にはKTextStorageProtocolを使用。
@@ -37,6 +42,7 @@ protocol KTextStorageReadable: KTextStorageCommon {
     
     func wordRange(at index: Int) -> Range<Int>?
     func attributedString(for range: Range<Int>, tabWidth: Int?) -> NSAttributedString?
+    func characterIndex(c: Character, from: Int, direction: KDirection) -> Int?
 }
 
 // 書き込み可能プロトコル（読み取り継承なし）
@@ -70,10 +76,7 @@ typealias KTextStorageProtocol = KTextStorageReadable & KTextStorageWritable
 // KEdit用軽量テキストストレージ
 final class KTextStorage: KTextStorageProtocol {
     // MARK: - Enum and Struct
-    enum KDirection: Int {
-        case forward = 1
-        case backward = -1
-    }
+    
     
     // attribute runの仮実装
     struct AttributeRun {
@@ -139,8 +142,7 @@ final class KTextStorage: KTextStorageProtocol {
         }
 
         _characters.replaceSubrange(range, with: newCharacters)
-        //notifyObservers()
-        //print("replaceCharacters()")
+        //print("replaceCharacters() newCharacter = \(newCharacters)")
         notifyObservers(.textChanged(range: range, insertedCount: newCharacters.count))
         return true
     }

@@ -76,7 +76,7 @@ final class KLayoutManager: KLayoutManagerReadable {
 
     // MARK: - Layout
     
-    func rebuildLayout() {
+    private func rebuildLayout() {
         _lines.removeAll()
         _maxLineWidth = 0
 
