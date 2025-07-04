@@ -264,7 +264,11 @@ final class KTextView: NSView, NSTextInputClient {
         let height = _layoutManager.lineHeight//font.ascender + abs(font.descender)
         
         _caretView.updateFrame(x: x, y: y, height: height)
+        
         _caretView.alphaValue = 1.0
+        //_caretView.isHidden = hasMarkedText() ? true : false
+        //print("caretview: isHidden: \(_caretView.isHidden)")
+        
         restartCaretBlinkTimer()
         
     }
@@ -783,6 +787,14 @@ final class KTextView: NSView, NSTextInputClient {
             return
         }
         
+        // 日本語入力中の場合はクリックに対応して変換を確定する。
+        if hasMarkedText() {
+            _textStorageRef.replaceString(in: selectionRange, with: markedText.string)
+            inputContext?.discardMarkedText()
+            unmarkText()
+            return
+        }
+        
         
         let location = convert(event.locationInWindow, from: nil)
         switch layoutRects.regionType(for: location, layoutManagerRef: _layoutManager, textStorageRef: _textStorageRef){
@@ -906,7 +918,7 @@ final class KTextView: NSView, NSTextInputClient {
         } else {
             return
         }
-        
+        //print("insertText()")
         
         let range = Range(replacementRange) ?? selectionRange
         
@@ -938,6 +950,8 @@ final class KTextView: NSView, NSTextInputClient {
         _markedText = attrString
         _replacementRange = range
         
+        _caretView.isHidden = true
+        
         needsDisplay = true
 
         /*
@@ -960,10 +974,22 @@ final class KTextView: NSView, NSTextInputClient {
         }
          */
     }
+    /*
+    func confirmMarkedText() {
+        if hasMarkedText() {
+            print("confirmMarkedText()")
+            insertText(_markedText, replacementRange: NSRange(selectionRange))
+            _markedText = NSAttributedString()
+            _markedTextRange = nil
+            _caretView.isHidden = false
+        }
+    }*/
     
     func unmarkText() {
         _markedTextRange = nil
         _markedText = NSAttributedString()
+        
+        _caretView.isHidden = false
     }
 
     func validAttributesForMarkedText() -> [NSAttributedString.Key] {

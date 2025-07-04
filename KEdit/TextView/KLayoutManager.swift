@@ -101,7 +101,7 @@ final class KLayoutManager: KLayoutManagerReadable {
             let lineRange = currentIndex..<lineEndIndex
             
             
-            
+            // タブの横幅を指定しつつ文字列をattributedstringに変換する。
             guard let attrString = _textStorageRef.attributedString(for: lineRange, tabWidth: tabWidth) else { print("\(#function) - attrString is nil"); return }
             
             let ctLine = CTLineCreateWithAttributedString(attrString)
