@@ -363,17 +363,18 @@ final class KTextView: NSView, NSTextInputClient {
             
             var ctLine = line.ctLine
             
-            // text inputについての試作部分。
+            // text input cliantの実装。textstorageには干渉せず、draw()の内部で全て完結する。
             if let repRange = _replacementRange {
                 //print("repRange - \(repRange)")
                 if lineRange.lowerBound <= repRange.lowerBound && repRange.upperBound <= lineRange.upperBound {
-                    //print("lineRange = \(lineRange), repRange = \(repRange)")
-                    //print("repRange - \(String(_textStorageRef[lineRange]!))")
+                    // _markedTextのフォントを本文と同じbaseFontに設定する。
+                    let muAttrString =  NSMutableAttributedString(attributedString: _markedText)
+                    muAttrString.addAttribute(.font, value: _textStorageRef.baseFont, range: NSRange(location: 0, length: muAttrString.length))
                     let lineA = _textStorageRef.attributedString(for: lineRange.lowerBound..<repRange.lowerBound, tabWidth:nil)
                     let lineB = _textStorageRef.attributedString(for: repRange.upperBound..<lineRange.upperBound, tabWidth:nil)
                     let fullLine = NSMutableAttributedString()
                     fullLine.append(lineA!)
-                    fullLine.append(_markedText)
+                    fullLine.append(muAttrString)
                     fullLine.append(lineB!)
                     ctLine = CTLineCreateWithAttributedString(fullLine)
                     
