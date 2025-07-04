@@ -320,9 +320,6 @@ final class KTextView: NSView, NSTextInputClient {
         // if verticalRange.contains(textPoint.y) のようにして使う。
         let verticalRange = (visibleRect.minY - lineHeight)..<visibleRect.maxY
         
-        /*let bgColor: NSColor = .textBackgroundColor.withAlphaComponent(1.0)
-        bgColor.setFill()
-        bounds.fill()*/
         // 背景透け対策。
         let bgColor = NSColor.textBackgroundColor.usingColorSpace(.deviceRGB)?.withAlphaComponent(1.0) ?? .red
         bgColor.setFill()
@@ -364,33 +361,22 @@ final class KTextView: NSView, NSTextInputClient {
             selectedTextBGColor.setFill()
             selectionRect.fill()
             
+            var ctLine = line.ctLine
+            
             // text inputについての試作部分。
             if let repRange = _replacementRange {
                 //print("repRange - \(repRange)")
                 if lineRange.lowerBound <= repRange.lowerBound && repRange.upperBound <= lineRange.upperBound {
-                    print("lineRange = \(lineRange), repRange = \(repRange)")
-                    print("repRange - \(String(_textStorageRef[lineRange]!))")
+                    //print("lineRange = \(lineRange), repRange = \(repRange)")
+                    //print("repRange - \(String(_textStorageRef[lineRange]!))")
                     let lineA = _textStorageRef.attributedString(for: lineRange.lowerBound..<repRange.lowerBound, tabWidth:nil)
                     let lineB = _textStorageRef.attributedString(for: repRange.upperBound..<lineRange.upperBound, tabWidth:nil)
                     let fullLine = NSMutableAttributedString()
                     fullLine.append(lineA!)
                     fullLine.append(_markedText)
                     fullLine.append(lineB!)
-                    let ctLine = CTLineCreateWithAttributedString(fullLine)
+                    ctLine = CTLineCreateWithAttributedString(fullLine)
                     
-                    let context = NSGraphicsContext.current?.cgContext
-                    context?.saveGState()
-                    context?.translateBy(x: 0, y: bounds.height)
-                    context?.scaleBy(x: 1.0, y: -1.0)
-                    
-                    let yInFlipped = CGFloat(i) * lineHeight + layoutRects.textEdgeInsets.top
-                    let ascent = CTFontGetAscent(_textStorageRef.baseFont)
-                    let lineOriginY = bounds.height - yInFlipped - ascent
-                    
-                    context?.textPosition = CGPoint(x: textPoint.x, y: lineOriginY)
-                    CTLineDraw(ctLine, context!)
-                    context?.restoreGState()
-                    continue
                 }
             }
             
@@ -408,7 +394,7 @@ final class KTextView: NSView, NSTextInputClient {
                 let lineOriginY = bounds.height - yInFlipped - ascent
                 
                 context?.textPosition = CGPoint(x: textPoint.x, y: lineOriginY)
-                CTLineDraw(line.ctLine, context!)
+                CTLineDraw(ctLine, context!)
                 context?.restoreGState()
             }
             
@@ -930,19 +916,28 @@ final class KTextView: NSView, NSTextInputClient {
     }
     
     func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
-        print("✏️ setMarkedText called with: \(string)")
+        //print("✏️ setMarkedText called with: \(string)")
         
         let attrString: NSAttributedString
         if let str = string as? String {
             attrString = NSAttributedString(string: str)
-            print("setMarkedText: as? String")
+            //print("setMarkedText: as? String")
         } else if let aStr = string as? NSAttributedString {
             attrString = aStr
-            print("setMarkedText: as? NSAttributedString")
+            //print("setMarkedText: as? NSAttributedString")
         } else {
             return
         }
+        
+        print("\(#function): selectedRange: \(selectedRange), replacementRange: \(replacementRange)")
+        
         // selectedRangeは「挿入される文字列のどこが選択されているか」、replacementRangeは「どこに挿入するか」を示す。
+        
+        // 選択範囲がある場合は、その部分を削除しておく。
+        if selectionRange.count > 0 {
+            _textStorageRef.replaceCharacters(in: selectionRange, with: [])
+            selectionRange = selectionRange.lowerBound..<selectionRange.lowerBound
+        }
         
         let range = Range(replacementRange) ?? selectionRange
         let plain = attrString.string
@@ -990,6 +985,8 @@ final class KTextView: NSView, NSTextInputClient {
         _markedText = NSAttributedString()
         
         _caretView.isHidden = false
+        
+        needsDisplay = true
     }
 
     func validAttributesForMarkedText() -> [NSAttributedString.Key] {
