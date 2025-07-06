@@ -246,12 +246,12 @@ final class KTextView: NSView, NSTextInputClient {
     // MARK: - Caret (KTextView methods)
     
     private func updateCaretPosition() {
-        
+        /*
         guard let lineInfo = _layoutManager.lineInfo(at: caretIndex) else { print("\(#function): updateCaretPosition() failed to find lineInfo"); return }
 
         
         //let ctLine = lineInfo.ctLine
-        guard let ctLine = lineInfo.ctLine else { print("\(#function): failed to get ctLine"); return}
+        //guard let ctLine = lineInfo.ctLine else { print("\(#function): failed to get ctLine"); return}
 
         let indexInLine = caretIndex - lineInfo.range.lowerBound
         
@@ -264,6 +264,9 @@ final class KTextView: NSView, NSTextInputClient {
         let x = layoutRects.textRegion.rect.origin.x + layoutRects.horizontalInsets + xOffset
         //let y = layoutRects.textRegion.rect.origin.y + CGFloat(lineIndex) * layoutManager.lineHeight + layoutRects.textEdgeInsets.top
         let y = layoutRects.textRegion.rect.origin.y + CGFloat(lineInfo.hardLineIndex) * _layoutManager.lineHeight + layoutRects.textEdgeInsets.top
+        
+        
+        
         let height = _layoutManager.lineHeight//font.ascender + abs(font.descender)
         
         _caretView.updateFrame(x: x, y: y, height: height)
@@ -271,7 +274,12 @@ final class KTextView: NSView, NSTextInputClient {
         _caretView.alphaValue = 1.0
         //_caretView.isHidden = hasMarkedText() ? true : false
         //print("caretview: isHidden: \(_caretView.isHidden)")
+         */
         
+        let caretPosition = characterPosition(at: caretIndex)
+        _caretView.updateFrame(x: caretPosition.x, y: caretPosition.y, height: _layoutManager.lineHeight)
+        
+        _caretView.alphaValue = 1.0
         restartCaretBlinkTimer()
         
     }
@@ -1019,9 +1027,16 @@ final class KTextView: NSView, NSTextInputClient {
     }
 
     func firstRect(forCharacterRange range: NSRange, actualRange: NSRangePointer?) -> NSRect {
-        let lineInfo = _layoutManager.lineInfo(at: range.location)
+        var point = characterPosition(at: caretIndex)
+        point = CGPoint(x: point.x, y: point.y + _layoutManager.lineHeight)
+        point = self.convert(point, from: nil)
         
-        return NSRect(x: 0, y: 0, width: 1, height: 1) // 仮実装（CTLineから取得へ）
+        guard let window = self.window else { print("\(#function): window is nil"); return .zero }
+        
+        point = window.convertPoint(toScreen: point)
+        
+        return NSRect(x: point.x, y: point.y, width: 1, height: _layoutManager.lineHeight)
+        
     }
     
     /*
@@ -1123,6 +1138,33 @@ final class KTextView: NSView, NSTextInputClient {
             showLineNumbers: _showLineNumbers,
             textEdgeInsets: .default
         )
+    }
+    
+    // characterIndex文字目の文字が含まれる行の位置。textRegion左上原点。
+    private func linePosition(at characterIndex:Int) -> CGPoint {
+        guard let layoutRects = makeLayoutRects(bounds: bounds) else {
+            print("\(#function): failed to make layoutRects"); return .zero }
+        let lineInfo = _layoutManager.line(at: characterIndex)
+        guard let line = lineInfo.line else {
+            print("\(#function): failed to make line"); return .zero }
+                
+        let x = layoutRects.textRegion.rect.origin.x + layoutRects.horizontalInsets
+        let y = layoutRects.textRegion.rect.origin.y + CGFloat(lineInfo.lineIndex) * _layoutManager.lineHeight + layoutRects.textEdgeInsets.top
+        return CGPoint(x: x, y: y)
+    }
+    
+    // characterIndex文字目の文字の位置。textRegion左上原点。
+    private func characterPosition(at characterIndex:Int) -> CGPoint {
+        let lineInfo = _layoutManager.line(at: characterIndex)
+        guard let line = lineInfo.line else {
+            print("\(#function): failed to make line"); return .zero }
+        
+        let linePoint = linePosition(at: characterIndex)
+        
+        let indexInLine = characterIndex - line.range.lowerBound
+        
+        return CGPoint(x: linePoint.x + line.characterOffset(at: indexInLine), y: linePoint.y)
+
     }
     
     

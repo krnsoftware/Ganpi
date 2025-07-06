@@ -174,6 +174,8 @@ final class KLayoutManager: KLayoutManagerReadable {
         }
         return nil
     }*/
+    
+    // index文字目の存在するKLineを返す。
     func lineInfo(at index: Int) -> KLine? {
         //print("lineInfo(at: \(index))")
         for line in lines {
@@ -182,6 +184,15 @@ final class KLayoutManager: KLayoutManagerReadable {
             }
         }
         return nil
+    }
+    
+    func line(at characterIndex: Int) -> (line: KLine?, lineIndex: Int) {
+        for (i, line) in lines.enumerated() {
+            if line.range.contains(characterIndex) || characterIndex == line.range.upperBound {
+                return (line, i)
+            }
+        }
+        return (nil, -1)
     }
     
     // KLinesからctLineを構築するために利用する。
