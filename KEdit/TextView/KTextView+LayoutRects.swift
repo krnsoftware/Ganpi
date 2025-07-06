@@ -68,9 +68,7 @@ struct LayoutRects {
         
         self.lineNumberRegion = lineNumberRect.map { Region(rect: $0) }
 
-        //let textWidth = CGFloat(layoutManagerRef.maxLineWidth) + textEdgeInsets.left + lineNumberWidth + textEdgeInsets.right
         let textWidth = max(CGFloat(layoutManagerRef.maxLineWidth) + textEdgeInsets.left + lineNumberWidth + textEdgeInsets.right, visibleRect.width)
-        //let textHeight = CGFloat(layoutManagerRef.lineCount) * layoutManagerRef.lineHeight + textEdgeInsets.top + textEdgeInsets.bottom + visibleRect.height * 0.67 // 見えている領域の2/3くらいの高さを余分に設定する。
         let textHeight = max(CGFloat(layoutManagerRef.lineCount) * layoutManagerRef.lineHeight + textEdgeInsets.top + textEdgeInsets.bottom + visibleRect.height * 0.67,visibleRect.height)
        
         let textRect = CGRect(x: 0, y: 0, width: textWidth, height: textHeight)
@@ -112,8 +110,10 @@ struct LayoutRects {
             // TextRegion内でLineに含まれる場合
             if lines.indices.contains(lineIndex) {
                 let line = lines[lineIndex]
+                guard let ctLine = line.ctLine else { print("regionType - invalid line") ; return .outside }
                 let relativeX = max(0, relativePoint.x)
-                let indexInLine = CTLineGetStringIndexForPosition(line.ctLine, CGPoint(x: relativeX, y: 0))
+                //let indexInLine = CTLineGetStringIndexForPosition(line.ctLine, CGPoint(x: relativeX, y: 0))
+                let indexInLine = CTLineGetStringIndexForPosition(ctLine, CGPoint(x: relativeX, y: 0))
                 
                 //print("regionType - in textRegion, lineIndex=\(lineIndex), indexInLine=\(indexInLine)")
                 

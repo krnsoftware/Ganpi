@@ -249,7 +249,9 @@ final class KTextView: NSView, NSTextInputClient {
         
         guard let lineInfo = _layoutManager.lineInfo(at: caretIndex) else { print("\(#function): updateCaretPosition() failed to find lineInfo"); return }
 
-        let ctLine = lineInfo.ctLine
+        
+        //let ctLine = lineInfo.ctLine
+        guard let ctLine = lineInfo.ctLine else { print("\(#function): failed to get ctLine"); return}
 
         let indexInLine = caretIndex - lineInfo.range.lowerBound
         
@@ -314,6 +316,7 @@ final class KTextView: NSView, NSTextInputClient {
         }
         
         let lines = _layoutManager.lines
+        
         let lineHeight = _layoutManager.lineHeight
         let textRect = layoutRects.textRegion.rect
         // 行が見える範囲にあるかどうか確認するためのRange。
@@ -340,10 +343,12 @@ final class KTextView: NSView, NSTextInputClient {
             let lineRange = line.range
             let selection = selectionRange.clamped(to: lineRange)
             //if !selection.isEmpty {
-                
-            let startOffset = CTLineGetOffsetForStringIndex(line.ctLine, selection.lowerBound - lineRange.lowerBound, nil)
-            var endOffset = CTLineGetOffsetForStringIndex(line.ctLine, selection.upperBound - lineRange.lowerBound, nil)
-                
+            
+            //let startOffset = CTLineGetOffsetForStringIndex(line.ctLine, selection.lowerBound - lineRange.lowerBound, nil)
+            //var endOffset = CTLineGetOffsetForStringIndex(line.ctLine, selection.upperBound - lineRange.lowerBound, nil)
+            guard var ctLine = line.ctLine else { continue }
+            let startOffset = CTLineGetOffsetForStringIndex(ctLine, selection.lowerBound - lineRange.lowerBound, nil)
+            var endOffset = CTLineGetOffsetForStringIndex(ctLine, selection.upperBound - lineRange.lowerBound, nil)
             
             // 改行が選択範囲に含まれている場合、その行はboundsの右端まで選択描画。
             if selectionRange.contains(lineRange.upperBound) {
@@ -361,7 +366,7 @@ final class KTextView: NSView, NSTextInputClient {
             selectedTextBGColor.setFill()
             selectionRect.fill()
             
-            var ctLine = line.ctLine
+            //var ctLine = line.ctLine
             
             // text input cliantの実装。textstorageには干渉せず、draw()の内部で全て完結する。
             if let repRange = _replacementRange {
@@ -370,13 +375,14 @@ final class KTextView: NSView, NSTextInputClient {
                     // _markedTextのフォントを本文と同じbaseFontに設定する。
                     let muAttrString =  NSMutableAttributedString(attributedString: _markedText)
                     muAttrString.addAttribute(.font, value: _textStorageRef.baseFont, range: NSRange(location: 0, length: muAttrString.length))
-                    let lineA = _textStorageRef.attributedString(for: lineRange.lowerBound..<repRange.lowerBound, tabWidth:nil)
-                    let lineB = _textStorageRef.attributedString(for: repRange.upperBound..<lineRange.upperBound, tabWidth:nil)
-                    let fullLine = NSMutableAttributedString()
-                    fullLine.append(lineA!)
-                    fullLine.append(muAttrString)
-                    fullLine.append(lineB!)
-                    ctLine = CTLineCreateWithAttributedString(fullLine)
+                    if let lineA = _textStorageRef.attributedString(for: lineRange.lowerBound..<repRange.lowerBound, tabWidth:nil),
+                       let lineB = _textStorageRef.attributedString(for: repRange.upperBound..<lineRange.upperBound, tabWidth:nil) {
+                        let fullLine = NSMutableAttributedString()
+                        fullLine.append(lineA)
+                        fullLine.append(muAttrString)
+                        fullLine.append(lineB)
+                        ctLine = CTLineCreateWithAttributedString(fullLine)
+                    }
                     
                 }
             }
@@ -637,11 +643,13 @@ final class KTextView: NSView, NSTextInputClient {
         guard let layoutRects = makeLayoutRects(bounds: bounds) else { print("\(#function); makeLayoutRects error"); return }
         
         let newLineInfo = _layoutManager.lines[newLineIndex]
-        let ctLine = newLineInfo.ctLine
+        //let ctLine = newLineInfo.ctLine
+        guard let ctLine = newLineInfo.ctLine else { print("\(#function): newLineInfo.ctLine nil"); return}
 
         // 初回のみ verticalCaretX をセット
         if isVerticalAction && !wasVerticalAction {
-            let currentCtLine = currentLine.ctLine
+            //let currentCtLine = currentLine.ctLine
+            guard let currentCtLine = currentLine.ctLine else { print("\(#function): currentLine.ctLine nil"); return}
             let indexInLine = caretIndex - currentLine.range.lowerBound
             //verticalCaretX = CTLineGetOffsetForStringIndex(currentCtLine, indexInLine, nil) + layoutRects.textEdgeInsets.left
             _verticalCaretX = CTLineGetOffsetForStringIndex(currentCtLine, indexInLine, nil) + layoutRects.horizontalInsets
@@ -1010,7 +1018,9 @@ final class KTextView: NSView, NSTextInputClient {
     }
 
     func firstRect(forCharacterRange range: NSRange, actualRange: NSRangePointer?) -> NSRect {
-        NSRect(x: 0, y: 0, width: 1, height: 1) // 仮実装（CTLineから取得へ）
+        let lineInfo = _layoutManager.lineInfo(at: range.location)
+        
+        return NSRect(x: 0, y: 0, width: 1, height: 1) // 仮実装（CTLineから取得へ）
     }
     
     /*
