@@ -258,7 +258,8 @@ final class KTextView: NSView, NSTextInputClient {
         guard let layoutRects = makeLayoutRects(bounds: bounds) else {
             print("\(#function): updateCaretPosition() failed to make layoutRects"); return }
         
-        let xOffset = CTLineGetOffsetForStringIndex(ctLine, indexInLine, nil)
+        //let xOffset = CTLineGetOffsetForStringIndex(ctLine, indexInLine, nil)
+        let xOffset = lineInfo.characterOffset(at: indexInLine)
         
         let x = layoutRects.textRegion.rect.origin.x + layoutRects.horizontalInsets + xOffset
         //let y = layoutRects.textRegion.rect.origin.y + CGFloat(lineIndex) * layoutManager.lineHeight + layoutRects.textEdgeInsets.top

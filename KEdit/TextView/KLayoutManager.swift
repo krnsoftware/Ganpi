@@ -124,6 +124,10 @@ final class KLayoutManager: KLayoutManagerReadable {
             
             let line = KLine(range: lineRange, hardLineIndex: currentLineNumber, softLineIndex: 0, layoutManager: self)
             _lines.append(line)
+            let width = line.width
+            if width > _maxLineWidth {
+                _maxLineWidth = width
+            }
 
             currentIndex = lineEndIndex
             currentLineNumber += 1
@@ -180,6 +184,7 @@ final class KLayoutManager: KLayoutManagerReadable {
         return nil
     }
     
+    // KLinesからctLineを構築するために利用する。
     func ctLine(in range: Range<Int>) -> CTLine? {
         guard let attrString = _textStorageRef.attributedString(for: range, tabWidth: tabWidth) else { print("\(#function) - attrString is nil"); return nil }
         
@@ -247,7 +252,7 @@ final class KLine {
     var ctLine: CTLine? {
         if _ctLine == nil || _obsolete {
             _obsolete = false
-            print("\(#function): KLine. build CTLine. hardLineIndex:\(hardLineIndex), softLineIndex:\(softLineIndex)")
+            //print("\(#function): KLine. build CTLine. hardLineIndex:\(hardLineIndex), softLineIndex:\(softLineIndex)")
             makeCTLine()
         }
         return _ctLine
@@ -289,6 +294,13 @@ final class KLine {
             offsets.append(offset)
         }
         return offsets
+    }
+    
+    // この行におけるindex文字目の相対位置を返す。
+    func characterOffset(at index:Int) -> CGFloat {
+        guard let line = _cachedCTLine else { print("\(#function): _cachedCTLine is nil"); return 0.0 }
+        
+        return CTLineGetOffsetForStringIndex(line, index, nil)
     }
     
     // この行における相対座標のx位置を返す。
