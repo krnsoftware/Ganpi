@@ -331,7 +331,7 @@ final class KTextView: NSView, NSTextInputClient {
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
         
-        print("\(#function): done.")
+        //print("\(#function): done.")
         
         guard let layoutRects = _layoutManager.makeLayoutRects() else {
             print("\(#function): layoutRects is nil")
@@ -339,12 +339,12 @@ final class KTextView: NSView, NSTextInputClient {
         }
         
         // test. TextRegionの外枠を赤で描く。
-        
+        /*
         let path = NSBezierPath(rect: layoutRects.textRegion.rect)
         NSColor.red.setStroke()
         path.lineWidth = 1
         path.stroke()
-        
+        */
         
         let lines = _layoutManager.lines
         
@@ -363,9 +363,11 @@ final class KTextView: NSView, NSTextInputClient {
             ? NSColor.selectedTextBackgroundColor
             : NSColor.unemphasizedSelectedTextBackgroundColor
         
+        // text inputのソフトラップで行が追加された場合に、その行以降の行の描画位置を下方にずらすための数。
+        var addedLineNumber = 0
         
         for (i, line) in lines.enumerated() {
-            let y = CGFloat(i) * lineHeight + layoutRects.textEdgeInsets.top
+            let y = CGFloat(i + addedLineNumber) * lineHeight + layoutRects.textEdgeInsets.top
             
             let textPoint = CGPoint(x: textRect.origin.x + layoutRects.horizontalInsets ,
                                     y: textRect.origin.y + y)
@@ -412,7 +414,14 @@ final class KTextView: NSView, NSTextInputClient {
                         fullLine.append(lineA)
                         fullLine.append(muAttrString)
                         fullLine.append(lineB)
-                        ctLine = CTLineCreateWithAttributedString(fullLine)
+                        //ctLine = CTLineCreateWithAttributedString(fullLine)
+                        let ctLines = _layoutManager.makeFakeCTLines(from: fullLine, width: layoutRects.textRegionWidth - layoutRects.textEdgeInsets.right)
+                        addedLineNumber += ctLines.count - 1
+                        for (j, line) in ctLines.enumerated() {
+                            drawCTLine(ctLine: line, x: textPoint.x, y: y + CGFloat(j) * lineHeight)
+                        }
+                        continue
+                        
                     }
                     
                 }
@@ -421,19 +430,7 @@ final class KTextView: NSView, NSTextInputClient {
             // テキスト部分を描画。
             // 見えている範囲をy方向にlineHeightだけ拡大したもの。見えていない場所は描画しない。
             if verticalRange.contains(textPoint.y) {
-            
-                let context = NSGraphicsContext.current?.cgContext
-                context?.saveGState()
-                context?.translateBy(x: 0, y: bounds.height)
-                context?.scaleBy(x: 1.0, y: -1.0)
-                
-                let yInFlipped = CGFloat(i) * lineHeight + layoutRects.textEdgeInsets.top
-                let ascent = CTFontGetAscent(_textStorageRef.baseFont)
-                let lineOriginY = bounds.height - yInFlipped - ascent
-                
-                context?.textPosition = CGPoint(x: textPoint.x, y: lineOriginY)
-                CTLineDraw(ctLine, context!)
-                context?.restoreGState()
+                drawCTLine(ctLine: ctLine, x: textPoint.x, y: y)
             }
             
         }
@@ -1180,6 +1177,20 @@ final class KTextView: NSView, NSTextInputClient {
         
         return CGPoint(x: linePoint.x + line.characterOffset(at: indexInLine), y: linePoint.y)
 
+    }
+    
+    private func drawCTLine(ctLine: CTLine, x: CGFloat, y: CGFloat) {
+        let context = NSGraphicsContext.current?.cgContext
+        context?.saveGState()
+        context?.translateBy(x: 0, y: bounds.height)
+        context?.scaleBy(x: 1.0, y: -1.0)
+        
+        let ascent = CTFontGetAscent(_textStorageRef.baseFont)
+        let lineOriginY = bounds.height - y - ascent
+        
+        context?.textPosition = CGPoint(x: x, y: lineOriginY)
+        CTLineDraw(ctLine, context!)
+        context?.restoreGState()
     }
     
     

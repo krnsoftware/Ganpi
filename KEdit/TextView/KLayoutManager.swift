@@ -278,6 +278,45 @@ final class KLayoutManager: KLayoutManagerReadable {
         return softLines
     }
     
+    // 既存のAttributedStringからCTLineのリストを作成する。
+    func makeFakeCTLines(from attributedString: NSAttributedString,
+                             width: CGFloat?) -> [CTLine] {
+        guard attributedString.length > 0 else { return [] }
+        guard let width = width else {
+            return [CTLineCreateWithAttributedString(attributedString)]
+        }
+
+        var lines: [CTLine] = []
+
+        var currentLocation = 0
+        let fullLength = attributedString.length
+
+        while currentLocation < fullLength {
+            // 対象部分のAttributedString
+            let remainingRange = NSRange(location: currentLocation, length: fullLength - currentLocation)
+            let subAttr = attributedString.attributedSubstring(from: remainingRange)
+            let line = CTLineCreateWithAttributedString(subAttr)
+
+            // この行に収まる最大のインデックスを取得
+            let truncationIndex = CTLineGetStringIndexForPosition(line, CGPoint(x: width, y: 0))
+
+            // 折り返し地点の調整
+            var breakIndex = truncationIndex
+            if breakIndex == kCFNotFound || breakIndex == 0 {
+                breakIndex = 1 // 最低でも1文字進める
+            }
+
+            let actualRange = NSRange(location: currentLocation, length: breakIndex)
+            let actualAttr = attributedString.attributedSubstring(from: actualRange)
+            let actualLine = CTLineCreateWithAttributedString(actualAttr)
+
+            lines.append(actualLine)
+            currentLocation += breakIndex
+        }
+
+        return lines
+    }
+    
     
     
 }
