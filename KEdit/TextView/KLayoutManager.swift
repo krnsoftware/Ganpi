@@ -87,6 +87,7 @@ final class KLayoutManager: KLayoutManagerReadable {
         _lines.removeAll()
         _maxLineWidth = 0
         
+        let layoutRects = makeLayoutRects()
 
         var currentIndex = 0
         var currentLineNumber = 0
@@ -121,10 +122,18 @@ final class KLayoutManager: KLayoutManagerReadable {
 
             _lines.append(KLineInfo(ctLine: ctLine, range: lineRange, hardLineIndex: currentLineNumber, softLineIndex: 0))
             */
-            
+            /*
             let line = KLine(range: lineRange, hardLineIndex: currentLineNumber, softLineIndex: 0, layoutManager: self)
             _lines.append(line)
             let width = line.width
+            if width > _maxLineWidth {
+                _maxLineWidth = width
+            }
+             */
+            // この状態だとLineNumberRectのことが考慮されない。これから修正予定。
+            guard let lineArray = makeLines(range: lineRange, hardLineIndex: currentLineNumber, width: layoutRects?.textRegionWidth) else { print("\(#function) - lineArray is nil"); return }
+            _lines.append(contentsOf: lineArray)
+            let width = lineArray[0].width
             if width > _maxLineWidth {
                 _maxLineWidth = width
             }
@@ -164,28 +173,14 @@ final class KLayoutManager: KLayoutManagerReadable {
         }
     }
     
-    /*
-    func lineInfo(at index: Int) -> KLineInfo? {
-        //print("lineInfo(at: \(index))")
-        for line in lines {
-            if line.range.contains(index) || index == line.range.upperBound {
-                    return line
-            }
-        }
-        return nil
-    }*/
-    
-    // index文字目の存在するKLineを返す。
-    func lineInfo(at index: Int) -> KLine? {
-        //print("lineInfo(at: \(index))")
-        for line in lines {
-            if line.range.contains(index) || index == line.range.upperBound {
-                    return line
-            }
-        }
-        return nil
+    // TextViewのframeが変更された際に呼び出される。
+    func textViewFrameInvalidated() {
+        rebuildLayout()
+        _textView?.updateFrameSizeToFitContent()
     }
+ 
     
+    // characterIndex文字目の文字が含まれるKLineとその行番号(ソフトラップの)を返す。
     func line(at characterIndex: Int) -> (line: KLine?, lineIndex: Int) {
         for (i, line) in lines.enumerated() {
             if line.range.contains(characterIndex) || characterIndex == line.range.upperBound {
@@ -202,35 +197,84 @@ final class KLayoutManager: KLayoutManagerReadable {
         return CTLineCreateWithAttributedString(attrString)
     }
     
+    // 現在のLayoutRectsを生成する。専らTextViewから呼び出される。
+    func makeLayoutRects() -> LayoutRects? {
+        guard let textView = _textView else { print("\(#function) - textView is nil"); return nil }
+        /*guard let clipBounds = textView.enclosingScrollView?.contentView.bounds else {
+            print("\(#function) - clipBound is nil")
+            return nil
+        }*/
+        
+        return LayoutRects(
+            layoutManagerRef: self,
+            textStorageRef: _textStorageRef,
+            //bounds: clipBounds,
+            visibleRect: textView.visibleRect,
+            showLineNumbers: textView.showLineNumbers,
+            wordWrap: textView.wordWrap,
+            textEdgeInsets: .default
+        )
+    }
     
-    /*
-    func offsetsForAllGlyphs(in info: LineInfo) -> [CGFloat] {
-        var result: [CGFloat] = []
-        
-        for i in 0..<info.range.count {
-            result.appen()
-        }
-        
-        return []
-    }*/
     
     
     // MARK: - private function
     
     // 表示用に空行を作成する。
-    /*
-    private func makeEmptyLine(index: Int, hardLineIndex: Int) -> KLineInfo {
-        return KLineInfo(ctLine: CTLineCreateWithAttributedString(NSAttributedString(string: "")),
-                        range: index..<index,
-                        hardLineIndex: hardLineIndex,
-                        softLineIndex: 0)
-    }*/
+    
     private func makeEmptyLine(index: Int, hardLineIndex: Int) -> KLine {
         return KLine(range: index..<index, hardLineIndex: hardLineIndex, softLineIndex: 0, layoutManager: self)
     }
     
     
-    
+    private func makeLines(range: Range<Int>, hardLineIndex: Int, width: CGFloat?) -> [KLine]? {
+        let hardLine = KLine(range: range, hardLineIndex: hardLineIndex, softLineIndex: 0, layoutManager: self)
+
+        guard let textWidth = width, _textView?.wordWrap == true else {
+            return [hardLine]
+        }
+
+        // オフセットリストを取得
+        let offsets = hardLine.characterOffsets()
+
+        guard offsets.count > 0 else {
+            return [hardLine]  // 空行またはオフセット取得失敗
+        }
+
+        var softLines: [KLine] = []
+
+        var startIndex = range.lowerBound
+        var lastOffset: CGFloat = 0.0
+        var softLineIndex = 0
+
+        for i in 1..<offsets.count {
+            let currentOffset = offsets[i]
+
+            if currentOffset - lastOffset > textWidth {
+                let endIndex = range.lowerBound + i
+                let softRange = startIndex..<endIndex
+                let softLine = KLine(range: softRange,
+                                     hardLineIndex: hardLineIndex,
+                                     softLineIndex: softLineIndex,
+                                     layoutManager: self)
+                softLines.append(softLine)
+                softLineIndex += 1
+                startIndex = endIndex
+                lastOffset = currentOffset
+            }
+        }
+
+        // 残りを追加
+        if startIndex < range.upperBound {
+            let softLine = KLine(range: startIndex..<range.upperBound,
+                                 hardLineIndex: hardLineIndex,
+                                 softLineIndex: softLineIndex,
+                                 layoutManager: self)
+            softLines.append(softLine)
+        }
+
+        return softLines
+    }
     
     
     

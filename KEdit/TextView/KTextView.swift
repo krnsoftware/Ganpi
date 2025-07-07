@@ -30,8 +30,9 @@ final class KTextView: NSView, NSTextInputClient {
         willSet { _lastActionSelector = _currentActionSelector }
     }
     
-    private let _showLineNumbers: Bool = true
-    private let _autoIndent: Bool = true
+    private var _showLineNumbers: Bool = true
+    private var _autoIndent: Bool = true
+    private var _wordWrap: Bool = true
     //private let _textPadding: CGFloat = 8
     
     // MARK: - Properties - IME入力用
@@ -71,6 +72,15 @@ final class KTextView: NSView, NSTextInputClient {
         set { selectionRange = newValue..<newValue }
     }
     
+    var wordWrap: Bool {
+        get { _wordWrap }
+        set { _wordWrap = newValue }
+    }
+    
+    var showLineNumbers: Bool {
+        get { _showLineNumbers }
+        set { _showLineNumbers = newValue }
+    }
     
     // 今回のセレクタが垂直方向にキャレット選択範囲を動かすものであるか返す。
     private var isVerticalAction: Bool {
@@ -204,7 +214,16 @@ final class KTextView: NSView, NSTextInputClient {
         }
     }
     
-    
+    override func viewWillDraw() {
+        super.viewWillDraw()
+        
+        // ソフトラップの場合、visibleRectに合わせて行の横幅を変更する必要があるが、
+        // scrollview.clipViewでの変更がないため通知含めvisibleRectの変更を知るすべがない。
+        // このため、viewWillDraw()でdraw()される直前に毎回チェックを行なうことにした。
+        if wordWrap {
+            _layoutManager.textViewFrameInvalidated()
+        }
+    }
     
     
     override func becomeFirstResponder() -> Bool {
@@ -311,18 +330,20 @@ final class KTextView: NSView, NSTextInputClient {
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
         
+        print("\(#function): done.")
+        
+        guard let layoutRects = _layoutManager.makeLayoutRects() else {
+            print("\(#function): layoutRects is nil")
+            return
+        }
+        
         // test. TextRegionの外枠を赤で描く。
-        /*
+        
         let path = NSBezierPath(rect: layoutRects.textRegion.rect)
         NSColor.red.setStroke()
         path.lineWidth = 1
         path.stroke()
-         */
         
-        guard let layoutRects = makeLayoutRects(bounds: bounds) else {
-            print("\(#function): layoutRects is nil")
-            return
-        }
         
         let lines = _layoutManager.lines
         
@@ -467,13 +488,25 @@ final class KTextView: NSView, NSTextInputClient {
    
     
     override func setFrameSize(_ newSize: NSSize) {
-        guard let rects = makeLayoutRects(bounds: bounds) else {
+        /*
+        if wordWrap {
+            super.setFrameSize(newSize)
+            _layoutManager.textViewFrameInvalidated()
+            print("setFrameSize: wordWrap == true")
+            return
+        }*/
+        guard let rects = _layoutManager.makeLayoutRects() else {
             print("\(#function) error")
             return
         }
-        
+        print("\(#function) ")
         super.setFrameSize(NSSize(width: rects.textRegion.rect.width, height: rects.textRegion.rect.height))
     }
+    /*
+    override func layout() {
+        super.layout()
+        print("\(#function)")
+    }*/
     
     // MARK: - Keyboard Input (NSResponder methods)
 
@@ -625,9 +658,12 @@ final class KTextView: NSView, NSTextInputClient {
         let indexForLineSearch: Int = (selectionRange.lowerBound < _verticalSelectionBase!) ? selectionRange.lowerBound : selectionRange.upperBound
 
         // 基準行情報取得
-        guard let currentLine = _layoutManager.lineInfo(at: indexForLineSearch) else { print("\(#function): lineInfoFor(index:) error \(indexForLineSearch)");  return }
+        //guard let currentLine = _layoutManager.lineInfo(at: indexForLineSearch) else { print("\(#function): lineInfoFor(index:) error \(indexForLineSearch)");  return }
+        let info = _layoutManager.line(at: indexForLineSearch)
+        guard let currentLine = info.line else { print("\(#function): currentLine is nil.");  return }
 
-        let newLineIndex = currentLine.hardLineIndex + direction.rawValue
+        //let newLineIndex = currentLine.hardLineIndex + direction.rawValue
+        let newLineIndex = info.lineIndex + direction.rawValue
         
         // newLineIndexがTextStorageインスタンスのcharacterの領域を越えている場合には両端まで広げる。
         if newLineIndex < 0 {
@@ -649,7 +685,7 @@ final class KTextView: NSView, NSTextInputClient {
             return
         }
         
-        guard let layoutRects = makeLayoutRects(bounds: bounds) else { print("\(#function); makeLayoutRects error"); return }
+        guard let layoutRects = _layoutManager.makeLayoutRects() else { print("\(#function); makeLayoutRects error"); return }
         
         let newLineInfo = _layoutManager.lines[newLineIndex]
         //let ctLine = newLineInfo.ctLine
@@ -786,7 +822,7 @@ final class KTextView: NSView, NSTextInputClient {
         //キャレット移動のセレクタ記録に残すためのダミーセレクタ。
         doCommand(by: #selector(clearCaretContext(_:)))
         
-        guard let layoutRects = makeLayoutRects(bounds: bounds) else {
+        guard let layoutRects = _layoutManager.makeLayoutRects() else {
             print("\(#function): layoutRects is nil")
             return
         }
@@ -815,9 +851,11 @@ final class KTextView: NSView, NSTextInputClient {
                 }
                 _horizontalSelectionBase = selectionRange.lowerBound
             case 3: // トリプルクリック - クリックした部分の行全体を選択。
-                if let lineInfo = _layoutManager.lineInfo(at: index) {
-                    let isLastLine = lineInfo.range.upperBound == _textStorageRef.count
-                    selectionRange = lineInfo.range.lowerBound..<lineInfo.range.upperBound + (isLastLine ? 0 : 1)
+                let info = _layoutManager.line(at: index)
+                if info.lineIndex >= 0 {
+                    guard let line = info.line else { return }
+                    let isLastLine = line.range.upperBound == _textStorageRef.count
+                    selectionRange = line.range.lowerBound..<line.range.upperBound + (isLastLine ? 0 : 1)
                 }
                 _horizontalSelectionBase = selectionRange.lowerBound
             default:
@@ -838,7 +876,7 @@ final class KTextView: NSView, NSTextInputClient {
     
     
     override func mouseDragged(with event: NSEvent) {
-        guard let layoutRects = makeLayoutRects(bounds: bounds) else {
+        guard let layoutRects = _layoutManager.makeLayoutRects() else {
             print("\(#function): layoutRects is nil")
             return
         }
@@ -1104,7 +1142,8 @@ final class KTextView: NSView, NSTextInputClient {
         let height = CGFloat(totalLines) * lineHeight * 4 / 3
         
         //print("layoutManager.maxLineWidth = \(layoutManager.maxLineWidth)")
-        guard let layoutRects = makeLayoutRects(bounds: bounds) else {
+        //guard let layoutRects = makeLayoutRects(bounds: bounds) else {
+        guard let layoutRects = _layoutManager.makeLayoutRects() else {
             print("\(#function): makeLayoutRects failed.")
             return
         }
@@ -1123,30 +1162,15 @@ final class KTextView: NSView, NSTextInputClient {
 
     }
     
-    // LayoutRectsを生成するメソッド。KTextView内ではこれ以外の方法で生成してはならない。
-    private func makeLayoutRects(bounds: CGRect) -> LayoutRects? {
-        guard let clipBounds = enclosingScrollView?.contentView.bounds else {
-            print("\(#function) - clipBound is nil")
-            return nil
-        }
-        
-        return LayoutRects(
-            layoutManagerRef: _layoutManager,
-            textStorageRef: _textStorageRef,
-            bounds: clipBounds,
-            visibleRect: visibleRect,
-            showLineNumbers: _showLineNumbers,
-            textEdgeInsets: .default
-        )
-    }
+    
     
     // characterIndex文字目の文字が含まれる行の位置。textRegion左上原点。
     private func linePosition(at characterIndex:Int) -> CGPoint {
-        guard let layoutRects = makeLayoutRects(bounds: bounds) else {
+        guard let layoutRects = _layoutManager.makeLayoutRects() else {
             print("\(#function): failed to make layoutRects"); return .zero }
         let lineInfo = _layoutManager.line(at: characterIndex)
-        guard let line = lineInfo.line else {
-            print("\(#function): failed to make line"); return .zero }
+        /*guard let line = lineInfo.line else {
+            print("\(#function): failed to make line"); return .zero }*/
                 
         let x = layoutRects.textRegion.rect.origin.x + layoutRects.horizontalInsets
         let y = layoutRects.textRegion.rect.origin.y + CGFloat(lineInfo.lineIndex) * _layoutManager.lineHeight + layoutRects.textEdgeInsets.top
