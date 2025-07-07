@@ -42,7 +42,8 @@ protocol KTextStorageReadable: KTextStorageCommon {
     
     func wordRange(at index: Int) -> Range<Int>?
     func attributedString(for range: Range<Int>, tabWidth: Int?) -> NSAttributedString?
-    func characterIndex(c: Character, from: Int, direction: KDirection) -> Int?
+    func lineRange(at index: Int) -> Range<Int>?
+    //func characterIndex(c: Character, from: Int, direction: KDirection) -> Int?
 }
 
 // 書き込み可能プロトコル（読み取り継承なし）
@@ -192,6 +193,7 @@ final class KTextStorage: KTextStorageProtocol {
     // MARK: - Utilities
     
     // 試しに実装したもの。
+    /*
     func characterIndex(c: Character, from: Int, direction: KDirection = .forward) -> Int? {
         guard from >= 0 && from < characterSlice.count else { return nil }
         
@@ -202,6 +204,29 @@ final class KTextStorage: KTextStorageProtocol {
             return characterSlice[..<from].lastIndex(of: c)
         }
         
+    }*/
+    
+    // index文字目のある場所を含む行のRangeを返す。改行は含まない。
+    func lineRange(at index: Int) -> Range<Int>? {
+        guard index >= 0 && index < _characters.count else { return nil }
+
+        var lower = index
+        while lower > 0 {
+            if _characters[lower - 1].isNewline {
+                break
+            }
+            lower -= 1
+        }
+
+        var upper = index
+        while upper < _characters.count {
+            if _characters[upper].isNewline {
+                break
+            }
+            upper += 1
+        }
+
+        return lower..<upper
     }
 
     

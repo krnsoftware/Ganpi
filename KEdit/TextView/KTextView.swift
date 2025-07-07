@@ -375,11 +375,8 @@ final class KTextView: NSView, NSTextInputClient {
             // 選択範囲の描画
             let lineRange = line.range
             let selection = selectionRange.clamped(to: lineRange)
-            //if !selection.isEmpty {
             
-            //let startOffset = CTLineGetOffsetForStringIndex(line.ctLine, selection.lowerBound - lineRange.lowerBound, nil)
-            //var endOffset = CTLineGetOffsetForStringIndex(line.ctLine, selection.upperBound - lineRange.lowerBound, nil)
-            guard var ctLine = line.ctLine else { continue }
+            guard let ctLine = line.ctLine else { continue }
             let startOffset = CTLineGetOffsetForStringIndex(ctLine, selection.lowerBound - lineRange.lowerBound, nil)
             var endOffset = CTLineGetOffsetForStringIndex(ctLine, selection.upperBound - lineRange.lowerBound, nil)
             
@@ -399,7 +396,6 @@ final class KTextView: NSView, NSTextInputClient {
             selectedTextBGColor.setFill()
             selectionRect.fill()
             
-            //var ctLine = line.ctLine
             
             // text input cliantの実装。textstorageには干渉せず、draw()の内部で全て完結する。
             if let repRange = _replacementRange {
@@ -440,32 +436,35 @@ final class KTextView: NSView, NSTextInputClient {
             NSColor.white.setFill()
             lnRect.fill()
             
+            // 非選択行の文字のattribute
+            let attrs: [NSAttributedString.Key: Any] = [
+                .font: NSFont.monospacedDigitSystemFont(ofSize: 0.9 * _textStorageRef.baseFont.pointSize,weight: .regular),
+                .foregroundColor: NSColor.secondaryLabelColor
+            ]
+            // 選択行の文字のattribute
+            let attrs_emphasized: [NSAttributedString.Key: Any] = [
+                .font: NSFont.monospacedDigitSystemFont(ofSize: 0.9 * _textStorageRef.baseFont.pointSize,weight: .bold),
+                .foregroundColor: NSColor.labelColor
+            ]
+            
             for i in 0..<lines.count {
                 let y = CGFloat(i) * lineHeight + layoutRects.textEdgeInsets.top
                 
-                let number = "\(i + 1)"
+                if lines[i].softLineIndex > 0 || !verticalRange.contains(y) {
+                    continue
+                }
                 
-                // 非選択行の文字のattribute
-                let attrs: [NSAttributedString.Key: Any] = [
-                    .font: NSFont.monospacedDigitSystemFont(ofSize: 0.9 * _textStorageRef.baseFont.pointSize,weight: .regular),
-                    .foregroundColor: NSColor.secondaryLabelColor
-                ]
-                // 選択行の文字のattribute
-                let attrs_emphasized: [NSAttributedString.Key: Any] = [
-                    .font: NSFont.monospacedDigitSystemFont(ofSize: 0.9 * _textStorageRef.baseFont.pointSize,weight: .bold),
-                    .foregroundColor: NSColor.labelColor
-                ]
+                //let number = "\(i + 1)"
+                let number = "\(lines[i].hardLineIndex + 1)"
                 
                 let size = number.size(withAttributes: attrs)
-                //let numberPoint = CGPoint(x: lnRect.maxX - size.width - padding,
-                //                          y: lnRect.origin.y + y)
                 
                 let numberPointX = lnRect.maxX - size.width - layoutRects.textEdgeInsets.left
                 let numberPointY = lnRect.origin.y + y - visibleRect.origin.y
                 let numberPoint = CGPoint(x: numberPointX, y: numberPointY)
                 
-                // 見えている範囲をy方向にlineHeightだけ拡大したもの。見えていない場所は描画しない。
-                let lineRange = lines[i].range
+                //let lineRange = lines[i].range
+                let lineRange = _textStorageRef.lineRange(at: lines[i].range.lowerBound) ?? lines[i].range
                 let caretIsInLine = lineRange.contains(caretIndex) || caretIndex == lineRange.upperBound
                 let selectionOverlapsLine =
                     selectionRange.overlaps(lineRange) ||
