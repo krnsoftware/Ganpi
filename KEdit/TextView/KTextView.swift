@@ -222,6 +222,7 @@ final class KTextView: NSView, NSTextInputClient {
         // このため、viewWillDraw()でdraw()される直前に毎回チェックを行なうことにした。
         if wordWrap {
             _layoutManager.textViewFrameInvalidated()
+            updateCaretPosition()
         }
     }
     

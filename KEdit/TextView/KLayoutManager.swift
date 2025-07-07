@@ -87,7 +87,7 @@ final class KLayoutManager: KLayoutManagerReadable {
         _lines.removeAll()
         _maxLineWidth = 0
         
-        let layoutRects = makeLayoutRects()
+        guard let layoutRects = makeLayoutRects() else { print("\(#function) - layoutRects is nil"); return }
 
         var currentIndex = 0
         var currentLineNumber = 0
@@ -130,9 +130,11 @@ final class KLayoutManager: KLayoutManagerReadable {
                 _maxLineWidth = width
             }
              */
-            // この状態だとLineNumberRectのことが考慮されない。これから修正予定。
-            guard let lineArray = makeLines(range: lineRange, hardLineIndex: currentLineNumber, width: layoutRects?.textRegionWidth) else { print("\(#function) - lineArray is nil"); return }
+            
+            //guard let lineArray = makeLines(range: lineRange, hardLineIndex: currentLineNumber, width: layoutRects?.textRegionWidth) else { print("\(#function) - lineArray is nil"); return }
+            guard let lineArray = makeLines(range: lineRange, hardLineIndex: currentLineNumber, width: layoutRects.textRegionWidth - layoutRects.textEdgeInsets.right) else { print("\(#function) - lineArray is nil"); return }
             _lines.append(contentsOf: lineArray)
+            
             let width = lineArray[0].width
             if width > _maxLineWidth {
                 _maxLineWidth = width
