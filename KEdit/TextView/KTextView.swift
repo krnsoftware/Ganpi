@@ -489,25 +489,13 @@ final class KTextView: NSView, NSTextInputClient {
    
     
     override func setFrameSize(_ newSize: NSSize) {
-        /*
-        if wordWrap {
-            super.setFrameSize(newSize)
-            _layoutManager.textViewFrameInvalidated()
-            print("setFrameSize: wordWrap == true")
-            return
-        }*/
         guard let rects = _layoutManager.makeLayoutRects() else {
             print("\(#function) error")
             return
         }
-        print("\(#function) ")
+
         super.setFrameSize(NSSize(width: rects.textRegion.rect.width, height: rects.textRegion.rect.height))
     }
-    /*
-    override func layout() {
-        super.layout()
-        print("\(#function)")
-    }*/
     
     // MARK: - Keyboard Input (NSResponder methods)
 
@@ -961,11 +949,13 @@ final class KTextView: NSView, NSTextInputClient {
         } else {
             return
         }
-        //print("insertText()")
         
         let range = Range(replacementRange) ?? selectionRange
         
-        _textStorageRef.replaceCharacters(in: range, with: Array(text))
+        //_textStorageRef.replaceCharacters(in: range, with: Array(text))
+        
+        // 渡されたstringをCharacter.isControlでフィルターして制御文字を除去しておく。
+        _textStorageRef.replaceCharacters(in: range, with: text.filter { !$0.isControl })
        
         _markedTextRange = nil
         _markedText = NSAttributedString()
@@ -986,7 +976,7 @@ final class KTextView: NSView, NSTextInputClient {
             return
         }
         
-        print("\(#function): selectedRange: \(selectedRange), replacementRange: \(replacementRange)")
+        //print("\(#function): selectedRange: \(selectedRange), replacementRange: \(replacementRange)")
         
         // selectedRangeは「挿入される文字列のどこが選択されているか」、replacementRangeは「どこに挿入するか」を示す。
         

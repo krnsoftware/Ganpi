@@ -9,6 +9,8 @@ import Cocoa
 
 extension Character {
     
+    // 文字種により全角・半角を判別する。
+    // proportional fontでは意味がないが、将来完全な等幅フォントを使用する際の高速化に使用する予定。
     var displayWidth: Int {
         guard let scalar = unicodeScalars.first else { return 1 }
         let value = scalar.value
@@ -25,6 +27,16 @@ extension Character {
             return 2
         default:
             return 1
+        }
+    }
+    
+    // そのCharacterが制御文字であるか否か返す。
+    // ASCIIの制御文字のみ対応。将来的にUnicode全域で必要になればまたその際に対応する。
+    // string.filter { !$0.isControl } のようにして制御文字を排除する。
+    var isControl: Bool {
+        unicodeScalars.allSatisfy { scalar in
+            let value = scalar.value
+            return (value <= 0x1F || value == 0x7F)
         }
     }
     
