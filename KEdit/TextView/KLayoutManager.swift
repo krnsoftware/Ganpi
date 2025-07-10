@@ -25,6 +25,11 @@ protocol KLayoutManagerReadable: AnyObject {
     var lineHeight: CGFloat { get }
     var lineSpacing: CGFloat { get }
     var maxLineWidth: CGFloat { get }
+    
+    func makeLayoutRects() -> LayoutRects?
+    func makeEmptyLine(index: Int, hardLineIndex: Int) -> KLine
+    func makeLines(range: Range<Int>, hardLineIndex: Int, width: CGFloat?) -> [KLine]?
+    func makeFakeCTLines(from attributedString: NSAttributedString, width: CGFloat?) -> [CTLine]
 }
 
 // MARK: - KLayoutManager
@@ -154,6 +159,8 @@ final class KLayoutManager: KLayoutManagerReadable {
         if _textStorageRef.characterSlice.last == "\n" {
             _lines.append(makeEmptyLine(index: _textStorageRef.count, hardLineIndex: _lines.count))
         }
+        
+        
                 
     }
     
@@ -165,7 +172,8 @@ final class KLayoutManager: KLayoutManagerReadable {
         switch modification {
         case let .textChanged(range, insertedCount):
             //print("🔧 テキスト変更: range = \(range), inserted = \(insertedCount)")
-            rebuildLayout()
+            //rebuildLayout()
+            //print("\(#function): call rebuildLayout()")
             view.textStorageDidModify(modification)
             
 
@@ -178,11 +186,13 @@ final class KLayoutManager: KLayoutManagerReadable {
     // TextViewのframeが変更された際に呼び出される。
     func textViewFrameInvalidated() {
         rebuildLayout()
+        //print("\(#function): call rebuildLayout()")
         _textView?.updateFrameSizeToFitContent()
     }
  
     
     // characterIndex文字目の文字が含まれるKLineとその行番号(ソフトラップの)を返す。
+    // 現在の文字がテキストの最後の場合には(nil, -1)が返る。
     func line(at characterIndex: Int) -> (line: KLine?, lineIndex: Int) {
         for (i, line) in lines.enumerated() {
             if line.range.contains(characterIndex) || characterIndex == line.range.upperBound {
@@ -224,12 +234,12 @@ final class KLayoutManager: KLayoutManagerReadable {
     
     // 表示用に空行を作成する。
     
-    private func makeEmptyLine(index: Int, hardLineIndex: Int) -> KLine {
+    func makeEmptyLine(index: Int, hardLineIndex: Int) -> KLine {
         return KLine(range: index..<index, hardLineIndex: hardLineIndex, softLineIndex: 0, layoutManager: self)
     }
     
     
-    private func makeLines(range: Range<Int>, hardLineIndex: Int, width: CGFloat?) -> [KLine]? {
+    func makeLines(range: Range<Int>, hardLineIndex: Int, width: CGFloat?) -> [KLine]? {
         let hardLine = KLine(range: range, hardLineIndex: hardLineIndex, softLineIndex: 0, layoutManager: self)
 
         guard let textWidth = width, _textView?.wordWrap == true else {

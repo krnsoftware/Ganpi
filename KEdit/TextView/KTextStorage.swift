@@ -143,7 +143,7 @@ final class KTextStorage: KTextStorageProtocol {
         }
 
         _characters.replaceSubrange(range, with: newCharacters)
-        //print("replaceCharacters() newCharacter = \(newCharacters)")
+        //log("chars = \(String(_characters))", from:self)
         notifyObservers(.textChanged(range: range, insertedCount: newCharacters.count))
         return true
     }

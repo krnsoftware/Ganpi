@@ -248,10 +248,10 @@ final class KTextView: NSView, NSTextInputClient {
         let width = frame.size.width
         frame.size = NSSize(width: width+10, height: frame.size.height)
         if bounds.contains(localPoint) {
-            print("✅ Returning self")
+            //print("✅ Returning self")
             return self
         } else {
-            print("❌ Returning nil")
+            //print("❌ Returning nil")
             return nil
         }
     }
@@ -346,7 +346,27 @@ final class KTextView: NSView, NSTextInputClient {
         path.stroke()
         */
         
+        
+        // for test.
+        /*
+        let klines = KLines(layoutManager: _layoutManager, textStorageRef: _textStorageRef)
+        if hasMarkedText(), let repRange = _replacementRange{
+            //print("test: _markedText: \(_markedText.string), repRange: \(repRange)")
+            klines.addFakeLine(replacementRange: repRange, attrString: _markedText)
+        }
+        klines.printLines()*/
+        // ここまで
+        
+        
         let lines = _layoutManager.lines
+        
+        
+        // for test.
+        /*
+        for line in lines {
+            log("line.range: \(line.range)", from:self)
+        }*/
+        // ここまで
         
         let lineHeight = _layoutManager.lineHeight
         let textRect = layoutRects.textRegion.rect
@@ -396,7 +416,7 @@ final class KTextView: NSView, NSTextInputClient {
             selectedTextBGColor.setFill()
             selectionRect.fill()
             
-            
+            /*
             // text input cliantの実装。textstorageには干渉せず、draw()の内部で全て完結する。
             if let repRange = _replacementRange {
                 //print("repRange - \(repRange)")
@@ -428,8 +448,29 @@ final class KTextView: NSView, NSTextInputClient {
             if verticalRange.contains(textPoint.y) {
                 drawCTLine(ctLine: ctLine, x: textPoint.x, y: y)
             }
+             */
             
         }
+        
+        // テキストを描画
+        let klines = KLines(layoutManager: _layoutManager, textStorageRef: _textStorageRef)
+        if hasMarkedText(), let repRange = _replacementRange{
+            klines.addFakeLine(replacementRange: repRange, attrString: _markedText)
+        }
+        for i in 0..<klines.count {
+            let y = CGFloat(i) * lineHeight + layoutRects.textEdgeInsets.top
+            
+            let textPoint = CGPoint(x: textRect.origin.x + layoutRects.horizontalInsets ,
+                                    y: textRect.origin.y + y)
+            
+            guard let line = klines[i] else { continue }
+            
+            if verticalRange.contains(textPoint.y) {
+                guard let ctLine = line.ctLine else { continue }
+                drawCTLine(ctLine: ctLine, x: textPoint.x, y: y)
+            }
+        }
+        klines.printLines()
         
         // 行番号部分を描画。
         if _showLineNumbers, let lnRect = layoutRects.lineNumberRegion?.rect {
@@ -480,6 +521,7 @@ final class KTextView: NSView, NSTextInputClient {
                 
             }
         }
+        
         
     }
    
@@ -980,6 +1022,13 @@ final class KTextView: NSView, NSTextInputClient {
         if selectionRange.count > 0 {
             _textStorageRef.replaceCharacters(in: selectionRange, with: [])
             selectionRange = selectionRange.lowerBound..<selectionRange.lowerBound
+        }
+        
+        // もし文字列が空の場合は変換が終了したとみなしてunmarkText()を呼び出す。
+        // OS標準のIMとAquaSKKを試したがいずれも変換終了時にunmarkedText()を呼び出さないことを確認。2025-07-10
+        if attrString.string.count == 0 {
+            unmarkText()
+            return
         }
         
         let range = Range(replacementRange) ?? selectionRange
