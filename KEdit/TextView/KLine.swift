@@ -156,7 +156,7 @@ final class KLines {
         _layoutManager = layoutManager
         _textStorageRef = textStorageRef
         
-        constructLines()
+        rebuildLines()
     }
     
     
@@ -202,7 +202,12 @@ final class KLines {
         
     }
     
-    func removeFakeLine() {
+    func removeFakeLines() {
+        _fakeLines.removeAll()
+    }
+    
+    func removeAllLines() {
+        _lines.removeAll()
         _fakeLines.removeAll()
     }
     
@@ -243,9 +248,9 @@ final class KLines {
         }
     }
     
-    // MARK: - private funcs.
+
     
-    private func constructLines(range: Range<Int>? = nil) {
+   func rebuildLines(range: Range<Int>? = nil) {
         _lines.removeAll()
         _maxLineWidth = 0
         
@@ -299,10 +304,14 @@ final class KLines {
         
         //最後の文字が改行だった場合、空行を1つ追加する。
         if textStorageRef.characterSlice.last == "\n" {
-            _lines.append(layoutManagerRef.makeEmptyLine(index: textStorageRef.count, hardLineIndex: _lines.count))
+            _lines.append(layoutManagerRef.makeEmptyLine(index: textStorageRef.count, hardLineIndex: currentLineNumber))
         }
                 
     }
+    
+    
+    
+// MARK: - private funcs.
     
     // ハード行の行番号hardLineIndexの行を取り出す。ソフトラップの場合は複数行になることがある。
     private func lines(hardLineIndex: Int) -> [KLine] {

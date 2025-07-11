@@ -20,7 +20,8 @@ struct KLineInfo {
 
 protocol KLayoutManagerReadable: AnyObject {
     //var lines: ArraySlice<KLineInfo> { get }
-    var lines: [KLine] { get }
+    //var lines: [KLine] { get }
+    var lines: KLines { get }
     var lineCount: Int { get }
     var lineHeight: CGFloat { get }
     var lineSpacing: CGFloat { get }
@@ -39,7 +40,12 @@ final class KLayoutManager: KLayoutManagerReadable {
     // MARK: - Properties
 
     //private(set) var _lines: [KLineInfo] = []
-    private(set) var _lines: [KLine] = []
+    //private(set) var _lines: [KLine] = []
+    //private var _lines: KLines
+    private lazy var _lines: KLines = {
+        return KLines(layoutManager: self, textStorageRef: _textStorageRef)
+    }()
+    
     private var _maxLineWidth: CGFloat = 0
     private let _textStorageRef: KTextStorageProtocol
     private weak var _textView: KTextView?
@@ -62,7 +68,8 @@ final class KLayoutManager: KLayoutManagerReadable {
     var lines: ArraySlice<KLineInfo> {
         return ArraySlice(_lines)
     }*/
-    var lines: [KLine] {
+    //var lines: [KLine] {
+    var lines: KLines {
         return _lines
     }
     
@@ -79,6 +86,8 @@ final class KLayoutManager: KLayoutManagerReadable {
     init(textStorageRef: KTextStorageProtocol) {
         _textStorageRef = textStorageRef
         
+        _lines = KLines(layoutManager: self, textStorageRef: _textStorageRef)
+        
         textStorageRef.addObserver { [weak self] modification in
             self?.textStorageDidModify(modification)
         }
@@ -89,6 +98,10 @@ final class KLayoutManager: KLayoutManagerReadable {
     // MARK: - Layout
     
     private func rebuildLayout() {
+        
+        _lines.rebuildLines()
+        
+        /*
         _lines.removeAll()
         _maxLineWidth = 0
         
@@ -160,7 +173,7 @@ final class KLayoutManager: KLayoutManagerReadable {
             _lines.append(makeEmptyLine(index: _textStorageRef.count, hardLineIndex: _lines.count))
         }
         
-        
+        */
                 
     }
     
@@ -194,7 +207,9 @@ final class KLayoutManager: KLayoutManagerReadable {
     // characterIndex文字目の文字が含まれるKLineとその行番号(ソフトラップの)を返す。
     // 現在の文字がテキストの最後の場合には(nil, -1)が返る。
     func line(at characterIndex: Int) -> (line: KLine?, lineIndex: Int) {
-        for (i, line) in lines.enumerated() {
+        //for (i, line) in lines.enumerated() {
+        for i in 0..<lines.count {
+            guard let line = lines[i] else { log("line is nil.", from:self); continue }
             if line.range.contains(characterIndex) || characterIndex == line.range.upperBound {
                 return (line, i)
             }

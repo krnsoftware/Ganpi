@@ -386,7 +386,9 @@ final class KTextView: NSView, NSTextInputClient {
         // text inputのソフトラップで行が追加された場合に、その行以降の行の描画位置を下方にずらすための数。
         var addedLineNumber = 0
         
-        for (i, line) in lines.enumerated() {
+        //for (i, line) in lines.enumerated() {
+        for i in 0..<lines.count {
+            guard let line = lines[i] else { log("line[i] is nil.", from:self); continue }
             let y = CGFloat(i + addedLineNumber) * lineHeight + layoutRects.textEdgeInsets.top
             
             let textPoint = CGPoint(x: textRect.origin.x + layoutRects.horizontalInsets ,
@@ -453,24 +455,25 @@ final class KTextView: NSView, NSTextInputClient {
         }
         
         // テキストを描画
-        let klines = KLines(layoutManager: _layoutManager, textStorageRef: _textStorageRef)
+        //let line = KLines(layoutManager: _layoutManager, textStorageRef: _textStorageRef)
         if hasMarkedText(), let repRange = _replacementRange{
-            klines.addFakeLine(replacementRange: repRange, attrString: _markedText)
+            lines.addFakeLine(replacementRange: repRange, attrString: _markedText)
         }
-        for i in 0..<klines.count {
+        for i in 0..<lines.count {
             let y = CGFloat(i) * lineHeight + layoutRects.textEdgeInsets.top
             
             let textPoint = CGPoint(x: textRect.origin.x + layoutRects.horizontalInsets ,
                                     y: textRect.origin.y + y)
             
-            guard let line = klines[i] else { continue }
+            guard let line = lines[i] else { continue }
             
             if verticalRange.contains(textPoint.y) {
                 guard let ctLine = line.ctLine else { continue }
                 drawCTLine(ctLine: ctLine, x: textPoint.x, y: y)
             }
         }
-        klines.printLines()
+        lines.removeFakeLines()
+        //klines.printLines()
         
         // 行番号部分を描画。
         if _showLineNumbers, let lnRect = layoutRects.lineNumberRegion?.rect {
@@ -489,14 +492,16 @@ final class KTextView: NSView, NSTextInputClient {
             ]
             
             for i in 0..<lines.count {
+                guard let line = lines[i] else { log("line number: line[i] is nil.", from:self); continue }
                 let y = CGFloat(i) * lineHeight + layoutRects.textEdgeInsets.top
                 
-                if lines[i].softLineIndex > 0 || !verticalRange.contains(y) {
+                //if lines[i].softLineIndex > 0 || !verticalRange.contains(y) {
+                if line.softLineIndex > 0 || !verticalRange.contains(y) {
                     continue
                 }
                 
                 //let number = "\(i + 1)"
-                let number = "\(lines[i].hardLineIndex + 1)"
+                let number = "\(line.hardLineIndex + 1)"
                 
                 let size = number.size(withAttributes: attrs)
                 
@@ -505,7 +510,8 @@ final class KTextView: NSView, NSTextInputClient {
                 let numberPoint = CGPoint(x: numberPointX, y: numberPointY)
                 
                 //let lineRange = lines[i].range
-                let lineRange = _textStorageRef.lineRange(at: lines[i].range.lowerBound) ?? lines[i].range
+                //let lineRange = _textStorageRef.lineRange(at: lines[i].range.lowerBound) ?? lines[i].range
+                let lineRange = _textStorageRef.lineRange(at: line.range.lowerBound) ?? line.range
                 let caretIsInLine = lineRange.contains(caretIndex) || caretIndex == lineRange.upperBound
                 let selectionOverlapsLine =
                     selectionRange.overlaps(lineRange) ||
@@ -714,7 +720,8 @@ final class KTextView: NSView, NSTextInputClient {
         
         guard let layoutRects = _layoutManager.makeLayoutRects() else { print("\(#function); makeLayoutRects error"); return }
         
-        let newLineInfo = _layoutManager.lines[newLineIndex]
+        //let newLineInfo = _layoutManager.lines[newLineIndex]
+        guard let newLineInfo = _layoutManager.lines[newLineIndex] else { log("newLineInfo is nil.", from:self); return }
         //let ctLine = newLineInfo.ctLine
         guard let ctLine = newLineInfo.ctLine else { print("\(#function): newLineInfo.ctLine nil"); return}
 
@@ -889,7 +896,8 @@ final class KTextView: NSView, NSTextInputClient {
                 break
             }
         case .lineNumber(let line):
-            let lineInfo = _layoutManager.lines[line]
+            //let lineInfo = _layoutManager.lines[line]
+            guard let lineInfo = _layoutManager.lines[line] else { log("lineInfo is nil", from:self); return }
             selectionRange = lineInfo.range
             _horizontalSelectionBase = lineInfo.range.lowerBound
         case .outside:
@@ -920,10 +928,12 @@ final class KTextView: NSView, NSTextInputClient {
             let upper = max(base, dragCaretIndex)
             selectionRange = lower..<upper
             
-        case .lineNumber(let line):
+        case .lineNumber(let lineNumber):
             //現在の選択範囲から、指定れた行の最後(改行含む)までを選択する。
             //horizontalSelectionBaseより前であれば、行頭までを選択する。
-            let lineRange = _layoutManager.lines[line].range
+            guard let line = _layoutManager.lines[lineNumber] else { log(".lineNumber. line = nil.", from:self); return }
+            //let lineRange = _layoutManager.lines[line].range
+            let lineRange = line.range
             let base = _horizontalSelectionBase ?? caretIndex
             if lineRange.upperBound > base {
                 selectionRange = base..<lineRange.upperBound
@@ -1168,7 +1178,8 @@ final class KTextView: NSView, NSTextInputClient {
         
         //layoutManager.rebuildLayout()
 
-        let totalLines = _layoutManager._lines.count
+        //let totalLines = _layoutManager._lines.count
+        let totalLines = _layoutManager.lines.count
         let lineHeight = _layoutManager.lineHeight
 
         //let edgePadding = KTextView.defaultEdgePadding

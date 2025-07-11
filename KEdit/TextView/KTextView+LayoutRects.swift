@@ -116,8 +116,10 @@ struct LayoutRects {
             let lineIndex = Int(relativePoint.y / lineHeight)
             
             // TextRegion内でLineに含まれる場合
-            if lines.indices.contains(lineIndex) {
-                let line = lines[lineIndex]
+            //if lines.indices.contains(lineIndex) {
+            if 0 <= lineIndex && lineIndex < lineCount {
+                
+                guard let line = lines[lineIndex] else { print("\(#function) - invalid lineIndex \(lineIndex)"); return .outside}
                 guard let ctLine = line.ctLine else { print("regionType - invalid line") ; return .outside }
                 let relativeX = max(0, relativePoint.x)
                 //let indexInLine = CTLineGetStringIndexForPosition(line.ctLine, CGPoint(x: relativeX, y: 0))
