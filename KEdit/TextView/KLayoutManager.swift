@@ -318,7 +318,7 @@ final class KLayoutManager: KLayoutManagerReadable {
         var baseIndex: Int = 0
         for i in 0..<attributedString.length {
             let offset = CTLineGetOffsetForStringIndex(fullLine, i, nil)
-            log("offset = \(Int(offset)), baseOffset = \(Int(baseOffset)), pm = \(Int(offset - baseOffset)))", from:self)
+            //log("offset = \(Int(offset)), baseOffset = \(Int(baseOffset)), pm = \(Int(offset - baseOffset)))", from:self)
             
             if offset - baseOffset >= width {
                 

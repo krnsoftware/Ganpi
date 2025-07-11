@@ -164,6 +164,7 @@ final class KTextView: NSView, NSTextInputClient {
         updateCaretPosition()
         startCaretBlinkTimer()
         
+        registerForDraggedTypes([.string])
     }
     
     override func viewDidMoveToWindow() {
@@ -179,7 +180,6 @@ final class KTextView: NSView, NSTextInputClient {
         _layoutManager.textView = self
 
         window?.makeFirstResponder(self)  // 念のため明示的に指定
-        updateCaretPosition()
        
         // キャレットの位置を再計算して表示しておく。
         updateCaretPosition()
@@ -875,6 +875,17 @@ final class KTextView: NSView, NSTextInputClient {
             let upper = max(base, dragCaretIndex)
             selectionRange = lower..<upper
             
+            // 上方向にドラッグした場合、caretIndexがselectionRange末尾のためスクロールされない。
+            // それを解決するためのコード。
+            if lower < base {
+                guard let scrollView = self.enclosingScrollView else { return }
+                let point = characterPosition(at: lower)
+                DispatchQueue.main.async {
+                    scrollView.contentView.scrollToVisible(NSRect(x:point.x, y:point.y, width: 1, height: 1))
+                }
+                return
+            }
+            
         case .lineNumber(let lineNumber):
             //現在の選択範囲から、指定れた行の最後(改行含む)までを選択する。
             //horizontalSelectionBaseより前であれば、行頭までを選択する。
@@ -891,6 +902,7 @@ final class KTextView: NSView, NSTextInputClient {
         case .outside:
             // textRegionより上なら文頭まで、下なら文末まで選択する。
             let textRect = layoutRects.textRegion.rect
+            
             if location.y < textRect.minY {
                 selectionRange = 0..<(_horizontalSelectionBase ?? caretIndex)
             } else if location.y > (_layoutManager.lineHeight * CGFloat(_layoutManager.lineCount) + layoutRects.textEdgeInsets.top)  {

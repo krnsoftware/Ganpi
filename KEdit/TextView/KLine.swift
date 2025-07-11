@@ -223,13 +223,13 @@ final class KLines {
              
         // 入力中の行の場合は、fake行を返す。
         if lineArrayIndex <= i, i < lineArrayIndex + _fakeLines.count {
-            log("fake.", from:self)
+            //log("fake.", from:self)
             return _fakeLines[i - lineArrayIndex] as KLine?
         }
         
         // 入力中の行より後の場合は、入力中の行の次の行を連続して取得できるようずらす。
         let convertedCount = i - _fakeLines.count + lines(hardLineIndex: _replaceLineNumber).count
-        log("slided.", from:self)
+        //log("slided.", from:self)
         
         return _lines[convertedCount]
         
