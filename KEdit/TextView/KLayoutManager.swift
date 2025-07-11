@@ -295,9 +295,27 @@ final class KLayoutManager: KLayoutManagerReadable {
         guard let width = width else {
             return [CTLineCreateWithAttributedString(attributedString)]
         }
-
         var lines: [CTLine] = []
-
+        
+        let fullLine = CTLineCreateWithAttributedString(attributedString)
+        
+        var baseOffset: CGFloat = 0
+        var baseIndex: Int = 0
+        for i in 0..<attributedString.length {
+            let offset = CTLineGetOffsetForStringIndex(fullLine, i, nil)
+            if offset - baseOffset >= width {
+                let subAttr = attributedString.attributedSubstring(from: NSRange(location: baseIndex, length: i - baseIndex))
+                lines.append(CTLineCreateWithAttributedString(subAttr))
+                baseIndex = i
+                baseOffset += offset
+            }
+        }
+        let subAttr = attributedString.attributedSubstring(from: NSRange(location: baseIndex, length: attributedString.length - baseIndex))
+        lines.append(CTLineCreateWithAttributedString(subAttr))
+        
+        return lines
+        
+        /*
         var currentLocation = 0
         let fullLength = attributedString.length
 
@@ -325,6 +343,9 @@ final class KLayoutManager: KLayoutManagerReadable {
         }
 
         return lines
+         */
+        
+        
     }
     
     

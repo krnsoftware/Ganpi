@@ -182,10 +182,12 @@ final class KLines {
            let lineB = textStorageRef.attributedString(for: replacementRange.upperBound..<range.upperBound, tabWidth: nil){
             let muAttrString =  NSMutableAttributedString(attributedString: attrString)
             muAttrString.addAttribute(.font, value: textStorageRef.baseFont, range: NSRange(location: 0, length: muAttrString.length))
+            //let sampleMutableString = NSMutableAttributedString(string: muAttrString.string, attributes: [.font: textStorageRef.baseFont])
             
             let fullLine = NSMutableAttributedString()
             fullLine.append(lineA)
             fullLine.append(muAttrString)
+            //fullLine.append(sampleMutableString)
             fullLine.append(lineB)
             //log("fullLine = \(fullLine)", from:self)
             let ctLines = layoutManager.makeFakeCTLines(from: fullLine, width: layoutRects.textRegionWidth - layoutRects.textEdgeInsets.right)
