@@ -318,14 +318,20 @@ final class KLayoutManager: KLayoutManagerReadable {
         var baseIndex: Int = 0
         for i in 0..<attributedString.length {
             let offset = CTLineGetOffsetForStringIndex(fullLine, i, nil)
+            log("offset = \(Int(offset)), baseOffset = \(Int(baseOffset)), pm = \(Int(offset - baseOffset)))", from:self)
+            
             if offset - baseOffset >= width {
+                
                 let subAttr = attributedString.attributedSubstring(from: NSRange(location: baseIndex, length: i - baseIndex))
+                //log("subAttr = \(subAttr.string)", from:self)
                 lines.append(CTLineCreateWithAttributedString(subAttr))
                 baseIndex = i
-                baseOffset += offset
+                //baseOffset += offset
+                baseOffset = offset
             }
         }
         let subAttr = attributedString.attributedSubstring(from: NSRange(location: baseIndex, length: attributedString.length - baseIndex))
+        //log("subAttr = \(subAttr.string)", from:self)
         lines.append(CTLineCreateWithAttributedString(subAttr))
         
         return lines

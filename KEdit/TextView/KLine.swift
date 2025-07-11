@@ -218,11 +218,12 @@ final class KLines {
         }
         
         // IM稼働中ではないか、あるいは入力中の行より前の場合にはそのまま返す。
-        if !hasFakeLine || i < lineArrayIndex  { log("normal.", from:self); return _lines[i] }
+        if !hasFakeLine || i < lineArrayIndex  { /*log("normal.", from:self);*/ return _lines[i] }
         
              
         // 入力中の行の場合は、fake行を返す。
         if lineArrayIndex <= i, i < lineArrayIndex + _fakeLines.count {
+            log("fake.", from:self)
             return _fakeLines[i - lineArrayIndex] as KLine?
         }
         
