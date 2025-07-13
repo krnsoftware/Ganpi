@@ -884,8 +884,37 @@ final class KTextView: NSView, NSTextInputClient {
         _latestClickedCharacterIndex = nil
         
         // マウスドラッグによる域外選択の際のオートスクロールに関するプロパティを初期化する。
+        terminateDraggingSelection()
+    }
+    
+    // 本来ここに置くべきではないが一時的にここに書く。
+    private func updateDraggingSelection() {
+        guard let window = self.window else { log("updateDraggingSelection: self or window is nil", from:self); return }
+        
+        // 現在のマウスポインタの位置を取得
+        let location = window.mouseLocationOutsideOfEventStream
+        
+        guard let contentView = self.enclosingScrollView?.contentView else { log("contentView is nil", from:self); return }
+        let locationInClipView = contentView.convert(location, from: nil)
+        if  contentView.bounds.contains(locationInClipView) {
+            // テキストが見えている場所にマウスポインタがある場合はなにもせず待機。
+            return
+        }
+        
+        let event = NSEvent.mouseEvent(with: .leftMouseDragged, location: location,
+                                       modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                       windowNumber: window.windowNumber, context: nil, eventNumber: 0,
+                                       clickCount: 1, pressure: 0)
+        
+        if let event = event {
+            self.mouseDragged(with: event)
+        }
+    }
+    
+    private func terminateDraggingSelection() {
         _dragTimer?.invalidate()
         _dragTimer = nil
+        _latestClickedCharacterIndex = nil
     }
     
     
@@ -898,12 +927,12 @@ final class KTextView: NSView, NSTextInputClient {
         doCommand(by: #selector(clearCaretContext(_:)))
         
         // オートスクロール用のタイマー設定
-        /*
+        
         if _dragTimer == nil {
             _dragTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
-                self?.mouseDragged(with:event)
+                self?.updateDraggingSelection()
             }
-        }*/
+        }
         
         let location = convert(event.locationInWindow, from: nil)
         
@@ -965,6 +994,8 @@ final class KTextView: NSView, NSTextInputClient {
                 selectionRange = (_horizontalSelectionBase ?? caretIndex)..<_textStorageRef.count
             }
         }
+        
+        _ = self.autoscroll(with: event)
 
         updateCaretPosition()
         scrollCaretToVisible()
