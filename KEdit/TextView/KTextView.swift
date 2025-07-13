@@ -7,7 +7,7 @@
 
 import Cocoa
 
-final class KTextView: NSView, NSTextInputClient {
+final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
 
     // MARK: - Struct and Enum
     private enum KTextEditDirection : Int {
@@ -45,6 +45,10 @@ final class KTextView: NSView, NSTextInputClient {
     
     // マウスによる領域選択でvisibleRectを越えた場合のオートスクロールに関するプロパティ
     private var _dragTimer: Timer?
+    
+    // ドラッグ&ドロップに関するプロパティ
+    private var _dragStartPoint: NSPoint? = nil
+    private let _minimumDragDistance: CGFloat = 3.0
     
     // 文書の編集や外見に関するプロパティ
     private var _showLineNumbers: Bool = true
@@ -835,15 +839,36 @@ final class KTextView: NSView, NSTextInputClient {
         
         let location = convert(event.locationInWindow, from: nil)
         
+        // この場所では動作しない。後ほど修正。
+        // 選択範囲内をクリックした場合 → ドラッグ候補として記録
+        /*if selectionRange.contains(index) {
+            _dragStartPoint = location
+
+            _dragTimer?.invalidate()
+            _dragTimer = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: false) { [weak self] _ in
+                guard let self = self else { return }
+                self.startDragIfNeeded(at: location)
+            }
+            return
+        } else {
+            _dragStartPoint = nil
+            _dragTimer?.invalidate()
+            _dragTimer = nil
+        }*/
+        
         switch layoutRects.regionType(for: location, layoutManagerRef: _layoutManager, textStorageRef: _textStorageRef){
         case .text(let index):
             _latestClickedCharacterIndex = index
             
             switch event.clickCount {
             case 1: // シングルクリック - クリック位置にキャレットを移動。
+                /*
                 caretIndex = index
-                _horizontalSelectionBase = index
+                _horizontalSelectionBase = index*/
                 _mouseSelectionMode = .character
+                
+                _dragStartPoint = location
+                
             case 2: // ダブルクリック - クリックした部分を単語選択。
                 if let wordRange = _textStorageRef.wordRange(at: index) {
                     selectionRange = wordRange
@@ -879,6 +904,21 @@ final class KTextView: NSView, NSTextInputClient {
     }
     
     override func mouseUp(with event: NSEvent) {
+        //guard let window = self.window else { log("window is nil."); return }
+        guard let dragStartPoint = _dragStartPoint else { log("_dragStartPoint is nil."); return }
+        //guard let layoutRects = _layoutManager.makeLayoutRects() else { log("layoutRects is nil."); return }
+        
+        let location = convert(event.locationInWindow, from: nil)
+        let dragDistance: CGFloat = hypot(location.x - dragStartPoint.x, location.y - dragStartPoint.y)
+        
+        // シングルクリックでマウスポインタがほとんど動いていなかった場合、単なるクリックとみなしてcaret位置をそこに設定する。
+        if event.clickCount == 1 && dragDistance < _minimumDragDistance {
+            guard let lastIndex = _latestClickedCharacterIndex else { log("_latestClickedCharacterIndex is nil."); return }
+            caretIndex = lastIndex
+            updateCaretPosition()
+        }
+        
+        
         // マウスボタンがアップされたら選択モードを.characterに戻す。
         _mouseSelectionMode = .character
         _latestClickedCharacterIndex = nil
@@ -887,35 +927,7 @@ final class KTextView: NSView, NSTextInputClient {
         terminateDraggingSelection()
     }
     
-    // 本来ここに置くべきではないが一時的にここに書く。
-    private func updateDraggingSelection() {
-        guard let window = self.window else { log("updateDraggingSelection: self or window is nil", from:self); return }
-        
-        // 現在のマウスポインタの位置を取得
-        let location = window.mouseLocationOutsideOfEventStream
-        
-        guard let contentView = self.enclosingScrollView?.contentView else { log("contentView is nil", from:self); return }
-        let locationInClipView = contentView.convert(location, from: nil)
-        if  contentView.bounds.contains(locationInClipView) {
-            // テキストが見えている場所にマウスポインタがある場合はなにもせず待機。
-            return
-        }
-        
-        let event = NSEvent.mouseEvent(with: .leftMouseDragged, location: location,
-                                       modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
-                                       windowNumber: window.windowNumber, context: nil, eventNumber: 0,
-                                       clickCount: 1, pressure: 0)
-        
-        if let event = event {
-            self.mouseDragged(with: event)
-        }
-    }
-    
-    private func terminateDraggingSelection() {
-        _dragTimer?.invalidate()
-        _dragTimer = nil
-        _latestClickedCharacterIndex = nil
-    }
+
     
     
     override func mouseDragged(with event: NSEvent) {
@@ -1000,6 +1012,12 @@ final class KTextView: NSView, NSTextInputClient {
         updateCaretPosition()
         scrollCaretToVisible()
     }
+    
+    func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
+        return .copy
+    }
+    
+    
     
     // MARK: - KTextView methods (notification)
     
@@ -1295,6 +1313,65 @@ final class KTextView: NSView, NSTextInputClient {
         context?.textPosition = CGPoint(x: x, y: lineOriginY)
         CTLineDraw(ctLine, context!)
         context?.restoreGState()
+    }
+    
+    
+    private func updateDraggingSelection() {
+        guard let window = self.window else { log("updateDraggingSelection: self or window is nil", from:self); return }
+        
+        // 現在のマウスポインタの位置を取得
+        let location = window.mouseLocationOutsideOfEventStream
+        
+        guard let contentView = self.enclosingScrollView?.contentView else { log("contentView is nil", from:self); return }
+        let locationInClipView = contentView.convert(location, from: nil)
+        if  contentView.bounds.contains(locationInClipView) {
+            // テキストが見えている場所にマウスポインタがある場合はなにもせず待機。
+            return
+        }
+        
+        let event = NSEvent.mouseEvent(with: .leftMouseDragged, location: location,
+                                       modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                       windowNumber: window.windowNumber, context: nil, eventNumber: 0,
+                                       clickCount: 1, pressure: 0)
+        
+        if let event = event {
+            self.mouseDragged(with: event)
+        }
+    }
+    
+    private func terminateDraggingSelection() {
+        _dragTimer?.invalidate()
+        _dragTimer = nil
+        _latestClickedCharacterIndex = nil
+    }
+    
+    // ドラッグ候補の位置に一定時間留まったらドラッグを開始する
+    private func startDragIfNeeded(at point: NSPoint) {
+        guard let dragStartPoint = _dragStartPoint else { return }
+
+        // 小さな移動ならドラッグ開始
+        let distance = hypot(point.x - dragStartPoint.x, point.y - dragStartPoint.y)
+        if distance < 4.0 {
+            beginDraggingSelectedText(from: dragStartPoint)
+            _dragStartPoint = nil
+            _dragTimer?.invalidate()
+            _dragTimer = nil
+        }
+    }
+
+    // 実際のドラッグ処理を開始する
+    private func beginDraggingSelectedText(from point: NSPoint) {
+        guard !selectionRange.isEmpty else { return }
+
+        let selectedText = String(_textStorageRef.characterSlice[selectionRange])
+        let pasteboardItem = NSPasteboardItem()
+        pasteboardItem.setString(selectedText, forType: .string)
+
+        let draggingItem = NSDraggingItem(pasteboardWriter: pasteboardItem)
+        let image = NSImage(size: NSSize(width: 1, height: 1)) // 透明な画像で構わない
+        draggingItem.setDraggingFrame(NSRect(origin: point, size: image.size), contents: image)
+
+        beginDraggingSession(with: [draggingItem], event: NSApp.currentEvent!, source: self)
     }
     
     
