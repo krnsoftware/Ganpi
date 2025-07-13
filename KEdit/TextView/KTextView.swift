@@ -15,13 +15,22 @@ final class KTextView: NSView, NSTextInputClient {
         case backward = -1
     }
     
+    private enum KMouseSelectionMode {
+        case character
+        case word
+        case line
+    }
+    
     // MARK: - Properties
     
     private var _textStorageRef: KTextStorageProtocol = KTextStorage()
     private var _layoutManager: KLayoutManager
     private let _caretView = KCaretView()
-
+    
+    // キャレットの表示に関するプロパティ
     private var _caretBlinkTimer: Timer?
+    
+    // キャレットの動作に関するプロパティ
     private var _verticalCaretX: CGFloat?        // 縦方向にキャレットを移動する際の基準X。
     private var _verticalSelectionBase: Int?     // 縦方向に選択範囲を拡縮する際の基準点。
     private var _horizontalSelectionBase: Int?   // 横方向に選択範囲を拡縮する際の基準点。
@@ -30,6 +39,14 @@ final class KTextView: NSView, NSTextInputClient {
         willSet { _lastActionSelector = _currentActionSelector }
     }
     
+    // マウスによる領域選択に関するプロパティ
+    private var _latestClickedCharacterIndex: Int?
+    private var _mouseSelectionMode: KMouseSelectionMode = .character
+    
+    // マウスによる領域選択でvisibleRectを越えた場合のオートスクロールに関するプロパティ
+    private var _dragTimer: Timer?
+    
+    // 文書の編集や外見に関するプロパティ
     private var _showLineNumbers: Bool = true
     private var _autoIndent: Bool = true
     private var _wordWrap: Bool = true
@@ -169,13 +186,13 @@ final class KTextView: NSView, NSTextInputClient {
     
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        
+        /*
         // IMEのためのサンプル
         if let context = self.inputContext {
             print("✅ inputContext is available: \(context)")
         } else {
             print("❌ inputContext is nil")
-        }
+        }*/
         
         _layoutManager.textView = self
 
@@ -816,14 +833,17 @@ final class KTextView: NSView, NSTextInputClient {
             return
         }
         
-        
         let location = convert(event.locationInWindow, from: nil)
+        
         switch layoutRects.regionType(for: location, layoutManagerRef: _layoutManager, textStorageRef: _textStorageRef){
         case .text(let index):
+            _latestClickedCharacterIndex = index
+            
             switch event.clickCount {
             case 1: // シングルクリック - クリック位置にキャレットを移動。
                 caretIndex = index
                 _horizontalSelectionBase = index
+                _mouseSelectionMode = .character
             case 2: // ダブルクリック - クリックした部分を単語選択。
                 if let wordRange = _textStorageRef.wordRange(at: index) {
                     selectionRange = wordRange
@@ -831,6 +851,7 @@ final class KTextView: NSView, NSTextInputClient {
                     caretIndex = index
                 }
                 _horizontalSelectionBase = selectionRange.lowerBound
+                _mouseSelectionMode = .word
             case 3: // トリプルクリック - クリックした部分の行全体を選択。
                 let info = _layoutManager.line(at: index)
                 if info.lineIndex >= 0 {
@@ -839,6 +860,7 @@ final class KTextView: NSView, NSTextInputClient {
                     selectionRange = line.range.lowerBound..<line.range.upperBound + (isLastLine ? 0 : 1)
                 }
                 _horizontalSelectionBase = selectionRange.lowerBound
+                _mouseSelectionMode = .line
             default:
                 break
             }
@@ -856,6 +878,16 @@ final class KTextView: NSView, NSTextInputClient {
         
     }
     
+    override func mouseUp(with event: NSEvent) {
+        // マウスボタンがアップされたら選択モードを.characterに戻す。
+        _mouseSelectionMode = .character
+        _latestClickedCharacterIndex = nil
+        
+        // マウスドラッグによる域外選択の際のオートスクロールに関するプロパティを初期化する。
+        _dragTimer?.invalidate()
+        _dragTimer = nil
+    }
+    
     
     override func mouseDragged(with event: NSEvent) {
         guard let layoutRects = _layoutManager.makeLayoutRects() else {
@@ -865,26 +897,50 @@ final class KTextView: NSView, NSTextInputClient {
         //キャレット移動のセレクタ記録に残すためのダミーセレクタ。
         doCommand(by: #selector(clearCaretContext(_:)))
         
+        // オートスクロール用のタイマー設定
+        /*
+        if _dragTimer == nil {
+            _dragTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
+                self?.mouseDragged(with:event)
+            }
+        }*/
+        
         let location = convert(event.locationInWindow, from: nil)
         
         switch layoutRects.regionType(for: location, layoutManagerRef: _layoutManager, textStorageRef: _textStorageRef){
         case .text(let index):
-            let dragCaretIndex = index
-            let base = _horizontalSelectionBase ?? caretIndex
-            let lower = min(base, dragCaretIndex)
-            let upper = max(base, dragCaretIndex)
-            selectionRange = lower..<upper
+            guard let anchor = _latestClickedCharacterIndex else { log("_latestClickedCharacterIndex is nil", from:self); return }
             
-            // 上方向にドラッグした場合、caretIndexがselectionRange末尾のためスクロールされない。
-            // それを解決するためのコード。
-            if lower < base {
+            switch _mouseSelectionMode {
+            case .character:
+                selectionRange = min(anchor, index)..<max(anchor, index)
+            case .word:
+                if let wordRange1 = _textStorageRef.wordRange(at: index),
+                   let wordRange2 = _textStorageRef.wordRange(at: anchor) {
+                    selectionRange = min(wordRange1.lowerBound, wordRange2.lowerBound)..<max(wordRange1.upperBound, wordRange2.upperBound)
+                }
+            case .line:
+                if let lineRangeForIndex = _textStorageRef.lineRange(at: index),
+                   let lineRangeForAnchor = _textStorageRef.lineRange(at: anchor) {
+                    let lower = min(lineRangeForIndex.lowerBound, lineRangeForAnchor.lowerBound)
+                    let upper = max(lineRangeForIndex.upperBound, lineRangeForAnchor.upperBound)
+                    let isLastLine = (_textStorageRef.count == upper)
+                    selectionRange = lower..<(isLastLine ? upper : upper + 1)
+                }
+            }
+            
+            // スクロールがcaretの位置で行なわれるため上方向の領域拡大で上スクロールが生じないためコードを追加する。
+            
+            
+            if index < anchor {
                 guard let scrollView = self.enclosingScrollView else { return }
-                let point = characterPosition(at: lower)
+                let point = characterPosition(at: index)
                 DispatchQueue.main.async {
                     scrollView.contentView.scrollToVisible(NSRect(x:point.x, y:point.y, width: 1, height: 1))
                 }
                 return
             }
+            
             
         case .lineNumber(let lineNumber):
             //現在の選択範囲から、指定れた行の最後(改行含む)までを選択する。
@@ -1167,7 +1223,6 @@ final class KTextView: NSView, NSTextInputClient {
         enclosingScrollView?.tile()
 
     }
-    
     
     
     // characterIndex文字目の文字が含まれる行の位置。textRegion左上原点。

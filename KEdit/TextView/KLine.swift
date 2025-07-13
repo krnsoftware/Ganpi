@@ -217,6 +217,8 @@ final class KLines {
             return nil
         }
         
+        guard i >= 0 && i < count else { log("i is out of range.", from: self); return nil }
+        
         // IM稼働中ではないか、あるいは入力中の行より前の場合にはそのまま返す。
         if !hasFakeLine || i < lineArrayIndex  { /*log("normal.", from:self);*/ return _lines[i] }
         
