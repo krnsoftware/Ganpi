@@ -929,7 +929,7 @@ final class KTextView: NSView, NSTextInputClient {
         // オートスクロール用のタイマー設定
         
         if _dragTimer == nil {
-            _dragTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
+            _dragTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
                 self?.updateDraggingSelection()
             }
         }
