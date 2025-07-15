@@ -795,6 +795,15 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                     return
                 }
                 
+                // シフトキーを押しながらシングルクリックすると、現在の選択領域からクリックした文字まで選択領域を拡大する。
+                let flags = event.modifierFlags
+                if flags.contains(.shift) {
+                    let lower = min(index, selectionRange.lowerBound)
+                    let upper = max(index, selectionRange.upperBound)
+                    selectionRange = lower..<upper
+                    return
+                }
+                
                 caretIndex = index
                 
             case 2: // ダブルクリック - クリックした部分を単語選択。
