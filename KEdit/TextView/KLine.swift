@@ -314,10 +314,8 @@ final class KLines {
     
     
     
-// MARK: - private funcs.
-    
     // ハード行の行番号hardLineIndexの行を取り出す。ソフトラップの場合は複数行になることがある。
-    private func lines(hardLineIndex: Int) -> [KLine] {
+    func lines(hardLineIndex: Int) -> [KLine] {
         var lines: [KLine] = []
         for line in _lines {
             if line.hardLineIndex == hardLineIndex {
@@ -330,7 +328,7 @@ final class KLines {
     }
     
     // ハード行の番号iの行のRangeを得る。行末の改行は含まない。
-    private func hardLineRange(hardLineIndex: Int) -> Range<Int>? {
+    func hardLineRange(hardLineIndex: Int) -> Range<Int>? {
         let lines = lines(hardLineIndex: hardLineIndex)
         guard !lines.isEmpty else { return nil }
         
@@ -338,7 +336,7 @@ final class KLines {
     }
     
     // index文字目の文字を含む行を返す。ソフト・ハードを問わない。
-    private func lineContainsCaharacter(index: Int) -> KLine? {
+    func lineContainsCaharacter(index: Int) -> KLine? {
         
         guard let textStorageRef = _textStorageRef else { print("\(#function): textstorageref==nil"); return nil }
         
@@ -361,6 +359,8 @@ final class KLines {
         log("out of range.", from: self)
         return nil
     }
+    
+    // MARK: - private methods.
     
     // hardLineIndex番目の行が_linesのどのindexか返す。
     private func lineArrayIndex(for hardLineIndex: Int) -> Int? {

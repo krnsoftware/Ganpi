@@ -815,21 +815,38 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 _horizontalSelectionBase = selectionRange.lowerBound
                 _mouseSelectionMode = .word
             case 3: // トリプルクリック - クリックした部分の行全体を選択。
+                /*
                 let info = _layoutManager.line(at: index)
                 if info.lineIndex >= 0 {
-                    guard let line = info.line else { return }
-                    let isLastLine = line.range.upperBound == _textStorageRef.count
-                    selectionRange = line.range.lowerBound..<line.range.upperBound + (isLastLine ? 0 : 1)
-                }
+                    guard let line = info.line else { log("line is nil", from:self); return }
+                    guard let hardLineRange = _layoutManager.lines.hardLineRange(hardLineIndex: line.hardLineIndex) else {
+                        log("hardLineRange is nil", from:self)
+                        return
+                    }
+                    //let isLastLine = line.range.upperBound == _textStorageRef.count
+                    //selectionRange = line.range.lowerBound..<line.range.upperBound + (isLastLine ? 0 : 1)
+                    let isLastLine = hardLineRange.upperBound == _textStorageRef.count
+                    selectionRange = hardLineRange.lowerBound..<hardLineRange.upperBound + (isLastLine ? 0 : 1)
+                }*/
+                guard let hardLineRange = _textStorageRef.lineRange(at: index) else { log("lineRange is nil", from:self); return }
+                let isLastLine = hardLineRange.upperBound == _textStorageRef.count
+                selectionRange = hardLineRange.lowerBound..<hardLineRange.upperBound + (isLastLine ? 0 : 1)
+                
                 _horizontalSelectionBase = selectionRange.lowerBound
                 _mouseSelectionMode = .line
             default:
                 break
             }
         case .lineNumber(let line):
-            guard let lineInfo = _layoutManager.lines[line] else { log("lineInfo is nil", from:self); return }
-            selectionRange = lineInfo.range
-            _horizontalSelectionBase = lineInfo.range.lowerBound
+            
+            guard let line = _layoutManager.lines[line] else { log("line is nil", from:self); return }
+            //selectionRange = lineInfo.range
+            guard let hardLineRange = _textStorageRef.lineRange(at: line.range.lowerBound) else { log("lineRange is nil", from:self); return }
+            let isLastLine = hardLineRange.upperBound == _textStorageRef.count
+            selectionRange = hardLineRange.lowerBound..<hardLineRange.upperBound + (isLastLine ? 0 : 1)
+            _horizontalSelectionBase = hardLineRange.lowerBound
+            
+            //_horizontalSelectionBase = lineInfo.range.lowerBound
         case .outside:
             break
         }
