@@ -48,20 +48,20 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     // ドラッグ&ドロップに関するプロパティ
     private var _dragStartPoint: NSPoint? = nil
+    private var _prepareDraggingText: Bool = false
     private let _minimumDragDistance: CGFloat = 3.0
+    private var _singleClickPending: Bool = false
     
     // 文書の編集や外見に関するプロパティ
     private var _showLineNumbers: Bool = true
     private var _autoIndent: Bool = true
     private var _wordWrap: Bool = true
-    //private let _textPadding: CGFloat = 8
     
-    // MARK: - Properties - IME入力用
-    
-    /// IME変換中のテキスト（確定前）
+    // Text Input Clientの実装。
+    // IME変換中のテキスト（確定前）
     private var _markedText: NSAttributedString = NSAttributedString()
 
-    /// 変換中の範囲（nilなら非存在）
+    // 変換中の範囲（nilなら非存在）
     private var _markedTextRange: Range<Int>? = nil
     
     // required.
@@ -263,9 +263,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     //testing.
     override func hitTest(_ point: NSPoint) -> NSView? {
         let localPoint = convert(point, from: superview)
-        //print("🧭 Global point: \(point), Local point: \(localPoint), Bounds: \(bounds)")
-        //print("scrollview.contentView.frame: \(String(describing: enclosingScrollView?.contentView.frame))")
-        //print("self.frame: \(String(describing: frame))")
         let width = frame.size.width
         frame.size = NSSize(width: width+10, height: frame.size.height)
         if bounds.contains(localPoint) {
@@ -287,36 +284,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     // MARK: - Caret (KTextView methods)
     
     private func updateCaretPosition() {
-        /*
-        guard let lineInfo = _layoutManager.lineInfo(at: caretIndex) else { print("\(#function): updateCaretPosition() failed to find lineInfo"); return }
-
-        
-        //let ctLine = lineInfo.ctLine
-        //guard let ctLine = lineInfo.ctLine else { print("\(#function): failed to get ctLine"); return}
-
-        let indexInLine = caretIndex - lineInfo.range.lowerBound
-        
-        guard let layoutRects = makeLayoutRects(bounds: bounds) else {
-            print("\(#function): updateCaretPosition() failed to make layoutRects"); return }
-        
-        //let xOffset = CTLineGetOffsetForStringIndex(ctLine, indexInLine, nil)
-        let xOffset = lineInfo.characterOffset(at: indexInLine)
-        
-        let x = layoutRects.textRegion.rect.origin.x + layoutRects.horizontalInsets + xOffset
-        //let y = layoutRects.textRegion.rect.origin.y + CGFloat(lineIndex) * layoutManager.lineHeight + layoutRects.textEdgeInsets.top
-        let y = layoutRects.textRegion.rect.origin.y + CGFloat(lineInfo.hardLineIndex) * _layoutManager.lineHeight + layoutRects.textEdgeInsets.top
-        
-        
-        
-        let height = _layoutManager.lineHeight//font.ascender + abs(font.descender)
-        
-        _caretView.updateFrame(x: x, y: y, height: height)
-        
-        _caretView.alphaValue = 1.0
-        //_caretView.isHidden = hasMarkedText() ? true : false
-        //print("caretview: isHidden: \(_caretView.isHidden)")
-         */
-        
         let caretPosition = characterPosition(at: caretIndex)
         _caretView.updateFrame(x: caretPosition.x, y: caretPosition.y, height: _layoutManager.lineHeight)
         
@@ -367,18 +334,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         path.stroke()
         */
         
-        
-        // for test.
-        /*
-        let klines = KLines(layoutManager: _layoutManager, textStorageRef: _textStorageRef)
-        if hasMarkedText(), let repRange = _replacementRange{
-            //print("test: _markedText: \(_markedText.string), repRange: \(repRange)")
-            klines.addFakeLine(replacementRange: repRange, attrString: _markedText)
-        }
-        klines.printLines()*/
-        // ここまで
-        
-        
         let lines = _layoutManager.lines
         let lineHeight = _layoutManager.lineHeight
         let textRect = layoutRects.textRegion.rect
@@ -397,21 +352,14 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             : NSColor.unemphasizedSelectedTextBackgroundColor
         
         
-        //for (i, line) in lines.enumerated() {
         for i in 0..<lines.count {
             guard let line = lines[i] else { log("line[i] is nil.", from:self); continue }
             let y = CGFloat(i) * lineHeight + layoutRects.textEdgeInsets.top
-            
-            //let textPoint = CGPoint(x: textRect.origin.x + layoutRects.horizontalInsets ,
-            //                        y: textRect.origin.y + y)
             
             // 選択範囲の描画
             let lineRange = line.range
             let selection = selectionRange.clamped(to: lineRange)
             
-            guard let ctLine = line.ctLine else { continue }
-            //let startOffset = CTLineGetOffsetForStringIndex(ctLine, selection.lowerBound - lineRange.lowerBound, nil)
-            //var endOffset = CTLineGetOffsetForStringIndex(ctLine, selection.upperBound - lineRange.lowerBound, nil)
             let startOffset = line.characterOffset(at: selection.lowerBound - lineRange.lowerBound)
             var endOffset = line.characterOffset(at: selection.upperBound - lineRange.lowerBound)
             
@@ -435,7 +383,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
         
         // テキストを描画
-        //let line = KLines(layoutManager: _layoutManager, textStorageRef: _textStorageRef)
         if hasMarkedText(), let repRange = _replacementRange{
             lines.addFakeLine(replacementRange: repRange, attrString: _markedText)
         }
@@ -453,7 +400,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             }
         }
         lines.removeFakeLines()
-        //klines.printLines()
         
         // 行番号部分を描画。
         if _showLineNumbers, let lnRect = layoutRects.lineNumberRegion?.rect {
@@ -475,12 +421,10 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 guard let line = lines[i] else { log("line number: line[i] is nil.", from:self); continue }
                 let y = CGFloat(i) * lineHeight + layoutRects.textEdgeInsets.top
                 
-                //if lines[i].softLineIndex > 0 || !verticalRange.contains(y) {
                 if line.softLineIndex > 0 || !verticalRange.contains(y) {
                     continue
                 }
                 
-                //let number = "\(i + 1)"
                 let number = "\(line.hardLineIndex + 1)"
                 
                 let size = number.size(withAttributes: attrs)
@@ -489,8 +433,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 let numberPointY = lnRect.origin.y + y - visibleRect.origin.y
                 let numberPoint = CGPoint(x: numberPointX, y: numberPointY)
                 
-                //let lineRange = lines[i].range
-                //let lineRange = _textStorageRef.lineRange(at: lines[i].range.lowerBound) ?? lines[i].range
                 let lineRange = _textStorageRef.lineRange(at: line.range.lowerBound) ?? line.range
                 let caretIsInLine = lineRange.contains(caretIndex) || caretIndex == lineRange.upperBound
                 let selectionOverlapsLine =
@@ -568,27 +510,22 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     // MARK: - Horizontal Movement (NSResponder methods)
 
     override func moveLeft(_ sender: Any?) {
-        
         moveCaretHorizontally(to: .backward, extendSelection: false)
     }
 
     override func moveRight(_ sender: Any?) {
-        
         moveCaretHorizontally(to: .forward, extendSelection: false)
     }
 
     override func moveRightAndModifySelection(_ sender: Any?) {
-        
         moveCaretHorizontally(to: .forward, extendSelection: true)
     }
 
     override func moveLeftAndModifySelection(_ sender: Any?) {
-        
         moveCaretHorizontally(to: .backward, extendSelection: true)
     }
     
     private func moveCaretHorizontally(to direction: KTextEditDirection, extendSelection: Bool) {
-        
         if !wasHorizontalActionWithModifySelection && extendSelection {
             _horizontalSelectionBase = selectionRange.lowerBound
         }
@@ -839,35 +776,26 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         let location = convert(event.locationInWindow, from: nil)
         
-        // この場所では動作しない。後ほど修正。
-        // 選択範囲内をクリックした場合 → ドラッグ候補として記録
-        /*if selectionRange.contains(index) {
-            _dragStartPoint = location
-
-            _dragTimer?.invalidate()
-            _dragTimer = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: false) { [weak self] _ in
-                guard let self = self else { return }
-                self.startDragIfNeeded(at: location)
-            }
-            return
-        } else {
-            _dragStartPoint = nil
-            _dragTimer?.invalidate()
-            _dragTimer = nil
-        }*/
         
         switch layoutRects.regionType(for: location, layoutManagerRef: _layoutManager, textStorageRef: _textStorageRef){
         case .text(let index):
             _latestClickedCharacterIndex = index
+            _singleClickPending = false
             
             switch event.clickCount {
             case 1: // シングルクリック - クリック位置にキャレットを移動。
-                /*
-                caretIndex = index
-                _horizontalSelectionBase = index*/
+                
                 _mouseSelectionMode = .character
                 
-                _dragStartPoint = location
+                // 選択領域がありその領域をクリックしている場合、テキストのドラッグ開始とみなす。
+                if !selectionRange.isEmpty, selectionRange.contains(index) {
+                    _prepareDraggingText = true
+                    _dragStartPoint = location
+                    _singleClickPending = true
+                    return
+                }
+                
+                caretIndex = index
                 
             case 2: // ダブルクリック - クリックした部分を単語選択。
                 if let wordRange = _textStorageRef.wordRange(at: index) {
@@ -890,7 +818,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 break
             }
         case .lineNumber(let line):
-            //let lineInfo = _layoutManager.lines[line]
             guard let lineInfo = _layoutManager.lines[line] else { log("lineInfo is nil", from:self); return }
             selectionRange = lineInfo.range
             _horizontalSelectionBase = lineInfo.range.lowerBound
@@ -904,27 +831,32 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     }
     
     override func mouseUp(with event: NSEvent) {
-        //guard let window = self.window else { log("window is nil."); return }
-        guard let dragStartPoint = _dragStartPoint else { log("_dragStartPoint is nil."); return }
-        //guard let layoutRects = _layoutManager.makeLayoutRects() else { log("layoutRects is nil."); return }
-        
-        let location = convert(event.locationInWindow, from: nil)
-        let dragDistance: CGFloat = hypot(location.x - dragStartPoint.x, location.y - dragStartPoint.y)
-        
-        // シングルクリックでマウスポインタがほとんど動いていなかった場合、単なるクリックとみなしてcaret位置をそこに設定する。
-        if event.clickCount == 1 && dragDistance < _minimumDragDistance {
-            guard let lastIndex = _latestClickedCharacterIndex else { log("_latestClickedCharacterIndex is nil."); return }
-            caretIndex = lastIndex
-            updateCaretPosition()
-        }
-        
         
         // マウスボタンがアップされたら選択モードを.characterに戻す。
         _mouseSelectionMode = .character
-        _latestClickedCharacterIndex = nil
+        
+        // mouseDown()の際に選択領域の内部をシングルクリックした後、ドラッグ&ドロップが発生せずにmouseUp()した場合の処理。
+        // 単純なシングルクリックの動作をするだけだが、普通のシングルクリックはmouseDown()時に確定するが、こちらはmouseUp()時に確定する。
+        // _latestClickedCharacterIndexを参照させたいところだが、draggingSesson()でtermnateが呼ばれるため、参照しにくい。
+        // 仕方なくlayoutRectを利用して現在のマウス位置からクリック位置を推測している。
+        if _singleClickPending {
+            let location = convert(event.locationInWindow, from: nil)
+            if let layoutRect = _layoutManager.makeLayoutRects() {
+                switch layoutRect.regionType(for: location, layoutManagerRef: _layoutManager, textStorageRef: _textStorageRef) {
+                case .text(let index):
+                    caretIndex = index
+                    //log("text: \(index)", from:self)
+                case .lineNumber(let line):
+                    log("lineNumber: \(line)", from:self)
+                case .outside:
+                    log("outside: ", from:self)
+                }
+            }
+        }
         
         // マウスドラッグによる域外選択の際のオートスクロールに関するプロパティを初期化する。
-        terminateDraggingSelection()
+        terminateDraggingOperation()
+
     }
     
 
@@ -938,15 +870,42 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         //キャレット移動のセレクタ記録に残すためのダミーセレクタ。
         doCommand(by: #selector(clearCaretContext(_:)))
         
-        // オートスクロール用のタイマー設定
         
+        let location = convert(event.locationInWindow, from: nil)
+        
+        // オートスクロール用のタイマー設定
         if _dragTimer == nil {
             _dragTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
                 self?.updateDraggingSelection()
             }
         }
         
-        let location = convert(event.locationInWindow, from: nil)
+        // テキストのドラッグ中の場合、draggingSessionを開始する。
+        if _prepareDraggingText, let dragStartPoint = _dragStartPoint {
+            let dragDistance: CGFloat = hypot(location.x - dragStartPoint.x, location.y - dragStartPoint.y)
+            if dragDistance >= _minimumDragDistance {
+                let str = String(_textStorageRef.characterSlice[selectionRange])
+                let pasteboardItem = NSPasteboardItem()
+                pasteboardItem.setString(str, forType: .string)
+                
+                let draggingItem = NSDraggingItem(pasteboardWriter: pasteboardItem)
+                let imageSize = NSSize(width: 120, height: 30)
+                let image = NSImage(size: imageSize)
+                let imageOrigin = CGPoint(x: location.x - imageSize.width / 2, y: location.y - imageSize.height / 2)
+                
+                // とりあえずの処置として、draggingItemには赤い矩形を設定しておく。
+                image.lockFocus()
+                NSColor.red.set()
+                NSBezierPath(rect: NSRect(origin: .zero, size: image.size)).fill()
+                image.unlockFocus()
+                
+                draggingItem.setDraggingFrame(NSRect(origin: imageOrigin, size: image.size), contents: image)
+                log("DRAGGING.", from:self)
+                beginDraggingSession(with: [draggingItem], event: event, source: self)
+                _singleClickPending = false
+            }
+            return
+        }
         
         switch layoutRects.regionType(for: location, layoutManagerRef: _layoutManager, textStorageRef: _textStorageRef){
         case .text(let index):
@@ -971,8 +930,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             }
             
             // スクロールがcaretの位置で行なわれるため上方向の領域拡大で上スクロールが生じないためコードを追加する。
-            
-            
             if index < anchor {
                 guard let scrollView = self.enclosingScrollView else { return }
                 let point = characterPosition(at: index)
@@ -987,7 +944,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             //現在の選択範囲から、指定れた行の最後(改行含む)までを選択する。
             //horizontalSelectionBaseより前であれば、行頭までを選択する。
             guard let line = _layoutManager.lines[lineNumber] else { log(".lineNumber. line = nil.", from:self); return }
-            //let lineRange = _layoutManager.lines[line].range
             let lineRange = line.range
             let base = _horizontalSelectionBase ?? caretIndex
             if lineRange.upperBound > base {
@@ -1014,9 +970,22 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     }
     
     func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
-        return .copy
+        switch context {
+        case .withinApplication:
+            return [.copy, .move]
+        case .outsideApplication:
+            return [.copy]
+        @unknown default:
+            return []
+        }
     }
     
+    func draggingSession(_ session: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation) {
+        log("Dragging session ended", from: self)
+
+        terminateDraggingOperation()
+        updateCaretPosition()
+    }
     
     
     // MARK: - KTextView methods (notification)
@@ -1075,7 +1044,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     }
     
     func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
-        //print("✏️ setMarkedText called with: \(string)")
         
         let attrString: NSAttributedString
         if let str = string as? String {
@@ -1087,8 +1055,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         } else {
             return
         }
-        
-        //print("\(#function): selectedRange: \(selectedRange), replacementRange: \(replacementRange)")
         
         // selectedRangeは「挿入される文字列のどこが選択されているか」、replacementRangeは「どこに挿入するか」を示す。
         
@@ -1114,37 +1080,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         _caretView.isHidden = true
         
         needsDisplay = true
-
-        /*
-        let plain = attrString.string
-        let range = Range(replacementRange) ?? selectionRange
-
-        //_textStorageRef.replaceCharacters(in: range, with: Array(plain))
-
-        let start = range.lowerBound
-        let end = start + plain.count
-        markedTextRange = start..<end
-        markedText = attrString
-
-        if let sel = Range(selectedRange), sel.upperBound <= markedText.length {
-            let selStart = start + sel.lowerBound
-            let selEnd = start + sel.upperBound
-            selectionRange = selStart..<selEnd
-        } else {
-            selectionRange = end..<end
-        }
-         */
+        
     }
-    /*
-    func confirmMarkedText() {
-        if hasMarkedText() {
-            print("confirmMarkedText()")
-            insertText(_markedText, replacementRange: NSRange(selectionRange))
-            _markedText = NSAttributedString()
-            _markedTextRange = nil
-            _caretView.isHidden = false
-        }
-    }*/
     
     func unmarkText() {
         _markedTextRange = nil
@@ -1205,7 +1142,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     func textStorageDidModify(_ modification: KStorageModified) {
         switch modification {
         case let .textChanged(range, insertedCount):
-            //print("テキスト変更: range = \(range), inserted = \(insertedCount)")
             
             if range.lowerBound == selectionRange.lowerBound /*(削除+)追記*/ ||
                 range.upperBound == selectionRange.lowerBound /*1文字削除*/ {
@@ -1238,22 +1174,14 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     // 現在のところinternalとしているが、将来的に公開レベルを変更する可能性あり。
     func updateFrameSizeToFitContent() {
-        //print("func name = \(#function)")
-        
-        //layoutManager.rebuildLayout()
-
-        //let totalLines = _layoutManager._lines.count
         let totalLines = _layoutManager.lines.count
         let lineHeight = _layoutManager.lineHeight
 
-        //let edgePadding = KTextView.defaultEdgePadding
         let showLineNumber = true
         let lineNumberWidth: CGFloat = showLineNumber ? 40 : 0
 
         let height = CGFloat(totalLines) * lineHeight * 4 / 3
         
-        //print("layoutManager.maxLineWidth = \(layoutManager.maxLineWidth)")
-        //guard let layoutRects = makeLayoutRects(bounds: bounds) else {
         guard let layoutRects = _layoutManager.makeLayoutRects() else {
             print("\(#function): makeLayoutRects failed.")
             return
@@ -1261,10 +1189,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         let width = _layoutManager.maxLineWidth
                     + lineNumberWidth
                     + layoutRects.textEdgeInsets.left * 2
-        //+ edgePadding.left
-                    //+ edgePadding.right
-
-        //self.frame.size = CGSize(width: width, height: height)
+        
         self.setFrameSize(CGSize(width: width, height: height))
 
         enclosingScrollView?.contentView.needsLayout = true
@@ -1315,7 +1240,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         context?.restoreGState()
     }
     
-    
+    // オートスクロール用のメソッド。タイマーから呼び出される。
     private func updateDraggingSelection() {
         guard let window = self.window else { log("updateDraggingSelection: self or window is nil", from:self); return }
         
@@ -1339,42 +1264,14 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
     }
     
-    private func terminateDraggingSelection() {
+    private func terminateDraggingOperation() {
         _dragTimer?.invalidate()
         _dragTimer = nil
         _latestClickedCharacterIndex = nil
+        _dragStartPoint = nil
+        _prepareDraggingText = false
+        //log("done.",from:self)
     }
-    
-    // ドラッグ候補の位置に一定時間留まったらドラッグを開始する
-    private func startDragIfNeeded(at point: NSPoint) {
-        guard let dragStartPoint = _dragStartPoint else { return }
-
-        // 小さな移動ならドラッグ開始
-        let distance = hypot(point.x - dragStartPoint.x, point.y - dragStartPoint.y)
-        if distance < 4.0 {
-            beginDraggingSelectedText(from: dragStartPoint)
-            _dragStartPoint = nil
-            _dragTimer?.invalidate()
-            _dragTimer = nil
-        }
-    }
-
-    // 実際のドラッグ処理を開始する
-    private func beginDraggingSelectedText(from point: NSPoint) {
-        guard !selectionRange.isEmpty else { return }
-
-        let selectedText = String(_textStorageRef.characterSlice[selectionRange])
-        let pasteboardItem = NSPasteboardItem()
-        pasteboardItem.setString(selectedText, forType: .string)
-
-        let draggingItem = NSDraggingItem(pasteboardWriter: pasteboardItem)
-        let image = NSImage(size: NSSize(width: 1, height: 1)) // 透明な画像で構わない
-        draggingItem.setDraggingFrame(NSRect(origin: point, size: image.size), contents: image)
-
-        beginDraggingSession(with: [draggingItem], event: NSApp.currentEvent!, source: self)
-    }
-    
-    
     
     // mouseDown()などのセレクター履歴を残すためのダミー。
     @objc func clearCaretContext(_ sender: Any?) { }
