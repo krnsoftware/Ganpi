@@ -433,6 +433,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 let numberPointY = lnRect.origin.y + y - visibleRect.origin.y
                 let numberPoint = CGPoint(x: numberPointX, y: numberPointY)
                 
+                if !verticalRange.contains(numberPoint.y) { continue }
+                
                 let lineRange = _textStorageRef.lineRange(at: line.range.lowerBound) ?? line.range
                 let caretIsInLine = lineRange.contains(caretIndex) || caretIndex == lineRange.upperBound
                 let selectionOverlapsLine =
@@ -1011,6 +1013,38 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
 
         terminateDraggingOperation()
         updateCaretPosition()
+    }
+    
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        if sender.draggingPasteboard.canReadObject(forClasses: [NSString.self], options: nil) {
+            return .copy
+        }
+        return []
+    }
+    
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        let pasteboard = sender.draggingPasteboard
+        guard let items = pasteboard.readObjects(forClasses: [NSString.self], options: nil) as? [String],
+              let droppedString = items.first else {
+            return false
+        }
+
+        let locationInView = convert(sender.draggingLocation, from: nil)
+        guard let layoutRects = _layoutManager.makeLayoutRects() else { return false }
+        
+        switch layoutRects.regionType(for: locationInView, layoutManagerRef: _layoutManager, textStorageRef: _textStorageRef) {
+        case .text(let index):
+            _textStorageRef.replaceCharacters(in: index..<index, with: Array(droppedString))
+            caretIndex = index + droppedString.count
+            updateCaretPosition()
+            return true
+        default:
+            return false
+        }
+    }
+    
+    override func prepareForDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        return true
     }
     
     
