@@ -997,6 +997,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         scrollCaretToVisible()
     }
     
+    // MARK: - DraggingSource methods
+    
     func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
         switch context {
         case .withinApplication:
@@ -1015,6 +1017,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         updateCaretPosition()
     }
     
+    // MARK: - DraggingDestination methods
+    
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
         if sender.draggingPasteboard.canReadObject(forClasses: [NSString.self], options: nil) {
             return .copy
@@ -1026,17 +1030,36 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         let pasteboard = sender.draggingPasteboard
         guard let items = pasteboard.readObjects(forClasses: [NSString.self], options: nil) as? [String],
               let droppedString = items.first else {
+            log("items is nil", from: self)
             return false
         }
 
         let locationInView = convert(sender.draggingLocation, from: nil)
-        guard let layoutRects = _layoutManager.makeLayoutRects() else { return false }
+        guard let layoutRects = _layoutManager.makeLayoutRects() else { log("layoutRects is nil", from: self); return false }
         
         switch layoutRects.regionType(for: locationInView, layoutManagerRef: _layoutManager, textStorageRef: _textStorageRef) {
         case .text(let index):
-            _textStorageRef.replaceCharacters(in: index..<index, with: Array(droppedString))
-            caretIndex = index + droppedString.count
-            updateCaretPosition()
+            let isSenderMyself = sender.draggingSource as AnyObject? === self
+            let isOptionKeyPressed = NSEvent.modifierFlags.contains(.option)
+            
+            if isOptionKeyPressed || !isSenderMyself { // .copy  オプションキーが押下されているか外部からのdrag and drop.
+                log(".copy: ", from: self)
+                _textStorageRef.replaceCharacters(in: index..<index, with: Array(droppedString))
+                selectionRange = index..<index + droppedString.count
+            } else  { // .move
+                if isSenderMyself { // 自分自身からのdrag and drop
+                    if index < selectionRange.lowerBound {
+                        _textStorageRef.replaceCharacters(in: selectionRange, with: Array(""))
+                        _textStorageRef.replaceCharacters(in: index..<index, with: Array(droppedString))
+                        selectionRange = index..<index + droppedString.count
+                    } else {
+                        let selectionLengh = selectionRange.upperBound - selectionRange.lowerBound
+                        _textStorageRef.replaceCharacters(in: selectionRange, with: Array(""))
+                        _textStorageRef.replaceCharacters(in: index - selectionLengh..<index - selectionLengh, with: Array(droppedString))
+                        selectionRange = index - selectionLengh..<index - selectionLengh + droppedString.count
+                    }
+                }
+            }
             return true
         default:
             return false
@@ -1045,6 +1068,42 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     override func prepareForDragOperation(_ sender: NSDraggingInfo) -> Bool {
         return true
+    }
+    
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+        let draggingLocationInWindow = sender.draggingLocation
+        let locationInView = convert(draggingLocationInWindow, from: nil)
+        
+        let isOptionKeyPressed = NSEvent.modifierFlags.contains(.option)
+        let isSenderMyself = sender.draggingSource as AnyObject? === self
+        let dragOperation: NSDragOperation = isSenderMyself ?  (isOptionKeyPressed ? .copy : .move) : .copy
+        //log("dragOperation: \(dragOperation), isSenderMyself: \(isSenderMyself)", from: self)
+
+        // 該当位置の文字インデックスを取得
+        guard let layoutRects = _layoutManager.makeLayoutRects() else { log("layoutRects is nil", from: self); return []}
+        switch layoutRects.regionType(for: locationInView, layoutManagerRef: _layoutManager, textStorageRef: _textStorageRef) {
+        case .text(let index):
+            // キャレットを一時的に移動（選択範囲は変更しない）
+            moveDropCaret(to: index)
+            return dragOperation
+
+        default:
+            // テキスト領域外の場合はキャレットを非表示にしてコピーを拒否
+            hideDropCaret()
+            return []
+        }
+    }
+    
+    // ドロップ用のキャレット位置へ移動（通常の updateCaretPosition を使わない）
+    private func moveDropCaret(to index: Int) {
+        let point = characterPosition(at: index)
+        _caretView.updateFrame(x: point.x, y: point.y, height: _layoutManager.lineHeight)
+        _caretView.isHidden = false
+    }
+
+    // ドロップ候補がなくなった場合にキャレットを非表示に
+    private func hideDropCaret() {
+        _caretView.isHidden = true
     }
     
     
