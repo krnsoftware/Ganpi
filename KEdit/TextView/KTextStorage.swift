@@ -89,7 +89,6 @@ final class KTextStorage: KTextStorageProtocol {
     // MARK: - Properties
 
     private(set) var _characters: [Character] = []
-    //private var _observers: [() -> Void] = []
     private var _observers: [(KStorageModified) -> Void] = []
     private var _baseFont: NSFont = .monospacedSystemFont(ofSize: 12, weight: .regular)
     private var _tabWidthCache: CGFloat?
@@ -191,20 +190,6 @@ final class KTextStorage: KTextStorageProtocol {
     }
     
     // MARK: - Utilities
-    
-    // 試しに実装したもの。
-    /*
-    func characterIndex(c: Character, from: Int, direction: KDirection = .forward) -> Int? {
-        guard from >= 0 && from < characterSlice.count else { return nil }
-        
-        switch direction {
-        case .forward:
-            return characterSlice[from...].firstIndex(of: c)
-        case .backward:
-            return characterSlice[..<from].lastIndex(of: c)
-        }
-        
-    }*/
     
     // index文字目のある場所を含む行のRangeを返す。改行は含まない。
     func lineRange(at index: Int) -> Range<Int>? {

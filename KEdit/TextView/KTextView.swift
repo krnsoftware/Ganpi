@@ -83,7 +83,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     var selectionRange: Range<Int> = 0..<0 {
         didSet {
             _caretView.isHidden = !selectionRange.isEmpty
-            scrollCaretToVisible()
+            //scrollCaretToVisible()
             needsDisplay = true
         }
     }
@@ -505,6 +505,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         //print("\(#function) - keyDown()")
         //print("inputContext = \(inputContext?.debugDescription ?? "nil")")
         interpretKeyEvents( [event] )
+        
+        scrollCaretToVisible()
     }
 
 
@@ -786,7 +788,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             
             switch event.clickCount {
             case 1: // シングルクリック - クリック位置にキャレットを移動。
-                
+                _horizontalSelectionBase = selectionRange.lowerBound
                 _mouseSelectionMode = .character
                 
                 // 選択領域がありその領域をクリックしている場合、テキストのドラッグ開始とみなす。
@@ -817,19 +819,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 _horizontalSelectionBase = selectionRange.lowerBound
                 _mouseSelectionMode = .word
             case 3: // トリプルクリック - クリックした部分の行全体を選択。
-                /*
-                let info = _layoutManager.line(at: index)
-                if info.lineIndex >= 0 {
-                    guard let line = info.line else { log("line is nil", from:self); return }
-                    guard let hardLineRange = _layoutManager.lines.hardLineRange(hardLineIndex: line.hardLineIndex) else {
-                        log("hardLineRange is nil", from:self)
-                        return
-                    }
-                    //let isLastLine = line.range.upperBound == _textStorageRef.count
-                    //selectionRange = line.range.lowerBound..<line.range.upperBound + (isLastLine ? 0 : 1)
-                    let isLastLine = hardLineRange.upperBound == _textStorageRef.count
-                    selectionRange = hardLineRange.lowerBound..<hardLineRange.upperBound + (isLastLine ? 0 : 1)
-                }*/
                 guard let hardLineRange = _textStorageRef.lineRange(at: index) else { log("lineRange is nil", from:self); return }
                 let isLastLine = hardLineRange.upperBound == _textStorageRef.count
                 selectionRange = hardLineRange.lowerBound..<hardLineRange.upperBound + (isLastLine ? 0 : 1)
@@ -964,6 +953,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 DispatchQueue.main.async {
                     scrollView.contentView.scrollToVisible(NSRect(x:point.x, y:point.y, width: 1, height: 1))
                 }
+                //log("selectionRange: \(selectionRange)", from:self)
+                //updateCaretPosition()
                 return
             }
             
@@ -984,11 +975,15 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             // textRegionより上なら文頭まで、下なら文末まで選択する。
             let textRect = layoutRects.textRegion.rect
             
+            log(".outside", from:self)
+            
             if location.y < textRect.minY {
-                selectionRange = 0..<(_horizontalSelectionBase ?? caretIndex)
+                //selectionRange = 0..<(_horizontalSelectionBase ?? caretIndex)
+                selectionRange = 0..<selectionRange.upperBound
             } else if location.y > (_layoutManager.lineHeight * CGFloat(_layoutManager.lineCount) + layoutRects.textEdgeInsets.top)  {
                 selectionRange = (_horizontalSelectionBase ?? caretIndex)..<_textStorageRef.count
             }
+            return
         }
         
         _ = self.autoscroll(with: event)
@@ -1042,8 +1037,11 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             let isSenderMyself = sender.draggingSource as AnyObject? === self
             let isOptionKeyPressed = NSEvent.modifierFlags.contains(.option)
             
+            // 自身のdrag and dropで現在の選択範囲内部をポイントした場合は無効。
+            if isSenderMyself && selectionRange.contains(index) { return false }
+            
             if isOptionKeyPressed || !isSenderMyself { // .copy  オプションキーが押下されているか外部からのdrag and drop.
-                log(".copy: ", from: self)
+                //log(".copy: ", from: self)
                 _textStorageRef.replaceCharacters(in: index..<index, with: Array(droppedString))
                 selectionRange = index..<index + droppedString.count
             } else  { // .move
@@ -1099,6 +1097,11 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         let point = characterPosition(at: index)
         _caretView.updateFrame(x: point.x, y: point.y, height: _layoutManager.lineHeight)
         _caretView.isHidden = false
+        
+        guard let scrollView = self.enclosingScrollView else { return }
+        DispatchQueue.main.async {
+            scrollView.contentView.scrollToVisible(NSRect(x:point.x, y:point.y, width: 1, height: 1))
+        }
     }
 
     // ドロップ候補がなくなった場合にキャレットを非表示に
