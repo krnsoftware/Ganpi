@@ -255,6 +255,17 @@ extension String {
     
 }
 
+//MARK: - Normalizing
+
+extension String {
+    
+    var normalizedString: String {
+        return self.replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+            .filter { !$0.isControl || $0 == "\n" || $0 == "\t" }
+    }
+}
+
 
 //MARK: - String Extension for NSColor
 

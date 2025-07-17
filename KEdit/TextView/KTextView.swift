@@ -726,9 +726,12 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
 
     @IBAction func paste(_ sender: Any?) {
         let pasteboard = NSPasteboard.general
-        guard let string = pasteboard.string(forType: .string) else { return }
+        guard let rawString = pasteboard.string(forType: .string) else { return }
+        
+        let string = rawString.normalizedString
 
         _textStorageRef.replaceCharacters(in: selectionRange, with: Array(string))
+        
         
     }
 
@@ -1041,10 +1044,12 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
         let pasteboard = sender.draggingPasteboard
         guard let items = pasteboard.readObjects(forClasses: [NSString.self], options: nil) as? [String],
-              let droppedString = items.first else {
+              let rawDroppedString = items.first else {
             log("items is nil", from: self)
             return false
         }
+        
+        let droppedString = rawDroppedString.normalizedString
 
         let locationInView = convert(sender.draggingLocation, from: nil)
         guard let layoutRects = _layoutManager.makeLayoutRects() else { log("layoutRects is nil", from: self); return false }
@@ -1161,21 +1166,22 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     func insertText(_ string: Any, replacementRange: NSRange) {
         
-        let text: String
+        let rawString: String
         if let str = string as? String {
-            text = str
+            rawString = str
         } else if let attrStr = string as? NSAttributedString {
-            text = attrStr.string
+            rawString = attrStr.string
         } else {
             return
         }
         
         let range = Range(replacementRange) ?? selectionRange
         
-        //_textStorageRef.replaceCharacters(in: range, with: Array(text))
+        let string = rawString.normalizedString
+        _textStorageRef.replaceCharacters(in: range, with: Array(string))
         
         // 渡されたstringをCharacter.isControlでフィルターして制御文字を除去しておく。
-        _textStorageRef.replaceCharacters(in: range, with: text.filter { !$0.isControl })
+        //_textStorageRef.replaceCharacters(in: range, with: text.filter { !$0.isControl })
        
         _markedTextRange = nil
         _markedText = NSAttributedString()

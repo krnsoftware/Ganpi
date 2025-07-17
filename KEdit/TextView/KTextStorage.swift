@@ -167,16 +167,16 @@ final class KTextStorage: KTextStorageProtocol {
         
         if _undoActions.element(at: 0)! == .none {
             let undoUnit = KUndoUnit(range: range, oldCharacters: Array(_characters[range]), newCharacters: newCharacters)
-            log("🧠 append: old = \(undoUnit.oldCharacters), new = \(undoUnit.newCharacters)", from:self)
+            //log("🧠 append: old = \(undoUnit.oldCharacters), new = \(undoUnit.newCharacters)", from:self)
             if _undoActions.element(at: 1)! != .none {
-                log("_undoActions.element(at: 1)! != .none", from:self)
+                //log("_undoActions.element(at: 1)! != .none", from:self)
                 _history.removeNewerThan(index: _undoDepth)
                 _undoDepth = 0
             }
             
             _history.append(undoUnit)
         }
-        log("_history.count: \(_history.count), _undoDepth: \(_undoDepth)", from:self)
+        //log("_history.count: \(_history.count), _undoDepth: \(_undoDepth)", from:self)
 
         _characters.replaceSubrange(range, with: newCharacters)
         notifyObservers(.textChanged(range: range, insertedCount: newCharacters.count))
