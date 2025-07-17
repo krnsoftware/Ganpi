@@ -20,6 +20,7 @@ enum KDirection: Int {
     case backward = -1
 }
 
+
 // MARK: - KTextStorageProtocol
 // read-onlyとして利用する場合にはKTextStorageReadableを使用。
 // read & writeとして利用する場合にはKTextStorageProtocolを使用。
@@ -80,9 +81,22 @@ final class KTextStorage: KTextStorageProtocol {
     
     
     // attribute runの仮実装
-    struct AttributeRun {
+    struct KAttributeRun {
         let range: Range<Int>
         let attributes: [NSAttributedString.Key: Any]
+    }
+    
+    // Undo用
+    struct KUndoUnit {
+        let range: Range<Int>
+        let oldCharacters: [Character]
+        let newCharacters: [Character]
+    }
+    
+    enum KUndoAction {
+        case undo
+        case redo
+        case none
     }
     
 
@@ -92,6 +106,10 @@ final class KTextStorage: KTextStorageProtocol {
     private var _observers: [(KStorageModified) -> Void] = []
     private var _baseFont: NSFont = .monospacedSystemFont(ofSize: 12, weight: .regular)
     private var _tabWidthCache: CGFloat?
+    
+    private var _history: KRingBuffer<KUndoUnit> = .init(capacity: 20)
+    private var _undoDepth: Int = 0
+    private var _undoActions: KRingBuffer<KUndoAction> = .init(capacity: 2)
 
     // MARK: - Public API
 
@@ -132,7 +150,13 @@ final class KTextStorage: KTextStorageProtocol {
     var characterSlice: ArraySlice<Character> {
         _characters[_characters.indices]
     }
+    
+    init() {
+        _undoActions.append(.none)
+        _undoActions.append(.none)
+    }
 
+    // 最終的に全ての文字列の変更はこのメソッドを通じて行う。
     @discardableResult
     func replaceCharacters(in range: Range<Int>, with newCharacters: [Character]) -> Bool {
         guard range.lowerBound >= 0,
@@ -140,10 +164,24 @@ final class KTextStorage: KTextStorageProtocol {
               range.lowerBound <= range.upperBound else {
             return false
         }
+        
+        if _undoActions.element(at: 0)! == .none {
+            let undoUnit = KUndoUnit(range: range, oldCharacters: Array(_characters[range]), newCharacters: newCharacters)
+            log("🧠 append: old = \(undoUnit.oldCharacters), new = \(undoUnit.newCharacters)", from:self)
+            if _undoActions.element(at: 1)! != .none {
+                log("_undoActions.element(at: 1)! != .none", from:self)
+                _history.removeNewerThan(index: _undoDepth)
+                _undoDepth = 0
+            }
+            
+            _history.append(undoUnit)
+        }
+        log("_history.count: \(_history.count), _undoDepth: \(_undoDepth)", from:self)
 
         _characters.replaceSubrange(range, with: newCharacters)
-        //log("chars = \(String(_characters))", from:self)
         notifyObservers(.textChanged(range: range, insertedCount: newCharacters.count))
+        
+        _undoActions.append(.none)
         return true
     }
     
@@ -188,6 +226,52 @@ final class KTextStorage: KTextStorageProtocol {
         guard range.lowerBound >= 0 && range.upperBound <= _characters.count else { return nil }
         return _characters[range]
     }
+    
+    
+    
+    // MARK: - Undo functions
+    
+    func undo() {
+        guard _undoDepth < _history.count else { log("undo: no more history", from: self); return }
+
+        _undoActions.append(.undo)
+
+        guard let undoUnit = _history.element(at: _undoDepth) else { log("undo: failed to get undoUnit at \(_undoDepth)", from: self); return }
+
+        let range = undoUnit.range.lowerBound..<undoUnit.range.lowerBound + undoUnit.newCharacters.count
+        replaceCharacters(in: range, with: undoUnit.oldCharacters)
+
+        _undoDepth += 1
+    }
+    
+    func redo() {
+        guard _undoDepth > 0 else { log("redo: no redo available", from: self); return }
+
+        _undoActions.append(.redo)
+
+        let redoIndex = _undoDepth - 1
+
+        guard let undoUnit = _history.element(at: redoIndex) else { log("redo: failed to get redoUnit at \(redoIndex)", from: self); return }
+
+        replaceCharacters(in: undoUnit.range, with: undoUnit.newCharacters)
+
+        _undoDepth -= 1
+    }
+    
+    func canUndo() -> Bool {
+        return _undoDepth < _history.count
+    }
+
+    func canRedo() -> Bool {
+        return _undoDepth > 0
+    }
+    
+    func resetUndoHistory() {
+        _history.reset()
+        _undoDepth = 0
+    }
+    
+    
     
     // MARK: - Utilities
     
@@ -275,7 +359,7 @@ final class KTextStorage: KTextStorageProtocol {
             attributes[.paragraphStyle] = paragraphStyle
         }
         
-        let attributeRun = KTextStorage.AttributeRun(
+        let attributeRun = KTextStorage.KAttributeRun(
             range: characterSlice.startIndex..<characterSlice.endIndex,
             attributes: attributes
         )

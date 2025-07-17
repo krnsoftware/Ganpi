@@ -671,6 +671,9 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         updateCaretPosition()
     }
     
+    
+    
+    
     // MARK: - Text Editing
     
     override func insertNewline(_ sender: Any?) {
@@ -732,6 +735,20 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     @IBAction override func selectAll(_ sender: Any?) {
         selectionRange = 0..<_textStorageRef.count
         
+    }
+    
+    // MARK: - Undo action
+    
+    @IBAction func undo(_ sender: Any?) {
+        if let textStorage = _textStorageRef as? KTextStorage {
+            textStorage.undo()
+        }
+    }
+    
+    @IBAction func redo(_ sender: Any?) {
+        if let textStorage = _textStorageRef as? KTextStorage {
+            textStorage.redo()
+        }
     }
 
 

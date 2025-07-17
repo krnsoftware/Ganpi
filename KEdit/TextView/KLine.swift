@@ -213,7 +213,7 @@ final class KLines {
     
     subscript(i: Int) -> KLine? {
         guard let lineArrayIndex = lineArrayIndex(for: _replaceLineNumber) else {
-            log("lineArrayIndex == nil", from: self)
+            log("lineArrayIndex == nil, _replaceLineNumber = \(_replaceLineNumber)", from: self)
             return nil
         }
         
