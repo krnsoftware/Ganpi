@@ -69,6 +69,9 @@ final class KLayoutManager: KLayoutManagerReadable {
         return _lines.count
     }
     
+    // KLinesが持つ最も幅の大きな行の幅を返します。表示マージンなし。
+    // hardwrapの場合にlayoutRects.textRegion.rect.widthを設定するために使用します。
+    // softwrapであっても値は返しますが、内容は不正です。
     var maxLineWidth: CGFloat {
         return _maxLineWidth
     }
@@ -94,6 +97,11 @@ final class KLayoutManager: KLayoutManagerReadable {
         }
     }
     
+    var wordWrap: Bool {
+        guard let textView = _textView else { log("_textView = nil", from:self); return false }
+        return textView.wordWrap
+    }
+    
     
     // MARK: - Init
 
@@ -113,19 +121,19 @@ final class KLayoutManager: KLayoutManagerReadable {
 
     // MARK: - Layout
     
-    private func rebuildLayout() {
-        //log("layout start",from:self)
-        /*
-        guard let textViewFrame = _textView?.bounds else { log("textViewFrame is nil",from:self); return }
+    func rebuildLayout() {
         
-        if textViewFrame != _prevTextViewFrame {
-            _prevTextViewFrame = textViewFrame
-            
-            _lines.rebuildLines()
-            _maxLineWidth = _lines.maxLineWidth
-        }*/
         _lines.rebuildLines()
-        _maxLineWidth = _lines.maxLineWidth
+        
+        if let wordWrap = _textView?.wordWrap,
+                let visibleRectWidth = _textView?.visibleRect.width {
+            if wordWrap {
+                _maxLineWidth = visibleRectWidth
+            } else {
+                _maxLineWidth = _lines.maxLineWidth
+            }
+        }
+        
               
     }
     

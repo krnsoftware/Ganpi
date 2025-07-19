@@ -142,7 +142,8 @@ final class KLines {
     
     var hasFakeLine: Bool { _fakeLines.isEmpty == false }
     
-    // 格納するKLineの数を返す。fakeLinesがある場合、fakeLinesの行数からオリジナルの行数を引いたものを追加する。
+    // 格納するKLineの数を返す。
+    // fakeLinesがある場合、fakeLinesの行数からオリジナルの行数を引いたものを追加する。
     var count: Int {
         let fakeLineCount = _fakeLines.count
         let originalLineCount = _fakeLines.isEmpty ? 0 : lines(hardLineIndex: _replaceLineNumber).count
@@ -159,7 +160,7 @@ final class KLines {
         _textStorageRef = textStorageRef
         
         rebuildLines()
-        log("initは何度よばれるのか", from:self)
+        //log("initは何度よばれるのか", from:self)
         
         if _lines.count == 0 {
             if let layoutManagerRef = _layoutManager {
@@ -201,7 +202,12 @@ final class KLines {
             //fullLine.append(sampleMutableString)
             fullLine.append(lineB)
             //log("fullLine = \(fullLine)", from:self)
-            let ctLines = layoutManager.makeFakeCTLines(from: fullLine, width: layoutRects.textRegionWidth - layoutRects.textEdgeInsets.right)
+            
+            let width: CGFloat? = layoutManager.wordWrap ? layoutRects.textRegionWidth - layoutRects.textEdgeInsets.right : nil
+            
+            //let ctLines = layoutManager.makeFakeCTLines(from: fullLine, width: layoutRects.textRegionWidth - layoutRects.textEdgeInsets.right)
+            let ctLines = layoutManager.makeFakeCTLines(from: fullLine, width: width)
+            
             
             for (i, fakeCTLine) in ctLines.enumerated() {
                 let fakeLine = KFakeLine(ctLine: fakeCTLine, hardLineIndex: hardLineIndex, softLineIndex: i, layoutManager: layoutManager)

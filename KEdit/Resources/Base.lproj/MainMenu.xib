@@ -188,6 +188,24 @@
                         </items>
                     </menu>
                 </menuItem>
+                <menuItem title="Option" id="DZR-wt-FL4" userLabel="Option">
+                    <modifierMask key="keyEquivalentModifierMask"/>
+                    <menu key="submenu" title="Option" id="v9D-RY-AWl">
+                        <items>
+                            <menuItem title="Auto Indent" id="BWe-5L-7Yj">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                            </menuItem>
+                            <menuItem title="Word Wrap" keyEquivalent="d" id="OkT-8l-3Pk">
+                                <connections>
+                                    <action selector="toggleWordWrap:" target="-1" id="xB2-W3-DmZ"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Show Invisible Characters" id="btp-F5-fp2">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                            </menuItem>
+                        </items>
+                    </menu>
+                </menuItem>
                 <menuItem title="Window" id="aUF-d1-5bR">
                     <modifierMask key="keyEquivalentModifierMask"/>
                     <menu key="submenu" title="Window" systemMenu="window" id="Td7-aD-5lo">

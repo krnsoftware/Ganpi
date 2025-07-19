@@ -86,7 +86,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     var selectionRange: Range<Int> = 0..<0 {
         didSet {
             _caretView.isHidden = !selectionRange.isEmpty
-            //scrollCaretToVisible()
             needsDisplay = true
         }
     }
@@ -98,7 +97,13 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     var wordWrap: Bool {
         get { _wordWrap }
-        set { _wordWrap = newValue }
+        set {
+            _wordWrap = newValue
+            _layoutManager.rebuildLayout()
+            updateFrameSizeToFitContent()
+            updateCaretPosition()
+            needsDisplay = true
+        }
     }
     
     var showLineNumbers: Bool {
@@ -334,11 +339,11 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
         
         // test. TextRegionの外枠を赤で描く。
-        
+        /*
         let path = NSBezierPath(rect: layoutRects.textRegion.rect)
         NSColor.red.setStroke()
         path.lineWidth = 2
-        path.stroke()
+        path.stroke()*/
         
         
         let lines = _layoutManager.lines
@@ -761,6 +766,12 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
     }
 
+    
+    // MARK: - Option Menu
+    
+    @IBAction func toggleWordWrap(_ sender: Any?) {
+        wordWrap = !wordWrap
+    }
 
 
     // MARK: - Deletion (NSResponder methods)
