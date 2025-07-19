@@ -107,23 +107,21 @@ final class KTextStorage: KTextStorageProtocol {
     private var _baseFont: NSFont = .monospacedSystemFont(ofSize: 12, weight: .regular)
     private var _tabWidthCache: CGFloat?
     
-    private var _history: KRingBuffer<KUndoUnit> = .init(capacity: 20)
+    private var _history: KRingBuffer<KUndoUnit> = .init(capacity: 5000)
     private var _undoDepth: Int = 0
     private var _undoActions: KRingBuffer<KUndoAction> = .init(capacity: 2)
 
     // MARK: - Public API
 
     var count: Int { _characters.count }
-
+    
     var string: String {
         get { String(_characters) }
-        //set { _characters = Array(newValue); notifyObservers() }
-        set { _characters = Array(newValue) }
+        set { characters = Array(newValue) }
     }
     
     var characters: [Character] { // 将来的に内部データが[Character]でなくなる可能性あり。
         get { _characters }
-        //set { _characters = newValue; notifyObservers()}
         set {
             replaceCharacters(in: 0..<newValue.count, with: newValue)
         }
@@ -151,7 +149,16 @@ final class KTextStorage: KTextStorageProtocol {
         _characters[_characters.indices]
     }
     
+    // 初期値として文字列をセットする際に使用する。
+    // ドキュメントからの読み込み時に限定して使用。Undoは反応しない。
+    func setDefaultString(_ string: String) {
+        _characters = Array(string)
+        _history.reset()
+    }
+    
+    
     init() {
+        // undoのアクションを先に2回分埋めておく。
         _undoActions.append(.none)
         _undoActions.append(.none)
     }
@@ -167,16 +174,13 @@ final class KTextStorage: KTextStorageProtocol {
         
         if _undoActions.element(at: 0)! == .none {
             let undoUnit = KUndoUnit(range: range, oldCharacters: Array(_characters[range]), newCharacters: newCharacters)
-            //log("🧠 append: old = \(undoUnit.oldCharacters), new = \(undoUnit.newCharacters)", from:self)
             if _undoActions.element(at: 1)! != .none {
-                //log("_undoActions.element(at: 1)! != .none", from:self)
                 _history.removeNewerThan(index: _undoDepth)
                 _undoDepth = 0
             }
             
             _history.append(undoUnit)
         }
-        //log("_history.count: \(_history.count), _undoDepth: \(_undoDepth)", from:self)
 
         _characters.replaceSubrange(range, with: newCharacters)
         notifyObservers(.textChanged(range: range, insertedCount: newCharacters.count))
@@ -211,7 +215,6 @@ final class KTextStorage: KTextStorageProtocol {
     }
     
 
-    //func addObserver(_ observer: @escaping () -> Void) {
     func addObserver(_ observer: @escaping ((KStorageModified) -> Void)){
         //print("\(#function)")
         _observers.append(observer)

@@ -22,13 +22,16 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     }
     
     // MARK: - Properties
-    
+    // 外部インスタンスの参照
     private var _textStorageRef: KTextStorageProtocol = KTextStorage()
     private var _layoutManager: KLayoutManager
     private let _caretView = KCaretView()
     
     // キャレットの表示に関するプロパティ
     private var _caretBlinkTimer: Timer?
+    
+    // 前回のcontentview.boundsを記録しておくためのプロパティ
+    private var _prevContentViewBounds: CGRect = .zero
     
     // キャレットの動作に関するプロパティ
     private var _verticalCaretX: CGFloat?        // 縦方向にキャレットを移動する際の基準X。
@@ -241,8 +244,13 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         // ソフトラップの場合、visibleRectに合わせて行の横幅を変更する必要があるが、
         // scrollview.clipViewでの変更がないため通知含めvisibleRectの変更を知るすべがない。
         // このため、viewWillDraw()でdraw()される直前に毎回チェックを行なうことにした。
-        if wordWrap {
+        
+        guard let currentContentViewBounds = enclosingScrollView?.contentView.bounds else { log("currentContentViewBounds=nil", from:self); return }
+        if currentContentViewBounds != _prevContentViewBounds {
+            //log("frame!=_previousFrame", from:self)
+            _prevContentViewBounds = enclosingScrollView?.contentView.bounds ?? .zero
             _layoutManager.textViewFrameInvalidated()
+            updateFrameSizeToFitContent()
             updateCaretPosition()
         }
     }
@@ -319,7 +327,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
         
-        //print("\(#function): done.")
         
         guard let layoutRects = _layoutManager.makeLayoutRects() else {
             print("\(#function): layoutRects is nil")
@@ -327,12 +334,12 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
         
         // test. TextRegionの外枠を赤で描く。
-        /*
+        
         let path = NSBezierPath(rect: layoutRects.textRegion.rect)
         NSColor.red.setStroke()
-        path.lineWidth = 1
+        path.lineWidth = 2
         path.stroke()
-        */
+        
         
         let lines = _layoutManager.lines
         let lineHeight = _layoutManager.lineHeight
@@ -1301,6 +1308,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                     caretIndex = range.lowerBound + insertedCount // 暫定的に挿入部の後端に置く。
                 }
             }
+            
         case let .colorChanged(range):
             print("カラー変更: range = \(range)")
         }
@@ -1319,23 +1327,27 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     // 現在のところinternalとしているが、将来的に公開レベルを変更する可能性あり。
     func updateFrameSizeToFitContent() {
-        let totalLines = _layoutManager.lines.count
-        let lineHeight = _layoutManager.lineHeight
+        //let totalLines = _layoutManager.lines.count
+        //let lineHeight = _layoutManager.lineHeight
+        /*
+        let lineNumberWidth = layoutRects.showLineNumbers ? layoutRects.lineNumberRegion?.rect.width ?? 100 : 0
 
-        let showLineNumber = true
-        let lineNumberWidth: CGFloat = showLineNumber ? 40 : 0
-
-        let height = CGFloat(totalLines) * lineHeight * 4 / 3
+        //let lineNumberWidth: CGFloat = showLineNumber ? 40 : 0
+        //let height = CGFloat(totalLines) * lineHeight * 4 / 3
         
-        guard let layoutRects = _layoutManager.makeLayoutRects() else {
-            print("\(#function): makeLayoutRects failed.")
-            return
-        }
         let width = _layoutManager.maxLineWidth
                     + lineNumberWidth
                     + layoutRects.textEdgeInsets.left * 2
         
-        self.setFrameSize(CGSize(width: width, height: height))
+        self.setFrameSize(CGSize(width: width, height: height))*/
+        
+        guard let layoutRects = _layoutManager.makeLayoutRects() else {
+            log("_layoutManger.makeLayoutRects() - nil.", from:self)
+            return
+        }
+        
+        let textRegionRect = layoutRects.textRegion.rect
+        setFrameSize(CGSize(width: textRegionRect.width, height: textRegionRect.height))
 
         enclosingScrollView?.contentView.needsLayout = true
         enclosingScrollView?.reflectScrolledClipView(enclosingScrollView!.contentView)
@@ -1361,7 +1373,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     private func characterPosition(at characterIndex:Int) -> CGPoint {
         let lineInfo = _layoutManager.line(at: characterIndex)
         guard let line = lineInfo.line else {
-            print("\(#function): failed to make line"); return .zero }
+            log("failed to make line", from:self); return .zero }
+        
         
         let linePoint = linePosition(at: characterIndex)
         

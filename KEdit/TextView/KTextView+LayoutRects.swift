@@ -77,11 +77,14 @@ struct LayoutRects {
         self.lineNumberRegion = lineNumberRect.map { Region(rect: $0) }
 
         let textWidth = wordWrap ? visibleRect.width : max(CGFloat(layoutManagerRef.maxLineWidth) + textEdgeInsets.left + lineNumberWidth + textEdgeInsets.right, visibleRect.width)
+        //let textWidth = wordWrap ? visibleRect.width - textEdgeInsets.right - textEdgeInsets.left : max(CGFloat(layoutManagerRef.maxLineWidth) + textEdgeInsets.left + lineNumberWidth + textEdgeInsets.right, visibleRect.width)
         let textHeight = max(CGFloat(layoutManagerRef.lineCount) * layoutManagerRef.lineHeight + textEdgeInsets.top + textEdgeInsets.bottom + visibleRect.height * 0.67,visibleRect.height)
-       
+        
         let textRect = CGRect(x: 0, y: 0, width: textWidth, height: textHeight)
+        //let textRect = CGRect(x: textEdgeInsets.left, y: textEdgeInsets.top, width: textWidth, height: textHeight)
 
         self.textRegion = Region(rect: textRect)
+        
     }
 
     enum RegionType {

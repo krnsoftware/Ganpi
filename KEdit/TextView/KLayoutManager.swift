@@ -39,17 +39,25 @@ final class KLayoutManager: KLayoutManagerReadable {
 
     // MARK: - Properties
 
-    //private(set) var _lines: [KLineInfo] = []
-    //private(set) var _lines: [KLine] = []
-    //private var _lines: KLines
+    // 関連するインスタンスの参照
+    private let _textStorageRef: KTextStorageProtocol
+    private weak var _textView: KTextView?
+    
+    // 計測上の全ての行の横幅の最大値。ワードラップありの場合には意味がない。
+    private var _maxLineWidth: CGFloat = 0
+    
+    // baseFontの現在のサイズにおけるspaceの幅の何倍かで指定する。
+    private var _tabWidth: Int = 4
+    
+    // 前回の描画部分のclipViewの矩形を記録する。
+    private var _prevTextViewFrame: NSRect = .zero
+    
+    // 表示される行をまとめるKLinesクラスインスタンス。
     private lazy var _lines: KLines = {
         return KLines(layoutManager: self, textStorageRef: _textStorageRef)
     }()
     
-    private var _maxLineWidth: CGFloat = 0
-    private let _textStorageRef: KTextStorageProtocol
-    private weak var _textView: KTextView?
-        
+    // 行間設定。
     var lineSpacing: CGFloat = 2.0
     
     var lineHeight: CGFloat {
@@ -78,7 +86,13 @@ final class KLayoutManager: KLayoutManagerReadable {
         set { _textView = newValue }
     }
 
-    var tabWidth: Int = 4 // baseFontの現在のサイズにおけるspaceの幅の何倍かで指定する。
+    var tabWidth: Int {
+        get { _tabWidth }
+        set {
+            _tabWidth = newValue
+            _lines.rebuildLines()
+        }
+    }
     
     
     // MARK: - Init
@@ -86,7 +100,9 @@ final class KLayoutManager: KLayoutManagerReadable {
     init(textStorageRef: KTextStorageProtocol) {
         _textStorageRef = textStorageRef
         
-        _lines = KLines(layoutManager: self, textStorageRef: _textStorageRef)
+        //_textStorageRef.string = "sample"
+        
+        //_lines = KLines(layoutManager: self, textStorageRef: _textStorageRef)
         
         textStorageRef.addObserver { [weak self] modification in
             self?.textStorageDidModify(modification)
@@ -98,97 +114,33 @@ final class KLayoutManager: KLayoutManagerReadable {
     // MARK: - Layout
     
     private func rebuildLayout() {
-        
-        _lines.rebuildLines()
-        
+        //log("layout start",from:self)
         /*
-        _lines.removeAll()
-        _maxLineWidth = 0
+        guard let textViewFrame = _textView?.bounds else { log("textViewFrame is nil",from:self); return }
         
-        guard let layoutRects = makeLayoutRects() else { print("\(#function) - layoutRects is nil"); return }
-
-        var currentIndex = 0
-        var currentLineNumber = 0
-        let characters = _textStorageRef.characterSlice
-        
-        // storageが空だった場合、空行を1つ追加する。
-        if _textStorageRef.count == 0 {
-            _lines.append(makeEmptyLine(index: 0, hardLineIndex: 0))
-            return
-        }
-
-        while currentIndex < characters.count {
-            var lineEndIndex = currentIndex
-
-            // 改行まで進める（改行文字は含めない）
-            while lineEndIndex < characters.count && characters[lineEndIndex] != "\n" {
-                lineEndIndex += 1
-            }
-
-            let lineRange = currentIndex..<lineEndIndex
+        if textViewFrame != _prevTextViewFrame {
+            _prevTextViewFrame = textViewFrame
             
-            /*
-            // タブの横幅を指定しつつ文字列をattributedstringに変換する。
-            /*guard let attrString = _textStorageRef.attributedString(for: lineRange, tabWidth: tabWidth) else { print("\(#function) - attrString is nil"); return }
-            
-            let ctLine = CTLineCreateWithAttributedString(attrString)*/
-            guard let ctLine = ctLine(in: lineRange) else { print("\(#function) - ctLine is nil"); return }
-            let width = CGFloat(CTLineGetTypographicBounds(ctLine, nil, nil, nil))
-            if width > _maxLineWidth {
-                _maxLineWidth = width
-            }
-
-            _lines.append(KLineInfo(ctLine: ctLine, range: lineRange, hardLineIndex: currentLineNumber, softLineIndex: 0))
-            */
-            /*
-            let line = KLine(range: lineRange, hardLineIndex: currentLineNumber, softLineIndex: 0, layoutManager: self)
-            _lines.append(line)
-            let width = line.width
-            if width > _maxLineWidth {
-                _maxLineWidth = width
-            }
-             */
-            
-            //guard let lineArray = makeLines(range: lineRange, hardLineIndex: currentLineNumber, width: layoutRects?.textRegionWidth) else { print("\(#function) - lineArray is nil"); return }
-            guard let lineArray = makeLines(range: lineRange, hardLineIndex: currentLineNumber, width: layoutRects.textRegionWidth - layoutRects.textEdgeInsets.right) else { print("\(#function) - lineArray is nil"); return }
-            _lines.append(contentsOf: lineArray)
-            
-            let width = lineArray[0].width
-            if width > _maxLineWidth {
-                _maxLineWidth = width
-            }
-
-            currentIndex = lineEndIndex
-            currentLineNumber += 1
-            
-            
-            if currentIndex < characters.count && characters[currentIndex] == "\n" {
-                currentIndex += 1 // 改行をスキップ
-            }
-            
-        }
-        
-        //最後の文字が改行だった場合、空行を1つ追加する。
-        if _textStorageRef.characterSlice.last == "\n" {
-            _lines.append(makeEmptyLine(index: _textStorageRef.count, hardLineIndex: _lines.count))
-        }
-        
-        */
-                
+            _lines.rebuildLines()
+            _maxLineWidth = _lines.maxLineWidth
+        }*/
+        _lines.rebuildLines()
+        _maxLineWidth = _lines.maxLineWidth
+              
     }
     
     
     // TextStorageが変更された際に呼び出される。
     func textStorageDidModify(_ modification: KStorageModified) {
-        guard let view = textView else { print("KLayoutManager - textStorageDidChange - textView is nil"); return }
+        guard let view = textView else { log("KLayoutManager - textStorageDidChange - textView is nil", from:self); return }
         
         switch modification {
         case let .textChanged(range, insertedCount):
-            //print("🔧 テキスト変更: range = \(range), inserted = \(insertedCount)")
-            //rebuildLayout()
-            //print("\(#function): call rebuildLayout()")
-            view.textStorageDidModify(modification)
             
+            //log("range: \(range), insertedCount: \(insertedCount)",from:self)
+            
+            rebuildLayout()
+            view.textStorageDidModify(modification)
 
         case let .colorChanged(range):
             print("🎨 カラー変更: range = \(range)")
@@ -198,9 +150,12 @@ final class KLayoutManager: KLayoutManagerReadable {
     
     // TextViewのframeが変更された際に呼び出される。
     func textViewFrameInvalidated() {
-        rebuildLayout()
+        if let wordWrap = _textView?.wordWrap, wordWrap {
+            rebuildLayout()
+        }
+        
         //print("\(#function): call rebuildLayout()")
-        _textView?.updateFrameSizeToFitContent()
+        //_textView?.updateFrameSizeToFitContent()
     }
  
     
@@ -208,6 +163,8 @@ final class KLayoutManager: KLayoutManagerReadable {
     // 現在の文字がテキストの最後の場合には(nil, -1)が返る。
     func line(at characterIndex: Int) -> (line: KLine?, lineIndex: Int) {
         //for (i, line) in lines.enumerated() {
+        //log("lines.count = \(lines.count)", from:self)
+        
         for i in 0..<lines.count {
             guard let line = lines[i] else { log("line is nil.", from:self); continue }
             if line.range.contains(characterIndex) || characterIndex == line.range.upperBound {
@@ -226,7 +183,7 @@ final class KLayoutManager: KLayoutManagerReadable {
     
     // 現在のLayoutRectsを生成する。専らTextViewから呼び出される。
     func makeLayoutRects() -> LayoutRects? {
-        guard let textView = _textView else { print("\(#function) - textView is nil"); return nil }
+        guard let textView = _textView else { log("textView = nil", from:self); return nil }
         /*guard let clipBounds = textView.enclosingScrollView?.contentView.bounds else {
             print("\(#function) - clipBound is nil")
             return nil
@@ -318,15 +275,12 @@ final class KLayoutManager: KLayoutManagerReadable {
         var baseIndex: Int = 0
         for i in 0..<attributedString.length {
             let offset = CTLineGetOffsetForStringIndex(fullLine, i, nil)
-            //log("offset = \(Int(offset)), baseOffset = \(Int(baseOffset)), pm = \(Int(offset - baseOffset)))", from:self)
             
             if offset - baseOffset >= width {
                 
                 let subAttr = attributedString.attributedSubstring(from: NSRange(location: baseIndex, length: i - baseIndex))
-                //log("subAttr = \(subAttr.string)", from:self)
                 lines.append(CTLineCreateWithAttributedString(subAttr))
                 baseIndex = i
-                //baseOffset += offset
                 baseOffset = offset
             }
         }
@@ -336,39 +290,7 @@ final class KLayoutManager: KLayoutManagerReadable {
         
         return lines
         
-        /*
-        var currentLocation = 0
-        let fullLength = attributedString.length
-
-        while currentLocation < fullLength {
-            // 対象部分のAttributedString
-            let remainingRange = NSRange(location: currentLocation, length: fullLength - currentLocation)
-            let subAttr = attributedString.attributedSubstring(from: remainingRange)
-            let line = CTLineCreateWithAttributedString(subAttr)
-
-            // この行に収まる最大のインデックスを取得
-            let truncationIndex = CTLineGetStringIndexForPosition(line, CGPoint(x: width, y: 0))
-
-            // 折り返し地点の調整
-            var breakIndex = truncationIndex
-            if breakIndex == kCFNotFound || breakIndex == 0 {
-                breakIndex = 1 // 最低でも1文字進める
-            }
-
-            let actualRange = NSRange(location: currentLocation, length: breakIndex)
-            let actualAttr = attributedString.attributedSubstring(from: actualRange)
-            let actualLine = CTLineCreateWithAttributedString(actualAttr)
-
-            lines.append(actualLine)
-            currentLocation += breakIndex
-        }
-
-        return lines
-         */
-        
-        
     }
-    
     
     
 }

@@ -128,7 +128,7 @@ final class KFakeLine : KLine {
 // KLineを保持するクラス。
 // 格納された行は見た目の行構成をそのまま表している。つまりソフトラップを1行として上から順に並んでいる。
 // KTextView.draw()内で、Text Inputによる変換中の文字列を扱うために仮の文字列を挿入する機能を持つ。
-// 仮文字列はdraw()最初に設定(addFakeLine)し、最後に削除(removeFakeLine)すること。
+// 仮文字列はdraw()の最初に設定(addFakeLine)し、最後に削除(removeFakeLine)すること。
 
 final class KLines {
     private var _lines: [KLine] = []
@@ -152,11 +152,22 @@ final class KLines {
         return _lines.count + (fakeLineCount != 0 ? fakeLineCount - originalLineCount : 0)
     }
     
+    var maxLineWidth: CGFloat { _maxLineWidth }
+    
     init(layoutManager: KLayoutManager?, textStorageRef: KTextStorageReadable?) {
         _layoutManager = layoutManager
         _textStorageRef = textStorageRef
         
         rebuildLines()
+        log("initは何度よばれるのか", from:self)
+        
+        if _lines.count == 0 {
+            if let layoutManagerRef = _layoutManager {
+                
+                _lines.append(layoutManagerRef.makeEmptyLine(index: 0, hardLineIndex: 0))
+            }
+            
+        }
     }
     
     
@@ -257,23 +268,31 @@ final class KLines {
         _lines.removeAll()
         _maxLineWidth = 0
         
-        //print("KLines: \(#function)")
+       //log("start.", from:self)
+       
+       
+        //guard let layoutManagerRef = _layoutManager else { print("\(#function) - layoutManagerRef is nil"); return }
+       guard let layoutManagerRef = _layoutManager else { log("layoutManagerRef is nil", from:self); return }
+        //guard let textStorageRef = _textStorageRef else { print("\(#function) - textStorageRef is nil"); return }
+       guard let textStorageRef = _textStorageRef else { log("textStorageRef is nil", from:self); return }
+       
+       // storageが空だった場合、空行を1つ追加する。
+       if textStorageRef.count == 0 {
+           //log("storage空のため空行を追加", from:self)
+          _lines.append(layoutManagerRef.makeEmptyLine(index: 0, hardLineIndex: 0))
+           return
+       }
+       
         
-        guard let layoutManagerRef = _layoutManager else { print("\(#function) - layoutManagerRef is nil"); return }
-        guard let textStorageRef = _textStorageRef else { print("\(#function) - textStorageRef is nil"); return }
-        
-        guard let layoutRects = layoutManagerRef.makeLayoutRects() else { print("\(#function) - layoutRects is nil"); return }
+        //guard let layoutRects = layoutManagerRef.makeLayoutRects() else { print("\(#function) - layoutRects is nil"); return }
+       guard let layoutRects = layoutManagerRef.makeLayoutRects() else { log("layoutRects is nil", from:self); return }
 
+       //log("after layoutRects construction.", from:self)
+       
         var currentIndex = 0
         var currentLineNumber = 0
         
         let characters = textStorageRef.characterSlice
-        
-        // storageが空だった場合、空行を1つ追加する。
-        if textStorageRef.count == 0 {
-           _lines.append(layoutManagerRef.makeEmptyLine(index: 0, hardLineIndex: 0))
-            return
-        }
 
         while currentIndex < characters.count {
             //print("KLines: \(#function)")
@@ -345,7 +364,7 @@ final class KLines {
         // 空行のみの場合は1行目の空行を返す。
         guard count > 0 else { return _lines.first }
         
-        log("index:\(index), count:\(count)", from: self)
+        //log("index:\(index), count:\(count)", from: self)
         guard index >= 0 && index <= count else { log("out of range.", from: self); return nil }
         
         for line in _lines {
