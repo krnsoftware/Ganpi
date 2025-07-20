@@ -46,6 +46,7 @@ protocol KTextStorageReadable: KTextStorageCommon {
     func wordRange(at index: Int) -> Range<Int>?
     func attributedString(for range: Range<Int>, tabWidth: Int?) -> NSAttributedString?
     func lineRange(at index: Int) -> Range<Int>?
+    func width(in range:Range<Int>) -> CGFloat
     //func characterIndex(c: Character, from: Int, direction: KDirection) -> Int?
 }
 
@@ -108,6 +109,7 @@ final class KTextStorage: KTextStorageProtocol {
     private var _observers: [(KStorageModified) -> Void] = []
     private var _baseFont: NSFont = .monospacedSystemFont(ofSize: 12, weight: .regular)
     private var _tabWidthCache: CGFloat?
+    private var _advanceCache: KGlyphAdvanceCache
     
     // data version
     //private var _characterVersion: UInt64 = 0
@@ -138,6 +140,7 @@ final class KTextStorage: KTextStorageProtocol {
         get { _baseFont }
         set {
             _baseFont = newValue
+            _advanceCache = KGlyphAdvanceCache(font: _baseFont)
             _tabWidthCache = nil
             notifyColoringChanged(in: 0..<_characters.count)
         }
@@ -147,6 +150,7 @@ final class KTextStorage: KTextStorageProtocol {
         get { _baseFont.pointSize }
         set {
             _baseFont = _baseFont.withSize(newValue)
+            _advanceCache = KGlyphAdvanceCache(font: _baseFont)
             notifyColoringChanged(in: 0..<_characters.count)
         }
     }
@@ -161,18 +165,16 @@ final class KTextStorage: KTextStorageProtocol {
     func setDefaultString(_ string: String) {
         _characters = Array(string)
         _history.reset()
-        //_characterVersion &+= 1
-        //_attributeVersion &+= 1
     }
-    
-    //var characterVersion: UInt64 { _characterVersion }
-    //var attributeVersion: UInt64 { _attributeVersion }
     
     
     init() {
         // undoのアクションを先に2回分埋めておく。
         _undoActions.append(.none)
         _undoActions.append(.none)
+        
+        _advanceCache = KGlyphAdvanceCache(font: _baseFont)
+        
     }
 
     // 最終的に全ての文字列の変更はこのメソッドを通じて行う。
@@ -193,13 +195,20 @@ final class KTextStorage: KTextStorageProtocol {
             
             _history.append(undoUnit)
         }
+        
+        // for cache
+        if 0 < newCharacters.count && newCharacters.count < 10 {
+            for c in newCharacters { _ = _advanceCache.advance(for: c) }
+        } else {
+            _advanceCache.register(characters: newCharacters)
+        }
+        log("advanceCache.count = \(_advanceCache.count)", from:self)
 
+        // replacement
         _characters.replaceSubrange(range, with: newCharacters)
         notifyObservers(.textChanged(range: range, insertedCount: newCharacters.count))
         
         _undoActions.append(.none)
-        //_characterVersion &+= 1
-        //_attributeVersion &+= 1
         
         return true
     }
@@ -401,6 +410,11 @@ final class KTextStorage: KTextStorageProtocol {
             result.append(NSAttributedString(string: string, attributes: run.attributes))
         }
         return result
+    }
+    
+    // 与えられた範囲の文字列の幅を返す。
+    func width(in range:Range<Int>) -> CGFloat {
+        return _advanceCache.width(for: _characters, in: range)
     }
     
     

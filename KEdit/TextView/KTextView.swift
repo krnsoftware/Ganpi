@@ -1306,7 +1306,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             for (i, line) in _layoutManager.lines.fakeLines.enumerated() {
                 guard let ctLine = line.ctLine else { log("ctLine = nil.",from:self); return .zero }
                 let stringRange = CTLineGetStringRange(ctLine)
-                log("CTLine range: \(stringRange.location) - \(stringRange.location + stringRange.length)",from:self)
+                //log("CTLine range: \(stringRange.location) - \(stringRange.location + stringRange.length)",from:self)
                 let start = stringRange.location
                 let end = start + stringRange.length
                 

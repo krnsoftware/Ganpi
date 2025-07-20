@@ -282,7 +282,7 @@ final class KLines {
         _lines.removeAll()
         _maxLineWidth = 0
         
-       log("start. time = \(Date())", from:self)
+       //log("start. time = \(Date())", from:self)
        
        
         //guard let layoutManagerRef = _layoutManager else { print("\(#function) - layoutManagerRef is nil"); return }
