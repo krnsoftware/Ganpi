@@ -13,6 +13,7 @@ class KLine {
     private weak var _layoutManager: KLayoutManager?
     private var _ctLine: CTLine?
     private var _obsolete: Bool = false
+    private var _cachedOffsets: [CGFloat]? = nil
     
     let range: Range<Int>
     let hardLineIndex: Int
@@ -63,6 +64,8 @@ class KLine {
     
     // この行における文字のオフセットを行の左端を0.0とした相対座標のx位置のリストで返す。
     func characterOffsets() -> [CGFloat] {
+        if let cached = _cachedOffsets { return cached }
+        
         guard let line = _cachedCTLine else { print("\(#function): _cachedCTLine is nil"); return [] }
         
         let stringRange = CTLineGetStringRange(line)
@@ -74,6 +77,8 @@ class KLine {
             let offset = CTLineGetOffsetForStringIndex(line, i, nil)
             offsets.append(offset)
         }
+        
+        _cachedOffsets = offsets
         return offsets
     }
     
@@ -101,6 +106,7 @@ class KLine {
             return
         }
         _ctLine = line
+        _cachedOffsets = nil
     }
     
     
@@ -141,6 +147,8 @@ final class KLines {
     private weak var _textStorageRef: KTextStorageReadable?
     
     var hasFakeLine: Bool { _fakeLines.isEmpty == false }
+    var fakeLines: [KFakeLine] { _fakeLines }
+    var replaceLineNumber: Int { _replaceLineNumber }
     
     // 格納するKLineの数を返す。
     // fakeLinesがある場合、fakeLinesの行数からオリジナルの行数を引いたものを追加する。
@@ -274,7 +282,7 @@ final class KLines {
         _lines.removeAll()
         _maxLineWidth = 0
         
-       //log("start.", from:self)
+       log("start. time = \(Date())", from:self)
        
        
         //guard let layoutManagerRef = _layoutManager else { print("\(#function) - layoutManagerRef is nil"); return }
@@ -385,10 +393,8 @@ final class KLines {
         return nil
     }
     
-    // MARK: - private methods.
-    
     // hardLineIndex番目の行が_linesのどのindexか返す。
-    private func lineArrayIndex(for hardLineIndex: Int) -> Int? {
+    func lineArrayIndex(for hardLineIndex: Int) -> Int? {
         for (i, line) in _lines.enumerated() {
             if line.hardLineIndex == hardLineIndex {
                 return i

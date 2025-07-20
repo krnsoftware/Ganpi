@@ -30,6 +30,8 @@ protocol KTextStorageCommon: AnyObject {
     var count: Int { get }
     var baseFont: NSFont { get }
     var characterSlice: ArraySlice<Character> { get }
+    //var characterVersion: UInt64 { get }
+    //var attributeVersion: UInt64 { get }
     subscript(index: Int) -> Character? { get }
     subscript(range: Range<Int>) -> ArraySlice<Character>? { get }
     
@@ -107,6 +109,11 @@ final class KTextStorage: KTextStorageProtocol {
     private var _baseFont: NSFont = .monospacedSystemFont(ofSize: 12, weight: .regular)
     private var _tabWidthCache: CGFloat?
     
+    // data version
+    //private var _characterVersion: UInt64 = 0
+    //private var _attributeVersion: UInt64 = 0
+    
+    // for undo.
     private var _history: KRingBuffer<KUndoUnit> = .init(capacity: 5000)
     private var _undoDepth: Int = 0
     private var _undoActions: KRingBuffer<KUndoAction> = .init(capacity: 2)
@@ -154,7 +161,12 @@ final class KTextStorage: KTextStorageProtocol {
     func setDefaultString(_ string: String) {
         _characters = Array(string)
         _history.reset()
+        //_characterVersion &+= 1
+        //_attributeVersion &+= 1
     }
+    
+    //var characterVersion: UInt64 { _characterVersion }
+    //var attributeVersion: UInt64 { _attributeVersion }
     
     
     init() {
@@ -186,6 +198,9 @@ final class KTextStorage: KTextStorageProtocol {
         notifyObservers(.textChanged(range: range, insertedCount: newCharacters.count))
         
         _undoActions.append(.none)
+        //_characterVersion &+= 1
+        //_attributeVersion &+= 1
+        
         return true
     }
     
@@ -304,6 +319,7 @@ final class KTextStorage: KTextStorageProtocol {
     
     // attributeの変更についてはテキストの変更時に自動ではなくattributeの変更の際に手動で送信する。
     func notifyColoringChanged(in range: Range<Int>) {
+        //_attributeVersion &+= 1
         notifyObservers(.colorChanged(range: range))
     }
 

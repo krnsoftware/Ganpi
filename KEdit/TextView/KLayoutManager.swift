@@ -36,6 +36,14 @@ protocol KLayoutManagerReadable: AnyObject {
 // MARK: - KLayoutManager
 
 final class KLayoutManager: KLayoutManagerReadable {
+    
+    // MARK: - Struct and Enum.
+    
+    enum KRebuildReason {
+            case charactersChanged(range: Range<Int>, insertedCount: Int)
+            case attributesChanged
+            case destructiveChange
+        }
 
     // MARK: - Properties
 
@@ -51,6 +59,10 @@ final class KLayoutManager: KLayoutManagerReadable {
     
     // 前回の描画部分のclipViewの矩形を記録する。
     private var _prevTextViewFrame: NSRect = .zero
+    
+    //private var _currentTextStorageVersion: Int = 0
+    
+    private var _prevLineNumberRegionWidth: CGFloat = 0
     
     // 表示される行をまとめるKLinesクラスインスタンス。
     private lazy var _lines: KLines = {
@@ -70,8 +82,8 @@ final class KLayoutManager: KLayoutManagerReadable {
     }
     
     // KLinesが持つ最も幅の大きな行の幅を返します。表示マージンなし。
-    // hardwrapの場合にlayoutRects.textRegion.rect.widthを設定するために使用します。
-    // softwrapであっても値は返しますが、内容は不正です。
+    // hardwrapの場合にlayoutRects.textRegion.rect.widthを設定するために使用する。
+    // softwrapであっても値は返すが、内容は不定。
     var maxLineWidth: CGFloat {
         return _maxLineWidth
     }
@@ -121,9 +133,26 @@ final class KLayoutManager: KLayoutManagerReadable {
 
     // MARK: - Layout
     
-    func rebuildLayout() {
+    func rebuildLayout(reason: KRebuildReason = .destructiveChange) {
+        guard let layoutRects = makeLayoutRects() else { log("layoutRects is nil", from:self); return }
+        let lineNumberRegionWidth = layoutRects.lineNumberRegion?.rect.width ?? 0
+        if lineNumberRegionWidth != _prevLineNumberRegionWidth {
+            _prevLineNumberRegionWidth = lineNumberRegionWidth
+            _lines.rebuildLines()
+            return
+        }
         
-        _lines.rebuildLines()
+        switch reason {
+        case .charactersChanged(range: let range, insertedCount: let insertedCount):
+            _lines.rebuildLines()
+        case .attributesChanged:
+            // 将来的に実装
+            _lines.rebuildLines()
+        case .destructiveChange:
+            _lines.rebuildLines()
+        }
+        
+        
         
         if let wordWrap = _textView?.wordWrap,
                 let visibleRectWidth = _textView?.visibleRect.width {
@@ -147,7 +176,7 @@ final class KLayoutManager: KLayoutManagerReadable {
             
             //log("range: \(range), insertedCount: \(insertedCount)",from:self)
             
-            rebuildLayout()
+            rebuildLayout(reason: .charactersChanged(range: range, insertedCount: insertedCount))
             view.textStorageDidModify(modification)
 
         case let .colorChanged(range):
@@ -222,7 +251,7 @@ final class KLayoutManager: KLayoutManagerReadable {
     func makeLines(range: Range<Int>, hardLineIndex: Int, width: CGFloat?) -> [KLine]? {
         let hardLine = KLine(range: range, hardLineIndex: hardLineIndex, softLineIndex: 0, layoutManager: self)
 
-        guard let textWidth = width, _textView?.wordWrap == true else {
+        guard let textWidth = width, wordWrap == true else {
             return [hardLine]
         }
 

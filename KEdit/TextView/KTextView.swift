@@ -1275,6 +1275,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     }
 
     func firstRect(forCharacterRange range: NSRange, actualRange: NSRangePointer?) -> NSRect {
+        /*
         var point = characterPosition(at: caretIndex)
         point = CGPoint(x: point.x, y: point.y + _layoutManager.lineHeight)
         point = self.convert(point, from: nil)
@@ -1283,7 +1284,51 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         point = window.convertPoint(toScreen: point)
         
-        return NSRect(x: point.x, y: point.y, width: 1, height: _layoutManager.lineHeight)
+        return NSRect(x: point.x, y: point.y, width: 1, height: _layoutManager.lineHeight)*/
+        
+        if let replacementRange = _replacementRange {
+            _layoutManager.lines.addFakeLine(replacementRange: replacementRange, attrString: _markedText)
+            
+            defer {
+                _layoutManager.lines.removeFakeLines()
+            }
+            let hardLineIndex = _layoutManager.lines.replaceLineNumber
+            
+            guard let totalLineIndex = _layoutManager.lines.lineArrayIndex(for: hardLineIndex) else { log("totalLineIndex is nil.",from:self); return .zero}
+            
+            let globalTargetIndex = range.location
+            let localTargetIndex = globalTargetIndex - replacementRange.lowerBound
+            
+            //log("targetIndex:\(targetIndex), replacementRange:\(replacementRange)",from:self)
+            
+            guard let layoutRects = _layoutManager.makeLayoutRects() else { log("layoutRects is nil.",from:self); return .zero }
+            
+            for (i, line) in _layoutManager.lines.fakeLines.enumerated() {
+                guard let ctLine = line.ctLine else { log("ctLine = nil.",from:self); return .zero }
+                let stringRange = CTLineGetStringRange(ctLine)
+                log("CTLine range: \(stringRange.location) - \(stringRange.location + stringRange.length)",from:self)
+                let start = stringRange.location
+                let end = start + stringRange.length
+                
+                if localTargetIndex >= start && localTargetIndex < end {
+                    let offset = CTLineGetOffsetForStringIndex(ctLine, localTargetIndex, nil)
+                    
+                    let y = CGFloat(totalLineIndex + i) * _layoutManager.lineHeight + layoutRects.textEdgeInsets.top
+                    let x = layoutRects.textRegion.rect.origin.x + layoutRects.horizontalInsets + offset
+                    
+                    var point = CGPoint(x: x, y: y)
+                    if let window = self.window {
+                        point = self.convert(point, to: nil)
+                        point = window.convertPoint(toScreen: point)
+                    }
+                    //log("CTLine条件一致。i=\(i)",from:self)
+                    return NSRect(x: point.x, y: point.y, width: 1, height: _layoutManager.lineHeight)
+                }
+            }
+            
+        }
+        //log("CTLineが条件に合わず。",from:self)
+        return .zero
         
     }
     
