@@ -63,7 +63,8 @@ struct LayoutRects {
         self.wordWrap = wordWrap
         self.textEdgeInsets = textEdgeInsets
                 
-        let digitCount = max(_minimumLineNumberCharacterWidth, "\(layoutManagerRef.lineCount)".count)
+        //let digitCount = max(_minimumLineNumberCharacterWidth, "\(layoutManagerRef.lineCount)".count)
+        let digitCount = max(_minimumLineNumberCharacterWidth, "\(textStorageRef.countLines())".count)
         let attrStr = NSAttributedString(string: "M", attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: textStorageRef.baseFont.pointSize * 0.95, weight: .regular)])
         let ctLine = CTLineCreateWithAttributedString(attrStr)
         let charWidth = CGFloat(CTLineGetTypographicBounds(ctLine, nil, nil, nil))

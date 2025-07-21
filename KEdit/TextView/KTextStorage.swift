@@ -44,6 +44,7 @@ protocol KTextStorageReadable: KTextStorageCommon {
     func attributedString(for range: Range<Int>, tabWidth: Int?) -> NSAttributedString?
     func lineRange(at index: Int) -> Range<Int>?
     func advances(in range:Range<Int>) -> [CGFloat]
+    func countLines() -> Int
 }
 
 // 書き込み可能プロトコル（読み取り継承なし）
@@ -316,6 +317,15 @@ final class KTextStorage: KTextStorageProtocol {
         }
 
         return lower..<upper
+    }
+    
+    // 論理行の行数を返す。最後が改行の場合は改行後にも1行あるとみなす。
+    func countLines() -> Int {
+        var count = 0
+        for c in _characters {
+            if c == "\n" { count += 1 }
+        }
+        return count + 1
     }
 
     
