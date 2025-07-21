@@ -1161,10 +1161,22 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     }
     
     @objc private func clipViewBoundsDidChange(_ notification: Notification) {
-        guard let currentContentViewBounds = enclosingScrollView?.contentView.bounds else { log("currentContentViewBounds=nil", from:self); return }
-        if currentContentViewBounds != _prevContentViewBounds && wordWrap {
-            _prevContentViewBounds = enclosingScrollView?.contentView.bounds ?? .zero
+        guard let cvBounds = enclosingScrollView?.contentView.bounds else { log("cvBounds==nil", from:self); return }
+        
+        // ワードラップ時、ClipViewの大きさが変化していれば再描画
+        // 描画領域が変更した際の挙動
+        if cvBounds.size != _prevContentViewBounds.size && wordWrap {
+            _prevContentViewBounds = cvBounds
             needsDisplay = true
+            return
+        }
+        
+        // ClipViewの原点が移動していれば再描画
+        // ワードラップなしで水平スクロールした際の挙動
+        if bounds.origin != _prevContentViewBounds.origin {
+            _prevContentViewBounds = cvBounds
+            needsDisplay = true
+            return
         }
         
     }
