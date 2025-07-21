@@ -71,6 +71,15 @@ final class KGlyphAdvanceCache {
         return advance
     }
     
+    func advances(for characters: [Character], in range: Range<Int>) -> [CGFloat] {
+        guard range.lowerBound >= 0, range.upperBound <= characters.count else {
+            log("range is out of bounds", from:self)
+                return []
+        }
+        
+        return characters[range].map { advance(for: $0) }
+    }
+    
     func width(for characters: [Character], in range: Range<Int>) -> CGFloat {
         guard !characters.isEmpty else { return 0 }
 

@@ -11,9 +11,10 @@ import Cocoa
 
 class KLine {
     private weak var _layoutManager: KLayoutManager?
+    private weak var _textStorageRef: KTextStorageReadable?
     private var _ctLine: CTLine?
-    private var _obsolete: Bool = false
-    private var _cachedOffsets: [CGFloat]? = nil
+    //private var _obsolete: Bool = false
+    private var _cachedOffsets: [CGFloat]
     
     let range: Range<Int>
     let hardLineIndex: Int
@@ -21,19 +22,20 @@ class KLine {
     
     // キャッシュされているCTLineを返す。
     // attributeが変更された場合、表示は無効だがサイズなどは有効のため古いキャッシュをそのまま利用する。
+    /*
     private var _cachedCTLine: CTLine? {
         if _ctLine == nil {
             _obsolete = false
             makeCTLine()
         }
         return _ctLine
-    }
+    }*/
     
     // 有効なCTLineを返す。
     var ctLine: CTLine? {
-        if _ctLine == nil || _obsolete {
-            _obsolete = false
-            //print("\(#function): KLine. build CTLine. hardLineIndex:\(hardLineIndex), softLineIndex:\(softLineIndex)")
+        //if _ctLine == nil || _obsolete {
+        if _ctLine == nil {
+            //_obsolete = false
             makeCTLine()
         }
         return _ctLine
@@ -41,29 +43,43 @@ class KLine {
     
     // 行の幅をCGFloatで返す。
     var width: CGFloat {
+        /*
         guard let line = _cachedCTLine else { print("\(#function): _cachedCTLine is nil"); return 0.0 }
         
-        return CTLineGetTypographicBounds(line, nil, nil, nil)
+        return CTLineGetTypographicBounds(line, nil, nil, nil)*/
+        
+        return _cachedOffsets.reduce(0, +)
     }
     
     
-    init(range: Range<Int>, hardLineIndex: Int, softLineIndex: Int, layoutManager: KLayoutManager){
+    init(range: Range<Int>, hardLineIndex: Int, softLineIndex: Int, layoutManager: KLayoutManager, textStorageRef: KTextStorageReadable){
         self.range = range
         self.hardLineIndex = hardLineIndex
         self.softLineIndex = softLineIndex
         self._layoutManager = layoutManager
+        self._textStorageRef = textStorageRef
+        
+        var result:[CGFloat] = []
+        _ = textStorageRef.advances(in: range).reduce(into: 0) { sum, value in
+            sum += value
+            result.append(sum)
+        }
+        _cachedOffsets = result
+        
+        //log("_cacheOffsets: \(_cachedOffsets)", from:self)
     }
-    
+    /*
     func attributesChanged(){
         _obsolete = true
     }
     
     func charactersChanged(){
         _ctLine = nil
-    }
+    }*/
     
     // この行における文字のオフセットを行の左端を0.0とした相対座標のx位置のリストで返す。
     func characterOffsets() -> [CGFloat] {
+        /*
         if let cached = _cachedOffsets { return cached }
         
         guard let line = _cachedCTLine else { print("\(#function): _cachedCTLine is nil"); return [] }
@@ -79,24 +95,41 @@ class KLine {
         }
         
         _cachedOffsets = offsets
-        return offsets
+        return offsets*/
+        return _cachedOffsets
     }
     
     // この行におけるindex文字目の相対位置を返す。
     func characterOffset(at index:Int) -> CGFloat {
+        /*
         guard let line = _cachedCTLine else { print("\(#function): _cachedCTLine is nil"); return 0.0 }
         
-        return CTLineGetOffsetForStringIndex(line, index, nil)
+        return CTLineGetOffsetForStringIndex(line, index, nil)*/
+        
+        guard index >= 0 && index <= _cachedOffsets.count else { log("index is out of range.", from:self); return 0.0 }
+        
+        if index == 0 {
+            return 0
+        }
+        
+        return _cachedOffsets[index - 1]
     }
     
     // この行における相対座標のx位置を返す。
-    func characterIndex(at x: CGFloat) -> Int {
-        guard let line = _cachedCTLine else { print("\(#function): _cachedCTLine is nil"); return 0 }
-        
-        let index = CTLineGetStringIndexForPosition(line, CGPoint(x: x, y: 0))
-        
-        return index < 0 ? 0 : index // 空行の場合に-1が返るため、その場合は0を返す。
-    }
+    /*
+    func characterIndex(at x: CGFloat, in characters: [Character]) -> Int {
+        guard x >= 0 else { log("x < 0", from:self); return 0 }
+        guard _cachedOffsets.count == characters.count else { log("offset count != character count", from:self); return 0 }
+
+        var currentOffset: CGFloat = 0
+        for (i, offset) in _cachedOffsets.enumerated() {
+            if x < currentOffset + offset / 2 {
+                return i
+            }
+            currentOffset += offset
+        }
+        return _cachedOffsets.count
+    }*/
     
     
     // この行のCTLineを作成する。作成はlayoutManagerに依頼する。
@@ -106,7 +139,7 @@ class KLine {
             return
         }
         _ctLine = line
-        _cachedOffsets = nil
+        //_cachedOffsets = nil
     }
     
     
@@ -123,9 +156,9 @@ final class KFakeLine : KLine {
     
     override var width: CGFloat { CTLineGetTypographicBounds(_ctLine, nil, nil, nil) }
     
-    init(ctLine: CTLine, hardLineIndex: Int, softLineIndex: Int, layoutManager: KLayoutManager) {
+    init(ctLine: CTLine, hardLineIndex: Int, softLineIndex: Int, layoutManager: KLayoutManager, textStorageRef: KTextStorageReadable) {
         _ctLine = ctLine
-        super.init(range: 0..<0, hardLineIndex: hardLineIndex, softLineIndex: softLineIndex, layoutManager: layoutManager)
+        super.init(range: 0..<0, hardLineIndex: hardLineIndex, softLineIndex: softLineIndex, layoutManager: layoutManager, textStorageRef: textStorageRef)
     }
 }
 
@@ -218,7 +251,7 @@ final class KLines {
             
             
             for (i, fakeCTLine) in ctLines.enumerated() {
-                let fakeLine = KFakeLine(ctLine: fakeCTLine, hardLineIndex: hardLineIndex, softLineIndex: i, layoutManager: layoutManager)
+                let fakeLine = KFakeLine(ctLine: fakeCTLine, hardLineIndex: hardLineIndex, softLineIndex: i, layoutManager: layoutManager, textStorageRef: textStorageRef)
                 
                 _fakeLines.append(fakeLine)
             }
@@ -282,7 +315,7 @@ final class KLines {
         _lines.removeAll()
         _maxLineWidth = 0
         
-       //log("start. time = \(Date())", from:self)
+       log("start. time = \(Date())", from:self)
        
        
         //guard let layoutManagerRef = _layoutManager else { print("\(#function) - layoutManagerRef is nil"); return }

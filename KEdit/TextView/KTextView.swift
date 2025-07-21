@@ -1161,7 +1161,12 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     }
     
     @objc private func clipViewBoundsDidChange(_ notification: Notification) {
-        needsDisplay = true
+        guard let currentContentViewBounds = enclosingScrollView?.contentView.bounds else { log("currentContentViewBounds=nil", from:self); return }
+        if currentContentViewBounds != _prevContentViewBounds && wordWrap {
+            _prevContentViewBounds = enclosingScrollView?.contentView.bounds ?? .zero
+            needsDisplay = true
+        }
+        
     }
     
     

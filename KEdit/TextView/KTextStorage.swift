@@ -30,12 +30,9 @@ protocol KTextStorageCommon: AnyObject {
     var count: Int { get }
     var baseFont: NSFont { get }
     var characterSlice: ArraySlice<Character> { get }
-    //var characterVersion: UInt64 { get }
-    //var attributeVersion: UInt64 { get }
     subscript(index: Int) -> Character? { get }
     subscript(range: Range<Int>) -> ArraySlice<Character>? { get }
     
-    //func addObserver(_ observer: @escaping () -> Void)
     func addObserver(_ observer: @escaping (KStorageModified) -> Void)
 }
 
@@ -46,8 +43,7 @@ protocol KTextStorageReadable: KTextStorageCommon {
     func wordRange(at index: Int) -> Range<Int>?
     func attributedString(for range: Range<Int>, tabWidth: Int?) -> NSAttributedString?
     func lineRange(at index: Int) -> Range<Int>?
-    func width(in range:Range<Int>) -> CGFloat
-    //func characterIndex(c: Character, from: Int, direction: KDirection) -> Int?
+    func advances(in range:Range<Int>) -> [CGFloat]
 }
 
 // 書き込み可能プロトコル（読み取り継承なし）
@@ -111,9 +107,6 @@ final class KTextStorage: KTextStorageProtocol {
     private var _tabWidthCache: CGFloat?
     private var _advanceCache: KGlyphAdvanceCache
     
-    // data version
-    //private var _characterVersion: UInt64 = 0
-    //private var _attributeVersion: UInt64 = 0
     
     // for undo.
     private var _history: KRingBuffer<KUndoUnit> = .init(capacity: 5000)
@@ -412,9 +405,9 @@ final class KTextStorage: KTextStorageProtocol {
         return result
     }
     
-    // 与えられた範囲の文字列の幅を返す。
-    func width(in range:Range<Int>) -> CGFloat {
-        return _advanceCache.width(for: _characters, in: range)
+    // 与えられた範囲のadvanceの配列を返す。
+    func advances(in range:Range<Int>) -> [CGFloat] {
+        return _advanceCache.advances(for: _characters, in: range)
     }
     
     

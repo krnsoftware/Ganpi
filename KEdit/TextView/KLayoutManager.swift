@@ -58,7 +58,7 @@ final class KLayoutManager: KLayoutManagerReadable {
     private var _tabWidth: Int = 4
     
     // 前回の描画部分のclipViewの矩形を記録する。
-    private var _prevTextViewFrame: NSRect = .zero
+    //private var _prevTextViewFrame: NSRect = .zero
     
     //private var _currentTextStorageVersion: Int = 0
     
@@ -244,17 +244,18 @@ final class KLayoutManager: KLayoutManagerReadable {
     // 表示用に空行を作成する。
     
     func makeEmptyLine(index: Int, hardLineIndex: Int) -> KLine {
-        return KLine(range: index..<index, hardLineIndex: hardLineIndex, softLineIndex: 0, layoutManager: self)
+        return KLine(range: index..<index, hardLineIndex: hardLineIndex, softLineIndex: 0, layoutManager: self, textStorageRef: _textStorageRef)
     }
     
     
     func makeLines(range: Range<Int>, hardLineIndex: Int, width: CGFloat?) -> [KLine]? {
-        let hardLine = KLine(range: range, hardLineIndex: hardLineIndex, softLineIndex: 0, layoutManager: self)
+        let hardLine = KLine(range: range, hardLineIndex: hardLineIndex, softLineIndex: 0, layoutManager: self, textStorageRef: _textStorageRef)
 
         guard let textWidth = width, wordWrap == true else {
+            
             return [hardLine]
         }
-
+        
         // オフセットリストを取得
         let offsets = hardLine.characterOffsets()
 
@@ -277,7 +278,8 @@ final class KLayoutManager: KLayoutManagerReadable {
                 let softLine = KLine(range: softRange,
                                      hardLineIndex: hardLineIndex,
                                      softLineIndex: softLineIndex,
-                                     layoutManager: self)
+                                     layoutManager: self,
+                                     textStorageRef: _textStorageRef)
                 softLines.append(softLine)
                 softLineIndex += 1
                 startIndex = endIndex
@@ -290,7 +292,8 @@ final class KLayoutManager: KLayoutManagerReadable {
             let softLine = KLine(range: startIndex..<range.upperBound,
                                  hardLineIndex: hardLineIndex,
                                  softLineIndex: softLineIndex,
-                                 layoutManager: self)
+                                 layoutManager: self,
+                                 textStorageRef: _textStorageRef)
             softLines.append(softLine)
         }
 
