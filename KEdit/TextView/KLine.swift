@@ -192,18 +192,74 @@ final class KLines {
     // 格納するKLineの数を返す。
     // fakeLinesがある場合、fakeLinesの行数からオリジナルの行数を引いたものを追加する。
     var count: Int {
+        guard !_fakeLines.isEmpty else { return _lines.count }
+        let originalLineCount = lines(hardLineIndex: _replaceLineNumber).count
+
+        return _lines.count + _fakeLines.count - originalLineCount
+    }
+    /*
+    var count: Int {
         let fakeLineCount = _fakeLines.count
         let originalLineCount = _fakeLines.isEmpty ? 0 : lines(hardLineIndex: _replaceLineNumber).count
         
         //print("KLines: \(#function) originalLineCount:\(originalLineCount) _lines.count:\(_lines.count) fakeLineCount:\(fakeLineCount)")
         
         return _lines.count + (fakeLineCount != 0 ? fakeLineCount - originalLineCount : 0)
-    }
+    }*/
     
     //var maxLineWidth: CGFloat { _maxLineWidth }
     var maxLineWidth: CGFloat {
         _lines.map{ $0.width }.max() ?? 0.0
     }
+    
+    var isValid: Bool {
+        guard !_lines.isEmpty else {
+            log("_lines.isEmpty", from: self)
+            return false
+        }
+
+        var expectedHardLineIndex = _lines[0].hardLineIndex
+        var expectedSoftLineIndex = 0
+        var currentRange = _lines[0].range
+
+        for i in 1..<_lines.count {
+            let line = _lines[i]
+
+            if line.hardLineIndex == expectedHardLineIndex {
+                // 同一ハードライン内のソフトライン継続
+                expectedSoftLineIndex += 1
+                if line.softLineIndex != expectedSoftLineIndex {
+                    log("error: unexpected softLineIndex at index \(i)", from: self)
+                    return false
+                }
+                if line.range.lowerBound != currentRange.upperBound {
+                    log("error: range discontinuity within hardLine at index \(i)", from: self)
+                    return false
+                }
+            } else if line.hardLineIndex == expectedHardLineIndex + 1 {
+                // 新しいハードラインの開始
+                expectedHardLineIndex += 1
+                expectedSoftLineIndex = 0
+                if line.softLineIndex != expectedSoftLineIndex {
+                    log("error: expected softLineIndex 0 at new hardLine \(i)", from: self)
+                    return false
+                }
+                if line.range.lowerBound != currentRange.upperBound + 1 {
+                    log("error: range gap between hardLines at index \(i)", from: self)
+                    return false
+                }
+            } else {
+                log("error: unexpected hardLineIndex at index \(i)", from: self)
+                return false
+            }
+
+            currentRange = line.range
+        }
+
+        return true
+    }
+    
+    
     
     init(layoutManager: KLayoutManager?, textStorageRef: KTextStorageReadable?) {
         _layoutManager = layoutManager
@@ -282,10 +338,13 @@ final class KLines {
     }
     
     subscript(i: Int) -> KLine? {
+        if !hasFakeLine { return _lines[i] }
+        
         guard let lineArrayIndex = lineArrayIndex(for: _replaceLineNumber) else {
             log("lineArrayIndex == nil, _replaceLineNumber = \(_replaceLineNumber)", from: self)
             return nil
         }
+        
         
         guard i >= 0 && i < count else { log("i is out of range.", from: self); return nil }
         
@@ -435,6 +494,9 @@ final class KLines {
         if textStorageRef.characterSlice.last == "\n" {
             _lines.append(layoutManagerRef.makeEmptyLine(index: textStorageRef.count, hardLineIndex: currentLineNumber))
         }
+        
+        // for testing
+        log("is valid: \(isValid)",from:self)
                 
     }
     
@@ -534,6 +596,8 @@ final class KLines {
         }
         return nil
     }
+    
+    
     
     
 }
