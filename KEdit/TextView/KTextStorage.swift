@@ -39,12 +39,13 @@ protocol KTextStorageCommon: AnyObject {
 // 読み取り専用プロトコル
 protocol KTextStorageReadable: KTextStorageCommon {
     var string: String { get }
+    var hardLineCount: Int { get } // if _character is empty, return 1. if end of chars is '\n', add 1.
     
     func wordRange(at index: Int) -> Range<Int>?
     func attributedString(for range: Range<Int>, tabWidth: Int?) -> NSAttributedString?
     func lineRange(at index: Int) -> Range<Int>?
     func advances(in range:Range<Int>) -> [CGFloat]
-    func countLines() -> Int
+    //func countLines() -> Int
 }
 
 // 書き込み可能プロトコル（読み取り継承なし）
@@ -105,8 +106,12 @@ final class KTextStorage: KTextStorageProtocol {
     private(set) var _characters: [Character] = []
     private var _observers: [(KStorageModified) -> Void] = []
     private var _baseFont: NSFont = .monospacedSystemFont(ofSize: 12, weight: .regular)
-    private var _tabWidthCache: CGFloat?
+    
+    // caches.
     private var _advanceCache: KGlyphAdvanceCache
+    private var _tabWidthCache: CGFloat?
+    private var _lineNumberDigitWidth: CGFloat?
+    private var _hardLineCount: Int?
     
     
     // for undo.
@@ -136,6 +141,7 @@ final class KTextStorage: KTextStorageProtocol {
             _baseFont = newValue
             _advanceCache = KGlyphAdvanceCache(font: _baseFont)
             _tabWidthCache = nil
+            _lineNumberDigitWidth = nil
             notifyColoringChanged(in: 0..<_characters.count)
         }
     }
@@ -145,6 +151,8 @@ final class KTextStorage: KTextStorageProtocol {
         set {
             _baseFont = _baseFont.withSize(newValue)
             _advanceCache = KGlyphAdvanceCache(font: _baseFont)
+            _tabWidthCache = nil
+            _lineNumberDigitWidth = nil
             notifyColoringChanged(in: 0..<_characters.count)
         }
     }
@@ -159,6 +167,27 @@ final class KTextStorage: KTextStorageProtocol {
     func setDefaultString(_ string: String) {
         _characters = Array(string)
         _history.reset()
+    }
+    
+    var lineNumberDigitWidth: CGFloat {
+        if let width = _lineNumberDigitWidth {
+            return width
+        }
+        let attrStr = NSAttributedString(string: "M", attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: _baseFont.pointSize * 0.95, weight: .regular)])
+        let ctLine = CTLineCreateWithAttributedString(attrStr)
+        let charWidth = CGFloat(CTLineGetTypographicBounds(ctLine, nil, nil, nil))
+        return charWidth
+    }
+    
+    // 論理行の数を返す。
+    var hardLineCount: Int {
+        if let hardLineCount = _hardLineCount {
+            return hardLineCount
+        }
+        var count = 1
+        for c in _characters { if c == "\n" { count += 1 } }
+        _hardLineCount = count
+        return count
     }
     
     
@@ -189,7 +218,7 @@ final class KTextStorage: KTextStorageProtocol {
             
             _history.append(undoUnit)
         }
-        
+       
         // for cache
         if 0 < newCharacters.count && newCharacters.count < 10 {
             for c in newCharacters { _ = _advanceCache.advance(for: c) }
@@ -197,12 +226,24 @@ final class KTextStorage: KTextStorageProtocol {
             _advanceCache.register(characters: newCharacters)
         }
         log("advanceCache.count = \(_advanceCache.count)", from:self)
+        
+        
+        // 改行の数が旧テキストと新テキストで異なれば_hardLineCountが変化する。
+        let oldReturnCount = _characters[range].filter { $0 == "\n" }.count
+        let newReturnCount = newCharacters.filter { $0 == "\n" }.count
+        if oldReturnCount != newReturnCount {
+            _hardLineCount = nil
+        }
 
         // replacement
         _characters.replaceSubrange(range, with: newCharacters)
-        notifyObservers(.textChanged(range: range, insertedCount: newCharacters.count))
         
+        let timerO = KTimeChecker(name:"observer")
+        timerO.start()
+        notifyObservers(.textChanged(range: range, insertedCount: newCharacters.count))
+        timerO.stop()
         _undoActions.append(.none)
+        
         
         return true
     }
@@ -319,14 +360,18 @@ final class KTextStorage: KTextStorageProtocol {
         return lower..<upper
     }
     
+    /*
     // 論理行の行数を返す。最後が改行の場合は改行後にも1行あるとみなす。
     func countLines() -> Int {
+        let timer = KTimeChecker(name: "countLines()")
+        timer.start()
         var count = 0
         for c in _characters {
             if c == "\n" { count += 1 }
         }
+        timer.stop()
         return count + 1
-    }
+    }*/
 
     
     // attributeの変更についてはテキストの変更時に自動ではなくattributeの変更の際に手動で送信する。

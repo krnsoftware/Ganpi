@@ -85,13 +85,18 @@ final class KLayoutManager: KLayoutManagerReadable {
     // hardwrapの場合にlayoutRects.textRegion.rect.widthを設定するために使用する。
     // softwrapであっても値は返すが、内容は不定。
     var maxLineWidth: CGFloat {
-        return _maxLineWidth
+        //return _maxLineWidth
+        guard let textView = _textView else { log("_textView = nil", from:self); return 0 }
+        let visibleRectWidth = textView.visibleRect.width
+        
+        return wordWrap ? visibleRectWidth : _lines.maxLineWidth
     }
     /*
     var lines: ArraySlice<KLineInfo> {
         return ArraySlice(_lines)
     }*/
     //var lines: [KLine] {
+    
     var lines: KLines {
         return _lines
     }
@@ -134,6 +139,8 @@ final class KLayoutManager: KLayoutManagerReadable {
     // MARK: - Layout
     
     func rebuildLayout(reason: KRebuildReason = .destructiveChange) {
+        
+        
         guard let layoutRects = makeLayoutRects() else { log("layoutRects is nil", from:self); return }
         let lineNumberRegionWidth = layoutRects.lineNumberRegion?.rect.width ?? 0
         if lineNumberRegionWidth != _prevLineNumberRegionWidth {
@@ -142,9 +149,14 @@ final class KLayoutManager: KLayoutManagerReadable {
             return
         }
         
+        
+        
         switch reason {
         case .charactersChanged(range: let range, insertedCount: let insertedCount):
-            _lines.rebuildLines()
+            let timer = KTimeChecker(name:"rebuidLayout/_lines.rebuildLines()")
+            timer.start()
+            _lines.rebuildLines(range: range, insertedCount: insertedCount)
+            timer.stop()
         case .attributesChanged:
             // 将来的に実装
             _lines.rebuildLines()
@@ -152,30 +164,16 @@ final class KLayoutManager: KLayoutManagerReadable {
             _lines.rebuildLines()
         }
         
-        
-        
-        if let wordWrap = _textView?.wordWrap,
-                let visibleRectWidth = _textView?.visibleRect.width {
-            if wordWrap {
-                _maxLineWidth = visibleRectWidth
-            } else {
-                _maxLineWidth = _lines.maxLineWidth
-            }
-        }
-        
-              
+          
     }
     
     
     // TextStorageが変更された際に呼び出される。
     func textStorageDidModify(_ modification: KStorageModified) {
-        guard let view = textView else { log("KLayoutManager - textStorageDidChange - textView is nil", from:self); return }
+        guard let view = textView else { log("textView is nil", from:self); return }
         
         switch modification {
         case let .textChanged(range, insertedCount):
-            
-            //log("range: \(range), insertedCount: \(insertedCount)",from:self)
-            
             rebuildLayout(reason: .charactersChanged(range: range, insertedCount: insertedCount))
             view.textStorageDidModify(modification)
 
@@ -199,16 +197,29 @@ final class KLayoutManager: KLayoutManagerReadable {
     // characterIndex文字目の文字が含まれるKLineとその行番号(ソフトラップの)を返す。
     // 現在の文字がテキストの最後の場合には(nil, -1)が返る。
     func line(at characterIndex: Int) -> (line: KLine?, lineIndex: Int) {
-        //for (i, line) in lines.enumerated() {
-        //log("lines.count = \(lines.count)", from:self)
+        var low = 0, high = _lines.count - 1
+        while low <= high {
+            let mid = (low + high) / 2
+            guard let range = _lines[mid]?.range else { log("_lines[mid] is nil.", from:self); return (nil, -1) }
+            if range.contains(characterIndex) || characterIndex == range.upperBound {
+                return (_lines[mid], mid)
+            } else if characterIndex < range.lowerBound {
+                high = mid - 1
+            } else {
+                low = mid + 1
+            }
+        }
+        log("no match. characterIndex: \(characterIndex)", from:self)
+        return (nil, -1)
         
+        /*
         for i in 0..<lines.count {
             guard let line = lines[i] else { log("line is nil.", from:self); continue }
             if line.range.contains(characterIndex) || characterIndex == line.range.upperBound {
                 return (line, i)
             }
         }
-        return (nil, -1)
+        return (nil, -1)*/
     }
     
     // KLinesからctLineを構築するために利用する。

@@ -16,8 +16,8 @@ class KLine {
     //private var _obsolete: Bool = false
     private var _cachedOffsets: [CGFloat]
     
-    let range: Range<Int>
-    let hardLineIndex: Int
+    var range: Range<Int>
+    var hardLineIndex: Int
     let softLineIndex: Int
     
     // キャッシュされているCTLineを返す。
@@ -48,7 +48,8 @@ class KLine {
         
         return CTLineGetTypographicBounds(line, nil, nil, nil)*/
         
-        return _cachedOffsets.reduce(0, +)
+        //return _cachedOffsets.reduce(0, +)
+        return _cachedOffsets.last ?? 0.0
     }
     
     
@@ -68,14 +69,18 @@ class KLine {
         
         //log("_cacheOffsets: \(_cachedOffsets)", from:self)
     }
-    /*
-    func attributesChanged(){
-        _obsolete = true
+    
+    func shiftRange(by delta:Int){
+        range = (range.lowerBound + delta)..<(range.upperBound + delta)
     }
     
-    func charactersChanged(){
+    func shiftHardLineIndex(by delta:Int){
+        hardLineIndex += delta
+    }
+    
+    func removeCTLine() {
         _ctLine = nil
-    }*/
+    }
     
     // この行における文字のオフセットを行の左端を0.0とした相対座標のx位置のリストで返す。
     func characterOffsets() -> [CGFloat] {
@@ -139,6 +144,7 @@ class KLine {
             return
         }
         _ctLine = line
+        //log("ctLine generated. hard: \(hardLineIndex), soft: \(softLineIndex)")
         //_cachedOffsets = nil
     }
     
@@ -171,7 +177,7 @@ final class KFakeLine : KLine {
 
 final class KLines {
     private var _lines: [KLine] = []
-    private var _maxLineWidth: CGFloat = 0
+    //private var _maxLineWidth: CGFloat = 0
     
     private var _fakeLines: [KFakeLine] = []
     private var _replaceLineNumber: Int = 0
@@ -194,7 +200,10 @@ final class KLines {
         return _lines.count + (fakeLineCount != 0 ? fakeLineCount - originalLineCount : 0)
     }
     
-    var maxLineWidth: CGFloat { _maxLineWidth }
+    //var maxLineWidth: CGFloat { _maxLineWidth }
+    var maxLineWidth: CGFloat {
+        _lines.map{ $0.width }.max() ?? 0.0
+    }
     
     init(layoutManager: KLayoutManager?, textStorageRef: KTextStorageReadable?) {
         _layoutManager = layoutManager
@@ -311,38 +320,90 @@ final class KLines {
     
 
     
-   func rebuildLines(range: Range<Int>? = nil) {
-        _lines.removeAll()
-        _maxLineWidth = 0
-        
-       log("start. time = \(Date())", from:self)
-       
-       
-        //guard let layoutManagerRef = _layoutManager else { print("\(#function) - layoutManagerRef is nil"); return }
-       guard let layoutManagerRef = _layoutManager else { log("layoutManagerRef is nil", from:self); return }
-        //guard let textStorageRef = _textStorageRef else { print("\(#function) - textStorageRef is nil"); return }
-       guard let textStorageRef = _textStorageRef else { log("textStorageRef is nil", from:self); return }
-       
-       // storageが空だった場合、空行を1つ追加する。
-       if textStorageRef.count == 0 {
-           //log("storage空のため空行を追加", from:self)
-          _lines.append(layoutManagerRef.makeEmptyLine(index: 0, hardLineIndex: 0))
-           return
-       }
+    func rebuildLines(range: Range<Int>? = nil, insertedCount: Int? = nil) {
        
         
-        //guard let layoutRects = layoutManagerRef.makeLayoutRects() else { print("\(#function) - layoutRects is nil"); return }
-       guard let layoutRects = layoutManagerRef.makeLayoutRects() else { log("layoutRects is nil", from:self); return }
+       //log("start. time = \(Date())", from:self)
+        let timer = KTimeChecker(name: "rebuildLines()")
+        
+       
+        guard let layoutManagerRef = _layoutManager else { log("layoutManagerRef is nil", from:self); return }
+        guard let textStorageRef = _textStorageRef else { log("textStorageRef is nil", from:self); return }
+       
+        // storageが空だった場合、空行を1つ追加する。
+        if textStorageRef.count == 0 {
+            _lines.removeAll()
+            _lines.append(layoutManagerRef.makeEmptyLine(index: 0, hardLineIndex: 0))
+            return
+        }
+        
+        
+         var currentIndex = 0
+         var currentLineNumber = 0
+        
+        //range, insertedCountが設定されている場合の影響範囲を導出する。
+        
+        if let range = range, let insertedCount = insertedCount {
+            log("range: \(range), insertedCount: \(insertedCount)",from:self)
+            // すでにstorageは編集されており、編集されたテキストの内容を知ることはできない。
+            // rangeは編集前のstorageからカットされた領域、insertedCountはそこに挿入された文字列の長さ。
+            // rangeのlowerとupperのそれぞれについて含まれる行を確定し、それらを結合することで影響範囲とする。
+            // 現状のstorageのrange.lowerBound..<range.lowerBound + insertedCount が挿入された文字列の領域。
+            // insertedCount - range.count が編集された部位より後のシフト量。
+            
+            // まずは簡易に、入力された範囲より前の行については温存し、それ以降の行を作り直すことにする。
+            timer.start()
+            var currentHardLineIndex = 0
+            for (i, line) in _lines.enumerated() {
+                if line.softLineIndex == 0 {
+                    currentHardLineIndex = i
+                }
+                
+                if line.range.upperBound + 1 > range.lowerBound {
+                    currentIndex = line.range.lowerBound
+                    _lines.removeSubrange(currentHardLineIndex..<_lines.count)
+                    _lines.forEach { $0.removeCTLine() }
+                    currentLineNumber = line.hardLineIndex
+                    break
+                }
+            }
+            timer.stop()
+            /*
+            timer.start()
+            var hardLineIndex = 0
+            for i in 0..<range.lowerBound {
+                if textStorageRef.characterSlice[i] == "\n" {
+                    hardLineIndex += 1
+                }
+            }
+            timer.stop()
 
-       //log("after layoutRects construction.", from:self)
-       
-        var currentIndex = 0
-        var currentLineNumber = 0
+            for (i, line) in _lines.enumerated() {
+                if line.hardLineIndex == hardLineIndex {
+                    currentIndex = line.range.lowerBound
+                    _lines.removeSubrange(i..<_lines.count)
+                    _lines.forEach { $0.removeCTLine() }
+                    currentLineNumber = hardLineIndex
+                    break
+                }
+                if i == _lines.count - 1 {
+                    _lines.removeAll()
+                }
+            }*/
+            
+        } else {
+            _lines.removeAll()
+        }
+        
+        
+        
+        
+        guard let layoutRects = layoutManagerRef.makeLayoutRects() else { log("layoutRects is nil", from:self); return }
+        
         
         let characters = textStorageRef.characterSlice
-
+        
         while currentIndex < characters.count {
-            //print("KLines: \(#function)")
             var lineEndIndex = currentIndex
 
             // 改行まで進める（改行文字は含めない）
@@ -355,11 +416,6 @@ final class KLines {
             guard let lineArray = layoutManagerRef.makeLines(range: lineRange, hardLineIndex: currentLineNumber, width: layoutRects.textRegionWidth - layoutRects.textEdgeInsets.right) else { print("\(#function) - lineArray is nil"); return }
             
             _lines.append(contentsOf: lineArray)
-            
-            let width = lineArray[0].width
-            if width > _maxLineWidth {
-                _maxLineWidth = width
-            }
 
             currentIndex = lineEndIndex
             currentLineNumber += 1
@@ -370,6 +426,7 @@ final class KLines {
             }
             
         }
+       
         
         //最後の文字が改行だった場合、空行を1つ追加する。
         if textStorageRef.characterSlice.last == "\n" {

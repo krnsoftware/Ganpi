@@ -64,6 +64,6 @@ final class KCaretView: NSView {
 
     func updateFrame(x: CGFloat, y: CGFloat, height: CGFloat) {
         frame = CGRect(x: x, y: y, width: caretWidth, height: height)
-        setNeedsDisplay(bounds)
+        
     }
 }

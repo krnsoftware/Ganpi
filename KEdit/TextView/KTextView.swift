@@ -298,8 +298,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     private func updateCaretPosition() {
         let caretPosition = characterPosition(at: caretIndex)
-        _caretView.updateFrame(x: caretPosition.x, y: caretPosition.y, height: _layoutManager.lineHeight)
         
+        _caretView.updateFrame(x: caretPosition.x, y: caretPosition.y, height: _layoutManager.lineHeight)
         _caretView.alphaValue = 1.0
         restartCaretBlinkTimer()
         
@@ -371,6 +371,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             // 選択範囲の描画
             let lineRange = line.range
             let selection = selectionRange.clamped(to: lineRange)
+            if selection.isEmpty { continue }
             
             let startOffset = line.characterOffset(at: selection.lowerBound - lineRange.lowerBound)
             var endOffset = line.characterOffset(at: selection.upperBound - lineRange.lowerBound)
@@ -412,6 +413,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             }
         }
         lines.removeFakeLines()
+        
+        
         
         // 行番号部分を描画。
         if _showLineNumbers, let lnRect = layoutRects.lineNumberRegion?.rect {
@@ -1200,7 +1203,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     }
     
     func insertText(_ string: Any, replacementRange: NSRange) {
-        
+                
         let rawString: String
         if let str = string as? String {
             rawString = str
@@ -1214,12 +1217,13 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         let string = rawString.normalizedString
         _textStorageRef.replaceCharacters(in: range, with: Array(string))
-        
         // 渡されたstringをCharacter.isControlでフィルターして制御文字を除去しておく。
         //_textStorageRef.replaceCharacters(in: range, with: text.filter { !$0.isControl })
        
         _markedTextRange = nil
         _markedText = NSAttributedString()
+        
+        
         
     }
     
@@ -1260,6 +1264,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         _caretView.isHidden = true
         
         needsDisplay = true
+        
         
     }
     
@@ -1420,8 +1425,13 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
         
         let textRegionRect = layoutRects.textRegion.rect
-        setFrameSize(CGSize(width: textRegionRect.width, height: textRegionRect.height))
-
+        
+        let frameSize = frame.size
+        let newFrameSize = CGSize(width: textRegionRect.width, height: textRegionRect.height)
+        //setFrameSize(CGSize(width: textRegionRect.width, height: textRegionRect.height))
+        if frameSize != newFrameSize {
+            setFrameSize(newFrameSize)
+        }
         enclosingScrollView?.contentView.needsLayout = true
         enclosingScrollView?.reflectScrolledClipView(enclosingScrollView!.contentView)
         enclosingScrollView?.tile()
@@ -1444,6 +1454,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     // characterIndex文字目の文字の位置。textRegion左上原点。
     private func characterPosition(at characterIndex:Int) -> CGPoint {
+        let timer = KTimeChecker(name:"characterPosition")
+        timer.start()
         let lineInfo = _layoutManager.line(at: characterIndex)
         guard let line = lineInfo.line else {
             log("failed to make line", from:self); return .zero }
@@ -1452,7 +1464,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         let linePoint = linePosition(at: characterIndex)
         
         let indexInLine = characterIndex - line.range.lowerBound
-        
+        timer.stop()
         return CGPoint(x: linePoint.x + line.characterOffset(at: indexInLine), y: linePoint.y)
 
     }
