@@ -226,11 +226,14 @@ final class KLines {
     // 外部から特定の行について別のAttributedStringを挿入することができる。
     // hardLineIndex行のinsertionオフセットの部分にattrStringを挿入する形になる。
     func addFakeLine(replacementRange: Range<Int>, attrString: NSAttributedString) {
+        let timer = KTimeChecker(name:"KLines.addFakeLine")
+        timer.start()
+        
         _fakeLines = []
         guard let textStorageRef = _textStorageRef else { print("\(#function) - textStorageRef is nil"); return }
         guard let layoutManager = _layoutManager else { print("\(#function) - layoutManagerRef is nil"); return }
         
-        guard let  hardLineIndex = lineContainsCaharacter(index: replacementRange.lowerBound)?.hardLineIndex else { print("\(#function) - replacementRange.lowerBound is out of range"); return }
+        guard let  hardLineIndex = lineContainsCharacter(index: replacementRange.lowerBound)?.hardLineIndex else { print("\(#function) - replacementRange.lowerBound is out of range"); return }
         _replaceLineNumber = hardLineIndex
         
         guard let range = hardLineRange(hardLineIndex: hardLineIndex) else { print("\(#function) - hardLineIndex:\(hardLineIndex) is out of range"); return }
@@ -265,7 +268,7 @@ final class KLines {
                 _fakeLines.append(fakeLine)
             }
         }
-        
+        timer.stop()
         
     }
     
@@ -459,6 +462,45 @@ final class KLines {
     }
     
     // index文字目の文字を含む行を返す。ソフト・ハードを問わない。
+    func lineContainsCharacter(index: Int) -> KLine? {
+        guard let textStorageRef = _textStorageRef else {
+            log("\(#function): textStorageRef is nil",from:self)
+            return nil
+        }
+
+        let count = textStorageRef.count
+        guard count > 0 else { return _lines.first }
+        guard index >= 0 && index <= count else {
+            log("index out of range (\(index))", from: self)
+            return nil
+        }
+
+        var low = 0
+        var high = _lines.count - 1
+
+        while low <= high {
+            let mid = (low + high) / 2
+            guard mid < _lines.count else {
+                log("mid out of range", from: self)
+                return nil
+            }
+
+            let line = _lines[mid]
+            let range = line.range.lowerBound ..< (line.range.upperBound + 1)  // include newline
+
+            if range.contains(index) {
+                return line
+            } else if index < range.lowerBound {
+                high = mid - 1
+            } else {
+                low = mid + 1
+            }
+        }
+
+        log("no match for index \(index)", from: self)
+        return nil
+    }
+    /*
     func lineContainsCaharacter(index: Int) -> KLine? {
         
         guard let textStorageRef = _textStorageRef else { print("\(#function): textstorageref==nil"); return nil }
@@ -481,7 +523,7 @@ final class KLines {
         }
         log("out of range.", from: self)
         return nil
-    }
+    }*/
     
     // hardLineIndex番目の行が_linesのどのindexか返す。
     func lineArrayIndex(for hardLineIndex: Int) -> Int? {
