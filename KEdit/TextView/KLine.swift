@@ -407,7 +407,6 @@ final class KLines {
        
         
        //log("start. time = \(Date())", from:self)
-        let timer = KTimeChecker(name: "rebuildLines()")
         
        
         guard let layoutManagerRef = _layoutManager else { log("layoutManagerRef is nil", from:self); return }
@@ -435,7 +434,6 @@ final class KLines {
             // insertedCount - range.count が編集された部位より後のシフト量。
             
             // まずは簡易に、入力された範囲より前の行については温存し、それ以降の行を作り直すことにする。
-            timer.start(message: "編集部分より前の部分を温存")
             var currentHardLineIndex = 0
             for (i, line) in _lines.enumerated() {
                 if line.softLineIndex == 0 {
@@ -450,7 +448,6 @@ final class KLines {
                     break
                 }
             }
-            timer.stop()
             /*
             timer.start()
             var hardLineIndex = 0
@@ -480,7 +477,6 @@ final class KLines {
         
         
         
-        timer.start(message: "rayout loop")
         guard let layoutRects = layoutManagerRef.makeLayoutRects() else { log("layoutRects is nil", from:self); return }
         
         
@@ -509,7 +505,6 @@ final class KLines {
             }
             
         }
-        timer.stop()
         
         //最後の文字が改行だった場合、空行を1つ追加する。
         if textStorageRef.characterSlice.last == "\n" {
@@ -519,7 +514,6 @@ final class KLines {
         // for testing
         log("is valid: \(isValid)",from:self)
         
-        timer.start(message: "cache index of lines.")
         
         // _linesに格納されているKLineのうち、softLineIndexが0の行のhardLineIndexと、その行の_lines上のindexをMapしておく。
         _hardLineIndexMap.removeAll()
@@ -530,7 +524,6 @@ final class KLines {
                 _hardLineIndexMap[currentHardLineIndex] = i
             }
         }
-        timer.stop()
         //log("_hardLineIndexMap: \(_hardLineIndexMap)",from:self)
                 
     }

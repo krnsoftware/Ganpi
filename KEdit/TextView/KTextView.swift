@@ -367,11 +367,15 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         for i in 0..<lines.count {
             guard let line = lines[i] else { log("line[i] is nil.", from:self); continue }
             let y = CGFloat(i) * lineHeight + layoutRects.textEdgeInsets.top
-            
+                        
             // 選択範囲の描画
             let lineRange = line.range
             let selection = selectionRange.clamped(to: lineRange)
-            if selection.isEmpty { continue }
+            if selection.isEmpty && !lineRange.isEmpty{ continue } // lineRange.isEmpty==trueなら空行のため処理対象
+            //log("selection.isEmpty is false.", from:self)
+            
+            if line.range.isEmpty { log("empty!", from:self)}
+
             
             let startOffset = line.characterOffset(at: selection.lowerBound - lineRange.lowerBound)
             var endOffset = line.characterOffset(at: selection.upperBound - lineRange.lowerBound)
@@ -382,6 +386,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             } else {
                 endOffset -= startOffset
             }
+            
+            
 
             let selectionRect = CGRect(
                 x: textRect.origin.x + startOffset + layoutRects.horizontalInsets,
@@ -396,12 +402,10 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
         
         // テキストを描画
-        let timer = KTimeChecker(name:"KTextView.draw()")
-        timer.start(message:"hasMarkedText()")
+        
         if hasMarkedText(), let repRange = _replacementRange{
             lines.addFakeLine(replacementRange: repRange, attrString: _markedText)
         }
-        timer.stopAndGo(message:"drawCTLine()loop")
         for i in 0..<lines.count {
             let y = CGFloat(i) * lineHeight + layoutRects.textEdgeInsets.top
             
@@ -415,7 +419,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 drawCTLine(ctLine: ctLine, x: textPoint.x, y: y)
             }
         }
-        timer.stop()
         lines.removeFakeLines()
         
         
@@ -1459,8 +1462,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     // characterIndex文字目の文字の位置。textRegion左上原点。
     private func characterPosition(at characterIndex:Int) -> CGPoint {
-        let timer = KTimeChecker(name:"characterPosition")
-        timer.start()
         let lineInfo = _layoutManager.line(at: characterIndex)
         guard let line = lineInfo.line else {
             log("failed to make line", from:self); return .zero }
@@ -1469,7 +1470,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         let linePoint = linePosition(at: characterIndex)
         
         let indexInLine = characterIndex - line.range.lowerBound
-        timer.stop()
         return CGPoint(x: linePoint.x + line.characterOffset(at: indexInLine), y: linePoint.y)
 
     }
