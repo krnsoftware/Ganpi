@@ -179,8 +179,13 @@ final class KLines {
     private var _lines: [KLine] = []
     //private var _maxLineWidth: CGFloat = 0
     
+    // cache.
+    private var _hardLineIndexMap: [Int:Int] = [:]
+    private var _replaceLineIndex: Int? // index of first line of replaced lines (soft-lines)
+    private var _replaceLineCount: Int? // count of replaced lines (soft-lines)
+    
     private var _fakeLines: [KFakeLine] = []
-    private var _replaceLineNumber: Int = 0
+    private var _replaceLineNumber: Int = 0 // hard-line number.
     
     private weak var _layoutManager: KLayoutManager?
     private weak var _textStorageRef: KTextStorageReadable?
@@ -283,21 +288,26 @@ final class KLines {
     // hardLineIndex行のinsertionオフセットの部分にattrStringを挿入する形になる。
     func addFakeLine(replacementRange: Range<Int>, attrString: NSAttributedString) {
         let timer = KTimeChecker(name:"KLines.addFakeLine")
-        timer.start()
+        
         
         _fakeLines = []
         guard let textStorageRef = _textStorageRef else { print("\(#function) - textStorageRef is nil"); return }
         guard let layoutManager = _layoutManager else { print("\(#function) - layoutManagerRef is nil"); return }
         
+        timer.start(message:"lineContainsCharacter")
         guard let  hardLineIndex = lineContainsCharacter(index: replacementRange.lowerBound)?.hardLineIndex else { print("\(#function) - replacementRange.lowerBound is out of range"); return }
         _replaceLineNumber = hardLineIndex
         
+        timer.stopAndGo(message:"hardLineRange")
         guard let range = hardLineRange(hardLineIndex: hardLineIndex) else { print("\(#function) - hardLineIndex:\(hardLineIndex) is out of range"); return }
         
+        timer.stopAndGo(message:"makeLayoutRects")
         guard let layoutRects = _layoutManager?.makeLayoutRects() else {
             print("\(#function): layoutRects is nil")
             return
         }
+        
+        timer.stopAndGo(message:"make Attributes")
         
         if let lineA = textStorageRef.attributedString(for: range.lowerBound..<replacementRange.lowerBound, tabWidth: nil),
            let lineB = textStorageRef.attributedString(for: replacementRange.upperBound..<range.upperBound, tabWidth: nil){
@@ -314,10 +324,11 @@ final class KLines {
             
             let width: CGFloat? = layoutManager.wordWrap ? layoutRects.textRegionWidth - layoutRects.textEdgeInsets.right : nil
             
+            timer.stopAndGo(message:"3")
             //let ctLines = layoutManager.makeFakeCTLines(from: fullLine, width: layoutRects.textRegionWidth - layoutRects.textEdgeInsets.right)
             let ctLines = layoutManager.makeFakeCTLines(from: fullLine, width: width)
             
-            
+            timer.stopAndGo(message:"4")
             for (i, fakeCTLine) in ctLines.enumerated() {
                 let fakeLine = KFakeLine(ctLine: fakeCTLine, hardLineIndex: hardLineIndex, softLineIndex: i, layoutManager: layoutManager, textStorageRef: textStorageRef)
                 
@@ -326,10 +337,16 @@ final class KLines {
         }
         timer.stop()
         
+        
+        _replaceLineCount = lines(hardLineIndex: _replaceLineNumber).count
+        _replaceLineIndex = lineArrayIndex(for: _replaceLineNumber)
     }
     
     func removeFakeLines() {
         _fakeLines.removeAll()
+        _replaceLineIndex = nil
+        _replaceLineCount = nil
+        
     }
     
     func removeAllLines() {
@@ -340,10 +357,13 @@ final class KLines {
     subscript(i: Int) -> KLine? {
         if !hasFakeLine { return _lines[i] }
         
+        /*
         guard let lineArrayIndex = lineArrayIndex(for: _replaceLineNumber) else {
             log("lineArrayIndex == nil, _replaceLineNumber = \(_replaceLineNumber)", from: self)
             return nil
-        }
+        }*/
+        guard let lineArrayIndex = _replaceLineIndex else { log("_fakeLineIndex = nil.", from:self); return nil}
+        guard let replaceLineCount = _replaceLineCount else { log("_fakeLineCount = nil.", from:self); return nil}
         
         
         guard i >= 0 && i < count else { log("i is out of range.", from: self); return nil }
@@ -359,7 +379,8 @@ final class KLines {
         }
         
         // 入力中の行より後の場合は、入力中の行の次の行を連続して取得できるようずらす。
-        let convertedCount = i - _fakeLines.count + lines(hardLineIndex: _replaceLineNumber).count
+        //let convertedCount = i - _fakeLines.count + lines(hardLineIndex: _replaceLineNumber).count
+        let convertedCount = i - _fakeLines.count + replaceLineCount
         //log("slided.", from:self)
         
         return _lines[convertedCount]
@@ -414,7 +435,7 @@ final class KLines {
             // insertedCount - range.count が編集された部位より後のシフト量。
             
             // まずは簡易に、入力された範囲より前の行については温存し、それ以降の行を作り直すことにする。
-            timer.start()
+            timer.start(message: "編集部分より前の部分を温存")
             var currentHardLineIndex = 0
             for (i, line) in _lines.enumerated() {
                 if line.softLineIndex == 0 {
@@ -459,7 +480,7 @@ final class KLines {
         
         
         
-        
+        timer.start(message: "rayout loop")
         guard let layoutRects = layoutManagerRef.makeLayoutRects() else { log("layoutRects is nil", from:self); return }
         
         
@@ -488,7 +509,7 @@ final class KLines {
             }
             
         }
-       
+        timer.stop()
         
         //最後の文字が改行だった場合、空行を1つ追加する。
         if textStorageRef.characterSlice.last == "\n" {
@@ -497,6 +518,20 @@ final class KLines {
         
         // for testing
         log("is valid: \(isValid)",from:self)
+        
+        timer.start(message: "cache index of lines.")
+        
+        // _linesに格納されているKLineのうち、softLineIndexが0の行のhardLineIndexと、その行の_lines上のindexをMapしておく。
+        _hardLineIndexMap.removeAll()
+        var currentHardLineIndex: Int = -1
+        for (i, line) in _lines.enumerated() {
+            if line.hardLineIndex == currentHardLineIndex + 1 {
+                currentHardLineIndex += 1
+                _hardLineIndexMap[currentHardLineIndex] = i
+            }
+        }
+        timer.stop()
+        //log("_hardLineIndexMap: \(_hardLineIndexMap)",from:self)
                 
     }
     
@@ -504,6 +539,22 @@ final class KLines {
     
     // ハード行の行番号hardLineIndexの行を取り出す。ソフトラップの場合は複数行になることがある。
     func lines(hardLineIndex: Int) -> [KLine] {
+        guard let startIndex = _hardLineIndexMap[hardLineIndex] else {
+            log("_hardLineIndexMap[\(hardLineIndex)] not found",from:self)
+            return []
+        }
+        var lines:[KLine] = []
+        for i in startIndex..<_lines.count {
+            let line = _lines[i]
+            if line.hardLineIndex == hardLineIndex {
+                lines.append(line)
+            } else {
+                break
+            }
+        }
+        return lines
+        //let timer = KTimeChecker(name:"KLines.lines()")
+        /*
         var lines: [KLine] = []
         for line in _lines {
             if line.hardLineIndex == hardLineIndex {
@@ -512,7 +563,9 @@ final class KLines {
                 break
             }
         }
-        return lines
+        //timer.stop()
+
+        return lines*/
     }
     
     // ハード行の番号iの行のRangeを得る。行末の改行は含まない。
@@ -588,6 +641,7 @@ final class KLines {
     }*/
     
     // hardLineIndex番目の行が_linesのどのindexか返す。
+    /*
     func lineArrayIndex(for hardLineIndex: Int) -> Int? {
         for (i, line) in _lines.enumerated() {
             if line.hardLineIndex == hardLineIndex {
@@ -595,6 +649,9 @@ final class KLines {
             }
         }
         return nil
+    }*/
+    func lineArrayIndex(for hardLineIndex: Int) -> Int? {
+        _hardLineIndexMap[hardLineIndex]
     }
     
     

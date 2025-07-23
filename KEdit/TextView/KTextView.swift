@@ -396,9 +396,12 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
         
         // テキストを描画
+        let timer = KTimeChecker(name:"KTextView.draw()")
+        timer.start(message:"hasMarkedText()")
         if hasMarkedText(), let repRange = _replacementRange{
             lines.addFakeLine(replacementRange: repRange, attrString: _markedText)
         }
+        timer.stopAndGo(message:"drawCTLine()loop")
         for i in 0..<lines.count {
             let y = CGFloat(i) * lineHeight + layoutRects.textEdgeInsets.top
             
@@ -412,6 +415,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 drawCTLine(ctLine: ctLine, x: textPoint.x, y: y)
             }
         }
+        timer.stop()
         lines.removeFakeLines()
         
         
@@ -1309,6 +1313,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         return NSRect(x: point.x, y: point.y, width: 1, height: _layoutManager.lineHeight)*/
         
         if let replacementRange = _replacementRange {
+            
             _layoutManager.lines.addFakeLine(replacementRange: replacementRange, attrString: _markedText)
             
             defer {

@@ -17,31 +17,40 @@ final class KTimeChecker {
         let start = DispatchTime.now()
         let result = block()
         let end = DispatchTime.now()
-        let elapsed = Double(end.uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000.0
+        //let elapsed = Double(end.uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000.0
+        let elapsed = elapsedTime(from: start, to: end)
         print(String(format: "[%@] elapsed: %.3f ms", name, elapsed))
         return result
     }
     
     // MARK: - Instance-based Timer
 
-    private let name: String
-    private var startTime: DispatchTime?
+    private let _name: String
+    private var _startTime: DispatchTime
+    private var _message: String = ""
 
-    init(name: String) {
-        self.name = name
+    init(name: String = "") {
+        _name = name
+        _startTime = DispatchTime.now()
     }
 
-    func start() {
-        startTime = DispatchTime.now()
+    func start(message: String = "") {
+        _message = message
+        _startTime = DispatchTime.now()
     }
 
     func stop() {
-        guard let start = startTime else {
-            print("[\(name)] Error: start() must be called before stop()")
-            return
-        }
         let end = DispatchTime.now()
-        let elapsed = Double(end.uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000.0
-        print(String(format: "[%@] elapsed: %.3f ms", name, elapsed))
+        let elapsed = Self.elapsedTime(from: _startTime, to: end)
+        print(String(format: "[%@:%@] elapsed: %.3f ms", _name, _message, elapsed))
+    }
+    
+    func stopAndGo(message: String = "") {
+        stop()
+        start(message: message)
+    }
+    
+    private static func elapsedTime(from: DispatchTime, to: DispatchTime) -> Double {
+        return Double(to.uptimeNanoseconds - from.uptimeNanoseconds) / 1_000_000.0
     }
 }
