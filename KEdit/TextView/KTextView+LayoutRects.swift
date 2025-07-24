@@ -65,19 +65,13 @@ struct LayoutRects {
         
         let digitCount = max(_minimumLineNumberCharacterWidth, Int(log10(Double(textStorageRef.hardLineCount))))
         
-        /*
-        let attrStr = NSAttributedString(string: "M", attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: textStorageRef.baseFont.pointSize * 0.95, weight: .regular)])
-        let ctLine = CTLineCreateWithAttributedString(attrStr)
-        let charWidth = CGFloat(CTLineGetTypographicBounds(ctLine, nil, nil, nil))*/
         var charWidth: CGFloat = 20
         if let textStorage = _textStorageRef as? KTextStorage  {
             charWidth = textStorage.lineNumberDigitWidth
+            log("charWidth: \(charWidth)")
         }
         let lineNumberWidth = CGFloat(digitCount) * charWidth + 5.0
-        //let charWidth = textStorage.lineNumberDigitWidth
-        //let lineNumberWidth = CGFloat(digitCount) * charWidth + 5.0
         
-        // ここより後は負荷が小さい
         let lineNumberRect: CGRect? = showLineNumbers ?
         CGRect(x: visibleRect.origin.x, y: visibleRect.origin.y, width: lineNumberWidth, height: visibleRect.height) :
             nil
@@ -85,12 +79,9 @@ struct LayoutRects {
         self.lineNumberRegion = lineNumberRect.map { Region(rect: $0) }
 
         let textWidth = wordWrap ? visibleRect.width : max(CGFloat(layoutManagerRef.maxLineWidth) + textEdgeInsets.left + lineNumberWidth + textEdgeInsets.right, visibleRect.width)
-        //log("layoutManagerRef.maxLineWidth: \(layoutManagerRef.maxLineWidth)")
-        //let textWidth = wordWrap ? visibleRect.width - textEdgeInsets.right - textEdgeInsets.left : max(CGFloat(layoutManagerRef.maxLineWidth) + textEdgeInsets.left + lineNumberWidth + textEdgeInsets.right, visibleRect.width)
         let textHeight = max(CGFloat(layoutManagerRef.lineCount) * layoutManagerRef.lineHeight + textEdgeInsets.top + textEdgeInsets.bottom + visibleRect.height * 0.67,visibleRect.height)
         
         let textRect = CGRect(x: 0, y: 0, width: textWidth, height: textHeight)
-        //let textRect = CGRect(x: textEdgeInsets.left, y: textEdgeInsets.top, width: textWidth, height: textHeight)
 
         self.textRegion = Region(rect: textRect)
         
@@ -112,7 +103,7 @@ struct LayoutRects {
 
         // LineNumberRegionの場合
         if let lnRect = lineNumberRegion?.rect, lnRect.contains(point) {
-            let lineIndex = min(Int(point.y / lineHeight), lineCount - 1)
+            let lineIndex = min(Int((point.y - textEdgeInsets.top ) / lineHeight), lineCount - 1)
             print("regionType - in lineNumberRegion: \(lineIndex)")
             return .lineNumber(line: lineIndex)
         }
