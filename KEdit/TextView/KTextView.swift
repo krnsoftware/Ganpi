@@ -373,8 +373,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             let selection = selectionRange.clamped(to: lineRange)
             if selection.isEmpty && !lineRange.isEmpty{ continue } // lineRange.isEmpty==trueなら空行のため処理対象
             //log("selection.isEmpty is false.", from:self)
-            
-            if line.range.isEmpty { log("empty!", from:self)}
+            //if line.range.isEmpty { log("empty!", from:self)}
 
             
             let startOffset = line.characterOffset(at: selection.lowerBound - lineRange.lowerBound)
@@ -458,13 +457,15 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 if !verticalRange.contains(numberPoint.y) { continue }
                 
                 let lineRange = _textStorageRef.lineRange(at: line.range.lowerBound) ?? line.range
-                let caretIsInLine = lineRange.contains(caretIndex) || caretIndex == lineRange.upperBound
+                let caretIsInLine = (lineRange.contains(caretIndex) && selectionRange.isEmpty) || caretIndex == lineRange.upperBound
                 let selectionOverlapsLine =
                     selectionRange.overlaps(lineRange) ||
                     (!selectionRange.isEmpty &&
                      selectionRange.lowerBound <= lineRange.lowerBound &&
                      selectionRange.upperBound >= lineRange.upperBound)
-                
+                //log("\(i) - caretIsInLine: \(caretIsInLine), selectionOverlapsLine: \(selectionOverlapsLine)",from:self)
+                //log("lineRange.contains(caretIndex):\(lineRange.contains(caretIndex)), caretIndex == lineRange.upperBound:\(caretIndex == lineRange.upperBound)",from:self)
+                //log("lineRange: \(lineRange), selectionRange: \(selectionRange), caretIndex: \(caretIndex)",from:self)
                 if caretIsInLine || selectionOverlapsLine {
                     number.draw(at: numberPoint, withAttributes: attrs_emphasized)
                 } else {

@@ -209,6 +209,7 @@ final class KTextStorage: KTextStorageProtocol {
             return false
         }
         
+        // undo. registering.
         if _undoActions.element(at: 0)! == .none {
             let undoUnit = KUndoUnit(range: range, oldCharacters: Array(_characters[range]), newCharacters: newCharacters)
             if _undoActions.element(at: 1)! != .none {
@@ -235,13 +236,15 @@ final class KTextStorage: KTextStorageProtocol {
             _hardLineCount = nil
         }
 
-        // replacement
+        // replacement.
         _characters.replaceSubrange(range, with: newCharacters)
         
-        let timerO = KTimeChecker(name:"observer")
-        timerO.start()
+        // notification.
+        let timer = KTimeChecker(name:"observer")
         notifyObservers(.textChanged(range: range, insertedCount: newCharacters.count))
-        timerO.stop()
+        timer.stop()
+        
+        // undo. recovery.
         _undoActions.append(.none)
         
         

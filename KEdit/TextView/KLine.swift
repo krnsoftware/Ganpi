@@ -13,29 +13,15 @@ class KLine {
     private weak var _layoutManager: KLayoutManager?
     private weak var _textStorageRef: KTextStorageReadable?
     private var _ctLine: CTLine?
-    //private var _obsolete: Bool = false
     private var _cachedOffsets: [CGFloat]
     
     var range: Range<Int>
     var hardLineIndex: Int
     let softLineIndex: Int
     
-    // キャッシュされているCTLineを返す。
-    // attributeが変更された場合、表示は無効だがサイズなどは有効のため古いキャッシュをそのまま利用する。
-    /*
-    private var _cachedCTLine: CTLine? {
-        if _ctLine == nil {
-            _obsolete = false
-            makeCTLine()
-        }
-        return _ctLine
-    }*/
-    
     // 有効なCTLineを返す。
     var ctLine: CTLine? {
-        //if _ctLine == nil || _obsolete {
         if _ctLine == nil {
-            //_obsolete = false
             makeCTLine()
         }
         return _ctLine
@@ -43,12 +29,6 @@ class KLine {
     
     // 行の幅をCGFloatで返す。
     var width: CGFloat {
-        /*
-        guard let line = _cachedCTLine else { print("\(#function): _cachedCTLine is nil"); return 0.0 }
-        
-        return CTLineGetTypographicBounds(line, nil, nil, nil)*/
-        
-        //return _cachedOffsets.reduce(0, +)
         return _cachedOffsets.last ?? 0.0
     }
     
@@ -60,14 +40,13 @@ class KLine {
         self._layoutManager = layoutManager
         self._textStorageRef = textStorageRef
         
+        // 文字のオフセットをadcanveから算出してcache。
         var result:[CGFloat] = []
         _ = textStorageRef.advances(in: range).reduce(into: 0) { sum, value in
             sum += value
             result.append(sum)
         }
         _cachedOffsets = result
-        
-        //log("_cacheOffsets: \(_cachedOffsets)", from:self)
     }
     
     func shiftRange(by delta:Int){
@@ -84,58 +63,18 @@ class KLine {
     
     // この行における文字のオフセットを行の左端を0.0とした相対座標のx位置のリストで返す。
     func characterOffsets() -> [CGFloat] {
-        /*
-        if let cached = _cachedOffsets { return cached }
-        
-        guard let line = _cachedCTLine else { print("\(#function): _cachedCTLine is nil"); return [] }
-        
-        let stringRange = CTLineGetStringRange(line)
-        let start = stringRange.location
-        let length = stringRange.length
-        var offsets: [CGFloat] = []
-        
-        for i in start..<(start + length) {
-            let offset = CTLineGetOffsetForStringIndex(line, i, nil)
-            offsets.append(offset)
-        }
-        
-        _cachedOffsets = offsets
-        return offsets*/
         return _cachedOffsets
     }
     
     // この行におけるindex文字目の相対位置を返す。
     func characterOffset(at index:Int) -> CGFloat {
-        /*
-        guard let line = _cachedCTLine else { print("\(#function): _cachedCTLine is nil"); return 0.0 }
-        
-        return CTLineGetOffsetForStringIndex(line, index, nil)*/
-        
         guard index >= 0 && index <= _cachedOffsets.count else { log("index is out of range.", from:self); return 0.0 }
         
         if index == 0 {
             return 0
         }
-        
         return _cachedOffsets[index - 1]
     }
-    
-    // この行における相対座標のx位置を返す。
-    /*
-    func characterIndex(at x: CGFloat, in characters: [Character]) -> Int {
-        guard x >= 0 else { log("x < 0", from:self); return 0 }
-        guard _cachedOffsets.count == characters.count else { log("offset count != character count", from:self); return 0 }
-
-        var currentOffset: CGFloat = 0
-        for (i, offset) in _cachedOffsets.enumerated() {
-            if x < currentOffset + offset / 2 {
-                return i
-            }
-            currentOffset += offset
-        }
-        return _cachedOffsets.count
-    }*/
-    
     
     // この行のCTLineを作成する。作成はlayoutManagerに依頼する。
     private func makeCTLine(){
@@ -144,8 +83,6 @@ class KLine {
             return
         }
         _ctLine = line
-        //log("ctLine generated. hard: \(hardLineIndex), soft: \(softLineIndex)")
-        //_cachedOffsets = nil
     }
     
     
@@ -202,21 +139,12 @@ final class KLines {
 
         return _lines.count + _fakeLines.count - originalLineCount
     }
-    /*
-    var count: Int {
-        let fakeLineCount = _fakeLines.count
-        let originalLineCount = _fakeLines.isEmpty ? 0 : lines(hardLineIndex: _replaceLineNumber).count
-        
-        //print("KLines: \(#function) originalLineCount:\(originalLineCount) _lines.count:\(_lines.count) fakeLineCount:\(fakeLineCount)")
-        
-        return _lines.count + (fakeLineCount != 0 ? fakeLineCount - originalLineCount : 0)
-    }*/
     
-    //var maxLineWidth: CGFloat { _maxLineWidth }
     var maxLineWidth: CGFloat {
         _lines.map{ $0.width }.max() ?? 0.0
     }
     
+    // _linesのデータが正しいかチェックする。
     var isValid: Bool {
         guard !_lines.isEmpty else {
             log("_lines.isEmpty", from: self)
@@ -271,15 +199,15 @@ final class KLines {
         _textStorageRef = textStorageRef
         
         rebuildLines()
-        //log("initは何度よばれるのか", from:self)
         
+        /*
         if _lines.count == 0 {
             if let layoutManagerRef = _layoutManager {
                 
                 _lines.append(layoutManagerRef.makeEmptyLine(index: 0, hardLineIndex: 0))
             }
             
-        }
+        }*/
     }
     
     
@@ -313,19 +241,15 @@ final class KLines {
            let lineB = textStorageRef.attributedString(for: replacementRange.upperBound..<range.upperBound, tabWidth: nil){
             let muAttrString =  NSMutableAttributedString(attributedString: attrString)
             muAttrString.addAttribute(.font, value: textStorageRef.baseFont, range: NSRange(location: 0, length: muAttrString.length))
-            //let sampleMutableString = NSMutableAttributedString(string: muAttrString.string, attributes: [.font: textStorageRef.baseFont])
             
             let fullLine = NSMutableAttributedString()
             fullLine.append(lineA)
             fullLine.append(muAttrString)
-            //fullLine.append(sampleMutableString)
             fullLine.append(lineB)
-            //log("fullLine = \(fullLine)", from:self)
             
             let width: CGFloat? = layoutManager.wordWrap ? layoutRects.textRegionWidth - layoutRects.textEdgeInsets.right : nil
             
             timer.stopAndGo(message:"3")
-            //let ctLines = layoutManager.makeFakeCTLines(from: fullLine, width: layoutRects.textRegionWidth - layoutRects.textEdgeInsets.right)
             let ctLines = layoutManager.makeFakeCTLines(from: fullLine, width: width)
             
             timer.stopAndGo(message:"4")
@@ -448,28 +372,6 @@ final class KLines {
                     break
                 }
             }
-            /*
-            timer.start()
-            var hardLineIndex = 0
-            for i in 0..<range.lowerBound {
-                if textStorageRef.characterSlice[i] == "\n" {
-                    hardLineIndex += 1
-                }
-            }
-            timer.stop()
-
-            for (i, line) in _lines.enumerated() {
-                if line.hardLineIndex == hardLineIndex {
-                    currentIndex = line.range.lowerBound
-                    _lines.removeSubrange(i..<_lines.count)
-                    _lines.forEach { $0.removeCTLine() }
-                    currentLineNumber = hardLineIndex
-                    break
-                }
-                if i == _lines.count - 1 {
-                    _lines.removeAll()
-                }
-            }*/
             
         } else {
             _lines.removeAll()
@@ -481,12 +383,14 @@ final class KLines {
         
         
         let characters = textStorageRef.characterSlice
+        let newLine = "\n" as Character
         
         while currentIndex < characters.count {
             var lineEndIndex = currentIndex
 
             // 改行まで進める（改行文字は含めない）
-            while lineEndIndex < characters.count && characters[lineEndIndex] != "\n" {
+            //while lineEndIndex < characters.count && characters[lineEndIndex] != "\n" {
+            while lineEndIndex < characters.count && characters[lineEndIndex] != newLine {
                 lineEndIndex += 1
             }
 
@@ -500,7 +404,8 @@ final class KLines {
             currentLineNumber += 1
             
             
-            if currentIndex < characters.count && characters[currentIndex] == "\n" {
+            //if currentIndex < characters.count && characters[currentIndex] == "\n" {
+            if currentIndex < characters.count && characters[currentIndex] == newLine {
                 currentIndex += 1 // 改行をスキップ
             }
             
