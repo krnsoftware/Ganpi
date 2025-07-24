@@ -9,12 +9,20 @@ import Cocoa
 
 // MARK: - General enum and struct
 
-// Observingに使用するenum
+// Observingに使用するenumとstruct
+struct KStorageModifiedInfo {
+    let range: Range<Int>
+    let insertedCount: Int
+    let deletedNewlineCount: Int
+    let insertedNewlineCount: Int
+}
 enum KStorageModified {
-    case textChanged(range: Range<Int>, insertedCount: Int)
+    //case textChanged(range: Range<Int>, insertedCount: Int)
+    case textChanged(info: KStorageModifiedInfo)
     case colorChanged(range: Range<Int>)
 }
 
+// 方向を示すenum
 enum KDirection: Int {
     case forward = 1
     case backward = -1
@@ -241,7 +249,8 @@ final class KTextStorage: KTextStorageProtocol {
         
         // notification.
         let timer = KTimeChecker(name:"observer")
-        notifyObservers(.textChanged(range: range, insertedCount: newCharacters.count))
+        //notifyObservers(.textChanged(range: range, insertedCount: newCharacters.count))
+        notifyObservers(.textChanged(info: KStorageModifiedInfo(range:range, insertedCount: newCharacters.count, deletedNewlineCount: oldReturnCount, insertedNewlineCount: newReturnCount)))
         timer.stop()
         
         // undo. recovery.

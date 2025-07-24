@@ -8,12 +8,12 @@
 import Cocoa
 
 
-struct KLineInfo {
+/*struct KLineInfo {
     let ctLine: CTLine
     let range: Range<Int>
     let hardLineIndex: Int
     let softLineIndex: Int
-}
+}*/
 
 
 // MARK: - protocol KLayoutManagerReadable
@@ -40,7 +40,7 @@ final class KLayoutManager: KLayoutManagerReadable {
     // MARK: - Struct and Enum.
     
     enum KRebuildReason {
-            case charactersChanged(range: Range<Int>, insertedCount: Int)
+        case charactersChanged(info: KStorageModifiedInfo)
             case attributesChanged
             case destructiveChange
         }
@@ -152,10 +152,11 @@ final class KLayoutManager: KLayoutManagerReadable {
         
         
         switch reason {
-        case .charactersChanged(range: let range, insertedCount: let insertedCount):
+        case .charactersChanged(let info):
             let timer = KTimeChecker(name:"rebuidLayout/_lines.rebuildLines()")
             timer.start()
-            _lines.rebuildLines(range: range, insertedCount: insertedCount)
+            //_lines.rebuildLines(range: range, insertedCount: insertedCount)
+            _lines.rebuildLines(with: info)
             timer.stop()
         case .attributesChanged:
             // 将来的に実装
@@ -170,14 +171,15 @@ final class KLayoutManager: KLayoutManagerReadable {
     
     // TextStorageが変更された際に呼び出される。
     func textStorageDidModify(_ modification: KStorageModified) {
-        guard let view = textView else { log("textView is nil", from:self); return }
+        guard let textView = _textView else { log("textView is nil", from:self); return }
         
         switch modification {
-        case let .textChanged(range, insertedCount):
-            rebuildLayout(reason: .charactersChanged(range: range, insertedCount: insertedCount))
-            view.textStorageDidModify(modification)
+        case .textChanged(let info):
+            //rebuildLayout(reason: .charactersChanged(range: info.range, insertedCount: info.insertedCount))
+            rebuildLayout(reason: .charactersChanged(info: info))
+            textView.textStorageDidModify(modification)
 
-        case let .colorChanged(range):
+        case .colorChanged(let range):
             print("🎨 カラー変更: range = \(range)")
             
         }

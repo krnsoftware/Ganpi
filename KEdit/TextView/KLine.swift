@@ -327,10 +327,13 @@ final class KLines {
     
 
     
-    func rebuildLines(range: Range<Int>? = nil, insertedCount: Int? = nil) {
-       
+    //func rebuildLines(range: Range<Int>? = nil, insertedCount: Int? = nil) {
+    func rebuildLines(with info: KStorageModifiedInfo? = nil){
         
        //log("start. time = \(Date())", from:self)
+        /*if let info = info {
+            log("info: \(info)",from:self)
+        }*/
         
        
         guard let layoutManagerRef = _layoutManager else { log("layoutManagerRef is nil", from:self); return }
@@ -349,7 +352,10 @@ final class KLines {
         
         //range, insertedCountが設定されている場合の影響範囲を導出する。
         
-        if let range = range, let insertedCount = insertedCount {
+        //if let range = info.range, let insertedCount = info.insertedCount {
+        if let info = info {
+            let range = info.range
+            let insertedCount = info.insertedCount
             log("range: \(range), insertedCount: \(insertedCount)",from:self)
             // すでにstorageは編集されており、編集されたテキストの内容を知ることはできない。
             // rangeは編集前のstorageからカットされた領域、insertedCountはそこに挿入された文字列の長さ。
@@ -375,7 +381,7 @@ final class KLines {
             
         } else {
             _lines.removeAll()
-        }
+         }
         
         
         

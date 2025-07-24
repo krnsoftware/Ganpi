@@ -1380,19 +1380,19 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     func textStorageDidModify(_ modification: KStorageModified) {
         switch modification {
-        case let .textChanged(range, insertedCount):
+        case let .textChanged(info):
             
-            if range.lowerBound == selectionRange.lowerBound /*(削除+)追記*/ ||
-                range.upperBound == selectionRange.lowerBound /*1文字削除*/ {
+            if info.range.lowerBound == selectionRange.lowerBound /*(削除+)追記*/ ||
+                info.range.upperBound == selectionRange.lowerBound /*1文字削除*/ {
                 // このtextviewによる編集。
-                caretIndex = range.lowerBound + insertedCount
+                caretIndex = info.range.lowerBound + info.insertedCount
                 //print("自viewによる編集")
             } else {
                 // 他のtextviewやapplescriptなどによる編集。動作検証は未。
                 print("外部による編集")
-                if !(selectionRange.upperBound < range.lowerBound || selectionRange.lowerBound > range.upperBound) {
+                if !(selectionRange.upperBound < info.range.lowerBound || selectionRange.lowerBound > info.range.upperBound) {
                     print("選択範囲が外部により変更された部位に重なっている。")
-                    caretIndex = range.lowerBound + insertedCount // 暫定的に挿入部の後端に置く。
+                    caretIndex = info.range.lowerBound + info.insertedCount // 暫定的に挿入部の後端に置く。
                 }
             }
             
