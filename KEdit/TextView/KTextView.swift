@@ -455,18 +455,19 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 let numberPoint = CGPoint(x: numberPointX, y: numberPointY)
                 
                 if !verticalRange.contains(numberPoint.y) { continue }
+            
                 
                 let lineRange = _textStorageRef.lineRange(at: line.range.lowerBound) ?? line.range
-                let caretIsInLine = (lineRange.contains(caretIndex) && selectionRange.isEmpty) || caretIndex == lineRange.upperBound
-                let selectionOverlapsLine =
-                    selectionRange.overlaps(lineRange) ||
-                    (!selectionRange.isEmpty &&
-                     selectionRange.lowerBound <= lineRange.lowerBound &&
-                     selectionRange.upperBound >= lineRange.upperBound)
-                //log("\(i) - caretIsInLine: \(caretIsInLine), selectionOverlapsLine: \(selectionOverlapsLine)",from:self)
-                //log("lineRange.contains(caretIndex):\(lineRange.contains(caretIndex)), caretIndex == lineRange.upperBound:\(caretIndex == lineRange.upperBound)",from:self)
-                //log("lineRange: \(lineRange), selectionRange: \(selectionRange), caretIndex: \(caretIndex)",from:self)
-                if caretIsInLine || selectionOverlapsLine {
+                let isActive =
+                    selectionRange.overlaps(lineRange)
+                    || (selectionRange.isEmpty && (
+                        lineRange.contains(selectionRange.lowerBound)
+                        || selectionRange.lowerBound == lineRange.upperBound
+                    ))
+                    || (!selectionRange.isEmpty &&
+                        selectionRange.lowerBound <= lineRange.lowerBound &&
+                        selectionRange.upperBound >= lineRange.upperBound)
+                if  isActive {
                     number.draw(at: numberPoint, withAttributes: attrs_emphasized)
                 } else {
                     number.draw(at: numberPoint, withAttributes: attrs)
