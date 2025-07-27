@@ -199,7 +199,7 @@ final class KTextStorage: KTextStorageProtocol {
         return count
     }
     
-    //
+    // タブ幅の元になるspaceの幅を返す。
     var spaceAdvance: CGFloat {
         if let cached = _spaceAdvanceCache {
             return cached

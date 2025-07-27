@@ -120,7 +120,12 @@ final class KFakeLine : KLine {
     
     override var ctLine: CTLine? { _ctLine }
     
-    override var width: CGFloat { CTLineGetTypographicBounds(_ctLine, nil, nil, nil) }
+    //override var width: CGFloat { CTLineGetTypographicBounds(_ctLine, nil, nil, nil) }
+    override var width: CGFloat {
+        let range = CTLineGetStringRange(_ctLine)
+        let endLocation = range.location + range.length
+        return CTLineGetOffsetForStringIndex(_ctLine, endLocation, nil)
+    }
     
     init(ctLine: CTLine, hardLineIndex: Int, softLineIndex: Int, layoutManager: KLayoutManager, textStorageRef: KTextStorageReadable) {
         _ctLine = ctLine
@@ -490,7 +495,7 @@ final class KLines: CustomStringConvertible {
         let characters = textStorageRef.characterSlice
         
         var newRange = 0..<textStorageRef.count
-        var startIndex = 0
+        //var startIndex = 0
         var removeRange = 0..<_lines.count
         
         if let info = info {
@@ -747,7 +752,53 @@ final class KLines: CustomStringConvertible {
         return lines.first!.range.lowerBound..<lines.last!.range.upperBound
     }
     
+    
+    func lineIndexContainsCharacter(index: Int) -> Int? {
+        guard let textStorageRef = _textStorageRef else {
+            log("\(#function): textStorageRef is nil",from:self)
+            return nil
+        }
+
+        let count = textStorageRef.count
+        guard count > 0 else { return 0 }
+        guard index >= 0 && index <= count else {
+            log("index out of range (\(index))", from: self)
+            return nil
+        }
+
+        var low = 0
+        var high = _lines.count - 1
+
+        while low <= high {
+            let mid = (low + high) / 2
+            guard mid < _lines.count else {
+                log("mid out of range", from: self)
+                return nil
+            }
+
+            let line = _lines[mid]
+            let range = line.range.lowerBound ..< (line.range.upperBound + 1)  // include newline
+
+            if range.contains(index) {
+                return mid
+            } else if index < range.lowerBound {
+                high = mid - 1
+            } else {
+                low = mid + 1
+            }
+        }
+
+        log("no match for index \(index)", from: self)
+        return nil
+    }
+    
+    func lineContainsCharacter(index: Int) -> KLine? {
+        guard let lineIndex = lineIndexContainsCharacter(index: index) else { log("no line contains character at index \(index)"); return nil }
+        return _lines[lineIndex]
+    }
+    
     // index文字目の文字を含む行を返す。ソフト・ハードを問わない。
+    /*
     func lineContainsCharacter(index: Int) -> KLine? {
         guard let textStorageRef = _textStorageRef else {
             log("\(#function): textStorageRef is nil",from:self)
@@ -785,7 +836,7 @@ final class KLines: CustomStringConvertible {
 
         log("no match for index \(index)", from: self)
         return nil
-    }
+    }*/
     /*
     func lineContainsCaharacter(index: Int) -> KLine? {
         
@@ -845,6 +896,19 @@ final class KLines: CustomStringConvertible {
     }
     
     
-    
+    func pointForFirstRect(for characterIndex: Int) -> CGPoint? {
+        guard let layoutManager = _layoutManager else { log("layoutManager not found.", from: self); return nil }
+        guard let layoutRects = layoutManager.makeLayoutRects() else { log("layoutRects not found.", from: self); return nil }
+        
+        guard let lineIndex = lineIndexContainsCharacter(index: characterIndex) else { log("lineIndex not found.", from: self); return .zero}
+        
+        
+        let line = _lines[lineIndex]
+        let offset = line.characterOffset(at: characterIndex - line.range.lowerBound)
+        let x = layoutRects.textRegion.rect.origin.x + layoutRects.horizontalInsets + offset
+        let y = layoutRects.textEdgeInsets.top + CGFloat(lineIndex + 1) * layoutManager.lineHeight
+        
+        return CGPoint(x: x, y: y)
+    }
     
 }

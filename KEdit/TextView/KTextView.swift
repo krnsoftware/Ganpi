@@ -1316,9 +1316,9 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         point = window.convertPoint(toScreen: point)
         
         return NSRect(x: point.x, y: point.y, width: 1, height: _layoutManager.lineHeight)*/
-        
+        /*
         if let replacementRange = _replacementRange {
-            
+            log("range:\(range), replacementRange:\(replacementRange)",from:self)
             _layoutManager.lines.addFakeLine(replacementRange: replacementRange, attrString: _markedText)
             
             defer {
@@ -1361,7 +1361,22 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
         //log("CTLineが条件に合わず。",from:self)
         return .zero
+        */
+        if let replacementRange = _replacementRange {
+            log("replacementRange: \(replacementRange), range: \(range)")
+            //guard var point = _layoutManager.lines.pointForFirstRect(for: range.lowerBound) else { log("pointForFirstRect(for:) failed.",from:self); return .zero }
+            guard var point = _layoutManager.lines.pointForFirstRect(for: replacementRange.lowerBound) else { log("pointForFirstRect(for:) failed.",from:self); return .zero }
+
+            
+            if let window = self.window {
+                point = convert(point, to: nil)
+                point = window.convertPoint(toScreen: point)
+            }
+            
+            return NSRect(x: point.x, y: point.y, width: 1, height: _layoutManager.lineHeight)
+        }
         
+        return .zero
     }
     
     /*
