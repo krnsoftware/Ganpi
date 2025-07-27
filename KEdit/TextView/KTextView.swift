@@ -838,7 +838,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             
             switch event.clickCount {
             case 1: // シングルクリック - クリック位置にキャレットを移動。
-                _horizontalSelectionBase = selectionRange.lowerBound
+                //_horizontalSelectionBase = selectionRange.lowerBound
+                _horizontalSelectionBase = index
                 _mouseSelectionMode = .character
                 
                 // 選択領域がありその領域をクリックしている場合、テキストのドラッグ開始とみなす。
