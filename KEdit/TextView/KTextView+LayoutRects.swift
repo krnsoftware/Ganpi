@@ -68,7 +68,7 @@ struct LayoutRects {
         var charWidth: CGFloat = 20
         if let textStorage = _textStorageRef as? KTextStorage  {
             charWidth = textStorage.lineNumberDigitWidth
-            log("charWidth: \(charWidth)")
+            //log("charWidth: \(charWidth)")
         }
         let lineNumberWidth = CGFloat(digitCount) * charWidth + 5.0
         
@@ -104,7 +104,7 @@ struct LayoutRects {
         // LineNumberRegionの場合
         if let lnRect = lineNumberRegion?.rect, lnRect.contains(point) {
             let lineIndex = min(Int((point.y - textEdgeInsets.top ) / lineHeight), lineCount - 1)
-            print("regionType - in lineNumberRegion: \(lineIndex)")
+            //print("regionType - in lineNumberRegion: \(lineIndex)")
             return .lineNumber(line: lineIndex)
         }
 

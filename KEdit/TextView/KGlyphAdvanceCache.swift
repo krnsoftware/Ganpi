@@ -19,6 +19,7 @@ final class KGlyphAdvanceCache {
 
     private let _font: NSFont
     private var _advanceCache: [Character: CGFloat] = [:]
+    //private var _tabWidth: CGFloat
     private let _lock = NSLock()
 
     private static let _defaultCharacters: [Character] = {
@@ -54,8 +55,16 @@ final class KGlyphAdvanceCache {
         self._font = font
         preload()
     }
+    
+    // CTLineからoffsetのリストを返す。
+    // 行それぞれで形成されるCTLineでキャッシュではなく実測による補正を行う。
+    /*static func offsets(of ctLine: CTLine) -> [CGFloat] {
+        var offsets:[CGFloat] = []
+        for i in 0..<
+        return []
+    }*/
 
-    func advance(for character: Character) -> CGFloat {
+    /*func advance(for character: Character) -> CGFloat {
         _lock.lock()
         defer { _lock.unlock() }
 
@@ -66,6 +75,25 @@ final class KGlyphAdvanceCache {
         let attr = NSAttributedString(string: String(character), attributes: [.font: _font])
         let line = CTLineCreateWithAttributedString(attr)
         let advance = CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
+
+        _advanceCache[character] = advance
+        return advance
+    }*/
+    // CTLineGetTypographicBoundsでadvanceを計算すると、まとめてcacheしたCTLineCreateWithAttributedString由来のadvanceと誤差が出る。
+    // 1文字ずつのものもCTLineCreateWithAttributedStringで計算することにして誤差は縮小したが、やはりずれる。
+    func advance(for character: Character) -> CGFloat {
+        _lock.lock()
+        defer { _lock.unlock() }
+
+        if let cached = _advanceCache[character] {
+            return cached
+        }
+
+        let attr = NSAttributedString(string: String(character), attributes: [.font: _font])
+        let line = CTLineCreateWithAttributedString(attr)
+
+        // 1文字だけなので index = 1 で advance 相当の位置になる
+        let advance = CTLineGetOffsetForStringIndex(line, 1, nil)
 
         _advanceCache[character] = advance
         return advance

@@ -16,6 +16,7 @@ struct KStorageModifiedInfo {
     let deletedNewlineCount: Int
     let insertedNewlineCount: Int
 }
+
 enum KStorageModified {
     //case textChanged(range: Range<Int>, insertedCount: Int)
     case textChanged(info: KStorageModifiedInfo)
@@ -117,7 +118,7 @@ final class KTextStorage: KTextStorageProtocol {
     
     // caches.
     private var _advanceCache: KGlyphAdvanceCache
-    private var _tabWidthCache: CGFloat?
+    private var _spaceAdvanceCache: CGFloat?
     private var _lineNumberDigitWidth: CGFloat?
     private var _hardLineCount: Int?
     
@@ -148,7 +149,7 @@ final class KTextStorage: KTextStorageProtocol {
         set {
             _baseFont = newValue
             _advanceCache = KGlyphAdvanceCache(font: _baseFont)
-            _tabWidthCache = nil
+            _spaceAdvanceCache = nil
             _lineNumberDigitWidth = nil
             notifyColoringChanged(in: 0..<_characters.count)
         }
@@ -159,7 +160,7 @@ final class KTextStorage: KTextStorageProtocol {
         set {
             _baseFont = _baseFont.withSize(newValue)
             _advanceCache = KGlyphAdvanceCache(font: _baseFont)
-            _tabWidthCache = nil
+            _spaceAdvanceCache = nil
             _lineNumberDigitWidth = nil
             notifyColoringChanged(in: 0..<_characters.count)
         }
@@ -196,6 +197,16 @@ final class KTextStorage: KTextStorageProtocol {
         for c in _characters { if c == "\n" { count += 1 } }
         _hardLineCount = count
         return count
+    }
+    
+    //
+    var spaceAdvance: CGFloat {
+        if let cached = _spaceAdvanceCache {
+            return cached
+        }
+        let newCache = " ".size(withAttributes: [.font: baseFont]).width
+        _spaceAdvanceCache = newCache
+        return newCache
     }
     
     
@@ -434,16 +445,19 @@ final class KTextStorage: KTextStorageProtocol {
     func attributedString(for range: Range<Int>, tabWidth: Int? = nil) -> NSAttributedString? {
         guard let slice = self[range] else { return nil }
         
+        /*
         if _tabWidthCache == nil {
             //_tabWidthCache = baseFont.advancement(forGlyph: baseFont.glyph(withName: "space")).width
             _tabWidthCache = " ".size(withAttributes: [.font: baseFont]).width
-        }
+        }*/
 
         // 仮実装：全体に一律の属性を与える
         var attributes: [NSAttributedString.Key: Any] = [.font: baseFont, .foregroundColor: NSColor.black]
-        if tabWidth != nil {
+        //if tabWidth != nil {
+        if let tabWidth = tabWidth {
             let paragraphStyle = NSMutableParagraphStyle()
-            paragraphStyle.defaultTabInterval = CGFloat(tabWidth!) * _tabWidthCache!
+            //paragraphStyle.defaultTabInterval = CGFloat(tabWidth!) * _tabWidthCache!
+            paragraphStyle.defaultTabInterval = CGFloat(tabWidth) * spaceAdvance
             attributes[.paragraphStyle] = paragraphStyle
         }
         
@@ -483,6 +497,9 @@ final class KTextStorage: KTextStorageProtocol {
     private func notifyObservers(_ event: KStorageModified) {
         _observers.forEach { $0(event) }
     }
+    
+    
+    
 }
 
 
