@@ -223,13 +223,13 @@ final class KLayoutManager: KLayoutManagerReadable {
         }
         return (nil, -1)*/
     }
-    
+    /*
     // KLinesからctLineを構築するために利用する。
     func ctLine(in range: Range<Int>) -> CTLine? {
         guard let attrString = _textStorageRef.attributedString(for: range, tabWidth: tabWidth) else { print("\(#function) - attrString is nil"); return nil }
         
         return CTLineCreateWithAttributedString(attrString)
-    }
+    }*/
     
     // 現在のLayoutRectsを生成する。専らTextViewから呼び出される。
     func makeLayoutRects() -> LayoutRects? {

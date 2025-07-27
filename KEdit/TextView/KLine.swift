@@ -22,7 +22,6 @@ class KLine: CustomStringConvertible {
     // 有効なCTLineを返す。
     var ctLine: CTLine? {
         if _ctLine == nil {
-            //log("ctLine is created. range: \(range)",from:self)
             makeCTLine()
         }
         return _ctLine
@@ -46,7 +45,8 @@ class KLine: CustomStringConvertible {
         self._textStorageRef = textStorageRef
         
         // 文字のオフセットをadcanveから算出してcache。
-        var result:[CGFloat] = []
+        //var result:[CGFloat] = []
+        var result:[CGFloat] = [0.0]
         _ = textStorageRef.advances(in: range).reduce(into: 0) { sum, value in
             sum += value
             result.append(sum)
@@ -63,7 +63,6 @@ class KLine: CustomStringConvertible {
     }
     
     func removeCTLine() {
-        //log("CTLine removed.: \(range)",from:self)
         _ctLine = nil
     }
     
@@ -74,37 +73,46 @@ class KLine: CustomStringConvertible {
     
     // この行におけるindex文字目の相対位置を返す。
     func characterOffset(at index:Int) -> CGFloat {
-        guard index >= 0 && index <= _cachedOffsets.count else { log("index is out of range.", from:self); return 0.0 }
         
-        if index == 0 {
-            return 0
-        }
-        return _cachedOffsets[index - 1]
+        return _cachedOffsets[index]
     }
     
-    // この行のCTLineを作成する。作成はlayoutManagerに依頼する。
+    // この行のCTLineを作成する。
     private func makeCTLine(){
-        /*
-        guard let line = _layoutManager?.ctLine(in: range) else {
-            print("\(#function): faild to generate CTLine for range ");
-            return
-        }
-        _ctLine = line
-         */
         guard let textStorageRef = _textStorageRef else { log("textStorageRef is nil.", from:self); return }
         guard let layoutManager = _layoutManager else { log("layoutManager is nil.", from:self); return }
         
-        guard let ctLine = layoutManager.ctLine(in: range) else {
-            log( "faild to get ctLine.", from:self)
-            return
-        }
+        guard let attrString = textStorageRef.attributedString(for: range, tabWidth: layoutManager.tabWidth) else { print("\(#function) - attrString is nil"); return }
         
+        let ctLine = CTLineCreateWithAttributedString(attrString)
         _ctLine = ctLine
         
+        // キャッシュの不正確なoffsetからキャレット位置計算用の正確なoffsetに差し替える。
+        var offsets: [CGFloat] = [0.0]
+        var currentOffset: CGFloat = 0
+
+        let fullRange = CFRange(location: 0, length: attrString.length)
+        guard let runs = CTLineGetGlyphRuns(ctLine) as? [CTRun] else { return }
         
-        
-        
-        
+        for run in runs {
+            let runRange = CTRunGetStringRange(run)
+            for index in runRange.location..<runRange.location + runRange.length {
+                // 文字位置に対応する offset を取得
+                let offset = CTLineGetOffsetForStringIndex(ctLine, index, nil)
+                
+                // 合字や装飾を含めて前回のオフセットとの差があるときのみ記録
+                if offset != currentOffset {
+                    offsets.append(offset)
+                    currentOffset = offset
+                }
+            }
+        }
+
+        // 最後に1文字進んだ位置（全体の右端）を追加
+        let finalOffset = CTLineGetOffsetForStringIndex(ctLine, fullRange.location + fullRange.length, nil)
+        offsets.append(finalOffset)
+
+        _cachedOffsets = offsets
         
     }
     

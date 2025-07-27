@@ -81,6 +81,7 @@ final class KGlyphAdvanceCache {
     }*/
     // CTLineGetTypographicBoundsでadvanceを計算すると、まとめてcacheしたCTLineCreateWithAttributedString由来のadvanceと誤差が出る。
     // 1文字ずつのものもCTLineCreateWithAttributedStringで計算することにして誤差は縮小したが、やはりずれる。
+    /*
     func advance(for character: Character) -> CGFloat {
         _lock.lock()
         defer { _lock.unlock() }
@@ -94,6 +95,26 @@ final class KGlyphAdvanceCache {
 
         // 1文字だけなので index = 1 で advance 相当の位置になる
         let advance = CTLineGetOffsetForStringIndex(line, 1, nil)
+
+        _advanceCache[character] = advance
+        return advance
+    }*/
+    // advanceはあくまでレイアウト用の仮の値。実測はCTLineに基いて行う。
+    func advance(for character: Character) -> CGFloat {
+        _lock.lock()
+        defer { _lock.unlock() }
+
+        if let cached = _advanceCache[character] {
+            return cached
+        }
+
+        let string = String(character)
+        let utf16Length = string.utf16.count
+
+        let attr = NSAttributedString(string: string, attributes: [.font: _font])
+        let line = CTLineCreateWithAttributedString(attr)
+
+        let advance = CTLineGetOffsetForStringIndex(line, utf16Length, nil)
 
         _advanceCache[character] = advance
         return advance
@@ -124,6 +145,7 @@ final class KGlyphAdvanceCache {
         return total
     }
     
+    /*
     func register(characters: [Character]) {
         let unknown = characters.filter { _advanceCache[$0] == nil }
         let attrString = NSAttributedString(
@@ -138,6 +160,28 @@ final class KGlyphAdvanceCache {
             let advance = offset - previousOffset
             _advanceCache[character] = advance
             previousOffset = offset
+        }
+    }*/
+    func register(characters: [Character]) {
+        let newChars = characters.filter { _advanceCache[$0] == nil }
+        guard !newChars.isEmpty else { return }
+
+        let joined = String(newChars)
+        let attrStr = NSAttributedString(string: joined, attributes: [.font: _font])
+        let ctLine = CTLineCreateWithAttributedString(attrStr)
+
+        // UTF16 offsetを追跡
+        var currentUTF16Offset = 0
+        for char in newChars {
+            let str = String(char)
+            let utf16Length = str.utf16.count
+
+            let startOffset = CTLineGetOffsetForStringIndex(ctLine, currentUTF16Offset, nil)
+            let endOffset = CTLineGetOffsetForStringIndex(ctLine, currentUTF16Offset + utf16Length, nil)
+            let advance = endOffset - startOffset
+
+            _advanceCache[char] = advance
+            currentUTF16Offset += utf16Length
         }
     }
 

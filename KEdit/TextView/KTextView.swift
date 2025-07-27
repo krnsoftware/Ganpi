@@ -102,6 +102,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             _layoutManager.rebuildLayout()
             updateFrameSizeToFitContent()
             updateCaretPosition()
+            //guard let scrollView = self.enclosingScrollView else { log("enclosingScrollView is nil"); return }
+            //scrollView.horizontalScroller?.isHidden = _wordWrap
             needsDisplay = true
         }
     }
