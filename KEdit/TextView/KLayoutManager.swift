@@ -263,6 +263,10 @@ final class KLayoutManager: KLayoutManagerReadable {
     
     func makeLines(range: Range<Int>, hardLineIndex: Int, width: CGFloat?) -> [KLine]? {
         let hardLine = KLine(range: range, hardLineIndex: hardLineIndex, softLineIndex: 0, layoutManager: self, textStorageRef: _textStorageRef)
+        
+        if hardLine.range.count == 0 {
+            return [hardLine]
+        }
 
         guard let textWidth = width, wordWrap == true else {
             
@@ -271,9 +275,14 @@ final class KLayoutManager: KLayoutManagerReadable {
         
         // オフセットリストを取得
         let offsets = hardLine.characterOffsets()
-
+        
+        
+/*
         guard offsets.count > 0 else {
             return [hardLine]  // 空行またはオフセット取得失敗
+        }*/
+        if offsets.count == 0 {
+            return [hardLine]
         }
 
         var softLines: [KLine] = []
@@ -282,7 +291,8 @@ final class KLayoutManager: KLayoutManagerReadable {
         var lastOffset: CGFloat = 0.0
         var softLineIndex = 0
 
-        for i in 1..<offsets.count {
+       // for i in 1..<offsets.count {
+        for i in 0..<offsets.count {
             let currentOffset = offsets[i]
 
             if currentOffset - lastOffset > textWidth {
@@ -309,7 +319,6 @@ final class KLayoutManager: KLayoutManagerReadable {
                                  textStorageRef: _textStorageRef)
             softLines.append(softLine)
         }
-
         return softLines
     }
     
