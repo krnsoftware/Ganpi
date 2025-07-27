@@ -126,8 +126,12 @@ struct LayoutRects {
                 guard let ctLine = line.ctLine else { print("regionType - invalid line") ; return .outside }
                 let relativeX = max(0, relativePoint.x)
                 //let indexInLine = CTLineGetStringIndexForPosition(line.ctLine, CGPoint(x: relativeX, y: 0))
-                let indexInLine = CTLineGetStringIndexForPosition(ctLine, CGPoint(x: relativeX, y: 0))
-                
+                let utf16Index = CTLineGetStringIndexForPosition(ctLine, CGPoint(x: relativeX, y: 0))
+                let string = String(textStorageRef.characterSlice[line.range])
+                guard let indexInLine = characterIndex(fromUTF16Offset: utf16Index, in: string) else {
+                    log("indexInLine is nil")
+                    return .outside
+                }
                 //print("regionType - in textRegion, lineIndex=\(lineIndex), indexInLine=\(indexInLine)")
                 
                 // CTLineGetStringIndexForPosition()は、ドキュメントにはないが、空行の場合に-1を返す仕様らしい。
@@ -148,5 +152,17 @@ struct LayoutRects {
         return .outside
     }
 
+    // 与えられた `string` において、UTF16オフセットから Character インデックス（0ベース）を返す。
+    // 存在しないオフセットの場合は nil。
+    private func characterIndex(fromUTF16Offset utf16Index: Int, in string: String) -> Int? {
+        // UTF16オフセットから String.Index を生成
+        guard let stringIndex = string.utf16.index(string.utf16.startIndex, offsetBy: utf16Index, limitedBy: string.utf16.endIndex),
+              stringIndex <= string.utf16.endIndex else {
+            return nil
+        }
+
+        let characterIndex = string.distance(from: string.startIndex, to: String.Index(stringIndex, within: string)!)
+        return characterIndex
+    }
     
 }
