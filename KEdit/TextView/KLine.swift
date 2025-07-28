@@ -78,60 +78,7 @@ class KLine: CustomStringConvertible {
     }
     
     // この行のCTLineを作成する。
-    /*private func makeCTLine(){
-        guard let textStorageRef = _textStorageRef else { log("textStorageRef is nil.", from:self); return }
-        guard let layoutManager = _layoutManager else { log("layoutManager is nil.", from:self); return }
-        
-        guard let attrString = textStorageRef.attributedString(for: range, tabWidth: layoutManager.tabWidth) else { print("\(#function) - attrString is nil"); return }
-        
-        let ctLine = CTLineCreateWithAttributedString(attrString)
-        _ctLine = ctLine
-        
-        // キャッシュの不正確なoffsetからキャレット位置計算用の正確なoffsetに差し替える。
-        /*
-        var offsets: [CGFloat] = [0.0]
-        var currentOffset: CGFloat = 0
-
-        let fullRange = CFRange(location: 0, length: attrString.length)
-        guard let runs = CTLineGetGlyphRuns(ctLine) as? [CTRun] else { return }
-        
-        for run in runs {
-            let runRange = CTRunGetStringRange(run)
-            for index in runRange.location..<runRange.location + runRange.length {
-                // 文字位置に対応する offset を取得
-                let offset = CTLineGetOffsetForStringIndex(ctLine, index, nil)
-                
-                // 合字や装飾を含めて前回のオフセットとの差があるときのみ記録
-                if offset != currentOffset {
-                    offsets.append(offset)
-                    currentOffset = offset
-                }
-            }
-        }
-
-        // 最後に1文字進んだ位置（全体の右端）を追加
-        let finalOffset = CTLineGetOffsetForStringIndex(ctLine, fullRange.location + fullRange.length, nil)
-        offsets.append(finalOffset)
-
-        _cachedOffsets = offsets
-        */
-        let string = attrString.string
-        var offsets: [CGFloat] = [0.0]
-        var currentOffset: CGFloat = 0
-
-        for charIndex in string.indices {
-            let utf16Index = charIndex.utf16Offset(in: string)
-            let offset = CTLineGetOffsetForStringIndex(ctLine, utf16Index, nil)
-            if offset != currentOffset {
-                offsets.append(offset)
-                currentOffset = offset
-            }
-        }
-
-        let endUTF16Index = string.utf16.count
-        let finalOffset = CTLineGetOffsetForStringIndex(ctLine, endUTF16Index, nil)
-        offsets.append(finalOffset)
-    }*/
+    // 同時に、offsetsのキャッシュをadvanceのキャッシュから生成した暫定のものからCTLineを利用した正確なものに入れ替え。
     private func makeCTLine() {
         guard let textStorageRef = _textStorageRef else {
             log("textStorageRef is nil.", from: self)
@@ -143,7 +90,7 @@ class KLine: CustomStringConvertible {
         }
 
         guard let attrString = textStorageRef.attributedString(for: range, tabWidth: layoutManager.tabWidth) else {
-            print("\(#function) - attrString is nil")
+            log("attrString is nil.", from: self)
             return
         }
 

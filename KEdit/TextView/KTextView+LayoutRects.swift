@@ -128,10 +128,11 @@ struct LayoutRects {
                 //let indexInLine = CTLineGetStringIndexForPosition(line.ctLine, CGPoint(x: relativeX, y: 0))
                 let utf16Index = CTLineGetStringIndexForPosition(ctLine, CGPoint(x: relativeX, y: 0))
                 let string = String(textStorageRef.characterSlice[line.range])
-                guard let indexInLine = characterIndex(fromUTF16Offset: utf16Index, in: string) else {
+                /*guard let indexInLine = characterIndex(fromUTF16Offset: utf16Index, in: string) else {
                     log("indexInLine is nil")
                     return .outside
-                }
+                }*/
+                let indexInLine = characterIndex(fromUTF16Offset: utf16Index, in: string) ?? 0
                 //print("regionType - in textRegion, lineIndex=\(lineIndex), indexInLine=\(indexInLine)")
                 
                 // CTLineGetStringIndexForPosition()は、ドキュメントにはないが、空行の場合に-1を返す仕様らしい。

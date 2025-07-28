@@ -33,6 +33,7 @@
 		863DC44E2DE34891003BAFF3 /* Exceptions for "KEdit" folder in "KEdit" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				Document/Untitled.swift,
 				Resources/Info.plist,
 			);
 			target = 863DC4262DE34891003BAFF3 /* KEdit */;
