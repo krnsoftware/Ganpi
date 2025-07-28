@@ -915,7 +915,9 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 switch layoutRect.regionType(for: location, layoutManagerRef: _layoutManager, textStorageRef: _textStorageRef) {
                 case .text(let index):
                     caretIndex = index
+                    updateCaretPosition()
                     //log("text: \(index)", from:self)
+                    
                 case .lineNumber(let line):
                     log("lineNumber: \(line)", from:self)
                 case .outside:
