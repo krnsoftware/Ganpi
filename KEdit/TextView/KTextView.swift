@@ -416,8 +416,9 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             guard let line = lines[i] else { continue }
             
             if verticalRange.contains(textPoint.y) {
-                guard let ctLine = line.ctLine else { continue }
-                drawCTLine(ctLine: ctLine, x: textPoint.x, y: y)
+                /*guard let ctLine = line.ctLine else { continue }
+                drawCTLine(ctLine: ctLine, x: textPoint.x, y: y)*/
+                line.draw(at: textPoint, in: bounds)
             }
         }
         lines.removeFakeLines()

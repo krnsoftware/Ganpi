@@ -77,6 +77,25 @@ class KLine: CustomStringConvertible {
         return _cachedOffsets[index]
     }
     
+    // KTextView.draw()から利用される描画メソッド
+    func draw(at point: CGPoint, in bounds: CGRect) {
+        guard let context = NSGraphicsContext.current?.cgContext else { return }
+        guard let ctLine = self.ctLine else { return }
+
+        context.saveGState()
+
+        context.translateBy(x: 0, y: bounds.height)
+        context.scaleBy(x: 1.0, y: -1.0)
+
+        let ascent = CTFontGetAscent(_textStorageRef!.baseFont)
+        let lineOriginY = bounds.height - point.y - ascent
+        context.textPosition = CGPoint(x: point.x, y: lineOriginY)
+
+        CTLineDraw(ctLine, context)
+
+        context.restoreGState()
+    }
+    
     // この行のCTLineを作成する。
     // 同時に、offsetsのキャッシュをadvanceのキャッシュから生成した暫定のものからCTLineを利用した正確なものに入れ替え。
     private func makeCTLine() {
