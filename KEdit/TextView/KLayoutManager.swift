@@ -30,7 +30,8 @@ protocol KLayoutManagerReadable: AnyObject {
     func makeLayoutRects() -> LayoutRects?
     func makeEmptyLine(index: Int, hardLineIndex: Int) -> KLine
     func makeLines(range: Range<Int>, hardLineIndex: Int, width: CGFloat?) -> [KLine]?
-    func makeFakeCTLines(from attributedString: NSAttributedString, width: CGFloat?) -> [CTLine]
+    //func makeFakeCTLines(from attributedString: NSAttributedString, width: CGFloat?) -> [CTLine]
+    func makeFakeLines(from attributedString: NSAttributedString,hardLineIndex: Int, width: CGFloat?) -> [KFakeLine]
 }
 
 // MARK: - KLayoutManager
@@ -322,6 +323,7 @@ final class KLayoutManager: KLayoutManagerReadable {
         return softLines
     }
     
+    /*
     // 既存のAttributedStringからCTLineのリストを作成する。
     func makeFakeCTLines(from attributedString: NSAttributedString,
                              width: CGFloat?) -> [CTLine] {
@@ -352,6 +354,45 @@ final class KLayoutManager: KLayoutManagerReadable {
         
         return lines
         
+    }*/
+    
+    func makeFakeLines(from attributedString: NSAttributedString,hardLineIndex: Int,
+                       width: CGFloat?) -> [KFakeLine] {
+        guard attributedString.length > 0 else { return [] }
+        guard let width = width else {
+            //return [CTLineCreateWithAttributedString(attributedString)]
+            return [KFakeLine(attributedString: attributedString, hardLineIndex: hardLineIndex, softLineIndex: 0, layoutManager: self, textStorageRef: _textStorageRef)]
+        }
+        //(attributedString: NSAttributedString, hardLineIndex: Int, softLineIndex: Int, layoutManager: KLayoutManager, textStorageRef: KTextStorageReadable)
+        
+        //var lines: [CTLine] = []
+        var lines: [KFakeLine] = []
+        
+        let fullLine = CTLineCreateWithAttributedString(attributedString)
+        
+        var baseOffset: CGFloat = 0
+        var baseIndex: Int = 0
+        var softLineIndex: Int = 0
+        for i in 0..<attributedString.length {
+            let offset = CTLineGetOffsetForStringIndex(fullLine, i, nil)
+            
+            if offset - baseOffset >= width {
+                
+                let subAttr = attributedString.attributedSubstring(from: NSRange(location: baseIndex, length: i - baseIndex))
+                //lines.append(CTLineCreateWithAttributedString(subAttr))
+                let fakeLine = KFakeLine(attributedString: subAttr, hardLineIndex: hardLineIndex, softLineIndex: softLineIndex, layoutManager: self, textStorageRef: _textStorageRef)
+                lines.append(fakeLine)
+                baseIndex = i
+                baseOffset = offset
+                softLineIndex += 1
+            }
+        }
+        let subAttr = attributedString.attributedSubstring(from: NSRange(location: baseIndex, length: attributedString.length - baseIndex))
+        //log("subAttr = \(subAttr.string)", from:self)
+        //lines.append(CTLineCreateWithAttributedString(subAttr))
+        lines.append(KFakeLine(attributedString: subAttr, hardLineIndex: hardLineIndex, softLineIndex: softLineIndex, layoutManager: self, textStorageRef: _textStorageRef))
+        
+        return lines
     }
     
     

@@ -10,10 +10,10 @@
 import Cocoa
 
 class KLine: CustomStringConvertible {
-    private weak var _layoutManager: KLayoutManager?
-    private weak var _textStorageRef: KTextStorageReadable?
+    fileprivate weak var _layoutManager: KLayoutManager?
+    fileprivate weak var _textStorageRef: KTextStorageReadable?
     private var _ctLine: CTLine?
-    private var _cachedOffsets: [CGFloat]
+    fileprivate var _cachedOffsets: [CGFloat]
     
     var range: Range<Int>
     var hardLineIndex: Int
@@ -106,7 +106,7 @@ class KLine: CustomStringConvertible {
             offsets.append(offset)
         }
 
-        _cachedOffsets = offsets
+        _cachedOffsets = offsets.isEmpty ? [0] : offsets
     }
     
     
@@ -117,19 +117,30 @@ class KLine: CustomStringConvertible {
 
 final class KFakeLine : KLine {
     private let _ctLine: CTLine
+    private let _attributedString: NSAttributedString
     
     override var ctLine: CTLine? { _ctLine }
     
     //override var width: CGFloat { CTLineGetTypographicBounds(_ctLine, nil, nil, nil) }
     override var width: CGFloat {
-        let range = CTLineGetStringRange(_ctLine)
-        let endLocation = range.location + range.length
-        return CTLineGetOffsetForStringIndex(_ctLine, endLocation, nil)
+        return _cachedOffsets.last ?? 0
     }
     
-    init(ctLine: CTLine, hardLineIndex: Int, softLineIndex: Int, layoutManager: KLayoutManager, textStorageRef: KTextStorageReadable) {
-        _ctLine = ctLine
+    
+    init(attributedString: NSAttributedString, hardLineIndex: Int, softLineIndex: Int, layoutManager: KLayoutManager, textStorageRef: KTextStorageReadable) {
+        _ctLine = CTLineCreateWithAttributedString(attributedString)
+        _attributedString = attributedString
+        
         super.init(range: 0..<0, hardLineIndex: hardLineIndex, softLineIndex: softLineIndex, layoutManager: layoutManager, textStorageRef: textStorageRef)
+        
+        let string = _attributedString.string
+        var offsets: [CGFloat] = []
+        for i in 0...string.count {
+            let prefixCount = string.index(string.startIndex, offsetBy: i).utf16Offset(in: string)
+            let offset = CTLineGetOffsetForStringIndex(_ctLine, prefixCount, nil)
+            offsets.append(offset)
+        }
+        _cachedOffsets = offsets.isEmpty ? [0] : offsets
     }
 }
 
@@ -251,27 +262,21 @@ final class KLines: CustomStringConvertible {
     // 外部から特定の行について別のAttributedStringを挿入することができる。
     // hardLineIndex行のinsertionオフセットの部分にattrStringを挿入する形になる。
     func addFakeLine(replacementRange: Range<Int>, attrString: NSAttributedString) {
-        let timer = KTimeChecker(name:"KLines.addFakeLine")
-        
-        
+                
         _fakeLines = []
         guard let textStorageRef = _textStorageRef else { print("\(#function) - textStorageRef is nil"); return }
         guard let layoutManager = _layoutManager else { print("\(#function) - layoutManagerRef is nil"); return }
         
-        timer.start(message:"lineContainsCharacter")
         guard let  hardLineIndex = lineContainsCharacter(index: replacementRange.lowerBound)?.hardLineIndex else { print("\(#function) - replacementRange.lowerBound is out of range"); return }
         _replaceLineNumber = hardLineIndex
         
-        timer.stopAndGo(message:"hardLineRange")
         guard let range = hardLineRange(hardLineIndex: hardLineIndex) else { print("\(#function) - hardLineIndex:\(hardLineIndex) is out of range"); return }
         
-        timer.stopAndGo(message:"makeLayoutRects")
         guard let layoutRects = _layoutManager?.makeLayoutRects() else {
             print("\(#function): layoutRects is nil")
             return
         }
         
-        timer.stopAndGo(message:"make Attributes")
         
         if let lineA = textStorageRef.attributedString(for: range.lowerBound..<replacementRange.lowerBound, tabWidth: nil),
            let lineB = textStorageRef.attributedString(for: replacementRange.upperBound..<range.upperBound, tabWidth: nil){
@@ -284,18 +289,16 @@ final class KLines: CustomStringConvertible {
             fullLine.append(lineB)
             
             let width: CGFloat? = layoutManager.wordWrap ? layoutRects.textRegionWidth - layoutRects.textEdgeInsets.right : nil
-            
-            timer.stopAndGo(message:"3")
+            /*
             let ctLines = layoutManager.makeFakeCTLines(from: fullLine, width: width)
             
-            timer.stopAndGo(message:"4")
             for (i, fakeCTLine) in ctLines.enumerated() {
                 let fakeLine = KFakeLine(ctLine: fakeCTLine, hardLineIndex: hardLineIndex, softLineIndex: i, layoutManager: layoutManager, textStorageRef: textStorageRef)
                 
                 _fakeLines.append(fakeLine)
-            }
+            }*/
+            _fakeLines.append(contentsOf: layoutManager.makeFakeLines(from: fullLine, hardLineIndex: hardLineIndex, width: width))
         }
-        timer.stop()
         
         
         //_replaceLineCount = lines(hardLineIndex: _replaceLineNumber).count
