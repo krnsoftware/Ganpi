@@ -57,7 +57,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     // 文書の編集や外見に関するプロパティ
     private var _showLineNumbers: Bool = true
-    private var _showInvisibleCharacters: Bool = false
+    private var _showInvisibleCharacters: Bool = true
     private var _autoIndent: Bool = true
     private var _wordWrap: Bool = true
     

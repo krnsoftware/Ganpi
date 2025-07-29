@@ -458,11 +458,25 @@ final class KTextStorage: KTextStorageProtocol {
     func attributedString(for range: Range<Int>, tabWidth: Int? = nil) -> NSAttributedString? {
         guard let slice = self[range] else { return nil }
         
-        /*
-        if _tabWidthCache == nil {
-            //_tabWidthCache = baseFont.advancement(forGlyph: baseFont.glyph(withName: "space")).width
-            _tabWidthCache = " ".size(withAttributes: [.font: baseFont]).width
-        }*/
+        // 冒頭の連続したtab以外のtabを全てspaceに入れ替える。
+        // 本来は行頭であるか確認するべきだが、問題になるのは現時点でfake lineのみのため気にしないことにする。
+        let tabChar:Character = "\t"
+        let spaceChar:Character = " "
+        var convertedSlice:[Character] = []
+        var leadingTabsDone = false
+        
+        for char in slice {
+            if !leadingTabsDone {
+                if char == tabChar {
+                    convertedSlice.append(char)
+                } else {
+                    leadingTabsDone = true
+                    convertedSlice.append(char == tabChar ? spaceChar : char)
+                }
+            } else {
+                convertedSlice.append(char == tabChar ? spaceChar : char)
+            }
+        }
 
         // 仮実装：全体に一律の属性を与える
         var attributes: [NSAttributedString.Key: Any] = [.font: baseFont, .foregroundColor: NSColor.black]
@@ -486,12 +500,19 @@ final class KTextStorage: KTextStorageProtocol {
             if overlap.count == 0 { continue }
             
             // ArraySliceのstartIndex補正
+            /*
             let lowerOffset = overlap.lowerBound - range.lowerBound
             let upperOffset = overlap.upperBound - range.lowerBound
-
+            
             let lowerIndex = slice.index(slice.startIndex, offsetBy: lowerOffset)
             let upperIndex = slice.index(slice.startIndex, offsetBy: upperOffset)
             let subSlice = slice[lowerIndex..<upperIndex]
+            let string = String(subSlice)*/
+            
+            let lowerOffset = overlap.lowerBound - range.lowerBound
+            let upperOffset = overlap.upperBound - range.lowerBound
+            
+            let subSlice = convertedSlice[lowerOffset..<upperOffset]
             let string = String(subSlice)
 
             result.append(NSAttributedString(string: string, attributes: run.attributes))

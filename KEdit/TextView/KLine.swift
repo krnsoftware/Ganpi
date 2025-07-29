@@ -68,12 +68,18 @@ class KLine: CustomStringConvertible {
     
     // この行における文字のオフセットを行の左端を0.0とした相対座標のx位置のリストで返す。
     func characterOffsets() -> [CGFloat] {
+        // offsetを取得する前にCTLineを生成しておく必要がある。
+        _ = ctLine
+        
         return _cachedOffsets
     }
     
     // この行におけるindex文字目の相対位置を返す。
     func characterOffset(at index:Int) -> CGFloat {
+        // offsetを取得する前にCTLineを生成しておく必要がある。
+        _ = ctLine
         
+        //log("_cacheOffsets:\(_cachedOffsets)")
         return _cachedOffsets[index]
     }
     
@@ -97,6 +103,7 @@ class KLine: CustomStringConvertible {
         
         // 不可視文字を表示。
         if layoutManager.showInvisibleCharacters {
+            let newlineChar:Character = "\n"
             var index = 0
             for i in range.lowerBound..<range.upperBound {
                 guard let char = textStorageRef[i] else { log("textStorageRef[\(i)] is nil."); return }
@@ -107,8 +114,8 @@ class KLine: CustomStringConvertible {
                 }
                 index += 1
             }
-            if range.upperBound < textStorageRef.count, textStorageRef[range.upperBound] == "\n" {
-                if let newlineCTChar = textStorageRef.invisibleCharacters?.ctLine(for: "\n") {
+            if range.upperBound < textStorageRef.count, textStorageRef[range.upperBound] == newlineChar {
+                if let newlineCTChar = textStorageRef.invisibleCharacters?.ctLine(for: newlineChar) {
                     context.textPosition = CGPoint(x: point.x + _cachedOffsets.last!, y: lineOriginY)
                     CTLineDraw(newlineCTChar, context)
                 }
@@ -140,6 +147,7 @@ class KLine: CustomStringConvertible {
         _ctLine = ctLine
 
         let string = attrString.string
+        //log("tab count = \(string.filter{$0 == "\t"}.count)", from:self)
         var offsets: [CGFloat] = []
 
         for i in 0...string.count {
@@ -149,6 +157,7 @@ class KLine: CustomStringConvertible {
         }
 
         _cachedOffsets = offsets.isEmpty ? [0.0] : offsets
+        //log("_cacheOffsets: \(_cachedOffsets)",from:self)
     }
     
     
