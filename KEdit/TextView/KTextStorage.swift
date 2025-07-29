@@ -49,6 +49,7 @@ protocol KTextStorageCommon: AnyObject {
 protocol KTextStorageReadable: KTextStorageCommon {
     var string: String { get }
     var hardLineCount: Int { get } // if _character is empty, return 1. if end of chars is '\n', add 1.
+    var invisibleCharacters: KInvisibleCharacters? { get }
     
     func wordRange(at index: Int) -> Range<Int>?
     func attributedString(for range: Range<Int>, tabWidth: Int?) -> NSAttributedString?
@@ -121,6 +122,7 @@ final class KTextStorage: KTextStorageProtocol {
     private var _spaceAdvanceCache: CGFloat?
     private var _lineNumberDigitWidth: CGFloat?
     private var _hardLineCount: Int?
+    private var _invisibleCharacters: KInvisibleCharacters?
     
     
     // for undo.
@@ -151,6 +153,7 @@ final class KTextStorage: KTextStorageProtocol {
             _advanceCache = KGlyphAdvanceCache(font: _baseFont)
             _spaceAdvanceCache = nil
             _lineNumberDigitWidth = nil
+            _invisibleCharacters = nil
             notifyColoringChanged(in: 0..<_characters.count)
         }
     }
@@ -162,6 +165,7 @@ final class KTextStorage: KTextStorageProtocol {
             _advanceCache = KGlyphAdvanceCache(font: _baseFont)
             _spaceAdvanceCache = nil
             _lineNumberDigitWidth = nil
+            _invisibleCharacters = nil
             notifyColoringChanged(in: 0..<_characters.count)
         }
     }
@@ -169,6 +173,14 @@ final class KTextStorage: KTextStorageProtocol {
     
     var characterSlice: ArraySlice<Character> {
         _characters[_characters.indices]
+    }
+    
+    var invisibleCharacters: KInvisibleCharacters? {
+        if let invisibleCharacters = _invisibleCharacters {
+            return invisibleCharacters
+        }
+        _invisibleCharacters = KInvisibleCharacters()
+        return _invisibleCharacters
     }
     
     // 初期値として文字列をセットする際に使用する。
@@ -216,6 +228,7 @@ final class KTextStorage: KTextStorageProtocol {
         _undoActions.append(.none)
         
         _advanceCache = KGlyphAdvanceCache(font: _baseFont)
+        _invisibleCharacters = KInvisibleCharacters()
         
     }
 

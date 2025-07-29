@@ -57,6 +57,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     // 文書の編集や外見に関するプロパティ
     private var _showLineNumbers: Bool = true
+    private var _showInvisibleCharacters: Bool = false
     private var _autoIndent: Bool = true
     private var _wordWrap: Bool = true
     
@@ -110,7 +111,24 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     var showLineNumbers: Bool {
         get { _showLineNumbers }
-        set { _showLineNumbers = newValue }
+        set {
+            _showLineNumbers = newValue
+            _layoutManager.rebuildLayout()
+            updateFrameSizeToFitContent()
+            updateCaretPosition()
+            needsDisplay = true
+        }
+    }
+    
+    var showInvisibleCharacters: Bool {
+        get { _showInvisibleCharacters }
+        set {
+            _showInvisibleCharacters = newValue
+            _layoutManager.rebuildLayout()
+            updateFrameSizeToFitContent()
+            updateCaretPosition()
+            needsDisplay = true
+        }
     }
     
     // 今回のセレクタが垂直方向にキャレット選択範囲を動かすものであるか返す。
@@ -1496,7 +1514,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         return CGPoint(x: linePoint.x + line.characterOffset(at: indexInLine), y: linePoint.y)
 
     }
-    
+    /*
     private func drawCTLine(ctLine: CTLine, x: CGFloat, y: CGFloat) {
         let context = NSGraphicsContext.current?.cgContext
         context?.saveGState()
@@ -1509,7 +1527,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         context?.textPosition = CGPoint(x: x, y: lineOriginY)
         CTLineDraw(ctLine, context!)
         context?.restoreGState()
-    }
+    }*/
     
     // オートスクロール用のメソッド。タイマーから呼び出される。
     private func updateDraggingSelection() {

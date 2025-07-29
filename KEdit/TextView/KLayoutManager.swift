@@ -120,6 +120,11 @@ final class KLayoutManager: KLayoutManagerReadable {
         return textView.wordWrap
     }
     
+    var showInvisibleCharacters: Bool {
+        guard let textView = _textView else { log("_textView = nil", from:self); return false }
+        return textView.showInvisibleCharacters
+    }
+    
     
     // MARK: - Init
 

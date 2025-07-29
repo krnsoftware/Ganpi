@@ -45,7 +45,7 @@ class KLine: CustomStringConvertible {
         self._textStorageRef = textStorageRef
         
         // 文字のオフセットをadcanveから算出してcache。
-        //var result:[CGFloat] = []
+        // この値は実測に比べて不正確のため、CTLineが生成された時点で正確なものに入れ替えられる。
         var result:[CGFloat] = [0.0]
         _ = textStorageRef.advances(in: range).reduce(into: 0) { sum, value in
             sum += value
@@ -79,21 +79,44 @@ class KLine: CustomStringConvertible {
     
     // KTextView.draw()から利用される描画メソッド
     func draw(at point: CGPoint, in bounds: CGRect) {
-        guard let context = NSGraphicsContext.current?.cgContext else { return }
-        guard let ctLine = self.ctLine else { return }
+        guard let context = NSGraphicsContext.current?.cgContext else { log("NSGraphicsContext.current is nil.", from: self); return }
+        guard let ctLine = self.ctLine else { log("ctLine is nil.", from: self); return }
+        guard let textStorageRef = _textStorageRef else { log("_textStorageRef is nil.", from: self); return }
+        guard let layoutManager = _layoutManager else { log("_layoutManager is nil.", from: self); return }
 
         context.saveGState()
-
+            
         context.translateBy(x: 0, y: bounds.height)
         context.scaleBy(x: 1.0, y: -1.0)
-
-        let ascent = CTFontGetAscent(_textStorageRef!.baseFont)
+            
+        let ascent = CTFontGetAscent(textStorageRef.baseFont)
         let lineOriginY = bounds.height - point.y - ascent
         context.textPosition = CGPoint(x: point.x, y: lineOriginY)
-
+        
         CTLineDraw(ctLine, context)
-
+        
+        // 不可視文字を表示。
+        if layoutManager.showInvisibleCharacters {
+            var index = 0
+            for i in range.lowerBound..<range.upperBound {
+                guard let char = textStorageRef[i] else { log("textStorageRef[\(i)] is nil."); return }
+                
+                if let ctChar = textStorageRef.invisibleCharacters?.ctLine(for: char) {
+                    context.textPosition = CGPoint(x: point.x + _cachedOffsets[index], y: lineOriginY)
+                    CTLineDraw(ctChar, context)
+                }
+                index += 1
+            }
+            if range.upperBound < textStorageRef.count, textStorageRef[range.upperBound] == "\n" {
+                if let newlineCTChar = textStorageRef.invisibleCharacters?.ctLine(for: "\n") {
+                    context.textPosition = CGPoint(x: point.x + _cachedOffsets.last!, y: lineOriginY)
+                    CTLineDraw(newlineCTChar, context)
+                }
+            }
+        }
+        
         context.restoreGState()
+        
     }
     
     // この行のCTLineを作成する。
@@ -125,7 +148,7 @@ class KLine: CustomStringConvertible {
             offsets.append(offset)
         }
 
-        _cachedOffsets = offsets.isEmpty ? [0] : offsets
+        _cachedOffsets = offsets.isEmpty ? [0.0] : offsets
     }
     
     
@@ -159,7 +182,7 @@ final class KFakeLine : KLine {
             let offset = CTLineGetOffsetForStringIndex(_ctLine, prefixCount, nil)
             offsets.append(offset)
         }
-        _cachedOffsets = offsets.isEmpty ? [0] : offsets
+        _cachedOffsets = offsets.isEmpty ? [0.0] : offsets
     }
 }
 
