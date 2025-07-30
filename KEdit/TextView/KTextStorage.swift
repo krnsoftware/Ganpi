@@ -6,6 +6,7 @@
 //
 
 import Cocoa
+import AppKit
 
 // MARK: - General enum and struct
 
@@ -152,11 +153,11 @@ final class KTextStorage: KTextStorageProtocol {
         get { _baseFont }
         set {
             _baseFont = newValue
-            //resetCaches()
-            _advanceCache = KGlyphAdvanceCache(font: _baseFont)
+            resetCaches()
+            /*_advanceCache = KGlyphAdvanceCache(font: _baseFont)
             _spaceAdvanceCache = nil
             _lineNumberDigitWidth = nil
-            _invisibleCharacters = nil
+            _invisibleCharacters = nil*/
             notifyColoringChanged(in: 0..<_characters.count)
         }
     }
@@ -165,11 +166,11 @@ final class KTextStorage: KTextStorageProtocol {
         get { _baseFont.pointSize }
         set {
             _baseFont = _baseFont.withSize(newValue)
-            //resetCaches()
-            _advanceCache = KGlyphAdvanceCache(font: _baseFont)
+            resetCaches()
+            /*_advanceCache = KGlyphAdvanceCache(font: _baseFont)
             _spaceAdvanceCache = nil
             _lineNumberDigitWidth = nil
-            _invisibleCharacters = nil
+            _invisibleCharacters = nil*/
             notifyColoringChanged(in: 0..<_characters.count)
         }
     }
@@ -334,7 +335,11 @@ final class KTextStorage: KTextStorageProtocol {
     // MARK: - Undo functions
     
     func undo() {
-        guard _undoDepth < _history.count else { log("undo: no more history", from: self); return }
+        guard _undoDepth < _history.count else {
+            NSSound.beep() // NSBeep()がなぜか使用できないためObjective-Cブリッジ経由で。
+            log("undo: no more history", from: self)
+            return
+        }
 
         _undoActions.append(.undo)
 
@@ -347,7 +352,11 @@ final class KTextStorage: KTextStorageProtocol {
     }
     
     func redo() {
-        guard _undoDepth > 0 else { log("redo: no redo available", from: self); return }
+        guard _undoDepth > 0 else {
+            NSSound.beep()
+            log("redo: no redo available", from: self)
+            return
+        }
 
         _undoActions.append(.redo)
 

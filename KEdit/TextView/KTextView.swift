@@ -1433,6 +1433,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 if !(selectionRange.upperBound < info.range.lowerBound || selectionRange.lowerBound > info.range.upperBound) {
                     print("選択範囲が外部により変更された部位に重なっている。")
                     caretIndex = info.range.lowerBound + info.insertedCount // 暫定的に挿入部の後端に置く。
+                } else {
+                    caretIndex = info.range.lowerBound + info.insertedCount
                 }
             }
             

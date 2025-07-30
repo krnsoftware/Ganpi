@@ -17,12 +17,12 @@ final class KInvisibleCharacters {
             "\u{0020}": "∙",    // SPACE → Middle Dot
             "\u{0009}": "➤",    // TAB → Right Arrow
             "\u{000A}": "⏎",    // LF → Return Symbol
+            "\u{3000}": "□",     // 全角スペース
         ]
     
     private static let _defaultAttributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: 10),
             .foregroundColor: NSColor.secondaryLabelColor
-
         ]
 
     init(attributes: [NSAttributedString.Key: Any] = _defaultAttributes,
