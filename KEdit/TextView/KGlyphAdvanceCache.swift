@@ -184,6 +184,10 @@ final class KGlyphAdvanceCache {
             currentUTF16Offset += utf16Length
         }
     }
+    
+    func setParticularCache(_ advance: CGFloat, for character: Character) {
+        _advanceCache[character] = advance
+    }
 
     
     private func preload() {

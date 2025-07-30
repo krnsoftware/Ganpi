@@ -46,10 +46,35 @@ class KLine: CustomStringConvertible {
         
         // 文字のオフセットをadcanveから算出してcache。
         // この値は実測に比べて不正確のため、CTLineが生成された時点で正確なものに入れ替えられる。
+        /*
         var result:[CGFloat] = [0.0]
         _ = textStorageRef.advances(in: range).reduce(into: 0) { sum, value in
             sum += value
             result.append(sum)
+        }
+        _cachedOffsets = result*/
+        
+        // 文頭の連続したtabはタブ幅に従って、それ以外のtabはspaceと同じ幅でoffsetsを構築する。
+        // この値はCTLineによる実測に比べ不正確なため、行の横幅を計算する以外の用途には用いられない。
+        let tabCar:Character = "\t"
+        let tabWidth = CGFloat(layoutManager.tabWidth) * textStorageRef.spaceAdvance
+        var result:[CGFloat] = [0.0]
+        var isInHeadTabs:Bool = true
+        var offset:CGFloat = 0.0
+        for i in range.lowerBound..<range.upperBound {
+            guard let char = textStorageRef[i] else { log("textStorageRef[i] = nil."); continue }
+            if isInHeadTabs, char == tabCar {
+                offset += tabWidth
+                
+            } else {
+                isInHeadTabs = false
+                if char == tabCar {
+                    offset += textStorageRef.spaceAdvance
+                } else {
+                    offset += textStorageRef.advance(for: char)
+                }
+            }
+            result.append(offset)
         }
         _cachedOffsets = result
     }
@@ -102,6 +127,7 @@ class KLine: CustomStringConvertible {
         CTLineDraw(ctLine, context)
         
         // 不可視文字を表示。
+        // 最初はattributedstring.draw(at:)で描画する予定だったが、contextの混乱が生じてどうやっても上手く描画できずCTLineを使用することになった。
         if layoutManager.showInvisibleCharacters {
             let newlineChar:Character = "\n"
             var index = 0
@@ -146,8 +172,8 @@ class KLine: CustomStringConvertible {
         let ctLine = CTLineCreateWithAttributedString(attrString)
         _ctLine = ctLine
 
+        // CTLineから文字のoffsetを算出してcacheを入れ替える。
         let string = attrString.string
-        //log("tab count = \(string.filter{$0 == "\t"}.count)", from:self)
         var offsets: [CGFloat] = []
 
         for i in 0...string.count {
@@ -157,7 +183,6 @@ class KLine: CustomStringConvertible {
         }
 
         _cachedOffsets = offsets.isEmpty ? [0.0] : offsets
-        //log("_cacheOffsets: \(_cachedOffsets)",from:self)
     }
     
     
@@ -172,7 +197,6 @@ final class KFakeLine : KLine {
     
     override var ctLine: CTLine? { _ctLine }
     
-    //override var width: CGFloat { CTLineGetTypographicBounds(_ctLine, nil, nil, nil) }
     override var width: CGFloat {
         return _cachedOffsets.last ?? 0
     }
@@ -204,7 +228,6 @@ final class KFakeLine : KLine {
 
 final class KLines: CustomStringConvertible {
     private var _lines: [KLine] = []
-    //private var _maxLineWidth: CGFloat = 0
     
     // cache.
     private var _hardLineIndexMap: [Int:Int] = [:]
@@ -286,10 +309,10 @@ final class KLines: CustomStringConvertible {
         return true
     }
     
+    // 文字列に変換される際の文字列を返す。
     var description: String {
         return "KLines - count: \(_lines.count), valid?: \(isValid)"
     }
-    
     
     
     init(layoutManager: KLayoutManager?, textStorageRef: KTextStorageReadable?) {
@@ -298,14 +321,6 @@ final class KLines: CustomStringConvertible {
         
         rebuildLines()
         
-        /*
-        if _lines.count == 0 {
-            if let layoutManagerRef = _layoutManager {
-                
-                _lines.append(layoutManagerRef.makeEmptyLine(index: 0, hardLineIndex: 0))
-            }
-            
-        }*/
     }
     
     
@@ -328,7 +343,6 @@ final class KLines: CustomStringConvertible {
             return
         }
         
-        
         if let lineA = textStorageRef.attributedString(for: range.lowerBound..<replacementRange.lowerBound, tabWidth: nil),
            let lineB = textStorageRef.attributedString(for: replacementRange.upperBound..<range.upperBound, tabWidth: nil){
             let muAttrString =  NSMutableAttributedString(attributedString: attrString)
@@ -340,19 +354,10 @@ final class KLines: CustomStringConvertible {
             fullLine.append(lineB)
             
             let width: CGFloat? = layoutManager.wordWrap ? layoutRects.textRegionWidth - layoutRects.textEdgeInsets.right : nil
-            /*
-            let ctLines = layoutManager.makeFakeCTLines(from: fullLine, width: width)
             
-            for (i, fakeCTLine) in ctLines.enumerated() {
-                let fakeLine = KFakeLine(ctLine: fakeCTLine, hardLineIndex: hardLineIndex, softLineIndex: i, layoutManager: layoutManager, textStorageRef: textStorageRef)
-                
-                _fakeLines.append(fakeLine)
-            }*/
             _fakeLines.append(contentsOf: layoutManager.makeFakeLines(from: fullLine, hardLineIndex: hardLineIndex, width: width))
         }
         
-        
-        //_replaceLineCount = lines(hardLineIndex: _replaceLineNumber).count
         _replaceLineCount = countSoftLinesOf(hardLineIndex: _replaceLineNumber)
         _replaceLineIndex = lineArrayIndex(for: _replaceLineNumber)
     }
@@ -403,7 +408,7 @@ final class KLines: CustomStringConvertible {
     }
     
     
-    
+    // for debug.
     func printLines() {
         let linesCount = count
         guard let textStorageRef = _textStorageRef else { print("\(#function) - textStorageRef is nil (\(linesCount)"); return}
@@ -416,122 +421,8 @@ final class KLines: CustomStringConvertible {
         }
     }
     
-
-    /*
-    //func rebuildLines(range: Range<Int>? = nil, insertedCount: Int? = nil) {
-    func rebuildLines(with info: KStorageModifiedInfo? = nil){
-        
-       //log("start. time = \(Date())", from:self)
-        /*if let info = info {
-            log("info: \(info)",from:self)
-        }*/
-        
-       
-        guard let layoutManagerRef = _layoutManager else { log("layoutManagerRef is nil", from:self); return }
-        guard let textStorageRef = _textStorageRef else { log("textStorageRef is nil", from:self); return }
-       
-        // storageが空だった場合、空行を1つ追加する。
-        if textStorageRef.count == 0 {
-            _lines.removeAll()
-            _lines.append(layoutManagerRef.makeEmptyLine(index: 0, hardLineIndex: 0))
-            return
-        }
-        
-        
-         var currentIndex = 0
-         var currentLineNumber = 0
-        
-        //range, insertedCountが設定されている場合の影響範囲を導出する。
-        
-        //if let range = info.range, let insertedCount = info.insertedCount {
-        if let info = info {
-            let range = info.range
-            let insertedCount = info.insertedCount
-            log("range: \(range), insertedCount: \(insertedCount)",from:self)
-            // すでにstorageは編集されており、編集されたテキストの内容を知ることはできない。
-            // rangeは編集前のstorageからカットされた領域、insertedCountはそこに挿入された文字列の長さ。
-            // rangeのlowerとupperのそれぞれについて含まれる行を確定し、それらを結合することで影響範囲とする。
-            // 現状のstorageのrange.lowerBound..<range.lowerBound + insertedCount が挿入された文字列の領域。
-            // insertedCount - range.count が編集された部位より後のシフト量。
-            
-            // まずは簡易に、入力された範囲より前の行については温存し、それ以降の行を作り直すことにする。
-            var currentHardLineIndex = 0
-            for (i, line) in _lines.enumerated() {
-                if line.softLineIndex == 0 {
-                    currentHardLineIndex = i
-                }
-                
-                if line.range.upperBound + 1 > range.lowerBound {
-                    currentIndex = line.range.lowerBound
-                    _lines.removeSubrange(currentHardLineIndex..<_lines.count)
-                    _lines.forEach { $0.removeCTLine() }
-                    currentLineNumber = line.hardLineIndex
-                    break
-                }
-            }
-            
-        } else {
-            _lines.removeAll()
-         }
-        
-        
-        
-        guard let layoutRects = layoutManagerRef.makeLayoutRects() else { log("layoutRects is nil", from:self); return }
-        
-        
-        let characters = textStorageRef.characterSlice
-        let newLine = "\n" as Character
-        
-        while currentIndex < characters.count {
-            var lineEndIndex = currentIndex
-
-            // 改行まで進める（改行文字は含めない）
-            //while lineEndIndex < characters.count && characters[lineEndIndex] != "\n" {
-            while lineEndIndex < characters.count && characters[lineEndIndex] != newLine {
-                lineEndIndex += 1
-            }
-
-            let lineRange = currentIndex..<lineEndIndex
-            
-            guard let lineArray = layoutManagerRef.makeLines(range: lineRange, hardLineIndex: currentLineNumber, width: layoutRects.textRegionWidth - layoutRects.textEdgeInsets.right) else { print("\(#function) - lineArray is nil"); return }
-            
-            _lines.append(contentsOf: lineArray)
-
-            currentIndex = lineEndIndex
-            currentLineNumber += 1
-            
-            
-            //if currentIndex < characters.count && characters[currentIndex] == "\n" {
-            if currentIndex < characters.count && characters[currentIndex] == newLine {
-                currentIndex += 1 // 改行をスキップ
-            }
-            
-        }
-        
-        //最後の文字が改行だった場合、空行を1つ追加する。
-        if textStorageRef.characterSlice.last == "\n" {
-            _lines.append(layoutManagerRef.makeEmptyLine(index: textStorageRef.count, hardLineIndex: currentLineNumber))
-        }
-        
-        // for testing
-        log("is valid: \(isValid)",from:self)
-        
-        
-        // _linesに格納されているKLineのうち、softLineIndexが0の行のhardLineIndexと、その行の_lines上のindexをMapしておく。
-        _hardLineIndexMap.removeAll()
-        var currentHardLineIndex: Int = -1
-        for (i, line) in _lines.enumerated() {
-            if line.hardLineIndex == currentHardLineIndex + 1 {
-                currentHardLineIndex += 1
-                _hardLineIndexMap[currentHardLineIndex] = i
-            }
-        }
-        //log("_hardLineIndexMap: \(_hardLineIndexMap)",from:self)
-                
-    }*/
-     
+    // 行の構成を再構築する。
     func rebuildLines(with info: KStorageModifiedInfo? = nil) {
-        //guard let info = info else { log("info is nil", from:self); return }
         guard let textStorageRef = _textStorageRef else { log("textStorageRef is nil", from:self); return }
         guard let layoutManager = _layoutManager else { log("layoutManager is nil", from:self); return }
         guard let layoutRects = layoutManager.makeLayoutRects() else { log("layoutRects is nil", from:self); return }
@@ -553,25 +444,6 @@ final class KLines: CustomStringConvertible {
         var removeRange = 0..<_lines.count
         
         if let info = info {
-            /*
-            log("info.range:\(info.range), info.insertedCount:\(info.insertedCount), info.insertedNewlineCount:\(info.insertedNewlineCount), info.deletedNewlineCount:\(info.deletedNewlineCount)",from:self)
-            // 選択範囲のlowerBoundとupperBouldを含むソフト行を取得。
-            guard let startSoftLine = lineContainsCharacter(index: info.range.lowerBound) else { log("startHardLine is nil", from:self); return }
-            //guard let endSoftLine = lineContainsCharacter(index: info.range.upperBound) else { log("endHardLine is nil", from:self); return }
-            //log("startSoftLine.hardLineIndex:\(startSoftLine.hardLineIndex), endSoftLine.hardLineIndex:\(endSoftLine.hardLineIndex)",from:self)
-            //print(_hardLineIndexMap)
-            
-            // 選択範囲のlowerBoundとupperBoundを含むハード行のKLines上のindexを取得。
-            guard let startHardLineIndex = lineArrayIndex(for: startSoftLine.hardLineIndex) else { log("startHardLineIndex is nil", from:self); return }
-            //guard let endHardLineIndex = lineArrayIndex(for: endSoftLine.hardLineIndex) else { log("endHardLineIndex is nil", from:self); return }
-            let endHardLineIndex = startHardLineIndex + info.deletedNewlineCount
-            //let endHardLineCount = lines(hardLineIndex: endHardLineIndex).count
-            guard let endHardLineCount = countSoftLinesOf(hardLineIndex: endHardLineIndex) else { log("endHardLineCount is nil", from:self); return }
-            log("startHardLineIndex:\(startHardLineIndex), endHardLineIndex:\(endHardLineIndex), endHardLineCount:\(endHardLineCount)",from:self)
-            removeRange = startHardLineIndex..<(endHardLineIndex + endHardLineCount)
-             */
-            log("info.range:\(info.range), insertedCount:\(info.insertedCount)", from: self)
-            
             /// 削除前の range.lowerBound に属していた KLine を特定
             guard let startSoftLine = lineContainsCharacter(index: info.range.lowerBound) else {
                 log("startLine not found", from: self)
@@ -609,25 +481,6 @@ final class KLines: CustomStringConvertible {
             /// 削除対象の範囲
             let endIndex = lastHardLineStartIndex + softCount
             removeRange = startHardLineArrayIndex..<endIndex
-            //log("removeRange:\(removeRange)",from:self)
-            
-            /*
-            startIndex = startHardLineIndex
-            
-            var lower = info.range.lowerBound
-            var upper = info.range.lowerBound + info.insertedCount
-            
-            // 追加された文字列の領域を行頭・行末まで拡張する。
-            while lower > 0 {
-                if characters[lower - 1] == newLineCharacter { break }
-                lower -= 1
-            }
-            while upper < characters.count {
-                if characters[upper] == newLineCharacter { upper += 1; break }
-                upper += 1
-            }
-            newRange = lower..<upper
-            log("newRange:\(newRange), removeRange:\(removeRange)",from:self)*/
             
             let characters = textStorageRef.characterSlice
             let newLineCharacter: Character = "\n"
@@ -651,9 +504,7 @@ final class KLines: CustomStringConvertible {
             }
 
             newRange = lower..<upper
-            //log("newRange:\(newRange)",from:self)
             
-            //log("_lines[\(removeRange.upperBound..<_lines.count)]",from:self)
             _lines[removeRange.upperBound..<_lines.count].forEach {
                 $0.shiftRange(by: info.insertedCount - info.range.count)
                 $0.shiftHardLineIndex(by: info.insertedNewlineCount - info.deletedNewlineCount)
@@ -678,34 +529,19 @@ final class KLines: CustomStringConvertible {
         if start < newRange.upperBound {
             lineRanges.append(start..<newRange.upperBound)
         }
-        //log("lineRanges:\(lineRanges) ",from:self)
         
         guard let newStartLine = lineContainsCharacter(index: newRange.lowerBound) else { log("newStartLine is nil", from:self); return }
         let newStartHardLineIndex = newStartLine.hardLineIndex
         var newLines:[KLine] = []
         for (i, range) in lineRanges.enumerated() {
-            //log("make new lines, range:\(range), i:\(i)",from:self)
-            //guard let lineArray = layoutManager.makeLines(range: range, hardLineIndex: (startIndex + i), width: layoutRects.textRegionWidth - layoutRects.textEdgeInsets.right) else {
             guard let lineArray = layoutManager.makeLines(range: range, hardLineIndex: (newStartHardLineIndex + i), width: layoutRects.textRegionWidth - layoutRects.textEdgeInsets.right) else {
                 log("lineArray is nil", from:self)
                 return
             }
-            //log("lineArray.count:\(lineArray.count), lineArray[0].hardLineIndex:\(lineArray[0].hardLineIndex), lineArray[0].softLineIndex:\(lineArray[0].softLineIndex), lineArray[0].range:\(lineArray[0].range)",from:self)
             newLines.append(contentsOf: lineArray)
         }
-        //log("newLines:\(newLines)", from:self)
-        /*
-        guard let lastNewLineRange = lineRanges.last else { log("lastNewLineRange is nil", from:self); return }
-        log("lastNewLineRange:\(lastNewLineRange)",from:self)
-        if characters.last == newLineCharacter, lastNewLineRange.lowerBound == characters.count, lastNewLineRange.count != 0 {
-            guard let lastLine = newLines.last else { log("newLines.last is nil", from:self); return }
-            newLines.append(layoutManager.makeEmptyLine(index: textStorageRef.count, hardLineIndex: lastLine.hardLineIndex + 1))
-        }*/
-        
         
         _lines.replaceSubrange(removeRange, with: newLines)
-        //log("removeRange:\(removeRange), newLines:\(newLines)", from: self)
-        
         
         guard let newLastLine = _lines.last else {
             log("newLastLine is nil", from: self)
@@ -718,39 +554,15 @@ final class KLines: CustomStringConvertible {
         if characters.last == "\n" && newLastLine.range.upperBound < count {
             let emptyLine = layoutManager.makeEmptyLine(index: textStorageRef.count, hardLineIndex: newLastLine.hardLineIndex + 1)
             _lines.append(emptyLine)
-            //log("append emptyLine: \(emptyLine)", from: self)
         }
         
-        
-        //log("lastNewLine.range:\(lastNewLine.range)")
-        //log("lastNewLine.range.upperBound == characters.count:\(lastNewLine.range.upperBound == characters.count)")
-        //log("characters.last == newLineCharacter:\(characters.last == newLineCharacter)")
-        //log("lastNewLine.range.count != 0:\(lastNewLine.range.count != 0)")
-        /*
-        if lastNewLine.range.upperBound == characters.count - 1, characters.last == newLineCharacter, lastNewLine.range.count != 0 {
-            newLines.append(layoutManager.makeEmptyLine(index: textStorageRef.count, hardLineIndex: lastNewLine.hardLineIndex + 1))
-            
-        }*/
-        
-        /*
-        if let info = info {
-            _lines[removeRange.lowerBound..<_lines.count].forEach {
-                $0.shiftRange(by: info.insertedCount - info.range.count)
-                $0.shiftHardLineIndex(by: info.insertedNewlineCount - info.deletedNewlineCount)
-            }
-        }*/
-        //printLines()
-        
         log("isValid: \(isValid)",from:self)
-        
 
         // mapも再構築
         _hardLineIndexMap.removeAll()
         for (i, line) in _lines.enumerated() where line.softLineIndex == 0 {
             _hardLineIndexMap[line.hardLineIndex] = i
         }
-        
-        //log("KLines \(_lines)", from: self)
         
     }
     
@@ -776,6 +588,7 @@ final class KLines: CustomStringConvertible {
         return lines.isEmpty ? nil : lines
     }
     
+    // ハード行の行番号hardLineIndexの行に含まれるソフト行の数を返す。
     func countSoftLinesOf(hardLineIndex: Int) -> Int? {
         guard let startIndex = _hardLineIndexMap[hardLineIndex] else {
             log("_hardLineIndexMap[\(hardLineIndex)] not found",from:self)
@@ -806,7 +619,7 @@ final class KLines: CustomStringConvertible {
         return lines.first!.range.lowerBound..<lines.last!.range.upperBound
     }
     
-    
+    // index文字目を含む行の_lines上のindexを返す。ソフト・ハードを問わない。
     func lineIndexContainsCharacter(index: Int) -> Int? {
         guard let textStorageRef = _textStorageRef else {
             log("\(#function): textStorageRef is nil",from:self)
@@ -846,86 +659,13 @@ final class KLines: CustomStringConvertible {
         return nil
     }
     
+    // index文字目の文字を含む行のKLineインスタンスを返す。
     func lineContainsCharacter(index: Int) -> KLine? {
         guard let lineIndex = lineIndexContainsCharacter(index: index) else { log("no line contains character at index \(index)"); return nil }
         return _lines[lineIndex]
     }
-    
-    // index文字目の文字を含む行を返す。ソフト・ハードを問わない。
-    /*
-    func lineContainsCharacter(index: Int) -> KLine? {
-        guard let textStorageRef = _textStorageRef else {
-            log("\(#function): textStorageRef is nil",from:self)
-            return nil
-        }
-
-        let count = textStorageRef.count
-        guard count > 0 else { return _lines.first }
-        guard index >= 0 && index <= count else {
-            log("index out of range (\(index))", from: self)
-            return nil
-        }
-
-        var low = 0
-        var high = _lines.count - 1
-
-        while low <= high {
-            let mid = (low + high) / 2
-            guard mid < _lines.count else {
-                log("mid out of range", from: self)
-                return nil
-            }
-
-            let line = _lines[mid]
-            let range = line.range.lowerBound ..< (line.range.upperBound + 1)  // include newline
-
-            if range.contains(index) {
-                return line
-            } else if index < range.lowerBound {
-                high = mid - 1
-            } else {
-                low = mid + 1
-            }
-        }
-
-        log("no match for index \(index)", from: self)
-        return nil
-    }*/
-    /*
-    func lineContainsCaharacter(index: Int) -> KLine? {
-        
-        guard let textStorageRef = _textStorageRef else { print("\(#function): textstorageref==nil"); return nil }
-        
-        let count = textStorageRef.count
-        
-        // 空行のみの場合は1行目の空行を返す。
-        guard count > 0 else { return _lines.first }
-        
-        //log("index:\(index), count:\(count)", from: self)
-        guard index >= 0 && index <= count else { log("out of range.", from: self); return nil }
-        
-        for line in _lines {
-            //print("\(#function) hardLineIndex:\(line.hardLineIndex), index:\(index)")
-            let range = line.range.lowerBound..<line.range.upperBound + 1
-            if range.contains(index) {
-                //print("\(#function) contains = true")
-                return line
-            }
-        }
-        log("out of range.", from: self)
-        return nil
-    }*/
-    
-    // hardLineIndex番目の行が_linesのどのindexか返す。
-    /*
-    func lineArrayIndex(for hardLineIndex: Int) -> Int? {
-        for (i, line) in _lines.enumerated() {
-            if line.hardLineIndex == hardLineIndex {
-                return i
-            }
-        }
-        return nil
-    }*/
+ 
+    // hardLineIndexを持つ行を返す。softLineIndexを指定することもできる。
     func lineArrayIndex(for hardLineIndex: Int, softLineIndex: Int = 0) -> Int? {
         guard let lineIndex = _hardLineIndexMap[hardLineIndex] else {
             log("lineIndex not found.", from: self)
@@ -949,7 +689,7 @@ final class KLines: CustomStringConvertible {
         return nil
     }
     
-    
+    // Text Input ClientのfirstRect()でRectを返すためのpointを返す。
     func pointForFirstRect(for characterIndex: Int) -> CGPoint? {
         guard let layoutManager = _layoutManager else { log("layoutManager not found.", from: self); return nil }
         guard let layoutRects = layoutManager.makeLayoutRects() else { log("layoutRects not found.", from: self); return nil }
