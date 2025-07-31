@@ -104,7 +104,11 @@ class KLine: CustomStringConvertible {
         // offsetを取得する前にCTLineを生成しておく必要がある。
         _ = ctLine
         
-        //log("_cacheOffsets:\(_cachedOffsets)")
+        if index < 0 || index >= _cachedOffsets.count {
+            log("index(\(index)) out of range.",from:self)
+            return 0.0
+        }
+        
         return _cachedOffsets[index]
     }
     
@@ -529,7 +533,7 @@ final class KLines: CustomStringConvertible {
         if start < newRange.upperBound {
             lineRanges.append(start..<newRange.upperBound)
         }
-        
+        /*
         guard let newStartLine = lineContainsCharacter(index: newRange.lowerBound) else { log("newStartLine is nil", from:self); return }
         let newStartHardLineIndex = newStartLine.hardLineIndex
         var newLines:[KLine] = []
@@ -541,7 +545,33 @@ final class KLines: CustomStringConvertible {
             newLines.append(contentsOf: lineArray)
         }
         
+        _lines.replaceSubrange(removeRange, with: newLines)*/
+        
+        guard let newStartLine = lineContainsCharacter(index: newRange.lowerBound) else {
+            log("newStartLine is nil", from: self)
+            return
+        }
+        let newStartHardLineIndex = newStartLine.hardLineIndex
+
+        
+        var newLinesBuffer = Array(repeating: [KLine](), count: lineRanges.count)
+        let width = layoutRects.textRegionWidth - layoutRects.textEdgeInsets.right
+
+        DispatchQueue.concurrentPerform(iterations: lineRanges.count) { i in
+            let range = lineRanges[i]
+            let hardLineIndex = newStartHardLineIndex + i
+            if let lineArray = layoutManager.makeLines(range: range, hardLineIndex: hardLineIndex, width: width) {
+                newLinesBuffer[i] = lineArray
+            } else {
+                log("lineArray is nil for index \(i)", from: self)
+                // エラー通知にする場合は別途検出処理を入れる必要あり
+            }
+        }
+
+        let newLines = newLinesBuffer.flatMap { $0 }
         _lines.replaceSubrange(removeRange, with: newLines)
+        
+        // kokomade
         
         guard let newLastLine = _lines.last else {
             log("newLastLine is nil", from: self)

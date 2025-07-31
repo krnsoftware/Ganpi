@@ -14,13 +14,15 @@
 import Foundation
 import AppKit
 import CoreText
+import os.lock
 
 final class KGlyphAdvanceCache {
 
     private let _font: NSFont
     private var _advanceCache: [Character: CGFloat] = [:]
+    private var _advanceLock = os_unfair_lock_s()
     //private var _tabWidth: CGFloat
-    private let _lock = NSLock()
+    //private let _lock = NSLock()
 
     private static let _defaultCharacters: [Character] = {
         var result: [Character] = []
@@ -45,8 +47,8 @@ final class KGlyphAdvanceCache {
     }()
 
     var count: Int {
-        _lock.lock()
-        defer { _lock.unlock() }
+        os_unfair_lock_lock(&_advanceLock)
+        defer { os_unfair_lock_unlock(&_advanceLock) }
         return _advanceCache.count
     }
     
@@ -101,12 +103,13 @@ final class KGlyphAdvanceCache {
     }*/
     // advanceはあくまでレイアウト用の仮の値。実測はCTLineに基いて行う。
     func advance(for character: Character) -> CGFloat {
-        _lock.lock()
-        defer { _lock.unlock() }
 
         if let cached = _advanceCache[character] {
             return cached
         }
+        
+        os_unfair_lock_lock(&_advanceLock)
+        defer { os_unfair_lock_unlock(&_advanceLock) }
 
         let string = String(character)
         let utf16Length = string.utf16.count
@@ -132,9 +135,10 @@ final class KGlyphAdvanceCache {
     func width(for characters: [Character], in range: Range<Int>) -> CGFloat {
         guard !characters.isEmpty else { return 0 }
 
+        os_unfair_lock_lock(&_advanceLock)
+        defer { os_unfair_lock_unlock(&_advanceLock) }
+        
         var total: CGFloat = 0
-        _lock.lock()
-        defer { _lock.unlock() }
 
         for i in range {
             if i >= 0 && i < characters.count {
