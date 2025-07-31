@@ -387,6 +387,10 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         for i in 0..<lines.count {
             guard let line = lines[i] else { log("line[i] is nil.", from:self); continue }
             let y = CGFloat(i) * lineHeight + layoutRects.textEdgeInsets.top
+            
+            if !verticalRange.contains(y) {
+                continue
+            }
                         
             // 選択範囲の描画
             let lineRange = line.range
