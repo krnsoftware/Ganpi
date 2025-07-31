@@ -551,6 +551,7 @@ final class KTextStorage: KTextStorageProtocol {
     
     private func resetCaches() {
         _advanceCache = KGlyphAdvanceCache(font: _baseFont)
+        _advanceCache.setParticularCache(spaceAdvance, for: "\t")
         _spaceAdvanceCache = nil
         _lineNumberDigitWidth = nil
         _invisibleCharacters = nil

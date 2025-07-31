@@ -110,6 +110,11 @@ final class KGlyphAdvanceCache {
         
         os_unfair_lock_lock(&_advanceLock)
         defer { os_unfair_lock_unlock(&_advanceLock) }
+        
+        // lock前に書換えられている可能性があるため再度チェック。
+        if let cached = _advanceCache[character] {
+            return cached
+        }
 
         let string = String(character)
         let utf16Length = string.utf16.count
@@ -130,6 +135,21 @@ final class KGlyphAdvanceCache {
         }
         
         return characters[range].map { advance(for: $0) }
+        
+        /* まったく処理速度が上がらなかったため削除。
+        let count = range.count
+        var result: [CGFloat] = []
+        result.reserveCapacity(count)
+
+        characters.withUnsafeBufferPointer { buffer in
+            let base = buffer.baseAddress! + range.lowerBound
+            for i in 0..<count {
+                let ch = base[i]
+                result.append(advance(for: ch))
+            }
+        }
+        return result
+         */
     }
     
     func width(for characters: [Character], in range: Range<Int>) -> CGFloat {

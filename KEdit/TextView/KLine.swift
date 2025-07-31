@@ -56,6 +56,7 @@ class KLine: CustomStringConvertible {
         
         // 文頭の連続したtabはタブ幅に従って、それ以外のtabはspaceと同じ幅でoffsetsを構築する。
         // この値はCTLineによる実測に比べ不正確なため、行の横幅を計算する以外の用途には用いられない。
+        /*
         let tabCar:Character = "\t"
         let tabWidth = CGFloat(layoutManager.tabWidth) * textStorageRef.spaceAdvance
         var result:[CGFloat] = [0.0]
@@ -74,6 +75,33 @@ class KLine: CustomStringConvertible {
                     offset += textStorageRef.advance(for: char)
                 }
             }
+            result.append(offset)
+        }
+        _cachedOffsets = result
+         */
+        //  460ms->370ms
+        let tabChar: Character = "\t"
+        let tabWidth = CGFloat(layoutManager.tabWidth) * textStorageRef.spaceAdvance
+        let chars = textStorageRef.characterSlice[range]
+
+        var result: [CGFloat] = [0.0]
+        var offset: CGFloat = 0.0
+        var index = 0
+
+        // 行頭の連続tabのみ特別扱い
+        for ch in chars {
+            if ch == tabChar {
+                offset += tabWidth
+                result.append(offset)
+                index += 1
+            } else {
+                break
+            }
+        }
+
+        // 残りをadvance(for:)ですべて処理（tabも含む）
+        for ch in chars.dropFirst(index) {
+            offset += textStorageRef.advance(for: ch) // "\t"も高速に処理される
             result.append(offset)
         }
         _cachedOffsets = result
@@ -188,6 +216,8 @@ class KLine: CustomStringConvertible {
 
         _cachedOffsets = offsets.isEmpty ? [0.0] : offsets
     }
+    
+   
     
     
     
@@ -547,6 +577,7 @@ final class KLines: CustomStringConvertible {
         
         _lines.replaceSubrange(removeRange, with: newLines)*/
         
+        // 並列処理を導入する。15000行のデータで1200ms->460msに短縮。
         guard let newStartLine = lineContainsCharacter(index: newRange.lowerBound) else {
             log("newStartLine is nil", from: self)
             return
