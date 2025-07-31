@@ -14,6 +14,7 @@ class KLine: CustomStringConvertible {
     fileprivate weak var _textStorageRef: KTextStorageReadable?
     private var _ctLine: CTLine?
     fileprivate var _cachedOffsets: [CGFloat]
+    private var _widthAndOffsetsFixed: Bool = false
     
     var range: Range<Int>
     var hardLineIndex: Int
@@ -205,16 +206,18 @@ class KLine: CustomStringConvertible {
         _ctLine = ctLine
 
         // CTLineから文字のoffsetを算出してcacheを入れ替える。
-        let string = attrString.string
-        var offsets: [CGFloat] = []
-
-        for i in 0...string.count {
-            let prefixCount = string.index(string.startIndex, offsetBy: i).utf16Offset(in: string)
-            let offset = CTLineGetOffsetForStringIndex(ctLine, prefixCount, nil)
-            offsets.append(offset)
+        if !_widthAndOffsetsFixed {
+            let string = attrString.string
+            var offsets: [CGFloat] = []
+            
+            for i in 0...string.count {
+                let prefixCount = string.index(string.startIndex, offsetBy: i).utf16Offset(in: string)
+                let offset = CTLineGetOffsetForStringIndex(ctLine, prefixCount, nil)
+                offsets.append(offset)
+            }
+            _cachedOffsets = offsets.isEmpty ? [0.0] : offsets
+            _widthAndOffsetsFixed = true
         }
-
-        _cachedOffsets = offsets.isEmpty ? [0.0] : offsets
     }
     
    
