@@ -257,12 +257,14 @@ final class KTextStorage: KTextStorageProtocol {
             _history.append(undoUnit)
         }
        
+        let timer2 = KTimeChecker(name: "cache")
         // for cache
         if 0 < newCharacters.count && newCharacters.count < 10 {
             for c in newCharacters { _ = _advanceCache.advance(for: c) }
         } else {
             _advanceCache.register(characters: newCharacters)
         }
+        timer2.stop()
         log("advanceCache.count = \(_advanceCache.count)", from:self)
         
         

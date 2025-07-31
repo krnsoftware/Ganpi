@@ -187,7 +187,9 @@ final class KGlyphAdvanceCache {
         }
     }*/
     func register(characters: [Character]) {
-        let newChars = characters.filter { _advanceCache[$0] == nil }
+        //let newChars = characters.filter { _advanceCache[$0] == nil }
+        // 1670ms -> 67ms
+        let newChars = Array(Set(characters.filter { _advanceCache[$0] == nil }))
         guard !newChars.isEmpty else { return }
 
         let joined = String(newChars)
