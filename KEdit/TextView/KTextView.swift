@@ -739,15 +739,16 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     // MARK: - Text Editing
     
     override func insertNewline(_ sender: Any?) {
+        let newlineChar:Character = "\n"
         
-        var spaces:[Character] = ["\n"]
+        var spaces:[Character] = [newlineChar]
         
-        if _autoIndent && selectionRange.lowerBound != 0 {
+        if _autoIndent && selectionRange.lowerBound != 0 && _textStorageRef[selectionRange.lowerBound - 1] != newlineChar {
             var range = 0..<0
             for i in (0..<selectionRange.lowerBound - 1).reversed() {
                 if i == 0 {
                     range = 0..<selectionRange.lowerBound
-                } else if _textStorageRef[i] == "\n" {
+                } else if _textStorageRef[i] == newlineChar {
                     range = (i + 1)..<selectionRange.lowerBound
                     break
                 }
