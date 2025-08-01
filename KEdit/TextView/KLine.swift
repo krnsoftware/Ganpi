@@ -542,12 +542,22 @@ final class KLines: CustomStringConvertible {
 
             newRange = lower..<upper
             
-            _lines[removeRange.upperBound..<_lines.count].forEach {
+            /*_lines[removeRange.upperBound..<_lines.count].forEach {
                 $0.shiftRange(by: info.insertedCount - info.range.count)
                 $0.shiftHardLineIndex(by: info.insertedNewlineCount - info.deletedNewlineCount)
                 //log("line index shifted by \(info.insertedNewlineCount - info.deletedNewlineCount)")
+            }*/
+            
+            
+            DispatchQueue.concurrentPerform(iterations: _lines.count - removeRange.upperBound) { i in
+                _lines[removeRange.upperBound + i].shiftRange(by: info.insertedCount - info.range.count)
+                _lines[removeRange.upperBound + i].shiftHardLineIndex(by: info.insertedNewlineCount - info.deletedNewlineCount)
             }
-            _lines.forEach { $0.removeCTLine() }
+            
+            //_lines.forEach { $0.removeCTLine() }
+            DispatchQueue.concurrentPerform(iterations: _lines.count) { i in
+                _lines[i].removeCTLine()
+            }
         }
         
         // その領域の文字列に含まれる行の領域の配列を得る。
