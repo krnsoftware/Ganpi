@@ -484,7 +484,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 
                 let size = number.size(withAttributes: attrs)
                 
-                let numberPointX = lnRect.maxX - size.width// - layoutRects.textEdgeInsets.left
+                let numberPointX = lnRect.maxX - size.width - LayoutRects.LineNumberEdgeInsets.default.right// - layoutRects.textEdgeInsets.left
                 let numberPointY = lnRect.origin.y + y - visibleRect.origin.y
                 let numberPoint = CGPoint(x: numberPointX, y: numberPointY)
                 

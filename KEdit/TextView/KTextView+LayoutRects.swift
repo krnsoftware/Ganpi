@@ -23,6 +23,13 @@ struct LayoutRects {
         static let `default` = TextEdgeInsets(top: 8, left: 8, bottom: 8, right: 8)
     }
     
+    struct LineNumberEdgeInsets {
+        let left: CGFloat
+        let right: CGFloat
+        
+        static let `default` = LineNumberEdgeInsets(left: 10, right: 10)
+    }
+    
     //private let _bounds: CGRect
     private let _visibleRect: CGRect
     private let _layoutManagerRef: KLayoutManagerReadable
@@ -71,7 +78,8 @@ struct LayoutRects {
             charWidth = textStorage.lineNumberCharacterMaxWidth
             //log("charWidth: \(charWidth)")
         }
-        let lineNumberWidth = CGFloat(digitCount) * charWidth + 10.0//5.0
+        //let lineNumberWidth = CGFloat(digitCount) * charWidth + 10.0//5.0
+        let lineNumberWidth = CGFloat(digitCount) * charWidth + LineNumberEdgeInsets.default.left + LineNumberEdgeInsets.default.right
         
         let lineNumberRect: CGRect? = showLineNumbers ?
         CGRect(x: visibleRect.origin.x, y: visibleRect.origin.y, width: lineNumberWidth, height: visibleRect.height) :

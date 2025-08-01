@@ -176,6 +176,7 @@ final class KTextStorage: KTextStorageProtocol {
         }
     }
     
+    // 行番号表示に使用するフォント
     var lineNumberFont: NSFont {
         get { _lineNumberFont }
         set {
@@ -184,6 +185,7 @@ final class KTextStorage: KTextStorageProtocol {
         }
     }
     
+    // 行番号表示に使用するフォント。強調表示用。
     var lineNumberFontEmph: NSFont {
         get { _lineNumberFont }
         set {
@@ -192,6 +194,15 @@ final class KTextStorage: KTextStorageProtocol {
         }
     }
     
+    var fontSizeOfLineNumber: CGFloat {
+        get { _lineNumberFont.pointSize }
+        set {
+            _lineNumberFont = _lineNumberFont.withSize(newValue)
+            _lineNumberFontEmph = _lineNumberFontEmph.withSize(newValue)
+        }
+    }
+    
+    // 行番号表示に使用する数字の最大の横幅。
     var lineNumberCharacterMaxWidth: CGFloat {
         if let width = _lineNumberCharacterMaxWidth {
             return width
@@ -604,6 +615,10 @@ final class KTextStorage: KTextStorageProtocol {
         _spaceAdvanceCache = nil
         _lineNumberDigitWidth = nil
         _invisibleCharacters = nil
+        //_lineNumberCharacterMaxWidth = nil
+        
+        fontSizeOfLineNumber = baseFont.pointSize - 1.0
+        
     }
     
     
