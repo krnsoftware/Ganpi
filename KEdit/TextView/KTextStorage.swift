@@ -52,6 +52,9 @@ protocol KTextStorageReadable: KTextStorageCommon {
     var hardLineCount: Int { get } // if _character is empty, return 1. if end of chars is '\n', add 1.
     var invisibleCharacters: KInvisibleCharacters? { get }
     var spaceAdvance: CGFloat { get }
+    var lineNumberCharacterMaxWidth: CGFloat { get }
+    var lineNumberFont: NSFont { get }
+    var lineNumberFontEmph: NSFont { get }
     
     func wordRange(at index: Int) -> Range<Int>?
     func attributedString(for range: Range<Int>, tabWidth: Int?) -> NSAttributedString?
@@ -119,6 +122,8 @@ final class KTextStorage: KTextStorageProtocol {
     private(set) var _characters: [Character] = []
     private var _observers: [(KStorageModified) -> Void] = []
     private var _baseFont: NSFont = .monospacedSystemFont(ofSize: 12, weight: .regular)
+    private var _lineNumberFont: NSFont = .monospacedDigitSystemFont(ofSize: 11 ,weight: .regular)
+    private var _lineNumberFontEmph: NSFont = .monospacedDigitSystemFont(ofSize: 11 ,weight: .bold)
     
     // caches.
     private var _advanceCache: KGlyphAdvanceCache
@@ -126,12 +131,16 @@ final class KTextStorage: KTextStorageProtocol {
     private var _lineNumberDigitWidth: CGFloat?
     private var _hardLineCount: Int?
     private var _invisibleCharacters: KInvisibleCharacters?
+    private var _lineNumberCharacterMaxWidth: CGFloat?
     
     
     // for undo.
     private var _history: KRingBuffer<KUndoUnit> = .init(capacity: 5000)
     private var _undoDepth: Int = 0
     private var _undoActions: KRingBuffer<KUndoAction> = .init(capacity: 2)
+    
+    // constants.
+    private let _characterCacheLoadLimit: Int = 100_000
 
     // MARK: - Public API
 
@@ -154,10 +163,6 @@ final class KTextStorage: KTextStorageProtocol {
         set {
             _baseFont = newValue
             resetCaches()
-            /*_advanceCache = KGlyphAdvanceCache(font: _baseFont)
-            _spaceAdvanceCache = nil
-            _lineNumberDigitWidth = nil
-            _invisibleCharacters = nil*/
             notifyColoringChanged(in: 0..<_characters.count)
         }
     }
@@ -167,12 +172,48 @@ final class KTextStorage: KTextStorageProtocol {
         set {
             _baseFont = _baseFont.withSize(newValue)
             resetCaches()
-            /*_advanceCache = KGlyphAdvanceCache(font: _baseFont)
-            _spaceAdvanceCache = nil
-            _lineNumberDigitWidth = nil
-            _invisibleCharacters = nil*/
             notifyColoringChanged(in: 0..<_characters.count)
         }
+    }
+    
+    var lineNumberFont: NSFont {
+        get { _lineNumberFont }
+        set {
+            _lineNumberFont = newValue
+            _lineNumberDigitWidth = nil
+        }
+    }
+    
+    var lineNumberFontEmph: NSFont {
+        get { _lineNumberFont }
+        set {
+            _lineNumberFontEmph = newValue
+            _lineNumberDigitWidth = nil
+        }
+    }
+    
+    var lineNumberCharacterMaxWidth: CGFloat {
+        if let width = _lineNumberCharacterMaxWidth {
+            return width
+        }
+        
+        let digits: [Character] = Array("0123456789")
+        let ctFont = _lineNumberFontEmph as CTFont
+
+        var maxWidth: CGFloat = 0
+
+        for char in digits {
+            guard let scalar = char.unicodeScalars.first else { continue }
+            let uniChar = UniChar(scalar.value)
+            var glyph = CGGlyph()
+            let success = CTFontGetGlyphsForCharacters(ctFont, [uniChar], &glyph, 1)
+            if success {
+                var advance: CGSize = .zero
+                CTFontGetAdvancesForGlyphs(ctFont, .horizontal, [glyph], &advance, 1)
+                maxWidth = max(maxWidth, advance.width)
+            }
+        }
+        return maxWidth
     }
     
     
@@ -259,11 +300,17 @@ final class KTextStorage: KTextStorageProtocol {
        
         let timer2 = KTimeChecker(name: "cache")
         // for cache
+        // キャッシュに回す文字数の上限を設定しようとしたところ、advance()で落ちるようになった。
+        // 原因ははっきりしないが、keyのCharacterがCharacterとして不正なことがある様子。一旦そのままにする。
         if 0 < newCharacters.count && newCharacters.count < 10 {
             for c in newCharacters { _ = _advanceCache.advance(for: c) }
         } else {
             _advanceCache.register(characters: newCharacters)
         }
+        /*} else if newCharacters.count < _characterCacheLoadLimit {
+            _advanceCache.register(characters: newCharacters)
+        }*/ // _characterCacheLoadLimit以上の文字数であればcacheしない。
+        
         timer2.stop()
         log("advanceCache.count = \(_advanceCache.count)", from:self)
         

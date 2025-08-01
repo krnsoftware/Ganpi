@@ -67,10 +67,11 @@ struct LayoutRects {
         
         var charWidth: CGFloat = 20
         if let textStorage = _textStorageRef as? KTextStorage  {
-            charWidth = textStorage.lineNumberDigitWidth
+            //charWidth = textStorage.lineNumberDigitWidth
+            charWidth = textStorage.lineNumberCharacterMaxWidth
             //log("charWidth: \(charWidth)")
         }
-        let lineNumberWidth = CGFloat(digitCount) * charWidth + 5.0
+        let lineNumberWidth = CGFloat(digitCount) * charWidth + 10.0//5.0
         
         let lineNumberRect: CGRect? = showLineNumbers ?
         CGRect(x: visibleRect.origin.x, y: visibleRect.origin.y, width: lineNumberWidth, height: visibleRect.height) :

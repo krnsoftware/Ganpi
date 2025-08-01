@@ -55,7 +55,10 @@ final class KGlyphAdvanceCache {
 
     init(font: NSFont) {
         self._font = font
+        
+        let timer = KTimeChecker(name:"preload")
         preload()
+        timer.stop()
     }
     
     // CTLineからoffsetのリストを返す。
@@ -103,7 +106,8 @@ final class KGlyphAdvanceCache {
     }*/
     // advanceはあくまでレイアウト用の仮の値。実測はCTLineに基いて行う。
     func advance(for character: Character) -> CGFloat {
-
+        
+        
         if let cached = _advanceCache[character] {
             return cached
         }

@@ -23,7 +23,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     // MARK: - Properties
     // 外部インスタンスの参照
-    private var _textStorageRef: KTextStorageProtocol = KTextStorage()
+    private var _textStorageRef: KTextStorageProtocol// = KTextStorage()
     private var _layoutManager: KLayoutManager
     private let _caretView = KCaretView()
     
@@ -366,6 +366,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         path.stroke()*/
         
         
+        
         let lines = _layoutManager.lines
         let lineHeight = _layoutManager.lineHeight
         let textRect = layoutRects.textRegion.rect
@@ -453,13 +454,21 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             lnRect.fill()
             
             // 非選択行の文字のattribute
-            let attrs: [NSAttributedString.Key: Any] = [
+            /*let attrs: [NSAttributedString.Key: Any] = [
                 .font: NSFont.monospacedDigitSystemFont(ofSize: 0.9 * _textStorageRef.baseFont.pointSize,weight: .regular),
+                .foregroundColor: NSColor.secondaryLabelColor
+            ]*/
+            let attrs: [NSAttributedString.Key: Any] = [
+                .font: _textStorageRef.lineNumberFont,
                 .foregroundColor: NSColor.secondaryLabelColor
             ]
             // 選択行の文字のattribute
-            let attrs_emphasized: [NSAttributedString.Key: Any] = [
+            /*let attrs_emphasized: [NSAttributedString.Key: Any] = [
                 .font: NSFont.monospacedDigitSystemFont(ofSize: 0.9 * _textStorageRef.baseFont.pointSize,weight: .bold),
+                .foregroundColor: NSColor.labelColor
+            ]*/
+            let attrs_emphasized: [NSAttributedString.Key: Any] = [
+                .font: _textStorageRef.lineNumberFontEmph,
                 .foregroundColor: NSColor.labelColor
             ]
             
@@ -475,7 +484,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 
                 let size = number.size(withAttributes: attrs)
                 
-                let numberPointX = lnRect.maxX - size.width - layoutRects.textEdgeInsets.left
+                let numberPointX = lnRect.maxX - size.width// - layoutRects.textEdgeInsets.left
                 let numberPointY = lnRect.origin.y + y - visibleRect.origin.y
                 let numberPoint = CGPoint(x: numberPointX, y: numberPointY)
                 
@@ -500,7 +509,11 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 
             }
         }
-        
+        /*
+        let path = NSBezierPath(rect: layoutRects.lineNumberRegion!.rect)
+        NSColor.red.setStroke()
+        path.lineWidth = 2
+        path.stroke()*/
         
     }
    

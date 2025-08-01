@@ -550,8 +550,9 @@ final class KLines: CustomStringConvertible {
             
             
             DispatchQueue.concurrentPerform(iterations: _lines.count - removeRange.upperBound) { i in
-                _lines[removeRange.upperBound + i].shiftRange(by: info.insertedCount - info.range.count)
-                _lines[removeRange.upperBound + i].shiftHardLineIndex(by: info.insertedNewlineCount - info.deletedNewlineCount)
+                let line = _lines[removeRange.upperBound + i]
+                line.shiftRange(by: info.insertedCount - info.range.count)
+                line.shiftHardLineIndex(by: info.insertedNewlineCount - info.deletedNewlineCount)
             }
             
             //_lines.forEach { $0.removeCTLine() }
