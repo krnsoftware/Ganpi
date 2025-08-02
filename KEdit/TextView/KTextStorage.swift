@@ -59,8 +59,8 @@ protocol KTextStorageReadable: KTextStorageCommon {
     func wordRange(at index: Int) -> Range<Int>?
     func attributedString(for range: Range<Int>, tabWidth: Int?) -> NSAttributedString?
     func lineRange(at index: Int) -> Range<Int>?
-    func advances(in range:Range<Int>) -> [CGFloat]
-    func advance(for character:Character) -> CGFloat
+    //func advances(in range:Range<Int>) -> [CGFloat]
+    //func advance(for character:Character) -> CGFloat
     //func countLines() -> Int
 }
 
@@ -126,7 +126,7 @@ final class KTextStorage: KTextStorageProtocol {
     private var _lineNumberFontEmph: NSFont = .monospacedDigitSystemFont(ofSize: 11 ,weight: .bold)
     
     // caches.
-    private var _advanceCache: KGlyphAdvanceCache
+    //private var _advanceCache: KGlyphAdvanceCache
     private var _spaceAdvanceCache: CGFloat?
     private var _lineNumberDigitWidth: CGFloat?
     private var _hardLineCount: Int?
@@ -284,7 +284,7 @@ final class KTextStorage: KTextStorageProtocol {
         _undoActions.append(.none)
         _undoActions.append(.none)
         
-        _advanceCache = KGlyphAdvanceCache(font: _baseFont)
+        //_advanceCache = KGlyphAdvanceCache(font: _baseFont)
         _invisibleCharacters = KInvisibleCharacters()
         
     }
@@ -326,7 +326,7 @@ final class KTextStorage: KTextStorageProtocol {
         }*/ // _characterCacheLoadLimit以上の文字数であればcacheしない。
         
         timer2.stop()
-        log("advanceCache.count = \(_advanceCache.count)", from:self)
+        //log("advanceCache.count = \(_advanceCache.count)", from:self)
          
         
         
@@ -598,13 +598,14 @@ final class KTextStorage: KTextStorageProtocol {
     }
     
     // 与えられた範囲のadvanceの配列を返す。
+    /*
     func advances(in range:Range<Int>) -> [CGFloat] {
         return _advanceCache.advances(for: _characters, in: range)
     }
     
     func advance(for character:Character) -> CGFloat {
         return _advanceCache.advance(for: character)
-    }
+    }*/
     
     
     // MARK: - Private
@@ -614,8 +615,8 @@ final class KTextStorage: KTextStorageProtocol {
     }
     
     private func resetCaches() {
-        _advanceCache = KGlyphAdvanceCache(font: _baseFont)
-        _advanceCache.setParticularCache(spaceAdvance, for: "\t")
+        //_advanceCache = KGlyphAdvanceCache(font: _baseFont)
+        //_advanceCache.setParticularCache(spaceAdvance, for: "\t")
         _spaceAdvanceCache = nil
         _lineNumberDigitWidth = nil
         _invisibleCharacters = nil

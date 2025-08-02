@@ -13,7 +13,8 @@ class KLine: CustomStringConvertible {
     fileprivate weak var _layoutManager: KLayoutManager?
     fileprivate weak var _textStorageRef: KTextStorageReadable?
     private var _ctLine: CTLine?
-    fileprivate var _cachedOffsets: [CGFloat]
+    //fileprivate var _cachedOffsets: [CGFloat]
+    fileprivate var _cachedOffsets: [CGFloat] = [0.0]
     private var _widthAndOffsetsFixed: Bool = false
     
     var range: Range<Int>
@@ -81,6 +82,7 @@ class KLine: CustomStringConvertible {
         _cachedOffsets = result
          */
         //  460ms->370ms
+        /*
         let tabChar: Character = "\t"
         let tabWidth = CGFloat(layoutManager.tabWidth) * textStorageRef.spaceAdvance
         let chars = textStorageRef.characterSlice[range]
@@ -105,7 +107,7 @@ class KLine: CustomStringConvertible {
             offset += textStorageRef.advance(for: ch) // "\t"も高速に処理される
             result.append(offset)
         }
-        _cachedOffsets = result
+        _cachedOffsets = result*/
     }
     
     //@inline(__always)
