@@ -309,21 +309,25 @@ final class KTextStorage: KTextStorageProtocol {
             _history.append(undoUnit)
         }
        
+        
         let timer2 = KTimeChecker(name: "cache")
         // for cache
         // キャッシュに回す文字数の上限を設定しようとしたところ、advance()で落ちるようになった。
         // 原因ははっきりしないが、keyのCharacterがCharacterとして不正なことがある様子。一旦そのままにする。
+        /*
         if 0 < newCharacters.count && newCharacters.count < 10 {
             for c in newCharacters { _ = _advanceCache.advance(for: c) }
         } else {
             _advanceCache.register(characters: newCharacters)
-        }
+        }*/
+        
         /*} else if newCharacters.count < _characterCacheLoadLimit {
             _advanceCache.register(characters: newCharacters)
         }*/ // _characterCacheLoadLimit以上の文字数であればcacheしない。
         
         timer2.stop()
         log("advanceCache.count = \(_advanceCache.count)", from:self)
+         
         
         
         // 改行の数が旧テキストと新テキストで異なれば_hardLineCountが変化する。

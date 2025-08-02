@@ -108,14 +108,19 @@ class KLine: CustomStringConvertible {
         _cachedOffsets = result
     }
     
+    //@inline(__always)
     func shiftRange(by delta:Int){
+        //if delta == 0 { return }
         range = (range.lowerBound + delta)..<(range.upperBound + delta)
     }
     
+    //@inline(__always)
     func shiftHardLineIndex(by delta:Int){
+        //if delta == 0 { return }
         hardLineIndex += delta
     }
     
+    //@inline(__always)
     func removeCTLine() {
         _ctLine = nil
     }

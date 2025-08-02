@@ -61,61 +61,13 @@ final class KGlyphAdvanceCache {
         timer.stop()
     }
     
-    // CTLineからoffsetのリストを返す。
-    // 行それぞれで形成されるCTLineでキャッシュではなく実測による補正を行う。
-    /*static func offsets(of ctLine: CTLine) -> [CGFloat] {
-        var offsets:[CGFloat] = []
-        for i in 0..<
-        return []
-    }*/
-
-    /*func advance(for character: Character) -> CGFloat {
-        _lock.lock()
-        defer { _lock.unlock() }
-
-        if let cached = _advanceCache[character] {
-            return cached
-        }
-
-        let attr = NSAttributedString(string: String(character), attributes: [.font: _font])
-        let line = CTLineCreateWithAttributedString(attr)
-        let advance = CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
-
-        _advanceCache[character] = advance
-        return advance
-    }*/
-    // CTLineGetTypographicBoundsでadvanceを計算すると、まとめてcacheしたCTLineCreateWithAttributedString由来のadvanceと誤差が出る。
-    // 1文字ずつのものもCTLineCreateWithAttributedStringで計算することにして誤差は縮小したが、やはりずれる。
+    
+    // advanceはあくまでレイアウト用の仮の値。実測はCTLineに基いて行う。
     /*
     func advance(for character: Character) -> CGFloat {
-        _lock.lock()
-        defer { _lock.unlock() }
-
-        if let cached = _advanceCache[character] {
-            return cached
-        }
-
-        let attr = NSAttributedString(string: String(character), attributes: [.font: _font])
-        let line = CTLineCreateWithAttributedString(attr)
-
-        // 1文字だけなので index = 1 で advance 相当の位置になる
-        let advance = CTLineGetOffsetForStringIndex(line, 1, nil)
-
-        _advanceCache[character] = advance
-        return advance
-    }*/
-    // advanceはあくまでレイアウト用の仮の値。実測はCTLineに基いて行う。
-    func advance(for character: Character) -> CGFloat {
-        
-        
-        if let cached = _advanceCache[character] {
-            return cached
-        }
-        
         os_unfair_lock_lock(&_advanceLock)
         defer { os_unfair_lock_unlock(&_advanceLock) }
         
-        // lock前に書換えられている可能性があるため再度チェック。
         if let cached = _advanceCache[character] {
             return cached
         }
@@ -130,7 +82,33 @@ final class KGlyphAdvanceCache {
 
         _advanceCache[character] = advance
         return advance
+    }*/
+    func advance(for character: Character) -> CGFloat {
+        // 読み取り用ロック（ロック競合を避ける簡易読み出し）
+        var cached: CGFloat? = nil
+        os_unfair_lock_lock(&_advanceLock)
+        cached = _advanceCache[character]
+        os_unfair_lock_unlock(&_advanceLock)
+
+        if let cached {
+            return cached
+        }
+
+        // ここでCTLine生成
+        let string = String(character)
+        let utf16Length = string.utf16.count
+        let attr = NSAttributedString(string: string, attributes: [.font: _font])
+        let line = CTLineCreateWithAttributedString(attr)
+        let advance = CTLineGetOffsetForStringIndex(line, utf16Length, nil)
+
+        // 書き込み時だけロック
+        os_unfair_lock_lock(&_advanceLock)
+        _advanceCache[character] = advance
+        os_unfair_lock_unlock(&_advanceLock)
+
+        return advance
     }
+    
     
     func advances(for characters: [Character], in range: Range<Int>) -> [CGFloat] {
         guard range.lowerBound >= 0, range.upperBound <= characters.count else {
@@ -138,7 +116,9 @@ final class KGlyphAdvanceCache {
                 return []
         }
         
+        
         return characters[range].map { advance(for: $0) }
+        
         
         /* まったく処理速度が上がらなかったため削除。
         let count = range.count
