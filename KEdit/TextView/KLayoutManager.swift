@@ -58,12 +58,13 @@ final class KLayoutManager: KLayoutManagerReadable {
     // baseFontの現在のサイズにおけるspaceの幅の何倍かで指定する。
     private var _tabWidth: Int = 4
     
-    // 前回の描画部分のclipViewの矩形を記録する。
-    //private var _prevTextViewFrame: NSRect = .zero
-    
-    //private var _currentTextStorageVersion: Int = 0
     
     private var _prevLineNumberRegionWidth: CGFloat = 0
+    
+    private let _purgeTimer: DispatchSourceTimer
+    private let _purgeQueue = DispatchQueue(label: "com.kedit.layoutmanager.purge", qos: .utility)
+    
+    
     
     // 表示される行をまとめるKLinesクラスインスタンス。
     private lazy var _lines: KLines = {
@@ -130,16 +131,22 @@ final class KLayoutManager: KLayoutManagerReadable {
 
     init(textStorageRef: KTextStorageProtocol) {
         _textStorageRef = textStorageRef
-        
-        //_textStorageRef.string = "sample"
-        
-        //_lines = KLines(layoutManager: self, textStorageRef: _textStorageRef)
+        _purgeTimer = DispatchSource.makeTimerSource(queue: _purgeQueue)
         
         textStorageRef.addObserver { [weak self] modification in
             self?.textStorageDidModify(modification)
         }
         
+        setupPurgeTimer()
+        
         rebuildLayout()
+        
+        
+    }
+    
+    deinit {
+        _purgeTimer.setEventHandler {}
+        _purgeTimer.cancel()
     }
 
     // MARK: - Layout
@@ -398,6 +405,20 @@ final class KLayoutManager: KLayoutManagerReadable {
         lines.append(KFakeLine(attributedString: subAttr, hardLineIndex: hardLineIndex, softLineIndex: softLineIndex, layoutManager: self, textStorageRef: _textStorageRef))
         
         return lines
+    }
+    
+    
+    private func setupPurgeTimer() {
+        // 5秒ごとにpurgeを呼ぶ（適宜調整可）
+        _purgeTimer.schedule(deadline: .now() + 5.0, repeating: 5.0)
+        _purgeTimer.setEventHandler { [weak self] in
+            self?.purgeObsoleteLines()
+        }
+        _purgeTimer.resume()
+    }
+
+    private func purgeObsoleteLines() {
+        _lines.purgeObsoleteCTLines()
     }
     
     

@@ -16,6 +16,7 @@ class KLine: CustomStringConvertible {
     //fileprivate var _cachedOffsets: [CGFloat]
     fileprivate var _cachedOffsets: [CGFloat] = [0.0]
     private var _widthAndOffsetsFixed: Bool = false
+    private var _lastAccessedTime: CFTimeInterval?
     
     var range: Range<Int>
     var hardLineIndex: Int
@@ -26,12 +27,19 @@ class KLine: CustomStringConvertible {
         if _ctLine == nil {
             makeCTLine()
         }
+        _lastAccessedTime = CACurrentMediaTime()
+        
         return _ctLine
     }
     
     // 行の幅をCGFloatで返す。
     var width: CGFloat {
         return _cachedOffsets.last ?? 0.0
+    }
+    
+    // CTLineが最後に要求された時間を返す。CTLineが生成されていなければnil.
+    var lastAccessedTime: CFTimeInterval? {
+        return _lastAccessedTime
     }
     
     var description: String {
@@ -46,68 +54,6 @@ class KLine: CustomStringConvertible {
         self._layoutManager = layoutManager
         self._textStorageRef = textStorageRef
         
-        // 文字のオフセットをadcanveから算出してcache。
-        // この値は実測に比べて不正確のため、CTLineが生成された時点で正確なものに入れ替えられる。
-        /*
-        var result:[CGFloat] = [0.0]
-        _ = textStorageRef.advances(in: range).reduce(into: 0) { sum, value in
-            sum += value
-            result.append(sum)
-        }
-        _cachedOffsets = result*/
-        
-        // 文頭の連続したtabはタブ幅に従って、それ以外のtabはspaceと同じ幅でoffsetsを構築する。
-        // この値はCTLineによる実測に比べ不正確なため、行の横幅を計算する以外の用途には用いられない。
-        /*
-        let tabCar:Character = "\t"
-        let tabWidth = CGFloat(layoutManager.tabWidth) * textStorageRef.spaceAdvance
-        var result:[CGFloat] = [0.0]
-        var isInHeadTabs:Bool = true
-        var offset:CGFloat = 0.0
-        for i in range.lowerBound..<range.upperBound {
-            guard let char = textStorageRef[i] else { log("textStorageRef[i] = nil."); continue }
-            if isInHeadTabs, char == tabCar {
-                offset += tabWidth
-                
-            } else {
-                isInHeadTabs = false
-                if char == tabCar {
-                    offset += textStorageRef.spaceAdvance
-                } else {
-                    offset += textStorageRef.advance(for: char)
-                }
-            }
-            result.append(offset)
-        }
-        _cachedOffsets = result
-         */
-        //  460ms->370ms
-        /*
-        let tabChar: Character = "\t"
-        let tabWidth = CGFloat(layoutManager.tabWidth) * textStorageRef.spaceAdvance
-        let chars = textStorageRef.characterSlice[range]
-
-        var result: [CGFloat] = [0.0]
-        var offset: CGFloat = 0.0
-        var index = 0
-
-        // 行頭の連続tabのみ特別扱い
-        for ch in chars {
-            if ch == tabChar {
-                offset += tabWidth
-                result.append(offset)
-                index += 1
-            } else {
-                break
-            }
-        }
-
-        // 残りをadvance(for:)ですべて処理（tabも含む）
-        for ch in chars.dropFirst(index) {
-            offset += textStorageRef.advance(for: ch) // "\t"も高速に処理される
-            result.append(offset)
-        }
-        _cachedOffsets = result*/
     }
     
     //@inline(__always)
@@ -125,6 +71,7 @@ class KLine: CustomStringConvertible {
     //@inline(__always)
     func removeCTLine() {
         _ctLine = nil
+        _lastAccessedTime = nil
     }
     
     // この行における文字のオフセットを行の左端を0.0とした相対座標のx位置のリストで返す。
@@ -785,6 +732,24 @@ final class KLines: CustomStringConvertible {
         let y = layoutRects.textEdgeInsets.top + CGFloat(lineIndex + 1) * layoutManager.lineHeight
         
         return CGPoint(x: x, y: y)
+    }
+    
+    // 最後にCTLineアクセスされてからthresholdで示された秒数が経過した行のCTLineをremoveする。
+    func purgeObsoleteCTLines(olderThan threshold: TimeInterval = 10.0) {
+        let now = CACurrentMediaTime()
+        
+        DispatchQueue.global(qos: .utility).async {
+            var count = 0
+            for line in self._lines {
+                if let lastAccessedTime = line.lastAccessedTime, now - lastAccessedTime > threshold {
+                    line.removeCTLine()
+                    count += 1
+                    //log("removeCTLine: hardLineIndex = \(line.hardLineIndex), softLineIndex = \(line.softLineIndex)",from:self)
+                }
+            }
+            if count > 0 { log("remove \(count) CTLines.",from:self) }
+        }
+        
     }
     
 }
