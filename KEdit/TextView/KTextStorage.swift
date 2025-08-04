@@ -7,6 +7,7 @@
 
 import Cocoa
 import AppKit
+import TreeSitterBridge
 
 // MARK: - General enum and struct
 
@@ -128,7 +129,7 @@ final class KTextStorage: KTextStorageProtocol {
     // caches.
     //private var _advanceCache: KGlyphAdvanceCache
     private var _spaceAdvanceCache: CGFloat?
-    private var _lineNumberDigitWidth: CGFloat?
+    //private var _lineNumberDigitWidth: CGFloat?
     private var _hardLineCount: Int?
     private var _invisibleCharacters: KInvisibleCharacters?
     private var _lineNumberCharacterMaxWidth: CGFloat?
@@ -181,7 +182,8 @@ final class KTextStorage: KTextStorageProtocol {
         get { _lineNumberFont }
         set {
             _lineNumberFont = newValue
-            _lineNumberDigitWidth = nil
+            //_lineNumberDigitWidth = nil
+            _lineNumberCharacterMaxWidth = nil
         }
     }
     
@@ -190,7 +192,8 @@ final class KTextStorage: KTextStorageProtocol {
         get { _lineNumberFont }
         set {
             _lineNumberFontEmph = newValue
-            _lineNumberDigitWidth = nil
+            //_lineNumberDigitWidth = nil
+            _lineNumberCharacterMaxWidth = nil
         }
     }
     
@@ -246,16 +249,17 @@ final class KTextStorage: KTextStorageProtocol {
         _characters = Array(string)
         _history.reset()
     }
-    
+    /*
     var lineNumberDigitWidth: CGFloat {
-        if let width = _lineNumberDigitWidth {
+        //if let width = _lineNumberDigitWidth {
+        if let width = _lineNumberCharacterMaxWidth {
             return width
         }
         let attrStr = NSAttributedString(string: "M", attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: _baseFont.pointSize * 0.95, weight: .regular)])
         let ctLine = CTLineCreateWithAttributedString(attrStr)
         let charWidth = CGFloat(CTLineGetTypographicBounds(ctLine, nil, nil, nil))
         return charWidth
-    }
+    }*/
     
     // 論理行の数を返す。
     var hardLineCount: Int {
@@ -287,6 +291,7 @@ final class KTextStorage: KTextStorageProtocol {
         //_advanceCache = KGlyphAdvanceCache(font: _baseFont)
         _invisibleCharacters = KInvisibleCharacters()
         
+        
     }
 
     // 最終的に全ての文字列の変更はこのメソッドを通じて行う。
@@ -308,27 +313,6 @@ final class KTextStorage: KTextStorageProtocol {
             
             _history.append(undoUnit)
         }
-       
-        
-        let timer2 = KTimeChecker(name: "cache")
-        // for cache
-        // キャッシュに回す文字数の上限を設定しようとしたところ、advance()で落ちるようになった。
-        // 原因ははっきりしないが、keyのCharacterがCharacterとして不正なことがある様子。一旦そのままにする。
-        /*
-        if 0 < newCharacters.count && newCharacters.count < 10 {
-            for c in newCharacters { _ = _advanceCache.advance(for: c) }
-        } else {
-            _advanceCache.register(characters: newCharacters)
-        }*/
-        
-        /*} else if newCharacters.count < _characterCacheLoadLimit {
-            _advanceCache.register(characters: newCharacters)
-        }*/ // _characterCacheLoadLimit以上の文字数であればcacheしない。
-        
-        timer2.stop()
-        //log("advanceCache.count = \(_advanceCache.count)", from:self)
-         
-        
         
         // 改行の数が旧テキストと新テキストで異なれば_hardLineCountが変化する。
         let oldReturnCount = _characters[range].filter { $0 == "\n" }.count
@@ -348,6 +332,21 @@ final class KTextStorage: KTextStorageProtocol {
         
         // undo. recovery.
         _undoActions.append(.none)
+        
+        // test code.
+        
+        // Tree-sitter C API を用いた簡易パーステスト
+        guard let parser = ts_parser_new() else { return false }
+        defer { ts_parser_delete(parser) }
+
+        let lang = tree_sitter_ruby()
+        ts_parser_set_language(parser, lang)
+
+        let source = "def hello\n  puts 'world'\nend"
+        let tree = ts_parser_parse_string(parser, nil, source, UInt32(source.utf8.count))
+        let root = ts_tree_root_node(tree)
+
+        print("Start byte: \(ts_node_start_byte(root)), End byte: \(ts_node_end_byte(root))")
         
         
         return true
@@ -608,6 +607,8 @@ final class KTextStorage: KTextStorageProtocol {
     }*/
     
     
+    
+    
     // MARK: - Private
 
     private func notifyObservers(_ event: KStorageModified) {
@@ -618,9 +619,9 @@ final class KTextStorage: KTextStorageProtocol {
         //_advanceCache = KGlyphAdvanceCache(font: _baseFont)
         //_advanceCache.setParticularCache(spaceAdvance, for: "\t")
         _spaceAdvanceCache = nil
-        _lineNumberDigitWidth = nil
+        //_lineNumberDigitWidth = nil
         _invisibleCharacters = nil
-        //_lineNumberCharacterMaxWidth = nil
+        _lineNumberCharacterMaxWidth = nil
         
         fontSizeOfLineNumber = baseFont.pointSize - 1.0
         
