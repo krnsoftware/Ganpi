@@ -325,6 +325,10 @@ final class KTextStorage: KTextStorageProtocol {
         // replacement.
         _characters.replaceSubrange(range, with: newCharacters)
         
+        // 構文カラーリングのパーサーに通す。現在は全文。
+        //_parser.parse(range.lowerBound..<range.upperBound + newCharacters.count - range.count)
+        _parser.parse(0..<count)
+        
         // notification.
         let timer = KTimeChecker(name:"observer")
         notifyObservers(.textChanged(info: KStorageModifiedInfo(range:range, insertedCount: newCharacters.count, deletedNewlineCount: oldReturnCount, insertedNewlineCount: newReturnCount)))
@@ -332,9 +336,6 @@ final class KTextStorage: KTextStorageProtocol {
         
         // undo. recovery.
         _undoActions.append(.none)
-        
-        //_parser.parse(range.lowerBound..<range.upperBound + newCharacters.count - range.count)
-        _parser.parse(0..<count)
         
         
         return true
