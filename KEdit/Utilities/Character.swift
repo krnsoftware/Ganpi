@@ -40,4 +40,9 @@ extension Character {
         }
     }
     
+    // そのCharacterがUTF-8実装のUnicodeとして1バイトであるか否か返す。
+    // Tree-sitterのnodeの範囲をRange<Int>互換にするで使用。
+    var isSingleByteCharacterInUTF8: Bool {
+        return String(self).utf8.count == 1
+    }
 }

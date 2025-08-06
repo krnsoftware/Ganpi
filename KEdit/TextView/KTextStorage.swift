@@ -120,20 +120,21 @@ final class KTextStorage: KTextStorageProtocol {
 
     // MARK: - Properties
 
+    // data.
     private(set) var _characters: [Character] = []
     private var _observers: [(KStorageModified) -> Void] = []
+    private lazy var _parser: KSyntaxParser = KSyntaxParser(textStorage: self, type: .ruby)
+    
+    // propaties for appearances.
     private var _baseFont: NSFont = .monospacedSystemFont(ofSize: 12, weight: .regular)
     private var _lineNumberFont: NSFont = .monospacedDigitSystemFont(ofSize: 11 ,weight: .regular)
     private var _lineNumberFontEmph: NSFont = .monospacedDigitSystemFont(ofSize: 11 ,weight: .bold)
     
     // caches.
-    //private var _advanceCache: KGlyphAdvanceCache
     private var _spaceAdvanceCache: CGFloat?
-    //private var _lineNumberDigitWidth: CGFloat?
     private var _hardLineCount: Int?
     private var _invisibleCharacters: KInvisibleCharacters?
     private var _lineNumberCharacterMaxWidth: CGFloat?
-    
     
     // for undo.
     private var _history: KRingBuffer<KUndoUnit> = .init(capacity: 5000)
@@ -326,27 +327,14 @@ final class KTextStorage: KTextStorageProtocol {
         
         // notification.
         let timer = KTimeChecker(name:"observer")
-        //notifyObservers(.textChanged(range: range, insertedCount: newCharacters.count))
         notifyObservers(.textChanged(info: KStorageModifiedInfo(range:range, insertedCount: newCharacters.count, deletedNewlineCount: oldReturnCount, insertedNewlineCount: newReturnCount)))
         timer.stop()
         
         // undo. recovery.
         _undoActions.append(.none)
         
-        // test code.
-        
-        // Tree-sitter C API を用いた簡易パーステスト
-        guard let parser = ts_parser_new() else { return false }
-        defer { ts_parser_delete(parser) }
-
-        let lang = tree_sitter_ruby()
-        ts_parser_set_language(parser, lang)
-
-        let source = "def hello\n  puts 'world'\nend"
-        let tree = ts_parser_parse_string(parser, nil, source, UInt32(source.utf8.count))
-        let root = ts_tree_root_node(tree)
-
-        print("Start byte: \(ts_node_start_byte(root)), End byte: \(ts_node_end_byte(root))")
+        //_parser.parse(range.lowerBound..<range.upperBound + newCharacters.count - range.count)
+        _parser.parse(0..<count)
         
         
         return true
@@ -531,7 +519,7 @@ final class KTextStorage: KTextStorageProtocol {
     
     // 与えられたRangeの範囲のテキストをNSAttributedStringとして返す。
     // 現在仮実装。最終的にtree-sitterによる色分けを行う予定。
-    func attributedString(for range: Range<Int>, tabWidth: Int? = nil) -> NSAttributedString? {
+    /*func attributedString(for range: Range<Int>, tabWidth: Int? = nil) -> NSAttributedString? {
         guard let slice = self[range] else { return nil }
         
         // 冒頭の連続したtab以外のtabを全てspaceに入れ替える。
@@ -593,6 +581,75 @@ final class KTextStorage: KTextStorageProtocol {
 
             result.append(NSAttributedString(string: string, attributes: run.attributes))
         }
+        return result
+    }*/
+    
+    func attributedString(for range: Range<Int>, tabWidth: Int? = nil) -> NSAttributedString? {
+        guard let slice = self[range] else { return nil }
+
+        let tabChar: Character = "\t"
+        let spaceChar: Character = " "
+        var convertedSlice: [Character] = []
+        var leadingTabsDone = false
+
+        for char in slice {
+            if !leadingTabsDone {
+                if char == tabChar {
+                    convertedSlice.append(char)
+                } else {
+                    leadingTabsDone = true
+                    convertedSlice.append(char == tabChar ? spaceChar : char)
+                }
+            } else {
+                convertedSlice.append(char == tabChar ? spaceChar : char)
+            }
+        }
+
+        // 基本属性（地の色）
+        var baseAttributes: [NSAttributedString.Key: Any] = [
+            .font: baseFont,
+            .foregroundColor: KSyntaxParser.KSyntaxColorType.default.color
+        ]
+
+        if let tabWidth = tabWidth {
+            let paragraphStyle = NSMutableParagraphStyle()
+            paragraphStyle.defaultTabInterval = CGFloat(tabWidth) * spaceAdvance
+            baseAttributes[.paragraphStyle] = paragraphStyle
+        }
+
+        // AttributedStringをベース色で作成
+        let result = NSMutableAttributedString(
+            string: String(convertedSlice),
+            attributes: baseAttributes
+        )
+
+        // syntax parser から対象範囲の構文情報を取得
+        let spans = _parser.highlightSpans(in: range)
+        print("Got \(spans.count) spans in range \(range)")
+        // 各spanに対して属性を上書き適用
+        /*
+        for span in spans {
+            let localLower = span.range.lowerBound - range.lowerBound
+            let localUpper = span.range.upperBound - range.lowerBound
+
+            guard localLower >= 0, localUpper <= convertedSlice.count, localLower < localUpper else { continue }
+
+            let nsRange = NSRange(location: localLower, length: localUpper - localLower)
+            result.addAttribute(.foregroundColor, value: span.kind.colorType.color, range: nsRange)
+        }*/
+        for span in spans {
+            //print("Span: \(span.range), kind: \(span.kind)")
+            let overlap = span.range.clamped(to: range)
+            guard !overlap.isEmpty else { continue }
+
+            let nsRange = NSRange(
+                location: overlap.lowerBound - range.lowerBound,
+                length: overlap.count
+            )
+
+            result.addAttribute(.foregroundColor, value: span.kind.colorType.color, range: nsRange)
+        }
+
         return result
     }
     

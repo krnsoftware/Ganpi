@@ -142,10 +142,13 @@ class KLine: CustomStringConvertible {
     // この行のCTLineを作成する。
     // 同時に、offsetsのキャッシュをadvanceのキャッシュから生成した暫定のものからCTLineを利用した正確なものに入れ替え。
     private func makeCTLine() {
+        //guard !range.isEmpty else { return }
+        
         guard let textStorageRef = _textStorageRef else {
             log("textStorageRef is nil.", from: self)
             return
         }
+        
         guard let layoutManager = _layoutManager else {
             log("layoutManager is nil.", from: self)
             return

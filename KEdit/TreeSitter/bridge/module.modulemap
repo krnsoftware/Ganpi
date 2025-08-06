@@ -6,8 +6,10 @@
 //
 
 module TreeSitterBridge {
-    header "../../../Vendor/tree-sitter-ruby-master/bindings/c/tree-sitter-ruby.h"
     header "../../../Vendor/tree-sitter-master/lib/include/tree_sitter/api.h"
+    header "../../../Vendor/tree-sitter-ruby-master/bindings/c/tree-sitter-ruby.h"
     header "ts_language_registry.h"
     export *
 }
+
+
