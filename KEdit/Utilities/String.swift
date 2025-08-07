@@ -268,7 +268,7 @@ extension String {
 
 
 //MARK: - String Extension for NSColor
-
+/*
 extension String {
     
     // 文字列"#RRGGBB", "#RRGGBBAA", "RRGGBB", "RRGGBBAA"をNSColorに変換して返す。
@@ -283,6 +283,32 @@ extension String {
             return NSColor(red: CGFloat(red)/255.0, green: CGFloat(green)/255.0, blue: CGFloat(blue)/255.0, alpha: CGFloat(alpha)/255.0) as Optional<NSColor>
         }
         return nil
+    }
+}*/
+
+extension String {
+    func convertToColor() -> NSColor? {
+        let pattern = "^#?([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})?$"
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else { return nil }
+        
+        guard let match = regex.firstMatch(in: self, options: [], range: NSRange(location: 0, length: self.utf16.count)) else {
+            return nil
+        }
+        
+        func hexComponent(at index: Int) -> CGFloat? {
+            guard let range = Range(match.range(at: index), in: self) else { return nil }
+            return CGFloat(Int(self[range], radix: 16) ?? 0) / 255.0
+        }
+        
+        guard let r = hexComponent(at: 1),
+              let g = hexComponent(at: 2),
+              let b = hexComponent(at: 3) else {
+            return nil
+        }
+        
+        let a = hexComponent(at: 4) ?? 1.0
+        
+        return NSColor(red: r, green: g, blue: b, alpha: a)
     }
 }
 

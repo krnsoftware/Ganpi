@@ -125,6 +125,8 @@ final class KTextStorage: KTextStorageProtocol {
     private var _observers: [(KStorageModified) -> Void] = []
     private lazy var _parser: KSyntaxParser = KSyntaxParser(textStorage: self, type: .ruby)
     
+    private var _skeletonString: KSkeletonStringInUTF8 = .init()
+    
     // propaties for appearances.
     private var _baseFont: NSFont = .monospacedSystemFont(ofSize: 12, weight: .regular)
     private var _lineNumberFont: NSFont = .monospacedDigitSystemFont(ofSize: 11 ,weight: .regular)
@@ -246,10 +248,11 @@ final class KTextStorage: KTextStorageProtocol {
     
     // 初期値として文字列をセットする際に使用する。
     // ドキュメントからの読み込み時に限定して使用。Undoは反応しない。
+    /*
     func setDefaultString(_ string: String) {
         _characters = Array(string)
         _history.reset()
-    }
+    }*/
     /*
     var lineNumberDigitWidth: CGFloat {
         //if let width = _lineNumberDigitWidth {
@@ -324,6 +327,7 @@ final class KTextStorage: KTextStorageProtocol {
 
         // replacement.
         _characters.replaceSubrange(range, with: newCharacters)
+        _skeletonString.replaceCharacters(range, with: newCharacters)
         
         // 構文カラーリングのパーサーに通す。現在は全文。
         //_parser.parse(range.lowerBound..<range.upperBound + newCharacters.count - range.count)
@@ -626,7 +630,7 @@ final class KTextStorage: KTextStorageProtocol {
 
         // syntax parser から対象範囲の構文情報を取得
         let spans = _parser.highlightSpans(in: range)
-        print("Got \(spans.count) spans in range \(range)")
+        //print("Got \(spans.count) spans in range \(range)")
         // 各spanに対して属性を上書き適用
         /*
         for span in spans {

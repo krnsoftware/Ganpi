@@ -15,6 +15,40 @@ typealias TSLanguage = OpaquePointer
 @_silgen_name("tree_sitter_ruby")
 func tree_sitter_ruby() -> UnsafePointer<TSLanguage>
 
+
+// structs for Tree-Sitter
+struct KInputEditInfo {
+    var startByte: Int
+    var oldEndByte: Int
+    var newEndByte: Int
+    var startPoint: KUTF8Point
+    var oldEndPoint: KUTF8Point
+    var newEndPoint: KUTF8Point
+    
+    func toTSInputEdit() -> TSInputEdit {
+        return TSInputEdit(
+            start_byte: UInt32(startByte),
+            old_end_byte: UInt32(oldEndByte),
+            new_end_byte: UInt32(newEndByte),
+            start_point: startPoint.tsPoint,
+            old_end_point: oldEndPoint.tsPoint,
+            new_end_point: newEndPoint.tsPoint
+        )
+    }
+}
+
+struct KUTF8Point {
+    var row: Int
+    var column: Int
+
+    var tsPoint: TSPoint {
+        TSPoint(row: UInt32(row), column: UInt32(column))
+    }
+}
+
+
+
+// 構文カラーリング用のパーサー。Tree-Sitterベース。
 final class KSyntaxParser {
 
     // MARK: - Enum and Struct
@@ -30,17 +64,32 @@ final class KSyntaxParser {
         case comment
         case string
         case keyword
+        case identifier
+        case function
 
         var color: NSColor {
+            guard let stringColor = "#860300".convertToColor() else { log("stringColor is nil."); return NSColor.black }
+            guard let commentColor = "#0B5A00".convertToColor() else { log("commentColor is nil."); return NSColor.black }
+            guard let functionColor = "#070093".convertToColor() else { log("functionColor is nil."); return NSColor.black }
+            
             switch self {
             case .default:
                 return NSColor.black
             case .comment:
-                return NSColor.systemGreen
+                //return NSColor.systemGreen
+                return commentColor
             case .string:
-                return NSColor.systemRed
+                //return NSColor.systemRed
+                return stringColor
             case .keyword:
                 return NSColor.systemBlue
+            case .function:
+                //return NSColor.systemPurple
+                return functionColor
+            case .identifier:
+                //return NSColor.systemMint
+                //return functionColor
+                return NSColor.black
             }
         }
     }
@@ -48,13 +97,19 @@ final class KSyntaxParser {
     /// 構文要素の種類を表す列挙体
     /// Tree-sitter の node type に対応させやすい文字列 rawValue を持つ
     enum KSyntaxElementKind {
-        case comment, string, keyword
+        case comment
+        case string
+        case keyword
+        case function
+        case identifier
 
         init?(nodeType: UnsafePointer<CChar>) {
             switch String(cString: nodeType) {
             case "comment": self = .comment
             case "string", "string_literal", "regex": self = .string
             case "keyword": self = .keyword
+            case "identifier": self = .identifier
+            case "method", "method_definition": self = .function
             default: return nil
             }
         }
@@ -64,6 +119,8 @@ final class KSyntaxParser {
             case .comment: return .comment
             case .string: return .string
             case .keyword: return .keyword
+            case .function: return .function
+            case .identifier: return .identifier
             }
         }
     }
@@ -131,6 +188,8 @@ final class KSyntaxParser {
     func highlightSpans(in range: Range<Int>) -> [KSyntaxHighlightSpan] {
         _highlightSpans.filter { $0.range.overlaps(range) }
     }
+    
+    
 
     // MARK: - Private methods
 
@@ -209,7 +268,7 @@ final class KSyntaxParser {
         let keywords = ["def", "end", "if", "else", "elsif", "while", "do", "class", "module", "begin", "rescue"]
         return keywords.contains(type)
     }
-    
+    /*
     private func walkTree(from node: TSNode, into result: inout [KSyntaxHighlightSpan]) {
         // 対象ノードタイプか判定
         if let kind = KSyntaxElementKind(nodeType: ts_node_type(node)) {
@@ -225,7 +284,30 @@ final class KSyntaxParser {
             let child = ts_node_child(node, i)
             walkTree(from: child, into: &result)
         }
+    }*/
+    private func walkTree(from node: TSNode, into result: inout [KSyntaxHighlightSpan]) {
+        let type = String(cString: ts_node_type(node))
+
+        if let kind = KSyntaxElementKind(nodeType: type) {
+            let start = Int(ts_node_start_byte(node))
+            let end = Int(ts_node_end_byte(node))
+            result.append(KSyntaxHighlightSpan(range: start..<end, kind: kind))
+        }
+
+        let childCount = ts_node_child_count(node)
+        for i in 0..<childCount {
+            let child = ts_node_child(node, i)
+            walkTree(from: child, into: &result)
+        }
     }
 }
+
+
+
+
+
+
+
+
 
 
