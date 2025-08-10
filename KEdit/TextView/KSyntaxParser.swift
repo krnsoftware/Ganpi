@@ -555,25 +555,25 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
         }
     }
 
-    // MARK: - スキャナ本体（差し替え用・完全版）
-    // MARK: - スキャナ本体（埋め込み変数対応版・メソッド丸ごと差し替え）
+    // MARK: - スキャナ本体
     private func _scan(range: Range<Int>, initialState: _ParserState) -> [KSyntaxNode] {
-        var out: [KSyntaxNode] = []
-        out.reserveCapacity(128)
+        var nodes: [KSyntaxNode] = []
+        nodes.reserveCapacity(256)
 
         let full = _skeleton.expandToFullLines(range: range)
-        guard full.lowerBound < full.upperBound else { return out }
+        guard full.lowerBound < full.upperBound else { return nodes }
 
         let bytes = _skeleton.bytes(in: full)
         let E = bytes.endIndex
 
-        @inline(__always)
-        func _match(_ at: Int, ascii: [UInt8]) -> Bool {
-            let end = at &+ ascii.count
-            return end <= E && bytes[at..<end].elementsEqual(ascii)
+        @inline(__always) func abs(_ local: Range<Int>) -> Range<Int> {
+            (full.lowerBound + (local.lowerBound - bytes.startIndex))..<(full.lowerBound + (local.upperBound - bytes.startIndex))
         }
-        @inline(__always)
-        func _firstNonSpaceAtLineStart(_ at: Int) -> Int {
+        @inline(__always) func match(_ at: Int, _ word: [UInt8]) -> Bool {
+            let end = at &+ word.count
+            return end <= E && bytes[at..<end].elementsEqual(word)
+        }
+        @inline(__always) func firstNonSpaceAtLineStart(_ at: Int) -> Int {
             var s = at
             if !(s == bytes.startIndex || bytes[s - 1] == FC.lf) {
                 var j = s &- 1
@@ -583,42 +583,115 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
             while s < E, (bytes[s] == FC.space || bytes[s] == FC.tab) { s &+= 1 }
             return s
         }
-        @inline(__always)
-        func _lineEndExcludingLF(from i: Int) -> Int {
+        @inline(__always) func lineEndExcludingLF(from i: Int) -> Int {
             var j = i
             while j < E, bytes[j] != FC.lf { j &+= 1 }
             return j
         }
-        @inline(__always)
-        func _isAsciiAlphaNum(_ b: UInt8) -> Bool {
+        @inline(__always) func isAlphaNum(_ b: UInt8) -> Bool {
             (b >= 0x30 && b <= 0x39) || (b >= 0x41 && b <= 0x5A) || (b >= 0x61 && b <= 0x7A)
         }
-        @inline(__always)
-        func _isAsciiSpace(_ b: UInt8) -> Bool { b == FC.space || b == FC.tab || b == FC.lf }
-
-        @inline(__always)
-        func _regexDelims(after rPos: Int) -> (open: UInt8, close: UInt8, next: Int)? {
+        @inline(__always) func prevNonSpace(_ idx: Int) -> UInt8? {
+            var k = idx &- 1
+            while k >= bytes.startIndex {
+                let c = bytes[k]
+                if c != FC.space && c != FC.tab && c != FC.lf { return c }
+                k &-= 1
+            }
+            return nil
+        }
+        @inline(__always) func regexDelims(after rPos: Int) -> (open: UInt8, close: UInt8, next: Int)? {
             let dPos = rPos &+ 1
             guard dPos < E else { return nil }
             let d = bytes[dPos]
-            guard !_isAsciiAlphaNum(d), !_isAsciiSpace(d) else { return nil }
+            if isAlphaNum(d) || d == FC.space || d == FC.tab || d == FC.lf { return nil }
             switch d {
-            case UInt8(ascii: "("): return (d, UInt8(ascii: ")"), dPos &+ 1)
-            case UInt8(ascii: "{"): return (d, UInt8(ascii: "}"), dPos &+ 1)
-            case UInt8(ascii: "["): return (d, UInt8(ascii: "]"), dPos &+ 1)
-            case UInt8(ascii: "<"): return (d, UInt8(ascii: ">"), dPos &+ 1)
-            default:                return (d, d,               dPos &+ 1)
+            case FC.leftParen:   return (d, FC.rightParen,   dPos &+ 1)
+            case FC.leftBrace:   return (d, FC.rightBrace,   dPos &+ 1)
+            case FC.leftBracket: return (d, FC.rightBracket, dPos &+ 1)
+            case FC.lt:          return (d, FC.gt,           dPos &+ 1)
+            default:             return (d, d,               dPos &+ 1)
             }
         }
 
-        // 直ちに絶対座標へ変換してノード追加
-        var spanStart = -1
-        @inline(__always) func _open(_ at: Int) { spanStart = at }
-        @inline(__always) func _close(_ kind: KSyntaxKind, _ at: Int) {
-            if spanStart >= 0 {
-                let abs = (full.lowerBound + (spanStart - bytes.startIndex))..<(full.lowerBound + (at - bytes.startIndex))
-                out.append(.init(range: abs, kind: kind))
+        // "#{…}" の中身だけ外扱いにする（括弧は文字列色に残す）。入れ子対応。
+        @inline(__always)
+        func scanInterpolation(from start: Int) -> Int {
+            var i = start
+            var depth = 1
+            while i < E {
+                let b = bytes[i]
+                if b == FC.backSlash, i &+ 1 < E { i &+= 2; continue }
+                if b == FC.leftBrace  { depth &+= 1; i &+= 1; continue }
+                if b == FC.rightBrace {
+                    depth &-= 1; i &+= 1
+                    if depth == 0 { break }
+                    continue
+                }
+
+                // @ / @@
+                if b == FC.at {
+                    let s = i
+                    var j = i &+ 1
+                    if j < E, bytes[j] == FC.at { j &+= 1 }
+                    if j < E, _identifierSet.contains(bytes[j]) {
+                        repeat { j &+= 1 } while j < E && _identifierSet.contains(bytes[j])
+                        nodes.append(.init(range: abs(s..<j), kind: .variable))
+                        i = j; continue
+                    }
+                }
+                // $ 変数群
+                if b == FC.dollar, i &+ 1 < E {
+                    let s = i
+                    var j = i &+ 1
+                    let d = bytes[j]
+                    if d >= 0x30 && d <= 0x39 {
+                        repeat { j &+= 1 } while j < E && (bytes[j] >= 0x30 && bytes[j] <= 0x39)
+                        nodes.append(.init(range: abs(s..<j), kind: .variable))
+                        i = j; continue
+                    }
+                    let specials: Set<UInt8> = [
+                        FC.tilde, FC.exclamation, FC.question, FC.slash,
+                        FC.colon, FC.period, FC.backtick, FC.singleQuote,
+                        FC.underscore, FC.dollar
+                    ]
+                    if specials.contains(d) {
+                        j &+= 1
+                        nodes.append(.init(range: abs(s..<j), kind: .variable))
+                        i = j; continue
+                    }
+                    if _identifierSet.contains(d) {
+                        repeat { j &+= 1 } while j < E && _identifierSet.contains(bytes[j])
+                        nodes.append(.init(range: abs(s..<j), kind: .variable))
+                        i = j; continue
+                    }
+                }
+                // キーワード
+                if _identifierSet.contains(b) {
+                    let s = i
+                    var j = i &+ 1
+                    while j < E && _identifierSet.contains(bytes[j]) { j &+= 1 }
+                    let len = j - s
+                    if let bucket = _keywordBuckets[len] {
+                        let slice = bytes[s..<j]
+                        if bucket.contains(where: { slice.elementsEqual($0) }) {
+                            nodes.append(.init(range: abs(s..<j), kind: .keyword))
+                            i = j; continue
+                        }
+                    }
+                    i = j; continue
+                }
+
+                i &+= 1
             }
+            return i // '}' の**次の**位置
+        }
+
+        // スパン管理
+        var spanStart = -1
+        @inline(__always) func open(_ at: Int) { spanStart = at }
+        @inline(__always) func close(_ kind: KSyntaxKind, _ at: Int) {
+            if spanStart >= 0 { nodes.append(.init(range: abs(spanStart..<at), kind: kind)) }
             spanStart = -1
         }
 
@@ -629,90 +702,25 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
         var rxClose: UInt8 = 0
         switch initialState {
         case .neutral: break
-        case .inLineComment: inLine = true; _open(bytes.startIndex)
-        case .inMultiComment: inMulti = true; _open(bytes.startIndex)
-        case .inString(let q): inStr = true; quote = q; _open(bytes.startIndex)
-        case .inHereDoc(let id): inHere = true; hereId = ArraySlice(id); _open(bytes.startIndex)
-        case .inRegex(_, let c): inRx = true; rxClose = c; _open(bytes.startIndex)
+        case .inLineComment: inLine = true; open(bytes.startIndex)
+        case .inMultiComment: inMulti = true; open(bytes.startIndex)
+        case .inString(let q): inStr = true; quote = q; open(bytes.startIndex)
+        case .inHereDoc(let id): inHere = true; hereId = ArraySlice(id); open(bytes.startIndex)
+        case .inRegex(_, let c): inRx = true; rxClose = c; open(bytes.startIndex)
         }
 
         let kwBegin = _kwBegin, kwEnd = _kwEnd
-
-        // 文字列内の #{ ... } で変数を拾う
-        @inline(__always)
-        func _scanInterpolationVariables(start jStart: Int) -> Int {
-            var j = jStart         // `#{` の直後から
-            var depth = 1
-            while j < E {
-                let c = bytes[j]
-                // エスケープ
-                if c == FC.backSlash, j &+ 1 < E { j &+= 2; continue }
-                // 入れ子
-                if c == UInt8(ascii: "{") { depth &+= 1; j &+= 1; continue }
-                if c == UInt8(ascii: "}") {
-                    depth &-= 1; j &+= 1
-                    if depth == 0 { break }
-                    continue
-                }
-
-                // 変数検出（@@ / @ / $...）
-                if c == UInt8(ascii: "@") {
-                    let start = j
-                    var k = j &+ 1
-                    if k < E, bytes[k] == UInt8(ascii: "@") { k &+= 1 } // @@
-                    if k < E, _identifierSet.contains(bytes[k]) {
-                        repeat { k &+= 1 } while k < E && _identifierSet.contains(bytes[k])
-                        // ノード追加（絶対座標）
-                        let abs = (full.lowerBound + (start - bytes.startIndex))..<(full.lowerBound + (k - bytes.startIndex))
-                        out.append(.init(range: abs, kind: .variable))
-                        j = k; continue
-                    }
-                } else if c == UInt8(ascii: "$") {
-                    let start = j
-                    var k = j &+ 1
-                    if k < E {
-                        let d = bytes[k]
-                        if d >= UInt8(ascii: "0") && d <= UInt8(ascii: "9") {
-                            repeat { k &+= 1 } while k < E && (bytes[k] >= UInt8(ascii: "0") && bytes[k] <= UInt8(ascii: "9"))
-                            let abs = (full.lowerBound + (start - bytes.startIndex))..<(full.lowerBound + (k - bytes.startIndex))
-                            out.append(.init(range: abs, kind: .variable))
-                            j = k; continue
-                        }
-                        let specials: Set<UInt8> = [
-                            UInt8(ascii: "~"), UInt8(ascii: "!"), UInt8(ascii: "?"), UInt8(ascii: "/"),
-                            UInt8(ascii: ":"), UInt8(ascii: "."), UInt8(ascii: "`"), UInt8(ascii: "'"),
-                            UInt8(ascii: "_"), UInt8(ascii: "$")
-                        ]
-                        if specials.contains(d) {
-                            k &+= 1
-                            let abs = (full.lowerBound + (start - bytes.startIndex))..<(full.lowerBound + (k - bytes.startIndex))
-                            out.append(.init(range: abs, kind: .variable))
-                            j = k; continue
-                        }
-                        if _identifierSet.contains(d) {
-                            repeat { k &+= 1 } while k < E && _identifierSet.contains(bytes[k])
-                            let abs = (full.lowerBound + (start - bytes.startIndex))..<(full.lowerBound + (k - bytes.startIndex))
-                            out.append(.init(range: abs, kind: .variable))
-                            j = k; continue
-                        }
-                    }
-                }
-
-                j &+= 1
-            }
-            return j // 閉じ '}' の次位置（または E）
-        }
-
         var i = bytes.startIndex
+
         while i < E {
             let b = bytes[i]
 
-            // ===== 内部状態 =====
+            // ---- 内部状態 ----
             if inMulti {
-                let j0 = _firstNonSpaceAtLineStart(i)
-                if j0 == i, _match(j0, ascii: kwEnd) {
-                    let endL = _lineEndExcludingLF(from: i)
-                    _close(.comment, endL)
+                let j0 = firstNonSpaceAtLineStart(i)
+                if j0 == i, match(j0, kwEnd) {
+                    let endL = lineEndExcludingLF(from: i)
+                    close(.comment, endL)
                     inMulti = false
                     i = (endL < E && bytes[endL] == FC.lf) ? endL &+ 1 : endL
                     continue
@@ -720,32 +728,20 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
                 i &+= 1; continue
             }
             if inHere {
-                let j0 = _firstNonSpaceAtLineStart(i)
+                let j0 = firstNonSpaceAtLineStart(i)
                 if j0 == i, !hereId.isEmpty,
                    i &+ hereId.count <= E,
                    bytes[i..<(i + hereId.count)].elementsEqual(hereId) {
-                    var j = _lineEndExcludingLF(from: i)
-                    if j < E { j &+= 1 } // LF を含める
-                    _close(.string, j)
+                    var j = lineEndExcludingLF(from: i)
+                    if j < E { j &+= 1 }
+                    close(.string, j)
                     inHere = false; hereId = []
                     i = j; continue
                 }
                 i &+= 1; continue
             }
             if inLine {
-                if b == FC.lf { _close(.comment, i); inLine = false }
-                i &+= 1; continue
-            }
-            if inStr {
-                // 文字列中：#{ ... } の変数色分け（"..." のみ。'...' や /.../ は対象外）
-                if quote == FC.doubleQuote, b == UInt8(ascii: "#"), i &+ 1 < E, bytes[i &+ 1] == UInt8(ascii: "{") {
-                    let jAfter = _scanInterpolationVariables(start: i &+ 2)
-                    i = jAfter
-                    continue
-                }
-                if escaped { escaped = false; i &+= 1; continue }
-                if b == FC.backSlash { escaped = true; i &+= 1; continue }
-                if b == quote { _close(.string, i &+ 1); inStr = false; i &+= 1; continue }
+                if b == FC.lf { close(.comment, i); inLine = false }
                 i &+= 1; continue
             }
             if inRx {
@@ -753,19 +749,42 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
                 if b == FC.backSlash { escaped = true; i &+= 1; continue }
                 if b == rxClose {
                     var j = i &+ 1
-                    while j < E && _isAsciiAlphaNum(bytes[j]) { j &+= 1 } // フラグ
-                    _close(.string, j)
+                    while j < E, isAlphaNum(bytes[j]) { j &+= 1 } // /re/ixm
+                    close(.string, j)
                     inRx = false
                     i = j; continue
                 }
                 i &+= 1; continue
             }
+            if inStr {
+                // "..." 内の "#{…}"：括弧は文字列色で残し、中身だけ外扱い
+                if quote == FC.doubleQuote,
+                   b == FC.numeric, i &+ 1 < E, bytes[i &+ 1] == FC.leftBrace {
+                    // 直前までの文字列を閉じる
+                    close(.string, i)
+                    // "#{"
+                    nodes.append(.init(range: abs(i..<(i &+ 2)), kind: .string))
+                    // 本体をスキャン
+                    var j = i &+ 2
+                    j = scanInterpolation(from: j)
+                    // "}" を文字列色で追加
+                    nodes.append(.init(range: abs((j &- 1)..<j), kind: .string))
+                    // 文字列を再開
+                    if j < E { open(j) } else { spanStart = -1; inStr = false }
+                    i = j
+                    continue
+                }
+                if escaped { escaped = false; i &+= 1; continue }
+                if b == FC.backSlash { escaped = true; i &+= 1; continue }
+                if b == quote { close(.string, i &+ 1); inStr = false; i &+= 1; continue }
+                i &+= 1; continue
+            }
 
-            // ===== オープニング =====
-            let j0 = _firstNonSpaceAtLineStart(i)
+            // ---- オープニング ----
+            let j0 = firstNonSpaceAtLineStart(i)
 
-            // =begin → 前方 =end 探索して一括ノード化（見つからねば inMulti 開始）
-            if j0 == i, _match(j0, ascii: _kwBegin) {
+            // =begin … =end
+            if j0 == i, match(j0, kwBegin) {
                 var head = i
                 if !(head == bytes.startIndex || bytes[head - 1] == FC.lf) {
                     var p = head &- 1
@@ -778,31 +797,29 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
                     while k < E, bytes[k] != FC.lf { k &+= 1 }
                     if k < E { k &+= 1 } else { break }
                     if k >= E { break }
-                    let s = _firstNonSpaceAtLineStart(k)
-                    if s == k, _match(s, ascii: _kwEnd) {
-                        let endL = _lineEndExcludingLF(from: k)
-                        let abs = (full.lowerBound + (head - bytes.startIndex))..<(full.lowerBound + (endL - bytes.startIndex))
-                        out.append(.init(range: abs, kind: .comment))
+                    let s = firstNonSpaceAtLineStart(k)
+                    if s == k, match(s, kwEnd) {
+                        let endL = lineEndExcludingLF(from: k)
+                        nodes.append(.init(range: abs(head..<endL), kind: .comment))
                         i = (endL < E && bytes[endL] == FC.lf) ? endL &+ 1 : endL
                         closedAt = i
                         break
                     }
                 }
                 if closedAt != nil { continue }
-                _open(head); inMulti = true; i &+= 1; continue
+                open(head); inMulti = true; i &+= 1; continue
             }
 
-            // 行頭の =end 単独塗り（ブロック外れ対策）
-            if j0 == i, _match(j0, ascii: _kwEnd) {
+            // 行頭の =end 単独塗り（防御）
+            if j0 == i, match(j0, kwEnd) {
                 var head = i
                 if !(head == bytes.startIndex || bytes[head - 1] == FC.lf) {
                     var p = head &- 1
                     while p >= bytes.startIndex && bytes[p] != FC.lf { p &-= 1 }
                     head = (p < bytes.startIndex) ? bytes.startIndex : p &+ 1
                 }
-                let endL = _lineEndExcludingLF(from: i)
-                let abs = (full.lowerBound + (head - bytes.startIndex))..<(full.lowerBound + (endL - bytes.startIndex))
-                out.append(.init(range: abs, kind: .comment))
+                let endL = lineEndExcludingLF(from: i)
+                nodes.append(.init(range: abs(head..<endL), kind: .comment))
                 i = (endL < E && bytes[endL] == FC.lf) ? endL &+ 1 : endL
                 continue
             }
@@ -824,90 +841,98 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
                 if ok {
                     while j < E, bytes[j] != FC.lf { j &+= 1 }
                     let body = (j < E) ? (j &+ 1) : j
-                    _open(i); inHere = true; hereId = bytes[idStart..<idEnd]
+                    open(i); inHere = true; hereId = bytes[idStart..<idEnd]
                     i = body; continue
                 }
             }
 
             // 行コメント
-            if b == UInt8(ascii: "#") {
-                _open(i); inLine = true; i &+= 1; continue
+            if b == FC.numeric {
+                open(i); inLine = true; i &+= 1; continue
             }
 
-            // /.../ 正規表現
+            // /…/ 正規表現 vs 除算
             if b == FC.slash {
-                _open(i); inStr = true; quote = FC.slash; i &+= 1; continue
+                let p = prevNonSpace(i)
+                let isDivision: Bool
+                if let pc = p {
+                    let isIdent = _identifierSet.contains(pc) || (pc >= 0x30 && pc <= 0x39)
+                    let isCloser = (pc == FC.rightParen || pc == FC.rightBracket || pc == FC.rightBrace)
+                    isDivision = isIdent || isCloser
+                } else {
+                    isDivision = false // 行頭なら regex
+                }
+                if !isDivision {
+                    open(i); inStr = true; quote = FC.slash; i &+= 1; continue
+                }
+                // 除算なら素通し
             }
 
-            // '...' / "..."
+            // '…' / "…"
             if b == FC.doubleQuote || b == FC.singleQuote {
-                _open(i); inStr = true; quote = b; i &+= 1; continue
+                open(i); inStr = true; quote = b; i &+= 1; continue
             }
 
             // %r / %R
             if b == FC.percent, i &+ 2 < E {
                 let rch = bytes[i &+ 1]
                 if rch == UInt8(ascii: "r") || rch == UInt8(ascii: "R"),
-                   let (_, cl, next) = _regexDelims(after: i &+ 1) {
-                    _open(i); inRx = true; rxClose = cl
+                   let (_, cl, next) = regexDelims(after: i &+ 1) {
+                    open(i); inRx = true; rxClose = cl
                     i = next; continue
                 }
             }
 
             // 変数（@ / @@）
-            if b == UInt8(ascii: "@") {
-                let start = i
+            if b == FC.at {
+                let s = i
                 var j = i &+ 1
-                if j < E, bytes[j] == UInt8(ascii: "@") { j &+= 1 }
+                if j < E, bytes[j] == FC.at { j &+= 1 }
                 if j < E, _identifierSet.contains(bytes[j]) {
                     repeat { j &+= 1 } while j < E && _identifierSet.contains(bytes[j])
-                    let abs = (full.lowerBound + (start - bytes.startIndex))..<(full.lowerBound + (j - bytes.startIndex))
-                    out.append(.init(range: abs, kind: .variable))
+                    nodes.append(.init(range: abs(s..<j), kind: .variable))
                     i = j; continue
                 }
             }
 
             // 変数（$...）
-            if b == UInt8(ascii: "$"), i &+ 1 < E {
-                let start = i
+            if b == FC.dollar, i &+ 1 < E {
+                let s = i
                 var j = i &+ 1
-                let c = bytes[j]
-                if c >= UInt8(ascii: "0") && c <= UInt8(ascii: "9") {
-                    repeat { j &+= 1 } while j < E && (bytes[j] >= UInt8(ascii: "0") && bytes[j] <= UInt8(ascii: "9"))
-                    let abs = (full.lowerBound + (start - bytes.startIndex))..<(full.lowerBound + (j - bytes.startIndex))
-                    out.append(.init(range: abs, kind: .variable))
+                let d = bytes[j]
+                if d >= 0x30 && d <= 0x39 {
+                    repeat { j &+= 1 } while j < E && (bytes[j] >= 0x30 && bytes[j] <= 0x39)
+                    nodes.append(.init(range: abs(s..<j), kind: .variable))
                     i = j; continue
                 }
                 let specials: Set<UInt8> = [
-                    UInt8(ascii: "~"), UInt8(ascii: "!"), UInt8(ascii: "?"), UInt8(ascii: "/"),
-                    UInt8(ascii: ":"), UInt8(ascii: "."), UInt8(ascii: "`"), UInt8(ascii: "'"),
-                    UInt8(ascii: "_"), UInt8(ascii: "$")
+                    FC.tilde, FC.exclamation, FC.question, FC.slash,
+                    FC.colon, FC.period, FC.backtick, FC.singleQuote,
+                    FC.underscore, FC.dollar
                 ]
-                if specials.contains(c) {
+                if specials.contains(d) {
                     j &+= 1
-                    let abs = (full.lowerBound + (start - bytes.startIndex))..<(full.lowerBound + (j - bytes.startIndex))
-                    out.append(.init(range: abs, kind: .variable))
+                    nodes.append(.init(range: abs(s..<j), kind: .variable))
                     i = j; continue
                 }
-                if _identifierSet.contains(c) {
+                if _identifierSet.contains(d) {
                     repeat { j &+= 1 } while j < E && _identifierSet.contains(bytes[j])
-                    let abs = (full.lowerBound + (start - bytes.startIndex))..<(full.lowerBound + (j - bytes.startIndex))
-                    out.append(.init(range: abs, kind: .variable))
+                    nodes.append(.init(range: abs(s..<j), kind: .variable))
                     i = j; continue
                 }
             }
 
             // キーワード
             if _identifierSet.contains(b) {
-                let start = i
+                let s = i
                 var j = i &+ 1
                 while j < E && _identifierSet.contains(bytes[j]) { j &+= 1 }
-                let len = j - start
+                let len = j - s
                 if let bucket = _keywordBuckets[len] {
-                    let slice = bytes[start..<j]
+                    let slice = bytes[s..<j]
                     if bucket.contains(where: { slice.elementsEqual($0) }) {
-                        let abs = (full.lowerBound + (start - bytes.startIndex))..<(full.lowerBound + (j - bytes.startIndex))
-                        out.append(.init(range: abs, kind: .keyword))
+                        nodes.append(.init(range: abs(s..<j), kind: .keyword))
+                        i = j; continue
                     }
                 }
                 i = j; continue
@@ -916,12 +941,12 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
             i &+= 1
         }
 
-        if inMulti { _close(.comment, E) }
-        if inHere  { _close(.string,  E) }
-        if inLine  { _close(.comment, E) }
-        if inStr   { _close(.string,  E) }
-        if inRx    { _close(.string,  E) }
+        if inMulti { close(.comment, E) }
+        if inHere  { close(.string,  E) }
+        if inLine  { close(.comment, E) }
+        if inStr   { close(.string,  E) }
+        if inRx    { close(.string,  E) }
 
-        return out
+        return nodes
     }
 }

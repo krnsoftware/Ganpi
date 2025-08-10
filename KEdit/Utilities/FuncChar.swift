@@ -15,12 +15,12 @@ struct FuncChar {
     static let lf: UInt8          = 0x0A  // \n
     static let tab: UInt8         = 0x09  // \t
     static let space: UInt8       = 0x20
-
+    
     // 引用・エスケープ
     static let doubleQuote: UInt8 = 0x22  // "
     static let singleQuote: UInt8 = 0x27  // '
     static let backSlash: UInt8   = 0x5C  // \
-
+    
     // 記号
     static let numeric: UInt8     = 0x23  // #
     static let percent: UInt8     = 0x25  // %
@@ -29,13 +29,13 @@ struct FuncChar {
     static let minus: UInt8       = 0x2D  // -
     static let tilde: UInt8       = 0x7E  // ~
     static let equals: UInt8      = 0x3D  // =
-
+    
     // 区切り
     static let colon: UInt8       = 0x3A  // :
     static let semicolon: UInt8   = 0x3B  // ;
     static let lt: UInt8          = 0x3C  // <
     static let gt: UInt8          = 0x3E  // >
-
+    
     // 括弧
     static let leftParen: UInt8    = 0x28 // (
     static let rightParen: UInt8   = 0x29 // )
@@ -43,6 +43,20 @@ struct FuncChar {
     static let rightBracket: UInt8 = 0x5D // ]
     static let leftBrace: UInt8    = 0x7B // {
     static let rightBrace: UInt8   = 0x7D // }
+    
+    // パーサー用
+    static let exclamation: UInt8 = 0x21 // !
+    static let dollar:     UInt8 = 0x24  // $
+    static let plus:       UInt8 = 0x2B  // +
+    static let asterisk:   UInt8 = 0x2A  // *
+    static let comma:      UInt8 = 0x2C  // ,
+    static let period:     UInt8 = 0x2E  // .
+    static let backtick:   UInt8 = 0x60  // `
+    static let question:   UInt8 = 0x3F  // ?
+    static let caret:      UInt8 = 0x5E  // ^
+    static let pipe:       UInt8 = 0x7C  // |
+    static let at:         UInt8 = 0x40  // @
+    static let underscore: UInt8 = 0x5F  // _
 }
 
 /*
