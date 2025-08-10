@@ -125,7 +125,7 @@ final class KTextStorage: KTextStorageProtocol {
     private(set) var _characters: [Character] = []
     private var _observers: [(KStorageModified) -> Void] = []
     //private lazy var _parser: KSyntaxParser = KSyntaxParser(textStorage: self, type: .ruby)
-    private lazy var _parser: KSyntaxParserProtocol = KSyntaxParserRuby(storage: self, identifierChars: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_", keywords: ["def","class","self","nil"])
+    private lazy var _parser: KSyntaxParserProtocol = KSyntaxParserRuby(storage: self)
     
     private var _skeletonString: KSkeletonStringInUTF8 = .init()
     

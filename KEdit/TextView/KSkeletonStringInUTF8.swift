@@ -10,6 +10,7 @@
 
 
 import Cocoa
+import simd
 
 // KTextStorageに於いて、_characters:[Characters]の代わりに用いられる[UInt8]のwrapper。
 // 主にTree-Sitterのパースと、テキスト内の制御文字等を検出するために使用される。
@@ -48,35 +49,69 @@ final class KSkeletonStringInUTF8 {
     
     // [Uint8]の文字列から特定の1文字についてoffsetの配列を得る。
     static func indicesOfCharacter(in buffer: [UInt8], range: Range<Int>, target: UInt8) -> [Int] {
-        if range.lowerBound < 0 || buffer.count < range.upperBound {
-            log("range: out of range.", from: self)
-            return []
-        }
+        guard range.lowerBound >= 0,
+              range.upperBound <= buffer.count,
+              range.lowerBound < range.upperBound else { return [] }
 
-        var indices: [Int] = []
-        let simdWidth = 16
-        var i = range.lowerBound
-        let end = range.upperBound - simdWidth
+        let n = range.count
+        var out: [Int] = []
+        out.reserveCapacity(min(n / 8, 1024))
 
-        // SIMDスキャン
-        while i <= end {
-            let chunk = SIMD16<UInt8>(buffer[i..<i+simdWidth])
-            let matches = chunk .== SIMD16<UInt8>(repeating: target)
-            for j in 0..<simdWidth where matches[j] {
-                indices.append(i + j)
+        if n < 128 {
+            var i = range.lowerBound
+            while i < range.upperBound {
+                if buffer[i] == target { out.append(i) }
+                i &+= 1
             }
-            i += simdWidth
+            return out
         }
 
-        // 端数処理
-        while i < range.upperBound {
-            if buffer[i] == target {
-                indices.append(i)
+        return buffer.withUnsafeBytes { raw -> [Int] in
+            let base = raw.baseAddress!.assumingMemoryBound(to: UInt8.self).advanced(by: range.lowerBound)
+            let end  = base.advanced(by: n)
+            let tgt  = SIMD16<UInt8>(repeating: target)
+
+            var p = base
+            let endMinus16 = end.advanced(by: -16)
+
+            // 16バイト塊
+            while p <= endMinus16 {
+                let v: SIMD16<UInt8> = p.withMemoryRebound(to: SIMD16<UInt8>.self, capacity: 1) { $0.pointee }
+                let m = v .== tgt
+
+                // ← 環境依存の _bitmask/simd_bitmask を使わず、手動で16ビットのマスクを作る
+                var mask: UInt32 = 0
+                @inline(__always) func set(_ bit: Int, _ cond: Bool) { if cond { mask |= (1 << bit) } }
+                set( 0, m[ 0]); set( 1, m[ 1]); set( 2, m[ 2]); set( 3, m[ 3])
+                set( 4, m[ 4]); set( 5, m[ 5]); set( 6, m[ 6]); set( 7, m[ 7])
+                set( 8, m[ 8]); set( 9, m[ 9]); set(10, m[10]); set(11, m[11])
+                set(12, m[12]); set(13, m[13]); set(14, m[14]); set(15, m[15])
+
+                if mask != 0 {
+                    let baseIdx = range.lowerBound
+                        + (Int(bitPattern: UnsafeRawPointer(p)) - Int(bitPattern: UnsafeRawPointer(base)))
+                    while mask != 0 {
+                        let j = Int(mask.trailingZeroBitCount)
+                        out.append(baseIdx + j)
+                        mask &= (mask - 1)
+                    }
+                }
+                p = p.advanced(by: 16)
             }
-            i += 1
-        }
 
-        return indices
+            // 端数
+            while p < end {
+                if p.pointee == target {
+                    let idx = range.lowerBound
+                        + (Int(bitPattern: UnsafeRawPointer(p)) - Int(bitPattern: UnsafeRawPointer(base)))
+                    out.append(idx)
+                }
+                p = p.advanced(by: 1)
+            }
+            return out
+        }
+    
+    
     }
     
     //MARK: - Internal functions. (for the limited use)
