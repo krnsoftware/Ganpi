@@ -50,6 +50,7 @@ protocol KTextStorageCommon: AnyObject {
 // 読み取り専用プロトコル
 protocol KTextStorageReadable: KTextStorageCommon {
     var string: String { get }
+    var skeletonString: KSkeletonStringInUTF8 { get }
     var hardLineCount: Int { get } // if _character is empty, return 1. if end of chars is '\n', add 1.
     var invisibleCharacters: KInvisibleCharacters? { get }
     var spaceAdvance: CGFloat { get }
@@ -58,7 +59,7 @@ protocol KTextStorageReadable: KTextStorageCommon {
     var lineNumberFontEmph: NSFont { get }
     
     func wordRange(at index: Int) -> Range<Int>?
-    func attributedString(for range: Range<Int>, tabWidth: Int?) -> NSAttributedString?
+    func attributedString(for range: Range<Int>, tabWidth: Int?, withoutColors: Bool) -> NSAttributedString?
     func lineRange(at index: Int) -> Range<Int>?
     //func advances(in range:Range<Int>) -> [CGFloat]
     //func advance(for character:Character) -> CGFloat
@@ -123,7 +124,8 @@ final class KTextStorage: KTextStorageProtocol {
     // data.
     private(set) var _characters: [Character] = []
     private var _observers: [(KStorageModified) -> Void] = []
-    private lazy var _parser: KSyntaxParser = KSyntaxParser(textStorage: self, type: .ruby)
+    //private lazy var _parser: KSyntaxParser = KSyntaxParser(textStorage: self, type: .ruby)
+    private lazy var _parser: KSyntaxParserProtocol = KSyntaxParserRuby(storage: self, identifierChars: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_", keywords: ["def","class","self","nil"])
     
     private var _skeletonString: KSkeletonStringInUTF8 = .init()
     
@@ -158,8 +160,12 @@ final class KTextStorage: KTextStorageProtocol {
     var characters: [Character] { // 将来的に内部データが[Character]でなくなる可能性あり。
         get { _characters }
         set {
-            replaceCharacters(in: 0..<newValue.count, with: newValue)
+            replaceCharacters(in: 0..<_characters.count, with: newValue)
         }
+    }
+    
+    var skeletonString: KSkeletonStringInUTF8 {
+        get { _skeletonString }
     }
 
     var baseFont: NSFont {
@@ -324,14 +330,17 @@ final class KTextStorage: KTextStorageProtocol {
         if oldReturnCount != newReturnCount {
             _hardLineCount = nil
         }
-
+        let timer0 = KTimeChecker(name:"replace and parse")
+        timer0.start(message: "replacing characters")
         // replacement.
         _characters.replaceSubrange(range, with: newCharacters)
         _skeletonString.replaceCharacters(range, with: newCharacters)
-        
+        timer0.stopAndGo(message: "parsing")
         // 構文カラーリングのパーサーに通す。現在は全文。
         //_parser.parse(range.lowerBound..<range.upperBound + newCharacters.count - range.count)
-        _parser.parse(0..<count)
+        //_parser.parse(range:0..<count)
+        _parser.noteEdit(oldRange: range, newCount: newCharacters.count)
+        timer0.stop()
         
         // notification.
         let timer = KTimeChecker(name:"observer")
@@ -522,9 +531,168 @@ final class KTextStorage: KTextStorageProtocol {
     }
     
     
+    
+    func attributedString(for range: Range<Int>,
+                          tabWidth: Int? = nil,
+                          withoutColors: Bool = false) -> NSAttributedString? {
+        // 1) Character slice (indices are character-based and match skeleton indices)
+        guard let slice = self[range] else { return nil }
+
+        // 2) Detect tabs on skeleton and build output buffer with tab->space (except leading tabs)
+        let skel = skeletonString.bytes(in: range) // 1 char == 1 byte ('a' for non-ASCII)
+        var buffer: [Character] = []
+        buffer.reserveCapacity(slice.count)
+
+        var leadingTabsDone = false
+        var iSkel = skel.startIndex
+        var iChar = slice.startIndex
+        while iSkel < skel.endIndex {
+            let ch = slice[iChar]
+            let isTab = (skel[iSkel] == FuncChar.tab)
+            if !leadingTabsDone {
+                if isTab {
+                    buffer.append(ch)            // keep leading tabs
+                } else {
+                    leadingTabsDone = true
+                    buffer.append(isTab ? " " : ch)
+                }
+            } else {
+                buffer.append(isTab ? " " : ch)  // replace later tabs with space
+            }
+            slice.formIndex(after: &iChar)
+            iSkel &+= 1
+        }
+
+        // 3) Base attributes (font + default color + optional paragraph style)
+        var baseAttrs: [NSAttributedString.Key: Any] = [
+            .font: baseFont,
+            .foregroundColor: NSColor.black
+        ]
+        if let tabWidth = tabWidth {
+            let ps = NSMutableParagraphStyle()
+            ps.defaultTabInterval = CGFloat(tabWidth) * spaceAdvance
+            baseAttrs[.paragraphStyle] = ps
+        }
+
+        // 4) Build attributed string with base attributes
+        let fullString = String(buffer)
+        let mas = NSMutableAttributedString(string: fullString, attributes: baseAttrs)
+
+        // 5) Fast path: skip coloring entirely when requested (CTLine bootstrap, etc.)
+        if withoutColors { return mas }
+        
+        // 5.5) Ensure parser state is up-to-date before applying colors
+        _parser.ensureUpToDate(for: range)
+
+        // 6) Apply syntax spans (character-offset based)
+        let spans = _parser.attributes(in: range, tabWidth: tabWidth ?? 0)
+        guard !spans.isEmpty else { return mas }
+
+        @inline(__always)
+        func nsRangeClipped(_ span: Range<Int>) -> NSRange? {
+            let localLower = max(span.lowerBound - range.lowerBound, 0)
+            let localUpper = min(span.upperBound - range.lowerBound, fullString.count)
+            guard localUpper > localLower else { return nil }
+            let s = fullString.index(fullString.startIndex, offsetBy: localLower)
+            let e = fullString.index(fullString.startIndex, offsetBy: localUpper)
+            return NSRange(s..<e, in: fullString)
+        }
+
+        var applied = 0
+        for s in spans {
+            if let r = nsRangeClipped(s.range) {
+                mas.addAttributes(s.attributes, range: r)
+                applied &+= 1
+                //log("apply attrs range=\(s.range.lowerBound)..<\(s.range.upperBound) -> NSRange\(r)", from: self)
+            } else {
+                //log("skip attrs (out of slice) \(s.range.lowerBound)..<\(s.range.upperBound)", from: self)
+            }
+        }
+        //log("applied spans: \(applied)/\(spans.count)", from: self)
+
+        return mas
+    }
+    /*func attributedString(for range: Range<Int>, tabWidth: Int? = nil) -> NSAttributedString? {
+        // 1) Character slice (indices are character-based and match skeleton indices)
+        guard let slice = self[range] else { return nil }
+
+        // 2) Detect tabs on skeleton and build output buffer with tab->space (except leading tabs)
+        let skel = skeletonString.bytes(in: range) // 1 char == 1 byte ('a' for non-ASCII)
+        var buffer: [Character] = []
+        buffer.reserveCapacity(slice.count)
+
+        var leadingTabsDone = false
+        var iSkel = skel.startIndex
+        var iChar = slice.startIndex
+        while iSkel < skel.endIndex {
+            let ch = slice[iChar]
+            let isTab = (skel[iSkel] == FuncChar.tab)
+            if !leadingTabsDone {
+                if isTab {
+                    buffer.append(ch)            // keep leading tabs
+                } else {
+                    leadingTabsDone = true
+                    buffer.append(isTab ? " " : ch)
+                }
+            } else {
+                buffer.append(isTab ? " " : ch)  // replace later tabs with space
+            }
+            slice.formIndex(after: &iChar)
+            iSkel &+= 1
+        }
+
+        // 3) Base attributes (font + default color + optional paragraph style)
+        var baseAttrs: [NSAttributedString.Key: Any] = [
+            .font: baseFont,
+            .foregroundColor: NSColor.black
+        ]
+        if let tabWidth = tabWidth {
+            let ps = NSMutableParagraphStyle()
+            ps.defaultTabInterval = CGFloat(tabWidth) * spaceAdvance
+            baseAttrs[.paragraphStyle] = ps
+        }
+
+        // 4) Build attributed string with base attributes
+        let fullString = String(buffer)
+        let mas = NSMutableAttributedString(string: fullString, attributes: baseAttrs)
+
+        // 5) パーサのスパンを取得（文字オフセット前提）
+        let spans = _parser.attributes(in: range, tabWidth: tabWidth ?? 0)
+        guard !spans.isEmpty else { return mas }
+
+        //let fullString = String(buffer)
+
+        // 文字オフセット → NSRange 変換（安全クリップ付き）
+        @inline(__always)
+        func nsRangeClipped(_ span: Range<Int>) -> NSRange? {
+            let localLower = max(span.lowerBound - range.lowerBound, 0)
+            let localUpper = min(span.upperBound - range.lowerBound, fullString.count)
+            guard localUpper > localLower else { return nil }
+            let s = fullString.index(fullString.startIndex, offsetBy: localLower)
+            let e = fullString.index(fullString.startIndex, offsetBy: localUpper)
+            return NSRange(s..<e, in: fullString)
+        }
+
+        // 適用＆ログ
+        var applied = 0
+        for s in spans {
+            if let r = nsRangeClipped(s.range) {
+                mas.addAttributes(s.attributes, range: r)
+                applied &+= 1
+                log("apply attrs range=\(s.range.lowerBound)..<\(s.range.upperBound) -> NSRange\(r)", from: self)
+            } else {
+                log("skip attrs (out of slice) \(s.range.lowerBound)..<\(s.range.upperBound)", from: self)
+            }
+        }
+        log("applied spans: \(applied)/\(spans.count)", from: self)
+
+        return mas
+    }*/
+    
+    /*
     // 与えられたRangeの範囲のテキストをNSAttributedStringとして返す。
     // 現在仮実装。最終的にtree-sitterによる色分けを行う予定。
-    /*func attributedString(for range: Range<Int>, tabWidth: Int? = nil) -> NSAttributedString? {
+    func attributedString(for range: Range<Int>, tabWidth: Int? = nil) -> NSAttributedString? {
         guard let slice = self[range] else { return nil }
         
         // 冒頭の連続したtab以外のtabを全てspaceに入れ替える。
@@ -589,7 +757,7 @@ final class KTextStorage: KTextStorageProtocol {
         return result
     }*/
     
-    func attributedString(for range: Range<Int>, tabWidth: Int? = nil) -> NSAttributedString? {
+    /*func attributedString(for range: Range<Int>, tabWidth: Int? = nil) -> NSAttributedString? {
         guard let slice = self[range] else { return nil }
 
         let tabChar: Character = "\t"
@@ -656,7 +824,7 @@ final class KTextStorage: KTextStorageProtocol {
         }
 
         return result
-    }
+    }*/
     
     // 与えられた範囲のadvanceの配列を返す。
     /*

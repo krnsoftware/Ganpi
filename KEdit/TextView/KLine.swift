@@ -77,7 +77,17 @@ class KLine: CustomStringConvertible {
     // この行における文字のオフセットを行の左端を0.0とした相対座標のx位置のリストで返す。
     func characterOffsets() -> [CGFloat] {
         // offsetを取得する前にCTLineを生成しておく必要がある。
-        _ = ctLine
+        //_ = ctLine
+        var whenCallingWithoutCTLine = false
+        if _ctLine == nil {
+            whenCallingWithoutCTLine = true
+            makeCTLine(withoutColors: true)
+        }
+        defer {
+            if whenCallingWithoutCTLine {
+                removeCTLine()
+            }
+        }
         
         return _cachedOffsets
     }
@@ -86,6 +96,7 @@ class KLine: CustomStringConvertible {
     func characterOffset(at index:Int) -> CGFloat {
         // offsetを取得する前にCTLineを生成しておく必要がある。
         _ = ctLine
+        
         
         if index < 0 || index >= _cachedOffsets.count {
             log("index(\(index)) out of range.",from:self)
@@ -141,7 +152,7 @@ class KLine: CustomStringConvertible {
     
     // この行のCTLineを作成する。
     // 同時に、offsetsのキャッシュをadvanceのキャッシュから生成した暫定のものからCTLineを利用した正確なものに入れ替え。
-    private func makeCTLine() {
+    private func makeCTLine(withoutColors:Bool = false) {
         //guard !range.isEmpty else { return }
         
         guard let textStorageRef = _textStorageRef else {
@@ -154,7 +165,7 @@ class KLine: CustomStringConvertible {
             return
         }
 
-        guard let attrString = textStorageRef.attributedString(for: range, tabWidth: layoutManager.tabWidth) else {
+        guard let attrString = textStorageRef.attributedString(for: range, tabWidth: layoutManager.tabWidth, withoutColors:withoutColors) else {
             log("attrString is nil.", from: self)
             return
         }
@@ -337,8 +348,8 @@ final class KLines: CustomStringConvertible {
             return
         }
         
-        if let lineA = textStorageRef.attributedString(for: range.lowerBound..<replacementRange.lowerBound, tabWidth: nil),
-           let lineB = textStorageRef.attributedString(for: replacementRange.upperBound..<range.upperBound, tabWidth: nil){
+        if let lineA = textStorageRef.attributedString(for: range.lowerBound..<replacementRange.lowerBound, tabWidth: nil, withoutColors: false),
+           let lineB = textStorageRef.attributedString(for: replacementRange.upperBound..<range.upperBound, tabWidth: nil, withoutColors: false){
             let muAttrString =  NSMutableAttributedString(attributedString: attrString)
             muAttrString.addAttribute(.font, value: textStorageRef.baseFont, range: NSRange(location: 0, length: muAttrString.length))
             
