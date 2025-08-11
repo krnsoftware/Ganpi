@@ -7,7 +7,6 @@
 
 import Cocoa
 import AppKit
-import TreeSitterBridge
 
 // MARK: - General enum and struct
 
