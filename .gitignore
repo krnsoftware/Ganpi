@@ -1,7 +1,46 @@
-//
-//  Untitled.swift
-//  KEdit
-//
-//  Created by KARINO Masatugu on 2025/08/05.
-//
+# macOS
+.DS_Store
+**/.DS_Store
 
+# Xcode
+build/
+DerivedData/
+*.xcworkspace/xcuserdata/
+xcuserdata/
+*.xccheckout
+*.moved-aside
+*.xcuserstate
+*.xcscmblueprint
+
+# SwiftPM
+.swiftpm/
+.build/
+
+# CocoaPods
+Pods/
+
+# Carthage
+Carthage/Build/
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+# Archives
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# User-specific
+*.swp
+*~
+*.orig
+
+# App-specific
+KEdit/Settings/*.user.json   # ユーザ設定ファイル（例）
+KEdit/Parser/*.cache         # パーサーキャッシュ（例）
+
+# Ignore vendor/ if it ever comes back, but remove tree-sitter-specific stuff
+Vendor/
