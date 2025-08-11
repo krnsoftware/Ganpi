@@ -43,7 +43,9 @@ protocol KTextStorageCommon: AnyObject {
     subscript(index: Int) -> Character? { get }
     subscript(range: Range<Int>) -> ArraySlice<Character>? { get }
     
-    func addObserver(_ observer: @escaping (KStorageModified) -> Void)
+    //func addObserver(_ observer: @escaping (KStorageModified) -> Void)
+    func addObserver(_ owner: AnyObject, _ handler: @escaping (KStorageModified) -> Void)
+    func removeObserver(_ owner: AnyObject)
 }
 
 // 読み取り専用プロトコル
@@ -117,12 +119,18 @@ final class KTextStorage: KTextStorageProtocol {
         case none
     }
     
+    private struct _ObserverEntry {
+        weak var owner: AnyObject?
+        let handler: (KStorageModified) -> Void
+    }
+    
 
     // MARK: - Properties
 
     // data.
     private(set) var _characters: [Character] = []
-    private var _observers: [(KStorageModified) -> Void] = []
+    //private var _observers: [(KStorageModified) -> Void] = []
+    private var _observers: [_ObserverEntry] = []
     //private lazy var _parser: KSyntaxParser = KSyntaxParser(textStorage: self, type: .ruby)
     private lazy var _parser: KSyntaxParserProtocol = KSyntaxParserRuby(storage: self)
     
@@ -343,7 +351,16 @@ final class KTextStorage: KTextStorageProtocol {
         
         // notification.
         let timer = KTimeChecker(name:"observer")
-        notifyObservers(.textChanged(info: KStorageModifiedInfo(range:range, insertedCount: newCharacters.count, deletedNewlineCount: oldReturnCount, insertedNewlineCount: newReturnCount)))
+        //notifyObservers(.textChanged(info: KStorageModifiedInfo(range:range, insertedCount: newCharacters.count, deletedNewlineCount: oldReturnCount, insertedNewlineCount: newReturnCount)))
+        notifyObservers(.textChanged(
+                info: .init(
+                    range: range,
+                    insertedCount: newCharacters.count,
+                    deletedNewlineCount: oldReturnCount,
+                    insertedNewlineCount: newReturnCount
+                )
+            )
+        )
         timer.stop()
         
         // undo. recovery.
@@ -378,11 +395,11 @@ final class KTextStorage: KTextStorageProtocol {
         replaceCharacters(in: range, with: [])
     }
     
-
+    /*
     func addObserver(_ observer: @escaping ((KStorageModified) -> Void)){
         //print("\(#function)")
         _observers.append(observer)
-    }
+    }*/
     
     subscript(index: Int) -> Character? {
         guard index >= 0, index < _characters.count else { return nil }
@@ -835,13 +852,39 @@ final class KTextStorage: KTextStorageProtocol {
         return _advanceCache.advance(for: character)
     }*/
     
+    // 登録：owner を弱参照で保持。handler はクロージャ。
+    func addObserver(_ owner: AnyObject, _ handler: @escaping (KStorageModified) -> Void) {
+        // 既存の owner を一掃してから登録（重複防止）
+        _observers.removeAll { $0.owner === owner || $0.owner == nil }
+        _observers.append(_ObserverEntry(owner: owner, handler: handler))
+    }
+
+    // 解除：owner 一致だけ除去
+    func removeObserver(_ owner: AnyObject) {
+        _observers.removeAll { $0.owner === owner || $0.owner == nil }
+    }
+
+        
+    
     
     
     
     // MARK: - Private
 
-    private func notifyObservers(_ event: KStorageModified) {
+    /*private func notifyObservers(_ event: KStorageModified) {
         _observers.forEach { $0(event) }
+    }*/
+    // 通知：同期。死んだ参照はついでに掃除。
+    private func notifyObservers(_ note: KStorageModified) {
+        var alive: [_ObserverEntry] = []
+        alive.reserveCapacity(_observers.count)
+        for e in _observers {
+            if let _ = e.owner {
+                e.handler(note)
+                alive.append(e)
+            }
+        }
+        _observers = alive
     }
     
     private func resetCaches() {

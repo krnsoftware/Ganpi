@@ -133,9 +133,19 @@ final class KLayoutManager: KLayoutManagerReadable {
         _textStorageRef = textStorageRef
         _purgeTimer = DispatchSource.makeTimerSource(queue: _purgeQueue)
         
-        textStorageRef.addObserver { [weak self] modification in
+        /*textStorageRef.addObserver { [weak self] modification in
             self?.textStorageDidModify(modification)
-        }
+        }*/
+        _textStorageRef.addObserver(self) { [weak self] note in
+                    guard let self else { return }
+                    switch note {
+                    case .textChanged(let info):
+                        self.rebuildLayout(reason: .charactersChanged(info: info))
+                        self.textView?.textStorageDidModify(note)   // ここは従来の呼び方で
+                    case .colorChanged(let range):
+                        log("colorChanged. range: \(range)")
+                    }
+                }
         
         setupPurgeTimer()
         
@@ -147,6 +157,7 @@ final class KLayoutManager: KLayoutManagerReadable {
     deinit {
         _purgeTimer.setEventHandler {}
         _purgeTimer.cancel()
+        _textStorageRef.removeObserver(self)
     }
 
     // MARK: - Layout
