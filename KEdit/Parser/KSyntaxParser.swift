@@ -627,6 +627,7 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
             }
 
             if inStr {
+                /*
                 // interpolation in double-quoted string: "#{ ... }"
                 if quote == FC.doubleQuote, b == FC.numeric, i &+ 1 < E, bytes[i + 1] == FC.leftBrace {
                     // close literal part before '#'
@@ -657,7 +658,54 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
                     i &+= 1
                     continue
                 }
+                i &+= 1; continue*/
+                
+                if quote == FC.doubleQuote, b == FC.numeric, i &+ 1 < E, bytes[i + 1] == FC.leftBrace {
+                    // close literal part before '#'
+                    close(.string, i)
+
+                    // ★追加: "#{” の2文字そのものを .string としてマーキング
+                    nodes.append(.init(range: _abs(i)..<_abs(i &+ 2), kind: .string))
+
+                    // skip '#{' and treat inner as code until matching '}'
+                    var depth = 1
+                    i &+= 2
+                    while i < E, depth > 0 {
+                        if bytes[i] == FC.leftBrace { depth &+= 1; i &+= 1; continue }
+                        if bytes[i] == FC.rightBrace {
+                            depth &-= 1
+                            i &+= 1
+                            if depth == 0 { // ★変更: 最外 '}' に到達した瞬間だけ処理
+                                // ★追加: 終端 '}' の1文字を .string としてマーキング
+                                let braceStart = i &- 1
+                                nodes.append(.init(range: _abs(braceStart)..<_abs(braceStart &+ 1), kind: .string))
+                                break
+                            }
+                            continue
+                        }
+                        // allow variables inside interpolation
+                        if bytes[i] == FC.at || bytes[i] == FC.dollar {
+                            i = emitVariable(from: i); continue
+                        }
+                        i &+= 1
+                    }
+                    // reopen string if still within literal
+                    if i < E { open(i); inStr = true } // keep same quote
+                    continue
+                }
+
+                // usual escapes / closing
+                if escaped { escaped = false; i &+= 1; continue }
+                if b == FC.backSlash { escaped = true; i &+= 1; continue }
+                if b == quote {
+                    close(.string, i &+ 1)
+                    inStr = false
+                    i &+= 1
+                    continue
+                }
                 i &+= 1; continue
+                
+                
             }
 
             // -------- openings --------
