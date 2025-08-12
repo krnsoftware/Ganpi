@@ -12,34 +12,24 @@ import Cocoa
 class KLine: CustomStringConvertible {
     fileprivate weak var _layoutManager: KLayoutManager?
     fileprivate weak var _textStorageRef: KTextStorageReadable?
-    private var _ctLine: CTLine?
     fileprivate var _cachedOffsets: [CGFloat] = [0.0]
     private var _widthAndOffsetsFixed: Bool = false
-    private var _lastAccessedTime: CFTimeInterval?
     
     var range: Range<Int>
     var hardLineIndex: Int
     let softLineIndex: Int
     
-    // 有効なCTLineを返す。
+    // CTLineを返す。
     var ctLine: CTLine? {
-        if _ctLine == nil {
-            makeCTLine()
-        }
-        _lastAccessedTime = CACurrentMediaTime()
-        
-        return _ctLine
+        return makeCTLine()
     }
     
     // 行の幅をCGFloatで返す。
     var width: CGFloat {
-        return _cachedOffsets.last ?? 0.0
+        let offsets = characterOffsets()
+        return offsets.last ?? 0.0
     }
     
-    // CTLineが最後に要求された時間を返す。CTLineが生成されていなければnil.
-    var lastAccessedTime: CFTimeInterval? {
-        return _lastAccessedTime
-    }
     
     var description: String {
         return "KLine - range: \(range), hardLineIndex: \(hardLineIndex), softLineIndex: \(softLineIndex)"
@@ -65,25 +55,10 @@ class KLine: CustomStringConvertible {
         hardLineIndex += delta
     }
     
-    @inline(__always)
-    func removeCTLine() {
-        _ctLine = nil
-        _lastAccessedTime = nil
-    }
-    
     // この行における文字のオフセットを行の左端を0.0とした相対座標のx位置のリストで返す。
     func characterOffsets() -> [CGFloat] {
-        // offsetを取得する前にCTLineを生成しておく必要がある。
-        //_ = ctLine
-        var whenCallingWithoutCTLine = false
-        if _ctLine == nil {
-            whenCallingWithoutCTLine = true
-            makeCTLine(withoutColors: true)
-        }
-        defer {
-            if whenCallingWithoutCTLine {
-                removeCTLine()
-            }
+        if !_widthAndOffsetsFixed {
+            _ = makeCTLine(withoutColors: true)
         }
         
         return _cachedOffsets
@@ -91,16 +66,14 @@ class KLine: CustomStringConvertible {
     
     // この行におけるindex文字目の相対位置を返す。
     func characterOffset(at index:Int) -> CGFloat {
-        // offsetを取得する前にCTLineを生成しておく必要がある。
-        _ = ctLine
+        let offsets = characterOffsets()
         
-        
-        if index < 0 || index >= _cachedOffsets.count {
+        if index < 0 || index >= offsets.count {
             log("index(\(index)) out of range.",from:self)
             return 0.0
         }
         
-        return _cachedOffsets[index]
+        return offsets[index]
     }
     
     // KTextView.draw()から利用される描画メソッド
@@ -148,29 +121,29 @@ class KLine: CustomStringConvertible {
     }
     
     // この行のCTLineを作成する。
-    // 同時に、offsetsのキャッシュをadvanceのキャッシュから生成した暫定のものからCTLineを利用した正確なものに入れ替え。
-    private func makeCTLine(withoutColors:Bool = false) {
+    // 作成時にCTLineから文字のoffsetを取得して格納する。
+    private func makeCTLine(withoutColors:Bool = false) -> CTLine? {
         //guard !range.isEmpty else { return }
         
         guard let textStorageRef = _textStorageRef else {
             log("textStorageRef is nil.", from: self)
-            return
+            return nil
         }
         
         guard let layoutManager = _layoutManager else {
             log("layoutManager is nil.", from: self)
-            return
+            return nil
         }
 
         guard let attrString = textStorageRef.attributedString(for: range, tabWidth: layoutManager.tabWidth, withoutColors:withoutColors) else {
             log("attrString is nil.", from: self)
-            return
+            return nil
         }
 
         let ctLine = CTLineCreateWithAttributedString(attrString)
-        _ctLine = ctLine
 
         // CTLineから文字のoffsetを算出してcacheを入れ替える。
+        // 一度offsetを算出して_cachedOffsetsにセットしたら、次からはパスする。
         if !_widthAndOffsetsFixed {
             let string = attrString.string
             var offsets: [CGFloat] = []
@@ -183,6 +156,8 @@ class KLine: CustomStringConvertible {
             _cachedOffsets = offsets.isEmpty ? [0.0] : offsets
             _widthAndOffsetsFixed = true
         }
+        
+        return ctLine
     }
     
    
@@ -502,10 +477,10 @@ final class KLines: CustomStringConvertible {
                 line.shiftRange(by: info.insertedCount - info.range.count)
                 line.shiftHardLineIndex(by: info.insertedNewlineCount - info.deletedNewlineCount)
             }
-            
+            /*
             DispatchQueue.concurrentPerform(iterations: _lines.count) { i in
                 _lines[i].removeCTLine()
-            }
+            }*/
         }
         
         // その領域の文字列に含まれる行の領域の配列を得る。
@@ -708,23 +683,6 @@ final class KLines: CustomStringConvertible {
         let y = layoutRects.textEdgeInsets.top + CGFloat(lineIndex + 1) * layoutManager.lineHeight
         
         return CGPoint(x: x, y: y)
-    }
-    
-    // 最後にCTLineアクセスされてからthresholdで示された秒数が経過した行のCTLineをremoveする。
-    func purgeObsoleteCTLines(olderThan threshold: TimeInterval = 10.0) {
-        let now = CACurrentMediaTime()
-        
-        DispatchQueue.global(qos: .utility).async {
-            var count = 0
-            for line in self._lines {
-                if let lastAccessedTime = line.lastAccessedTime, now - lastAccessedTime > threshold {
-                    line.removeCTLine()
-                    count += 1
-                }
-            }
-            if count > 0 { log("remove \(count) CTLines.",from:self) }
-        }
-        
     }
     
 }

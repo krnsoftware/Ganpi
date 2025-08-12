@@ -38,7 +38,7 @@ final class KInvisibleCharacters {
         }
 
         guard let marker = _dictionary[char] else {
-            log("dictionary[char] is nil.",from:self)
+            //log("dictionary[char] is nil.",from:self)
             return nil
         }
 

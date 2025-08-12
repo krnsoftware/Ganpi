@@ -47,13 +47,7 @@ final class KLayoutManager: KLayoutManagerReadable {
     // baseFontの現在のサイズにおけるspaceの幅の何倍かで指定する。
     private var _tabWidth: Int = 4
     
-    
     private var _prevLineNumberRegionWidth: CGFloat = 0
-    
-    private let _purgeTimer: DispatchSourceTimer
-    private let _purgeQueue = DispatchQueue(label: "com.kedit.layoutmanager.purge", qos: .utility)
-    
-    
     
     // 表示される行をまとめるKLinesクラスインスタンス。
     private lazy var _lines: KLines = {
@@ -116,7 +110,6 @@ final class KLayoutManager: KLayoutManagerReadable {
 
     init(textStorageRef: KTextStorageProtocol) {
         _textStorageRef = textStorageRef
-        _purgeTimer = DispatchSource.makeTimerSource(queue: _purgeQueue)
         
         _textStorageRef.addObserver(self) { [weak self] note in
                 guard let self else { return }
@@ -128,17 +121,13 @@ final class KLayoutManager: KLayoutManagerReadable {
                 log("colorChanged. range: \(range)")
             }
         }
-        
-        setupPurgeTimer()
-        
+                
         rebuildLayout()
         
         
     }
     
     deinit {
-        _purgeTimer.setEventHandler {}
-        _purgeTimer.cancel()
         _textStorageRef.removeObserver(self)
     }
 
@@ -226,7 +215,6 @@ final class KLayoutManager: KLayoutManagerReadable {
         return LayoutRects(
             layoutManagerRef: self,
             textStorageRef: _textStorageRef,
-            //bounds: clipBounds,
             visibleRect: textView.visibleRect,
             showLineNumbers: textView.showLineNumbers,
             wordWrap: textView.wordWrap,
@@ -320,7 +308,6 @@ final class KLayoutManager: KLayoutManagerReadable {
             if offset - baseOffset >= width {
                 
                 let subAttr = attributedString.attributedSubstring(from: NSRange(location: baseIndex, length: i - baseIndex))
-                //lines.append(CTLineCreateWithAttributedString(subAttr))
                 let fakeLine = KFakeLine(attributedString: subAttr, hardLineIndex: hardLineIndex, softLineIndex: softLineIndex, layoutManager: self, textStorageRef: _textStorageRef)
                 lines.append(fakeLine)
                 baseIndex = i
@@ -333,20 +320,6 @@ final class KLayoutManager: KLayoutManagerReadable {
         lines.append(KFakeLine(attributedString: subAttr, hardLineIndex: hardLineIndex, softLineIndex: softLineIndex, layoutManager: self, textStorageRef: _textStorageRef))
         
         return lines
-    }
-    
-    
-    private func setupPurgeTimer() {
-        // 5秒ごとにpurgeを呼ぶ（適宜調整可）
-        _purgeTimer.schedule(deadline: .now() + 5.0, repeating: 5.0)
-        _purgeTimer.setEventHandler { [weak self] in
-            self?.purgeObsoleteLines()
-        }
-        _purgeTimer.resume()
-    }
-
-    private func purgeObsoleteLines() {
-        _lines.purgeObsoleteCTLines()
     }
     
     
