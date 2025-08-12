@@ -10,7 +10,7 @@ import Cocoa
 extension Character {
     
     // 文字種により全角・半角を判別する。
-    // proportional fontでは意味がないが、将来完全な等幅フォントを使用する際の高速化に使用する予定。
+    // proportional fontでは意味がないが、将来完全な等幅フォントを使用する場合に利用する予定。
     var displayWidth: Int {
         guard let scalar = unicodeScalars.first else { return 1 }
         let value = scalar.value

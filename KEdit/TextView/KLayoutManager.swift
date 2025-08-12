@@ -8,19 +8,9 @@
 import Cocoa
 
 
-/*struct KLineInfo {
-    let ctLine: CTLine
-    let range: Range<Int>
-    let hardLineIndex: Int
-    let softLineIndex: Int
-}*/
-
-
 // MARK: - protocol KLayoutManagerReadable
 
 protocol KLayoutManagerReadable: AnyObject {
-    //var lines: ArraySlice<KLineInfo> { get }
-    //var lines: [KLine] { get }
     var lines: KLines { get }
     var lineCount: Int { get }
     var lineHeight: CGFloat { get }
@@ -30,7 +20,6 @@ protocol KLayoutManagerReadable: AnyObject {
     func makeLayoutRects() -> LayoutRects?
     func makeEmptyLine(index: Int, hardLineIndex: Int) -> KLine
     func makeLines(range: Range<Int>, hardLineIndex: Int, width: CGFloat?) -> [KLine]?
-    //func makeFakeCTLines(from attributedString: NSAttributedString, width: CGFloat?) -> [CTLine]
     func makeFakeLines(from attributedString: NSAttributedString,hardLineIndex: Int, width: CGFloat?) -> [KFakeLine]
 }
 
@@ -93,11 +82,7 @@ final class KLayoutManager: KLayoutManagerReadable {
         
         return wordWrap ? visibleRectWidth : _lines.maxLineWidth
     }
-    /*
-    var lines: ArraySlice<KLineInfo> {
-        return ArraySlice(_lines)
-    }*/
-    //var lines: [KLine] {
+    
     
     var lines: KLines {
         return _lines
@@ -133,19 +118,16 @@ final class KLayoutManager: KLayoutManagerReadable {
         _textStorageRef = textStorageRef
         _purgeTimer = DispatchSource.makeTimerSource(queue: _purgeQueue)
         
-        /*textStorageRef.addObserver { [weak self] modification in
-            self?.textStorageDidModify(modification)
-        }*/
         _textStorageRef.addObserver(self) { [weak self] note in
-                    guard let self else { return }
-                    switch note {
-                    case .textChanged(let info):
-                        self.rebuildLayout(reason: .charactersChanged(info: info))
-                        self.textView?.textStorageDidModify(note)   // ここは従来の呼び方で
-                    case .colorChanged(let range):
-                        log("colorChanged. range: \(range)")
-                    }
-                }
+                guard let self else { return }
+                switch note {
+            case .textChanged(let info):
+                self.rebuildLayout(reason: .charactersChanged(info: info))
+                self.textView?.textStorageDidModify(note)
+            case .colorChanged(let range):
+                log("colorChanged. range: \(range)")
+            }
+        }
         
         setupPurgeTimer()
         
@@ -179,7 +161,6 @@ final class KLayoutManager: KLayoutManagerReadable {
         case .charactersChanged(let info):
             let timer = KTimeChecker(name:"rebuidLayout/_lines.rebuildLines()")
             timer.start()
-            //_lines.rebuildLines(range: range, insertedCount: insertedCount)
             _lines.rebuildLines(with: info)
             timer.stop()
         case .attributesChanged:
@@ -199,7 +180,6 @@ final class KLayoutManager: KLayoutManagerReadable {
         
         switch modification {
         case .textChanged(let info):
-            //rebuildLayout(reason: .charactersChanged(range: info.range, insertedCount: info.insertedCount))
             rebuildLayout(reason: .charactersChanged(info: info))
             textView.textStorageDidModify(modification)
 
@@ -215,8 +195,6 @@ final class KLayoutManager: KLayoutManagerReadable {
             rebuildLayout()
         }
         
-        //print("\(#function): call rebuildLayout()")
-        //_textView?.updateFrameSizeToFitContent()
     }
  
     
@@ -238,30 +216,12 @@ final class KLayoutManager: KLayoutManagerReadable {
         log("no match. characterIndex: \(characterIndex)", from:self)
         return (nil, -1)
         
-        /*
-        for i in 0..<lines.count {
-            guard let line = lines[i] else { log("line is nil.", from:self); continue }
-            if line.range.contains(characterIndex) || characterIndex == line.range.upperBound {
-                return (line, i)
-            }
-        }
-        return (nil, -1)*/
     }
-    /*
-    // KLinesからctLineを構築するために利用する。
-    func ctLine(in range: Range<Int>) -> CTLine? {
-        guard let attrString = _textStorageRef.attributedString(for: range, tabWidth: tabWidth) else { print("\(#function) - attrString is nil"); return nil }
-        
-        return CTLineCreateWithAttributedString(attrString)
-    }*/
+    
     
     // 現在のLayoutRectsを生成する。専らTextViewから呼び出される。
     func makeLayoutRects() -> LayoutRects? {
         guard let textView = _textView else { log("textView = nil", from:self); return nil }
-        /*guard let clipBounds = textView.enclosingScrollView?.contentView.bounds else {
-            print("\(#function) - clipBound is nil")
-            return nil
-        }*/
         
         return LayoutRects(
             layoutManagerRef: self,
@@ -279,12 +239,11 @@ final class KLayoutManager: KLayoutManagerReadable {
     // MARK: - private function
     
     // 表示用に空行を作成する。
-    
     func makeEmptyLine(index: Int, hardLineIndex: Int) -> KLine {
         return KLine(range: index..<index, hardLineIndex: hardLineIndex, softLineIndex: 0, layoutManager: self, textStorageRef: _textStorageRef)
     }
     
-    
+    // KLineインスタンスを作成する。
     func makeLines(range: Range<Int>, hardLineIndex: Int, width: CGFloat?) -> [KLine]? {
         let hardLine = KLine(range: range, hardLineIndex: hardLineIndex, softLineIndex: 0, layoutManager: self, textStorageRef: _textStorageRef)
         
@@ -299,12 +258,7 @@ final class KLayoutManager: KLayoutManagerReadable {
         
         // オフセットリストを取得
         let offsets = hardLine.characterOffsets()
-        
-        
-/*
-        guard offsets.count > 0 else {
-            return [hardLine]  // 空行またはオフセット取得失敗
-        }*/
+
         if offsets.count == 0 {
             return [hardLine]
         }
@@ -315,7 +269,6 @@ final class KLayoutManager: KLayoutManagerReadable {
         var lastOffset: CGFloat = 0.0
         var softLineIndex = 0
 
-       // for i in 1..<offsets.count {
         for i in 0..<offsets.count {
             let currentOffset = offsets[i]
 
@@ -346,49 +299,14 @@ final class KLayoutManager: KLayoutManagerReadable {
         return softLines
     }
     
-    /*
-    // 既存のAttributedStringからCTLineのリストを作成する。
-    func makeFakeCTLines(from attributedString: NSAttributedString,
-                             width: CGFloat?) -> [CTLine] {
-        guard attributedString.length > 0 else { return [] }
-        guard let width = width else {
-            return [CTLineCreateWithAttributedString(attributedString)]
-        }
-        var lines: [CTLine] = []
-        
-        let fullLine = CTLineCreateWithAttributedString(attributedString)
-        
-        var baseOffset: CGFloat = 0
-        var baseIndex: Int = 0
-        for i in 0..<attributedString.length {
-            let offset = CTLineGetOffsetForStringIndex(fullLine, i, nil)
-            
-            if offset - baseOffset >= width {
-                
-                let subAttr = attributedString.attributedSubstring(from: NSRange(location: baseIndex, length: i - baseIndex))
-                lines.append(CTLineCreateWithAttributedString(subAttr))
-                baseIndex = i
-                baseOffset = offset
-            }
-        }
-        let subAttr = attributedString.attributedSubstring(from: NSRange(location: baseIndex, length: attributedString.length - baseIndex))
-        //log("subAttr = \(subAttr.string)", from:self)
-        lines.append(CTLineCreateWithAttributedString(subAttr))
-        
-        return lines
-        
-    }*/
-    
+    // Input methodで入力中の文字列を表示するためのKFakeLineを生成する。
     func makeFakeLines(from attributedString: NSAttributedString,hardLineIndex: Int,
                        width: CGFloat?) -> [KFakeLine] {
         guard attributedString.length > 0 else { return [] }
         guard let width = width else {
-            //return [CTLineCreateWithAttributedString(attributedString)]
             return [KFakeLine(attributedString: attributedString, hardLineIndex: hardLineIndex, softLineIndex: 0, layoutManager: self, textStorageRef: _textStorageRef)]
         }
-        //(attributedString: NSAttributedString, hardLineIndex: Int, softLineIndex: Int, layoutManager: KLayoutManager, textStorageRef: KTextStorageReadable)
         
-        //var lines: [CTLine] = []
         var lines: [KFakeLine] = []
         
         let fullLine = CTLineCreateWithAttributedString(attributedString)
@@ -411,8 +329,7 @@ final class KLayoutManager: KLayoutManagerReadable {
             }
         }
         let subAttr = attributedString.attributedSubstring(from: NSRange(location: baseIndex, length: attributedString.length - baseIndex))
-        //log("subAttr = \(subAttr.string)", from:self)
-        //lines.append(CTLineCreateWithAttributedString(subAttr))
+        
         lines.append(KFakeLine(attributedString: subAttr, hardLineIndex: hardLineIndex, softLineIndex: softLineIndex, layoutManager: self, textStorageRef: _textStorageRef))
         
         return lines

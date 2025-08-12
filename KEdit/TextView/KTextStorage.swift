@@ -19,7 +19,6 @@ struct KStorageModifiedInfo {
 }
 
 enum KStorageModified {
-    //case textChanged(range: Range<Int>, insertedCount: Int)
     case textChanged(info: KStorageModifiedInfo)
     case colorChanged(range: Range<Int>)
 }
@@ -129,11 +128,8 @@ final class KTextStorage: KTextStorageProtocol {
 
     // data.
     private(set) var _characters: [Character] = []
-    //private var _observers: [(KStorageModified) -> Void] = []
     private var _observers: [_ObserverEntry] = []
-    //private lazy var _parser: KSyntaxParser = KSyntaxParser(textStorage: self, type: .ruby)
     private lazy var _parser: KSyntaxParserProtocol = KSyntaxParserRuby(storage: self)
-    
     private var _skeletonString: KSkeletonStringInUTF8 = .init()
     
     // propaties for appearances.
@@ -198,7 +194,6 @@ final class KTextStorage: KTextStorageProtocol {
         get { _lineNumberFont }
         set {
             _lineNumberFont = newValue
-            //_lineNumberDigitWidth = nil
             _lineNumberCharacterMaxWidth = nil
         }
     }
@@ -208,7 +203,6 @@ final class KTextStorage: KTextStorageProtocol {
         get { _lineNumberFont }
         set {
             _lineNumberFontEmph = newValue
-            //_lineNumberDigitWidth = nil
             _lineNumberCharacterMaxWidth = nil
         }
     }
@@ -259,24 +253,6 @@ final class KTextStorage: KTextStorageProtocol {
         return _invisibleCharacters
     }
     
-    // 初期値として文字列をセットする際に使用する。
-    // ドキュメントからの読み込み時に限定して使用。Undoは反応しない。
-    /*
-    func setDefaultString(_ string: String) {
-        _characters = Array(string)
-        _history.reset()
-    }*/
-    /*
-    var lineNumberDigitWidth: CGFloat {
-        //if let width = _lineNumberDigitWidth {
-        if let width = _lineNumberCharacterMaxWidth {
-            return width
-        }
-        let attrStr = NSAttributedString(string: "M", attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: _baseFont.pointSize * 0.95, weight: .regular)])
-        let ctLine = CTLineCreateWithAttributedString(attrStr)
-        let charWidth = CGFloat(CTLineGetTypographicBounds(ctLine, nil, nil, nil))
-        return charWidth
-    }*/
     
     // 論理行の数を返す。
     var hardLineCount: Int {
@@ -305,7 +281,6 @@ final class KTextStorage: KTextStorageProtocol {
         _undoActions.append(.none)
         _undoActions.append(.none)
         
-        //_advanceCache = KGlyphAdvanceCache(font: _baseFont)
         _invisibleCharacters = KInvisibleCharacters()
         
         
@@ -337,21 +312,16 @@ final class KTextStorage: KTextStorageProtocol {
         if oldReturnCount != newReturnCount {
             _hardLineCount = nil
         }
-        let timer0 = KTimeChecker(name:"replace and parse")
-        timer0.start(message: "replacing characters")
+        
         // replacement.
         _characters.replaceSubrange(range, with: newCharacters)
         _skeletonString.replaceCharacters(range, with: newCharacters)
-        timer0.stopAndGo(message: "parsing")
-        // 構文カラーリングのパーサーに通す。現在は全文。
-        //_parser.parse(range.lowerBound..<range.upperBound + newCharacters.count - range.count)
-        //_parser.parse(range:0..<count)
+
+        // 構文カラーリングのパーサーに通す。
         _parser.noteEdit(oldRange: range, newCount: newCharacters.count)
-        timer0.stop()
         
         // notification.
         let timer = KTimeChecker(name:"observer")
-        //notifyObservers(.textChanged(info: KStorageModifiedInfo(range:range, insertedCount: newCharacters.count, deletedNewlineCount: oldReturnCount, insertedNewlineCount: newReturnCount)))
         notifyObservers(.textChanged(
                 info: .init(
                     range: range,
@@ -394,12 +364,6 @@ final class KTextStorage: KTextStorageProtocol {
     func deleteCharacters(in range: Range<Int>) -> Bool {
         replaceCharacters(in: range, with: [])
     }
-    
-    /*
-    func addObserver(_ observer: @escaping ((KStorageModified) -> Void)){
-        //print("\(#function)")
-        _observers.append(observer)
-    }*/
     
     subscript(index: Int) -> Character? {
         guard index >= 0, index < _characters.count else { return nil }
@@ -489,19 +453,6 @@ final class KTextStorage: KTextStorageProtocol {
 
         return lower..<upper
     }
-    
-    /*
-    // 論理行の行数を返す。最後が改行の場合は改行後にも1行あるとみなす。
-    func countLines() -> Int {
-        let timer = KTimeChecker(name: "countLines()")
-        timer.start()
-        var count = 0
-        for c in _characters {
-            if c == "\n" { count += 1 }
-        }
-        timer.stop()
-        return count + 1
-    }*/
 
     
     // attributeの変更についてはテキストの変更時に自動ではなくattributeの変更の際に手動で送信する。
@@ -628,229 +579,7 @@ final class KTextStorage: KTextStorageProtocol {
 
         return mas
     }
-    /*func attributedString(for range: Range<Int>, tabWidth: Int? = nil) -> NSAttributedString? {
-        // 1) Character slice (indices are character-based and match skeleton indices)
-        guard let slice = self[range] else { return nil }
-
-        // 2) Detect tabs on skeleton and build output buffer with tab->space (except leading tabs)
-        let skel = skeletonString.bytes(in: range) // 1 char == 1 byte ('a' for non-ASCII)
-        var buffer: [Character] = []
-        buffer.reserveCapacity(slice.count)
-
-        var leadingTabsDone = false
-        var iSkel = skel.startIndex
-        var iChar = slice.startIndex
-        while iSkel < skel.endIndex {
-            let ch = slice[iChar]
-            let isTab = (skel[iSkel] == FuncChar.tab)
-            if !leadingTabsDone {
-                if isTab {
-                    buffer.append(ch)            // keep leading tabs
-                } else {
-                    leadingTabsDone = true
-                    buffer.append(isTab ? " " : ch)
-                }
-            } else {
-                buffer.append(isTab ? " " : ch)  // replace later tabs with space
-            }
-            slice.formIndex(after: &iChar)
-            iSkel &+= 1
-        }
-
-        // 3) Base attributes (font + default color + optional paragraph style)
-        var baseAttrs: [NSAttributedString.Key: Any] = [
-            .font: baseFont,
-            .foregroundColor: NSColor.black
-        ]
-        if let tabWidth = tabWidth {
-            let ps = NSMutableParagraphStyle()
-            ps.defaultTabInterval = CGFloat(tabWidth) * spaceAdvance
-            baseAttrs[.paragraphStyle] = ps
-        }
-
-        // 4) Build attributed string with base attributes
-        let fullString = String(buffer)
-        let mas = NSMutableAttributedString(string: fullString, attributes: baseAttrs)
-
-        // 5) パーサのスパンを取得（文字オフセット前提）
-        let spans = _parser.attributes(in: range, tabWidth: tabWidth ?? 0)
-        guard !spans.isEmpty else { return mas }
-
-        //let fullString = String(buffer)
-
-        // 文字オフセット → NSRange 変換（安全クリップ付き）
-        @inline(__always)
-        func nsRangeClipped(_ span: Range<Int>) -> NSRange? {
-            let localLower = max(span.lowerBound - range.lowerBound, 0)
-            let localUpper = min(span.upperBound - range.lowerBound, fullString.count)
-            guard localUpper > localLower else { return nil }
-            let s = fullString.index(fullString.startIndex, offsetBy: localLower)
-            let e = fullString.index(fullString.startIndex, offsetBy: localUpper)
-            return NSRange(s..<e, in: fullString)
-        }
-
-        // 適用＆ログ
-        var applied = 0
-        for s in spans {
-            if let r = nsRangeClipped(s.range) {
-                mas.addAttributes(s.attributes, range: r)
-                applied &+= 1
-                log("apply attrs range=\(s.range.lowerBound)..<\(s.range.upperBound) -> NSRange\(r)", from: self)
-            } else {
-                log("skip attrs (out of slice) \(s.range.lowerBound)..<\(s.range.upperBound)", from: self)
-            }
-        }
-        log("applied spans: \(applied)/\(spans.count)", from: self)
-
-        return mas
-    }*/
     
-    /*
-    // 与えられたRangeの範囲のテキストをNSAttributedStringとして返す。
-    // 現在仮実装。最終的にtree-sitterによる色分けを行う予定。
-    func attributedString(for range: Range<Int>, tabWidth: Int? = nil) -> NSAttributedString? {
-        guard let slice = self[range] else { return nil }
-        
-        // 冒頭の連続したtab以外のtabを全てspaceに入れ替える。
-        // 本来は行頭であるか確認するべきだが、問題になるのは現時点でfake lineのみのため気にしないことにする。
-        let tabChar:Character = "\t"
-        let spaceChar:Character = " "
-        var convertedSlice:[Character] = []
-        var leadingTabsDone = false
-        
-        for char in slice {
-            if !leadingTabsDone {
-                if char == tabChar {
-                    convertedSlice.append(char)
-                } else {
-                    leadingTabsDone = true
-                    convertedSlice.append(char == tabChar ? spaceChar : char)
-                }
-            } else {
-                convertedSlice.append(char == tabChar ? spaceChar : char)
-            }
-        }
-
-        // 仮実装：全体に一律の属性を与える
-        var attributes: [NSAttributedString.Key: Any] = [.font: baseFont, .foregroundColor: NSColor.black]
-        //if tabWidth != nil {
-        if let tabWidth = tabWidth {
-            let paragraphStyle = NSMutableParagraphStyle()
-            //paragraphStyle.defaultTabInterval = CGFloat(tabWidth!) * _tabWidthCache!
-            paragraphStyle.defaultTabInterval = CGFloat(tabWidth) * spaceAdvance
-            attributes[.paragraphStyle] = paragraphStyle
-        }
-        
-        let attributeRun = KTextStorage.KAttributeRun(
-            range: characterSlice.startIndex..<characterSlice.endIndex,
-            attributes: attributes
-        )
-        let attributeRuns = [attributeRun]
-
-        let result = NSMutableAttributedString()
-        for run in attributeRuns {
-            let overlap = run.range.clamped(to: range)
-            if overlap.count == 0 { continue }
-            
-            // ArraySliceのstartIndex補正
-            /*
-            let lowerOffset = overlap.lowerBound - range.lowerBound
-            let upperOffset = overlap.upperBound - range.lowerBound
-            
-            let lowerIndex = slice.index(slice.startIndex, offsetBy: lowerOffset)
-            let upperIndex = slice.index(slice.startIndex, offsetBy: upperOffset)
-            let subSlice = slice[lowerIndex..<upperIndex]
-            let string = String(subSlice)*/
-            
-            let lowerOffset = overlap.lowerBound - range.lowerBound
-            let upperOffset = overlap.upperBound - range.lowerBound
-            
-            let subSlice = convertedSlice[lowerOffset..<upperOffset]
-            let string = String(subSlice)
-
-            result.append(NSAttributedString(string: string, attributes: run.attributes))
-        }
-        return result
-    }*/
-    
-    /*func attributedString(for range: Range<Int>, tabWidth: Int? = nil) -> NSAttributedString? {
-        guard let slice = self[range] else { return nil }
-
-        let tabChar: Character = "\t"
-        let spaceChar: Character = " "
-        var convertedSlice: [Character] = []
-        var leadingTabsDone = false
-
-        for char in slice {
-            if !leadingTabsDone {
-                if char == tabChar {
-                    convertedSlice.append(char)
-                } else {
-                    leadingTabsDone = true
-                    convertedSlice.append(char == tabChar ? spaceChar : char)
-                }
-            } else {
-                convertedSlice.append(char == tabChar ? spaceChar : char)
-            }
-        }
-
-        // 基本属性（地の色）
-        var baseAttributes: [NSAttributedString.Key: Any] = [
-            .font: baseFont,
-            .foregroundColor: KSyntaxParser.KSyntaxColorType.default.color
-        ]
-
-        if let tabWidth = tabWidth {
-            let paragraphStyle = NSMutableParagraphStyle()
-            paragraphStyle.defaultTabInterval = CGFloat(tabWidth) * spaceAdvance
-            baseAttributes[.paragraphStyle] = paragraphStyle
-        }
-
-        // AttributedStringをベース色で作成
-        let result = NSMutableAttributedString(
-            string: String(convertedSlice),
-            attributes: baseAttributes
-        )
-
-        // syntax parser から対象範囲の構文情報を取得
-        let spans = _parser.highlightSpans(in: range)
-        //print("Got \(spans.count) spans in range \(range)")
-        // 各spanに対して属性を上書き適用
-        /*
-        for span in spans {
-            let localLower = span.range.lowerBound - range.lowerBound
-            let localUpper = span.range.upperBound - range.lowerBound
-
-            guard localLower >= 0, localUpper <= convertedSlice.count, localLower < localUpper else { continue }
-
-            let nsRange = NSRange(location: localLower, length: localUpper - localLower)
-            result.addAttribute(.foregroundColor, value: span.kind.colorType.color, range: nsRange)
-        }*/
-        for span in spans {
-            //print("Span: \(span.range), kind: \(span.kind)")
-            let overlap = span.range.clamped(to: range)
-            guard !overlap.isEmpty else { continue }
-
-            let nsRange = NSRange(
-                location: overlap.lowerBound - range.lowerBound,
-                length: overlap.count
-            )
-
-            result.addAttribute(.foregroundColor, value: span.kind.colorType.color, range: nsRange)
-        }
-
-        return result
-    }*/
-    
-    // 与えられた範囲のadvanceの配列を返す。
-    /*
-    func advances(in range:Range<Int>) -> [CGFloat] {
-        return _advanceCache.advances(for: _characters, in: range)
-    }
-    
-    func advance(for character:Character) -> CGFloat {
-        return _advanceCache.advance(for: character)
-    }*/
     
     // 登録：owner を弱参照で保持。handler はクロージャ。
     func addObserver(_ owner: AnyObject, _ handler: @escaping (KStorageModified) -> Void) {
@@ -864,16 +593,10 @@ final class KTextStorage: KTextStorageProtocol {
         _observers.removeAll { $0.owner === owner || $0.owner == nil }
     }
 
-        
-    
-    
     
     
     // MARK: - Private
 
-    /*private func notifyObservers(_ event: KStorageModified) {
-        _observers.forEach { $0(event) }
-    }*/
     // 通知：同期。死んだ参照はついでに掃除。
     private func notifyObservers(_ note: KStorageModified) {
         var alive: [_ObserverEntry] = []
@@ -888,10 +611,7 @@ final class KTextStorage: KTextStorageProtocol {
     }
     
     private func resetCaches() {
-        //_advanceCache = KGlyphAdvanceCache(font: _baseFont)
-        //_advanceCache.setParticularCache(spaceAdvance, for: "\t")
         _spaceAdvanceCache = nil
-        //_lineNumberDigitWidth = nil
         _invisibleCharacters = nil
         _lineNumberCharacterMaxWidth = nil
         

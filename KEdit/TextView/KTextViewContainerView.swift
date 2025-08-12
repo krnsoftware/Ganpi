@@ -60,7 +60,6 @@ final class KTextViewContainerView: NSView {
         _textView.updateFrameSizeToFitContent()
 
         addSubview(_scrollView)
-        //_textView.autoresizingMask = [] 
 
         NSLayoutConstraint.activate([
             _scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),

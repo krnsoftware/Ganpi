@@ -13,7 +13,6 @@ class KLine: CustomStringConvertible {
     fileprivate weak var _layoutManager: KLayoutManager?
     fileprivate weak var _textStorageRef: KTextStorageReadable?
     private var _ctLine: CTLine?
-    //fileprivate var _cachedOffsets: [CGFloat]
     fileprivate var _cachedOffsets: [CGFloat] = [0.0]
     private var _widthAndOffsetsFixed: Bool = false
     private var _lastAccessedTime: CFTimeInterval?
@@ -56,19 +55,17 @@ class KLine: CustomStringConvertible {
         
     }
     
-    //@inline(__always)
+    @inline(__always)
     func shiftRange(by delta:Int){
-        //if delta == 0 { return }
         range = (range.lowerBound + delta)..<(range.upperBound + delta)
     }
     
-    //@inline(__always)
+    @inline(__always)
     func shiftHardLineIndex(by delta:Int){
-        //if delta == 0 { return }
         hardLineIndex += delta
     }
     
-    //@inline(__always)
+    @inline(__always)
     func removeCTLine() {
         _ctLine = nil
         _lastAccessedTime = nil
@@ -253,7 +250,6 @@ final class KLines: CustomStringConvertible {
     // fakeLinesがある場合、fakeLinesの行数からオリジナルの行数を引いたものを追加する。
     var count: Int {
         guard !_fakeLines.isEmpty else { return _lines.count }
-        //let originalLineCount = lines(hardLineIndex: _replaceLineNumber).count
         guard let originalLineCount = countSoftLinesOf(hardLineIndex: _replaceLineNumber) else {
             log("originalLineCount is nil",from:self)
             return -1
@@ -382,11 +378,6 @@ final class KLines: CustomStringConvertible {
     subscript(i: Int) -> KLine? {
         if !hasFakeLine { return _lines[i] }
         
-        /*
-        guard let lineArrayIndex = lineArrayIndex(for: _replaceLineNumber) else {
-            log("lineArrayIndex == nil, _replaceLineNumber = \(_replaceLineNumber)", from: self)
-            return nil
-        }*/
         guard let lineArrayIndex = _replaceLineIndex else { log("_fakeLineIndex = nil.", from:self); return nil}
         guard let replaceLineCount = _replaceLineCount else { log("_fakeLineCount = nil.", from:self); return nil}
         
@@ -399,14 +390,11 @@ final class KLines: CustomStringConvertible {
              
         // 入力中の行の場合は、fake行を返す。
         if lineArrayIndex <= i, i < lineArrayIndex + _fakeLines.count {
-            //log("fake.", from:self)
             return _fakeLines[i - lineArrayIndex] as KLine?
         }
         
         // 入力中の行より後の場合は、入力中の行の次の行を連続して取得できるようずらす。
-        //let convertedCount = i - _fakeLines.count + lines(hardLineIndex: _replaceLineNumber).count
         let convertedCount = i - _fakeLines.count + replaceLineCount
-        //log("slided.", from:self)
         
         return _lines[convertedCount]
         
@@ -459,7 +447,6 @@ final class KLines: CustomStringConvertible {
             let startHardLineIndex = startSoftLine.hardLineIndex
 
             /// KLine 配列上の startIndex を取得
-            //guard let startHardLineArrayIndex = lineArrayIndex(for: startHardLineIndex, softLineIndex: startSoftLine.softLineIndex) else {
             guard let startHardLineArrayIndex = lineArrayIndex(for: startHardLineIndex) else {
                 log("startIndex not found", from: self)
                 return
@@ -510,20 +497,12 @@ final class KLines: CustomStringConvertible {
 
             newRange = lower..<upper
             
-            /*_lines[removeRange.upperBound..<_lines.count].forEach {
-                $0.shiftRange(by: info.insertedCount - info.range.count)
-                $0.shiftHardLineIndex(by: info.insertedNewlineCount - info.deletedNewlineCount)
-                //log("line index shifted by \(info.insertedNewlineCount - info.deletedNewlineCount)")
-            }*/
-            
-            
             DispatchQueue.concurrentPerform(iterations: _lines.count - removeRange.upperBound) { i in
                 let line = _lines[removeRange.upperBound + i]
                 line.shiftRange(by: info.insertedCount - info.range.count)
                 line.shiftHardLineIndex(by: info.insertedNewlineCount - info.deletedNewlineCount)
             }
             
-            //_lines.forEach { $0.removeCTLine() }
             DispatchQueue.concurrentPerform(iterations: _lines.count) { i in
                 _lines[i].removeCTLine()
             }
@@ -545,19 +524,6 @@ final class KLines: CustomStringConvertible {
         if start < newRange.upperBound {
             lineRanges.append(start..<newRange.upperBound)
         }
-        /*
-        guard let newStartLine = lineContainsCharacter(index: newRange.lowerBound) else { log("newStartLine is nil", from:self); return }
-        let newStartHardLineIndex = newStartLine.hardLineIndex
-        var newLines:[KLine] = []
-        for (i, range) in lineRanges.enumerated() {
-            guard let lineArray = layoutManager.makeLines(range: range, hardLineIndex: (newStartHardLineIndex + i), width: layoutRects.textRegionWidth - layoutRects.textEdgeInsets.right) else {
-                log("lineArray is nil", from:self)
-                return
-            }
-            newLines.append(contentsOf: lineArray)
-        }
-        
-        _lines.replaceSubrange(removeRange, with: newLines)*/
         
         // 並列処理を導入する。15000行のデータで1200ms->460msに短縮。
         guard let newStartLine = lineContainsCharacter(index: newRange.lowerBound) else {
@@ -577,15 +543,12 @@ final class KLines: CustomStringConvertible {
                 newLinesBuffer[i] = lineArray
             } else {
                 log("lineArray is nil for index \(i)", from: self)
-                // エラー通知にする場合は別途検出処理を入れる必要あり
             }
         }
 
         let newLines = newLinesBuffer.flatMap { $0 }
         _lines.replaceSubrange(removeRange, with: newLines)
-        
-        // kokomade
-        
+                
         guard let newLastLine = _lines.last else {
             log("newLastLine is nil", from: self)
             return
@@ -654,7 +617,6 @@ final class KLines: CustomStringConvertible {
     // ハード行の番号iの行のRangeを得る。行末の改行は含まない。
     func hardLineRange(hardLineIndex: Int) -> Range<Int>? {
         guard let lines = lines(hardLineIndex: hardLineIndex) else { log("hardLineRange(\(hardLineIndex)) not found",from:self); return nil}
-        //guard !lines.isEmpty else { return nil }
         if lines.isEmpty {
             return nil
         }
@@ -758,7 +720,6 @@ final class KLines: CustomStringConvertible {
                 if let lastAccessedTime = line.lastAccessedTime, now - lastAccessedTime > threshold {
                     line.removeCTLine()
                     count += 1
-                    //log("removeCTLine: hardLineIndex = \(line.hardLineIndex), softLineIndex = \(line.softLineIndex)",from:self)
                 }
             }
             if count > 0 { log("remove \(count) CTLines.",from:self) }

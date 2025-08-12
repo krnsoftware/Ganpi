@@ -60,7 +60,6 @@ struct LayoutRects {
     }
     
     
-    //init(layoutManagerRef: KLayoutManagerReadable, textStorageRef: KTextStorageReadable, bounds: CGRect, visibleRect: CGRect, showLineNumbers: Bool, textEdgeInsets: TextEdgeInsets = .default) {
     init(layoutManagerRef: KLayoutManagerReadable, textStorageRef: KTextStorageReadable, visibleRect: CGRect, showLineNumbers: Bool, wordWrap: Bool, textEdgeInsets: TextEdgeInsets = .default) {
         //_bounds = bounds
         _visibleRect = visibleRect
@@ -74,11 +73,8 @@ struct LayoutRects {
         
         var charWidth: CGFloat = 20
         if let textStorage = _textStorageRef as? KTextStorage  {
-            //charWidth = textStorage.lineNumberDigitWidth
             charWidth = textStorage.lineNumberCharacterMaxWidth
-            //log("charWidth: \(charWidth)")
         }
-        //let lineNumberWidth = CGFloat(digitCount) * charWidth + 10.0//5.0
         let lineNumberWidth = CGFloat(digitCount) * charWidth + LineNumberEdgeInsets.default.left + LineNumberEdgeInsets.default.right
         
         let lineNumberRect: CGRect? = showLineNumbers ?
@@ -113,7 +109,6 @@ struct LayoutRects {
         // LineNumberRegionの場合
         if let lnRect = lineNumberRegion?.rect, lnRect.contains(point) {
             let lineIndex = min(Int((point.y - textEdgeInsets.top ) / lineHeight), lineCount - 1)
-            //print("regionType - in lineNumberRegion: \(lineIndex)")
             return .lineNumber(line: lineIndex)
         }
 
@@ -128,21 +123,13 @@ struct LayoutRects {
             let lineIndex = Int(relativePoint.y / lineHeight)
             
             // TextRegion内でLineに含まれる場合
-            //if lines.indices.contains(lineIndex) {
             if 0 <= lineIndex && lineIndex < lineCount {
-                
                 guard let line = lines[lineIndex] else { print("\(#function) - invalid lineIndex \(lineIndex)"); return .outside}
                 guard let ctLine = line.ctLine else { print("regionType - invalid line") ; return .outside }
                 let relativeX = max(0, relativePoint.x)
-                //let indexInLine = CTLineGetStringIndexForPosition(line.ctLine, CGPoint(x: relativeX, y: 0))
                 let utf16Index = CTLineGetStringIndexForPosition(ctLine, CGPoint(x: relativeX, y: 0))
                 let string = String(textStorageRef.characterSlice[line.range])
-                /*guard let indexInLine = characterIndex(fromUTF16Offset: utf16Index, in: string) else {
-                    log("indexInLine is nil")
-                    return .outside
-                }*/
                 let indexInLine = characterIndex(fromUTF16Offset: utf16Index, in: string) ?? 0
-                //print("regionType - in textRegion, lineIndex=\(lineIndex), indexInLine=\(indexInLine)")
                 
                 // CTLineGetStringIndexForPosition()は、ドキュメントにはないが、空行の場合に-1を返す仕様らしい。
                 // 空行の場合はindexは0で問題ないことから、-1の場合には0を返す。

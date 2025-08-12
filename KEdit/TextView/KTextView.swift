@@ -103,8 +103,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             _layoutManager.rebuildLayout()
             updateFrameSizeToFitContent()
             updateCaretPosition()
-            //guard let scrollView = self.enclosingScrollView else { log("enclosingScrollView is nil"); return }
-            //scrollView.horizontalScroller?.isHidden = _wordWrap
             needsDisplay = true
         }
     }
@@ -358,15 +356,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             return
         }
         
-        // test. TextRegionの外枠を赤で描く。
-        /*
-        let path = NSBezierPath(rect: layoutRects.textRegion.rect)
-        NSColor.red.setStroke()
-        path.lineWidth = 2
-        path.stroke()*/
-        
-        
-        
         let lines = _layoutManager.lines
         let lineHeight = _layoutManager.lineHeight
         let textRect = layoutRects.textRegion.rect
@@ -397,8 +386,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             let lineRange = line.range
             let selection = selectionRange.clamped(to: lineRange)
             if selection.isEmpty && !lineRange.isEmpty{ continue } // lineRange.isEmpty==trueなら空行のため処理対象
-            //log("selection.isEmpty is false.", from:self)
-            //if line.range.isEmpty { log("empty!", from:self)}
 
             
             let startOffset = line.characterOffset(at: selection.lowerBound - lineRange.lowerBound)
@@ -439,8 +426,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             guard let line = lines[i] else { continue }
             
             if verticalRange.contains(textPoint.y) {
-                /*guard let ctLine = line.ctLine else { continue }
-                drawCTLine(ctLine: ctLine, x: textPoint.x, y: y)*/
                 line.draw(at: textPoint, in: bounds)
             }
         }
@@ -454,19 +439,11 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             lnRect.fill()
             
             // 非選択行の文字のattribute
-            /*let attrs: [NSAttributedString.Key: Any] = [
-                .font: NSFont.monospacedDigitSystemFont(ofSize: 0.9 * _textStorageRef.baseFont.pointSize,weight: .regular),
-                .foregroundColor: NSColor.secondaryLabelColor
-            ]*/
             let attrs: [NSAttributedString.Key: Any] = [
                 .font: _textStorageRef.lineNumberFont,
                 .foregroundColor: NSColor.secondaryLabelColor
             ]
             // 選択行の文字のattribute
-            /*let attrs_emphasized: [NSAttributedString.Key: Any] = [
-                .font: NSFont.monospacedDigitSystemFont(ofSize: 0.9 * _textStorageRef.baseFont.pointSize,weight: .bold),
-                .foregroundColor: NSColor.labelColor
-            ]*/
             let attrs_emphasized: [NSAttributedString.Key: Any] = [
                 .font: _textStorageRef.lineNumberFontEmph,
                 .foregroundColor: NSColor.labelColor
@@ -1348,62 +1325,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     }
 
     func firstRect(forCharacterRange range: NSRange, actualRange: NSRangePointer?) -> NSRect {
-        /*
-        var point = characterPosition(at: caretIndex)
-        point = CGPoint(x: point.x, y: point.y + _layoutManager.lineHeight)
-        point = self.convert(point, from: nil)
         
-        guard let window = self.window else { print("\(#function): window is nil"); return .zero }
-        
-        point = window.convertPoint(toScreen: point)
-        
-        return NSRect(x: point.x, y: point.y, width: 1, height: _layoutManager.lineHeight)*/
-        /*
-        if let replacementRange = _replacementRange {
-            log("range:\(range), replacementRange:\(replacementRange)",from:self)
-            _layoutManager.lines.addFakeLine(replacementRange: replacementRange, attrString: _markedText)
-            
-            defer {
-                _layoutManager.lines.removeFakeLines()
-            }
-            let hardLineIndex = _layoutManager.lines.replaceLineNumber
-            
-            guard let totalLineIndex = _layoutManager.lines.lineArrayIndex(for: hardLineIndex) else { log("totalLineIndex is nil.",from:self); return .zero}
-            
-            let globalTargetIndex = range.location
-            let localTargetIndex = globalTargetIndex - replacementRange.lowerBound
-            
-            //log("targetIndex:\(targetIndex), replacementRange:\(replacementRange)",from:self)
-            
-            guard let layoutRects = _layoutManager.makeLayoutRects() else { log("layoutRects is nil.",from:self); return .zero }
-            
-            for (i, line) in _layoutManager.lines.fakeLines.enumerated() {
-                guard let ctLine = line.ctLine else { log("ctLine = nil.",from:self); return .zero }
-                let stringRange = CTLineGetStringRange(ctLine)
-                //log("CTLine range: \(stringRange.location) - \(stringRange.location + stringRange.length)",from:self)
-                let start = stringRange.location
-                let end = start + stringRange.length
-                
-                if localTargetIndex >= start && localTargetIndex < end {
-                    let offset = CTLineGetOffsetForStringIndex(ctLine, localTargetIndex, nil)
-                    
-                    let y = CGFloat(totalLineIndex + i) * _layoutManager.lineHeight + layoutRects.textEdgeInsets.top
-                    let x = layoutRects.textRegion.rect.origin.x + layoutRects.horizontalInsets + offset
-                    
-                    var point = CGPoint(x: x, y: y)
-                    if let window = self.window {
-                        point = self.convert(point, to: nil)
-                        point = window.convertPoint(toScreen: point)
-                    }
-                    //log("CTLine条件一致。i=\(i)",from:self)
-                    return NSRect(x: point.x, y: point.y, width: 1, height: _layoutManager.lineHeight)
-                }
-            }
-            
-        }
-        //log("CTLineが条件に合わず。",from:self)
-        return .zero
-        */
         if let replacementRange = _replacementRange {
             log("replacementRange: \(replacementRange), range: \(range)")
             //guard var point = _layoutManager.lines.pointForFirstRect(for: range.lowerBound) else { log("pointForFirstRect(for:) failed.",from:self); return .zero }
@@ -1474,19 +1396,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     // 現在のところinternalとしているが、将来的に公開レベルを変更する可能性あり。
     func updateFrameSizeToFitContent() {
-        //let totalLines = _layoutManager.lines.count
-        //let lineHeight = _layoutManager.lineHeight
-        /*
-        let lineNumberWidth = layoutRects.showLineNumbers ? layoutRects.lineNumberRegion?.rect.width ?? 100 : 0
-
-        //let lineNumberWidth: CGFloat = showLineNumber ? 40 : 0
-        //let height = CGFloat(totalLines) * lineHeight * 4 / 3
-        
-        let width = _layoutManager.maxLineWidth
-                    + lineNumberWidth
-                    + layoutRects.textEdgeInsets.left * 2
-        
-        self.setFrameSize(CGSize(width: width, height: height))*/
         
         guard let layoutRects = _layoutManager.makeLayoutRects() else {
             log("_layoutManger.makeLayoutRects() - nil.", from:self)
@@ -1534,20 +1443,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         return CGPoint(x: linePoint.x + line.characterOffset(at: indexInLine), y: linePoint.y)
 
     }
-    /*
-    private func drawCTLine(ctLine: CTLine, x: CGFloat, y: CGFloat) {
-        let context = NSGraphicsContext.current?.cgContext
-        context?.saveGState()
-        context?.translateBy(x: 0, y: bounds.height)
-        context?.scaleBy(x: 1.0, y: -1.0)
-        
-        let ascent = CTFontGetAscent(_textStorageRef.baseFont)
-        let lineOriginY = bounds.height - y - ascent
-        
-        context?.textPosition = CGPoint(x: x, y: lineOriginY)
-        CTLineDraw(ctLine, context!)
-        context?.restoreGState()
-    }*/
+    
     
     // オートスクロール用のメソッド。タイマーから呼び出される。
     private func updateDraggingSelection() {

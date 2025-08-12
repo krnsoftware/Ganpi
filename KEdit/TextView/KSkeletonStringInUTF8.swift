@@ -171,23 +171,6 @@ final class KSkeletonStringInUTF8 {
         matchesKeyword(at: index, word: word[...])
     }
     
-    /*
-    func hasWordBoundaries(at index: Int, length: Int, isIdent: (UInt8) -> Bool) -> Bool {
-        guard index >= 0, length > 0, index + length <= _bytes.count else {
-            log("index:\(index), length:\(length), count:\(_bytes.count) — out of range", from: self)
-            return false
-        }
-        let leftOK = (index == 0) || !isIdent(_bytes[index - 1])
-        let end = index + length
-        let rightOK = (end == _bytes.count) || !isIdent(_bytes[end])
-        return leftOK && rightOK
-    }
-
-    func hasWordBoundaries(at index: Int, length: Int, identSet: Set<UInt8>) -> Bool {
-        hasWordBoundaries(at: index, length: length) { identSet.contains($0) }
-    }*/
-    
-    
     
     // 改行コード("\n")のoffsetを全て返す。
     func newlineIndices() -> [Int] {
@@ -197,11 +180,6 @@ final class KSkeletonStringInUTF8 {
         _newlineCache = res
         return res
     }
-    /*
-    func newlineIndices() -> [Int] {
-        let newLine:UInt8 = 0x0A // "\n"
-        return _bytes.enumerated().compactMap { $0.element == newLine ? $0.offset : nil }
-    }*/
     
     // rangeの範囲内に於いて\nで区切られた行の範囲を返す。\nは含まない。
     // --- 二分探索ヘルパ（昇順配列 a 前提） ---

@@ -8,6 +8,7 @@
 
 import Cocoa
 
+// 不可視文字の表示用クラス。不可視文字の代替文字の管理とCTLineの保持・提供を目的とする。
 final class KInvisibleCharacters {
     private var _dictionary: [Character: String]
     private var _cache: [Character: CTLine] = [:]
@@ -29,7 +30,7 @@ final class KInvisibleCharacters {
              dictionary: [Character: String] = _defaultDictionary) {
             _attributes = attributes
             _dictionary = dictionary
-        }
+    }
 
     func ctLine(for char: Character) -> CTLine? {
         if let cached = _cache[char] {
@@ -37,6 +38,7 @@ final class KInvisibleCharacters {
         }
 
         guard let marker = _dictionary[char] else {
+            log("dictionary[char] is nil.",from:self)
             return nil
         }
 

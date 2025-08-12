@@ -17,7 +17,6 @@ final class KTimeChecker {
         let start = DispatchTime.now()
         let result = block()
         let end = DispatchTime.now()
-        //let elapsed = Double(end.uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000.0
         let elapsed = elapsedTime(from: start, to: end)
         print(String(format: "[%@] elapsed: %.3f ms", name, elapsed))
         return result

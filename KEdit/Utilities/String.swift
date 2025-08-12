@@ -268,23 +268,7 @@ extension String {
 
 
 //MARK: - String Extension for NSColor
-/*
-extension String {
-    
-    // 文字列"#RRGGBB", "#RRGGBBAA", "RRGGBB", "RRGGBBAA"をNSColorに変換して返す。
-    func convertToColor() -> NSColor? {
-        let regex = try! NSRegularExpression(pattern: "^#?([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})?$", options: [.caseInsensitive])
-        let results = regex.matches(in: self, options: [], range: NSMakeRange(0, self.utf16.count))
-        if results.count > 0 {
-            let red = Int(self[Range(results[0].range(at: 1), in: self)!], radix: 16)!
-            let green = Int(self[Range(results[0].range(at: 2), in: self)!], radix: 16)!
-            let blue = Int(self[Range(results[0].range(at: 3), in: self)!], radix: 16)!
-            let alpha = results[0].range(at: 4).length > 0 ? Int(self[Range(results[0].range(at: 4), in: self)!], radix: 16)! : 0xFF
-            return NSColor(red: CGFloat(red)/255.0, green: CGFloat(green)/255.0, blue: CGFloat(blue)/255.0, alpha: CGFloat(alpha)/255.0) as Optional<NSColor>
-        }
-        return nil
-    }
-}*/
+
 
 extension String {
     func convertToColor() -> NSColor? {
@@ -341,20 +325,6 @@ extension NSColor {
         return hexString
     }
 }
-/*
-extension NSColor {
-    
-    // NSColorを文字列に変化して返す。
-    func convertToHexadecimalString(_ withAlpha: Bool = false) -> String {
-        var colorString = ""
-        colorString += String(format: "%02X", Int(self.redComponent * 255))
-        colorString += String(format: "%02X", Int(self.greenComponent * 255))
-        colorString += String(format: "%02X", Int(self.blueComponent * 255))
-        if withAlpha { colorString += String(format: "%02X", Int(self.alphaComponent * 255)) }
-        
-        return colorString
-    }
-}*/
 
 
 extension String.Encoding {
