@@ -203,6 +203,32 @@
                             <menuItem title="Show Invisible Characters" id="btp-F5-fp2">
                                 <modifierMask key="keyEquivalentModifierMask"/>
                             </menuItem>
+                            <menuItem isSeparatorItem="YES" id="DCM-i9-Xef"/>
+                            <menuItem title="Split Window" id="f9b-8c-NF8">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <menu key="submenu" title="Split Window" id="aRf-Qp-kpM">
+                                    <items>
+                                        <menuItem title="Split Vertically" id="TC2-bX-ChJ">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="splitVertically:" target="-1" id="fgZ-BE-Sgg"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Split Horizontally" id="AfN-Sh-FTM">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="splitHorizontally:" target="-1" id="Xg1-BI-EAe"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Merge" id="J8f-MN-eo3">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="removeSplit:" target="-1" id="HL7-er-Amy"/>
+                                            </connections>
+                                        </menuItem>
+                                    </items>
+                                </menu>
+                            </menuItem>
                         </items>
                     </menu>
                 </menuItem>

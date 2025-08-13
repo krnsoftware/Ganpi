@@ -28,6 +28,7 @@ final class KTextViewContainerView: NSView {
     // MARK: - Init
 
     override init(frame: NSRect) {
+        
         let textStorageRef = KTextStorage()
         let layoutManager = KLayoutManager(textStorageRef: textStorageRef)
         _textView = KTextView(
@@ -40,6 +41,20 @@ final class KTextViewContainerView: NSView {
         
         setup()
         
+    }
+    
+    init(frame: NSRect, textStorageRef: KTextStorageProtocol) {
+        //let layoutManager = KLayoutManager(textStorageRef: textStorageRef)
+        
+        _textView = KTextView(
+            frame: .zero,
+            textStorageRef: textStorageRef//,
+            //layoutManager: layoutManager
+        )
+        
+        super.init(frame: frame)
+        
+        setup()
     }
 
     required init?(coder: NSCoder) {
@@ -66,6 +81,22 @@ final class KTextViewContainerView: NSView {
         _scrollView.documentView = _textView
         _scrollView.translatesAutoresizingMaskIntoConstraints = false
         _textView.updateFrameSizeToFitContent()
+        
+        // test
+        // KTextViewContainerView のスクロール設定内
+
+        if #available(macOS 11.0, *) {
+            _scrollView.automaticallyAdjustsContentInsets = false
+        }
+
+        // ← ここを .zero ではなく明示初期化に
+        if _scrollView.responds(to: #selector(setter: NSScrollView.contentInsets)) {
+            _scrollView.contentInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
+        }
+        if _scrollView.responds(to: #selector(setter: NSScrollView.scrollerInsets)) {
+            _scrollView.scrollerInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
+        }
+        // end
 
         addSubview(_scrollView)
 

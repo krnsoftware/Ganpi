@@ -295,7 +295,9 @@ final class KLines: CustomStringConvertible {
         _layoutManager = layoutManager
         _textStorageRef = textStorageRef
         
-        rebuildLines()
+        setLinesEmpty()
+        
+        //rebuildLines() <- これのせいで循環してた。
         
     }
     
@@ -396,13 +398,15 @@ final class KLines: CustomStringConvertible {
         guard let layoutRects = layoutManager.makeLayoutRects() else { log("layoutRects is nil", from:self); return }
         
         // storageが空だった場合は空行を追加するのみ。
+        if textStorageRef.count == 0 { setLinesEmpty(); return }
+        /*
         if textStorageRef.count == 0 {
             _lines.removeAll()
             _lines.append(layoutManager.makeEmptyLine(index: 0, hardLineIndex: 0))
             _hardLineIndexMap.removeAll()
             _hardLineIndexMap[0] = 0
             return
-        }
+        }*/
         
         let newLineCharacter:Character = "\n"
         let characters = textStorageRef.characterSlice
@@ -537,7 +541,7 @@ final class KLines: CustomStringConvertible {
             _lines.append(emptyLine)
         }
         
-        log("isValid: \(isValid)",from:self)
+        //log("isValid: \(isValid)",from:self)
 
         // mapも再構築
         _hardLineIndexMap.removeAll()
@@ -685,4 +689,13 @@ final class KLines: CustomStringConvertible {
         return CGPoint(x: x, y: y)
     }
     
+    
+    private func setLinesEmpty() {
+        guard let layoutManager = _layoutManager else { log("layoutManager not found.", from: self); return }
+        
+        _lines.removeAll()
+        _lines.append(layoutManager.makeEmptyLine(index: 0, hardLineIndex: 0))
+        _hardLineIndexMap.removeAll()
+        _hardLineIndexMap[0] = 0
+    }
 }

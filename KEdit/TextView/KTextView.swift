@@ -100,6 +100,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         get { _wordWrap }
         set {
             _wordWrap = newValue
+            _applyWordWrapToEnclosingScrollView()
+            
             _layoutManager.rebuildLayout()
             updateFrameSizeToFitContent()
             updateCaretPosition()
@@ -185,6 +187,9 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         self._textStorageRef = textStorageRef
         self._layoutManager = KLayoutManager(textStorageRef: textStorageRef)
         super.init(frame: frame)
+        
+        //log("_textStorageRef.count: \(_textStorageRef.count)")
+        
         commonInit()
     }
 
@@ -208,28 +213,40 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     private func commonInit() {
         addSubview(_caretView)
         wantsLayer = true
-        updateCaretPosition()
-        startCaretBlinkTimer()
+        
+        _layoutManager.textView = self
+        
+        //updateCaretPosition()
+        //startCaretBlinkTimer()
+        
+        
+        //_layoutManager.rebuildLayout()
+        
         
         registerForDraggedTypes([.string])
     }
     
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        /*
-        // IMEのためのサンプル
-        if let context = self.inputContext {
-            print("✅ inputContext is available: \(context)")
-        } else {
-            print("❌ inputContext is nil")
-        }*/
         
-        _layoutManager.textView = self
+        // scrollviewのscrollerの状態をセット
+        DispatchQueue.main.async { [weak self] in
+                self?._applyWordWrapToEnclosingScrollView()
+            }
+        
+        //_layoutManager.textView = self
 
         window?.makeFirstResponder(self)  // 念のため明示的に指定
        
         // キャレットの位置を再計算して表示しておく。
         updateCaretPosition()
+        startCaretBlinkTimer()
+        
+        //test
+        /*
+        let info = KStorageModifiedInfo(range: 0..<_textStorageRef.count, insertedCount: 0, deletedNewlineCount: 0, insertedNewlineCount: 0)
+        _layoutManager.textStorageDidModify(.textChanged(info: info))
+         */
         
         // 古い監視を解除
         NotificationCenter.default.removeObserver(self)
@@ -1480,6 +1497,19 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     // mouseDown()などのセレクター履歴を残すためのダミー。
     @objc func clearCaretContext(_ sender: Any?) { }
+    
+    // scrollviewの水平スクローラーのオンオフを設定に追従させる。
+    private func _applyWordWrapToEnclosingScrollView() {
+        guard let sv = self.enclosingScrollView else { return }
+
+        if _wordWrap {
+            if sv.hasHorizontalScroller { sv.hasHorizontalScroller = false }
+        } else {
+            if !sv.hasHorizontalScroller { sv.hasHorizontalScroller = true }
+        }
+
+        sv.tile()
+    }
     
 }
 

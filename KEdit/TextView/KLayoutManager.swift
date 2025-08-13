@@ -122,7 +122,7 @@ final class KLayoutManager: KLayoutManagerReadable {
             }
         }
                 
-        rebuildLayout()
+        //rebuildLayout()
         
         
     }
@@ -136,6 +136,7 @@ final class KLayoutManager: KLayoutManagerReadable {
     func rebuildLayout(reason: KRebuildReason = .destructiveChange) {
         
         guard let layoutRects = makeLayoutRects() else { log("layoutRects is nil", from:self); return }
+        
         let lineNumberRegionWidth = layoutRects.lineNumberRegion?.rect.width ?? 0
         if lineNumberRegionWidth != _prevLineNumberRegionWidth {
             _prevLineNumberRegionWidth = lineNumberRegionWidth
@@ -189,6 +190,9 @@ final class KLayoutManager: KLayoutManagerReadable {
     // characterIndex文字目の文字が含まれるKLineとその行番号(ソフトラップの)を返す。
     // 現在の文字がテキストの最後の場合には(nil, -1)が返る。
     func line(at characterIndex: Int) -> (line: KLine?, lineIndex: Int) {
+        //test
+        if characterIndex == 0 { return (line: _lines[0], lineIndex: 0)}
+        
         var low = 0, high = _lines.count - 1
         while low <= high {
             let mid = (low + high) / 2
