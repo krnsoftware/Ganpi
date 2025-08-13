@@ -298,13 +298,15 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     override func becomeFirstResponder() -> Bool {
         print("\(#function)")
-        updateActiveState()
+        _caretView.isHidden = false
+        //updateActiveState()
         return super.becomeFirstResponder()
     }
 
     override func resignFirstResponder() -> Bool {
         print("\(#function)")
-        updateActiveState()
+        _caretView.isHidden = true
+        //updateActiveState()
         return super.resignFirstResponder()
     }
     
@@ -1201,11 +1203,11 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     // MARK: - KTextView methods (notification)
     
     @objc private func windowBecameKey(_ notification: Notification) {
-        updateActiveState()
+        //updateActiveState()
     }
         
     @objc private func windowResignedKey(_ notification: Notification) {
-        updateActiveState()
+        //updateActiveState()
     }
     
     @objc private func clipViewBoundsDidChange(_ notification: Notification) {
@@ -1403,13 +1405,13 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         updateCaretPosition()
         needsDisplay = true
     }
-
+/*
     private func updateActiveState() {
         let isActive = (window?.isKeyWindow == true) && (window?.firstResponder === self)
         _caretView.isHidden = !isActive
         needsDisplay = true
     }
-    
+    */
     
     // 現在のところinternalとしているが、将来的に公開レベルを変更する可能性あり。
     func updateFrameSizeToFitContent() {
