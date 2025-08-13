@@ -21,6 +21,9 @@ final class KViewController: NSViewController {
         //print("現在の関数名：\(#function)")
         // KTextViewContainerView の作成
         textViewContainerView = KTextViewContainerView()
+        
+        // 起動直後に生成されるウインドウのタイトルバーが白く塗り潰される問題を解決。
+        // view.window?.titlebarAppearsTransparent = false
 
         // Auto Layout を使用
         textViewContainerView.translatesAutoresizingMaskIntoConstraints = false
@@ -32,5 +35,14 @@ final class KViewController: NSViewController {
             textViewContainerView.topAnchor.constraint(equalTo: view.topAnchor),
             textViewContainerView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
+        
+        Swift.print("KViewController.viewDidLoad")
+        
+        
+    }
+    
+    override func viewDidAppear() {
+        super.viewDidAppear()
+        Swift.print("KViewController.viewDidAppear") 
     }
 }

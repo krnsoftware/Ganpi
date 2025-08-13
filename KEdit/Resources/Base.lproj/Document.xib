@@ -28,10 +28,5 @@
             </connections>
             <point key="canvasLocation" x="56" y="-83"/>
         </window>
-        <viewController id="oeb-f6-4KT" customClass="KViewController" customModule="KEdit" customModuleProvider="target">
-            <connections>
-                <outlet property="view" destination="gIp-Ho-8D9" id="FUD-Sz-uaf"/>
-            </connections>
-        </viewController>
     </objects>
 </document>

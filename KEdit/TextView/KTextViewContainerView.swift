@@ -20,6 +20,10 @@ final class KTextViewContainerView: NSView {
     var textView: KTextView {
         _textView
     }
+    
+    var scrollView: NSScrollView {
+        _scrollView
+    }
 
     // MARK: - Init
 
@@ -31,9 +35,11 @@ final class KTextViewContainerView: NSView {
             textStorageRef: textStorageRef,
             layoutManager: layoutManager
         )
-
+        
         super.init(frame: frame)
+        
         setup()
+        
     }
 
     required init?(coder: NSCoder) {
@@ -49,6 +55,8 @@ final class KTextViewContainerView: NSView {
         super.init(coder: coder)
         setup()
     }
+    
+    
 
     // MARK: - Setup
 

@@ -135,7 +135,6 @@ final class KLayoutManager: KLayoutManagerReadable {
     
     func rebuildLayout(reason: KRebuildReason = .destructiveChange) {
         
-        
         guard let layoutRects = makeLayoutRects() else { log("layoutRects is nil", from:self); return }
         let lineNumberRegionWidth = layoutRects.lineNumberRegion?.rect.width ?? 0
         if lineNumberRegionWidth != _prevLineNumberRegionWidth {
