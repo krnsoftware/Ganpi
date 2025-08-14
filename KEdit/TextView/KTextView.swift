@@ -26,9 +26,13 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     private var _textStorageRef: KTextStorageProtocol// = KTextStorage()
     private var _layoutManager: KLayoutManager
     private let _caretView = KCaretView()
+    private var _containerView: KTextViewContainerView?
     
     // キャレットの表示に関するプロパティ
     private var _caretBlinkTimer: Timer?
+    
+    // フォーカスリングの表示に関するプロパティ
+    private weak var _owningContainer: KTextViewContainerView?
     
     // 前回のcontentview.boundsを記録しておくためのプロパティ
     private var _prevContentViewBounds: CGRect = .zero
@@ -129,6 +133,11 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             updateCaretPosition()
             needsDisplay = true
         }
+    }
+    
+    var containerView: KTextViewContainerView? {
+        get { _containerView }
+        set { _containerView = newValue}
     }
     
     // 今回のセレクタが垂直方向にキャレット選択範囲を動かすものであるか返す。
@@ -297,17 +306,21 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     
     override func becomeFirstResponder() -> Bool {
-        print("\(#function)")
+        //print("\(#function)")
+        let ok = super.becomeFirstResponder()
         _caretView.isHidden = false
-        //updateActiveState()
-        return super.becomeFirstResponder()
+        containerView?.setActiveEditor(true)
+        needsDisplay = true
+        return ok
     }
 
     override func resignFirstResponder() -> Bool {
-        print("\(#function)")
+        //print("\(#function)")
+        let ok = super.resignFirstResponder()
         _caretView.isHidden = true
-        //updateActiveState()
-        return super.resignFirstResponder()
+        containerView?.setActiveEditor(false)
+        needsDisplay = true
+        return ok
     }
     
     //testing.
@@ -369,6 +382,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
         
+        //log("dirtyRect: \(dirtyRect)",from:self)
         
         guard let layoutRects = _layoutManager.makeLayoutRects() else {
             print("\(#function): layoutRects is nil")
@@ -389,8 +403,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         bounds.fill()
         
         let selectedTextBGColor = window?.isKeyWindow == true
-            ? NSColor.selectedTextBackgroundColor
-            : NSColor.unemphasizedSelectedTextBackgroundColor
+        ? NSColor.selectedTextBackgroundColor
+        : NSColor.unemphasizedSelectedTextBackgroundColor
         
         
         for i in 0..<lines.count {
@@ -400,12 +414,12 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             if !verticalRange.contains(y) {
                 continue
             }
-                        
+            
             // 選択範囲の描画
             let lineRange = line.range
             let selection = selectionRange.clamped(to: lineRange)
             if selection.isEmpty && !lineRange.isEmpty{ continue } // lineRange.isEmpty==trueなら空行のため処理対象
-
+            
             
             let startOffset = line.characterOffset(at: selection.lowerBound - lineRange.lowerBound)
             var endOffset = line.characterOffset(at: selection.upperBound - lineRange.lowerBound)
@@ -418,7 +432,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             }
             
             
-
+            
             let selectionRect = CGRect(
                 x: textRect.origin.x + startOffset + layoutRects.horizontalInsets,
                 y: y,
@@ -485,18 +499,18 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 let numberPoint = CGPoint(x: numberPointX, y: numberPointY)
                 
                 if !verticalRange.contains(numberPoint.y) { continue }
-            
+                
                 
                 let lineRange = _textStorageRef.lineRange(at: line.range.lowerBound) ?? line.range
                 let isActive =
-                    selectionRange.overlaps(lineRange)
-                    || (selectionRange.isEmpty && (
-                        lineRange.contains(selectionRange.lowerBound)
-                        || selectionRange.lowerBound == lineRange.upperBound
-                    ))
-                    || (!selectionRange.isEmpty &&
-                        selectionRange.lowerBound <= lineRange.lowerBound &&
-                        selectionRange.upperBound >= lineRange.upperBound)
+                selectionRange.overlaps(lineRange)
+                || (selectionRange.isEmpty && (
+                    lineRange.contains(selectionRange.lowerBound)
+                    || selectionRange.lowerBound == lineRange.upperBound
+                ))
+                || (!selectionRange.isEmpty &&
+                    selectionRange.lowerBound <= lineRange.lowerBound &&
+                    selectionRange.upperBound >= lineRange.upperBound)
                 if  isActive {
                     number.draw(at: numberPoint, withAttributes: attrs_emphasized)
                 } else {
@@ -506,10 +520,15 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             }
         }
         /*
-        let path = NSBezierPath(rect: layoutRects.lineNumberRegion!.rect)
-        NSColor.red.setStroke()
-        path.lineWidth = 2
-        path.stroke()*/
+         let path = NSBezierPath(rect: layoutRects.lineNumberRegion!.rect)
+         NSColor.red.setStroke()
+         path.lineWidth = 2
+         path.stroke()*/
+        
+        // フォーカスリングを描く
+        //_drawFocusBorderIfNeeded()
+        
+        
         
     }
    
@@ -1375,6 +1394,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         0
     }
 
+
     // MARK: - KTextView methods (helpers)
     
     func textStorageDidModify(_ modification: KStorageModified) {
@@ -1513,5 +1533,54 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         sv.tile()
     }
     
+    // textviewの周囲にフォーカスリングを表示する必要があるか返す。
+    private func _shouldShowFocusBorder() -> Bool {
+        guard window?.isKeyWindow == true else { return false }
+        guard window?.firstResponder === self else { return false }
+        // 祖先にある NSSplitView を探す
+        var v: NSView? = self
+        while let s = v, !(s is NSSplitView) { v = s.superview }
+        if let sv = v as? NSSplitView { return sv.subviews.count > 1 }
+        // SplitView不在（=1枚表示）は描かない
+        return false
+    }
+    
+    // textviewの周囲にフォーカスリングを表示する。
+    @inline(__always)
+    private func _drawFocusBorderIfNeeded() {
+        guard _shouldShowFocusBorder() else { return }
+        
+        let vr = self.visibleRect                    // ← スクロール中の可視領域（自座標系）
+        guard !vr.isEmpty else { return }
+        
+        let inset: CGFloat = 0.5
+        let r    = vr.insetBy(dx: inset, dy: inset)
+        let path = NSBezierPath(roundedRect: r, xRadius: 2, yRadius: 2)
+        let accent = NSColor.controlAccentColor
+        
+        // --- ソフトグロー（外側ふわっと） ---
+        NSGraphicsContext.saveGraphicsState()
+        let glow = NSShadow()
+        glow.shadowOffset = .zero
+        glow.shadowBlurRadius = 3              // 2〜4で好み調整
+        glow.shadowColor = accent.withAlphaComponent(0.45)
+        glow.set()
+        
+        accent.withAlphaComponent(0.25).setStroke()
+        path.lineWidth = 1.0
+        
+        // 可視領域の内側に収める（グローが外へはみ出さない）
+        NSBezierPath(rect: vr).addClip()
+        path.stroke()
+        NSGraphicsContext.restoreGraphicsState()
+        
+        // --- 芯のヘアライン ---
+        NSGraphicsContext.saveGraphicsState()
+        accent.withAlphaComponent(0.4).setStroke()
+        path.lineWidth = 1.0
+        path.stroke()
+        NSGraphicsContext.restoreGraphicsState()
+    }
+
 }
 

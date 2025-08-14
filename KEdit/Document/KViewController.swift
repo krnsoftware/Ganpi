@@ -93,6 +93,7 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
                 self._splitView.setPosition(self._splitView.bounds.height / 2, ofDividerAt: 0)
             }
         }
+        _panes.forEach { $0.syncFocusOverlayNow() }
     }
 
     private func _removeSecondPaneIfExists() {
@@ -100,6 +101,8 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         let second = _panes.removeLast()
         second.removeFromSuperview()
         _splitView.adjustSubviews()
+        
+        view.window?.makeFirstResponder(_panes[0].textView)
     }
 
     private func _setHalfSplit() {
