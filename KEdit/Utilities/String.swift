@@ -255,6 +255,56 @@ extension String {
     
 }
 
+// MARK: - Conversion of String.Index
+
+extension StringProtocol {
+    
+    // String.IndexからInt、あるいはRange<String.Index>からRange<Int>に変換する。
+    func integerRange(from stringRange: Range<String.Index>) -> Range<Int>? {
+        // 1) 範囲が self に属しているか検証
+        guard stringRange.lowerBound >= startIndex,
+              stringRange.upperBound <= endIndex,
+              stringRange.lowerBound <= stringRange.upperBound
+        else { print("StringProtocol::integerRange] out of range.") ; return nil }
+
+        // 2) 正常系
+        let lower = distance(from: startIndex, to: stringRange.lowerBound)
+        let upper = distance(from: startIndex, to: stringRange.upperBound)
+        return lower..<upper
+    }
+
+    func integerIndex(of index: String.Index) -> Int? {
+        guard index >= startIndex, index <= endIndex else {
+            print("StringProtocol::integerIndex] out of range.")
+            return nil
+        }
+        return distance(from: startIndex, to: index)
+    }
+    
+    // IntからString.Index、あるいはRange<Int>からRange<String.Index>に変換する。
+    func stringIndexRange(from intRange: Range<Int>) -> Range<String.Index>? {
+        guard let lower = stringIndexIndex(of: intRange.lowerBound),
+              let upper = stringIndexIndex(of: intRange.upperBound),
+              lower <= upper else {
+            print("StringProtocol::stringIndexRange] out of range.")
+            return nil
+        }
+        return lower..<upper
+    }
+
+    func stringIndexIndex(of index: Int) -> String.Index? {
+        guard index >= 0, index <= self.count else {
+            print("StringProtocol::stringIndexIndex] out of range.")
+            return nil
+        }
+        return self.index(startIndex, offsetBy: index)
+    }
+    
+    
+    
+    
+}
+
 //MARK: - Normalizing
 
 extension String {
@@ -338,3 +388,41 @@ extension String.Encoding {
         return characterCodeTypeArray.contains(code)
     }
 }
+
+/*
+extension String {
+    /// pattern を検索し、全一致の NSRange を返す（グループは返さない）
+    func search(pattern: String,
+                options: NSRegularExpression.Options = [],
+                range: NSRange? = nil) -> [NSValue] {
+        guard let re = try? NSRegularExpression(pattern: pattern, options: options) else {
+            print(#function + ": Regex - irregular pattern.")
+            return []
+        }
+        // 範囲の正規化（UTF-16 基準）
+        let full = NSRange(location: 0, length: (self as NSString).length)
+        let r = range.map { NSIntersectionRange($0, full) }.flatMap { $0.length > 0 ? $0 : nil } ?? full
+
+        return re.matches(in: self, options: [], range: r).map { NSValue(range: $0.range(at: 0)) }
+    }
+    
+    /// pattern を template に置換（$1 等テンプレート可）
+        /// 戻り値: (置換数, 置換後文字列)。pattern が不正なら (0, "")
+        func replaceAll(pattern: String,
+                        template: String,
+                        options: NSRegularExpression.Options = [],
+                        range: NSRange? = nil) -> (count: Int, string: String) {
+            guard let re = try? NSRegularExpression(pattern: pattern, options: options) else {
+                print(#function + ": Regex - irregular pattern.")
+                return (0, "")
+            }
+            let full = NSRange(location: 0, length: (self as NSString).length)
+            let r = range.map { NSIntersectionRange($0, full) }.flatMap { $0.length > 0 ? $0 : nil } ?? full
+
+            // 置換数（matches は高速）
+            let count = re.numberOfMatches(in: self, options: [], range: r)
+            // 実際の置換（テンプレート展開は Foundation に任せる）
+            let out = re.stringByReplacingMatches(in: self, options: [], range: r, withTemplate: template)
+            return (count, out)
+        }
+}*/

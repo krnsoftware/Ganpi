@@ -42,9 +42,11 @@ protocol KTextStorageCommon: AnyObject {
     subscript(index: Int) -> Character? { get }
     subscript(range: Range<Int>) -> ArraySlice<Character>? { get }
     
-    //func addObserver(_ observer: @escaping (KStorageModified) -> Void)
     func addObserver(_ owner: AnyObject, _ handler: @escaping (KStorageModified) -> Void)
     func removeObserver(_ owner: AnyObject)
+    
+    func undo()
+    func redo()
 }
 
 // 読み取り専用プロトコル

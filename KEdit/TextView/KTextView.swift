@@ -8,7 +8,7 @@
 import Cocoa
 
 final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
-
+    
     // MARK: - Struct and Enum
     private enum KTextEditDirection : Int {
         case forward = 1
@@ -68,7 +68,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     // Text Input Clientの実装。
     // IME変換中のテキスト（確定前）
     private var _markedText: NSAttributedString = NSAttributedString()
-
+    
     // 変換中の範囲（nilなら非存在）
     private var _markedTextRange: Range<Int>? = nil
     
@@ -94,7 +94,12 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             needsDisplay = true
         }
     }
-
+    
+    // 読み取り専用として公開
+    var textStorage: KTextStorageReadable {
+        return _textStorageRef
+    }
+    
     var caretIndex: Int {
         get { selectionRange.upperBound }
         set { selectionRange = newValue..<newValue }
@@ -153,33 +158,33 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     private var wasVerticalAction: Bool {
         guard let sel = _lastActionSelector else { return false }
         return sel == #selector(moveUp(_:)) ||
-                sel == #selector(moveDown(_:)) ||
-                sel == #selector(moveUpAndModifySelection(_:)) ||
-                sel == #selector(moveDownAndModifySelection(_:))
+        sel == #selector(moveDown(_:)) ||
+        sel == #selector(moveUpAndModifySelection(_:)) ||
+        sel == #selector(moveDownAndModifySelection(_:))
     }
     
     // 前回のセレクタが垂直方向の選択範囲を動かすものだったか返す。
     private var wasVerticalActionWithModifySelection: Bool {
         guard let sel = _lastActionSelector else { return false }
         return sel == #selector(moveUpAndModifySelection(_:)) ||
-                sel == #selector(moveDownAndModifySelection(_:))
+        sel == #selector(moveDownAndModifySelection(_:))
     }
-
+    
     // 前回のセレクタが水平方向に選択範囲を動かすものだったか返す。
     private var wasHorizontalActionWithModifySelection: Bool {
         guard let sel = _lastActionSelector else { return false }
         return sel == #selector(moveLeftAndModifySelection(_:)) ||
-                sel == #selector(moveRightAndModifySelection(_:))
+        sel == #selector(moveRightAndModifySelection(_:))
     }
-
+    
     override var acceptsFirstResponder: Bool { true }
     override var canBecomeKeyView: Bool { return true } // for IME testing. then remove.
     override var isFlipped: Bool { true }
     override var isOpaque: Bool { true }
-
-
+    
+    
     // MARK: - Initialization (KTextView methods)
-
+    
     // Designated Initializer #1（既定: 新規生成）
     override init(frame: NSRect) {
         let storage:KTextStorageProtocol = KTextStorage()
@@ -190,7 +195,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         self.wantsLayer = false
         commonInit()
     }
-
+    
     // Designated Initializer #2（外部からストレージ注入）
     init(frame: NSRect, textStorageRef: KTextStorageProtocol) {
         self._textStorageRef = textStorageRef
@@ -201,7 +206,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         commonInit()
     }
-
+    
     // Designated Initializer #3（完全注入: 将来用）
     init(frame: NSRect, textStorageRef: KTextStorageProtocol, layoutManager: KLayoutManager) {
         self._textStorageRef = textStorageRef
@@ -209,7 +214,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         super.init(frame: frame)
         commonInit()
     }
-
+    
     // Interface Builder用
     required init?(coder: NSCoder) {
         let storage = KTextStorage()
@@ -218,7 +223,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         super.init(coder: coder)
         commonInit()
     }
-
+    
     private func commonInit() {
         addSubview(_caretView)
         wantsLayer = true
@@ -240,21 +245,21 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         // scrollviewのscrollerの状態をセット
         DispatchQueue.main.async { [weak self] in
-                self?._applyWordWrapToEnclosingScrollView()
-            }
+            self?._applyWordWrapToEnclosingScrollView()
+        }
         
         //_layoutManager.textView = self
-
+        
         window?.makeFirstResponder(self)  // 念のため明示的に指定
-       
+        
         // キャレットの位置を再計算して表示しておく。
         updateCaretPosition()
         startCaretBlinkTimer()
         
         //test
         /*
-        let info = KStorageModifiedInfo(range: 0..<_textStorageRef.count, insertedCount: 0, deletedNewlineCount: 0, insertedNewlineCount: 0)
-        _layoutManager.textStorageDidModify(.textChanged(info: info))
+         let info = KStorageModifiedInfo(range: 0..<_textStorageRef.count, insertedCount: 0, deletedNewlineCount: 0, insertedNewlineCount: 0)
+         _layoutManager.textStorageDidModify(.textChanged(info: info))
          */
         
         // 古い監視を解除
@@ -268,7 +273,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 name: NSWindow.didBecomeKeyNotification,
                 object: window
             )
-                
+            
             NotificationCenter.default.addObserver(
                 self,
                 selector: #selector(windowResignedKey),
@@ -278,12 +283,12 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
         
         if let clipView = enclosingScrollView?.contentView {
-               NotificationCenter.default.addObserver(
-                   self,
-                   selector: #selector(clipViewBoundsDidChange(_:)),
-                   name: NSView.boundsDidChangeNotification,
-                   object: clipView
-               )
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(clipViewBoundsDidChange(_:)),
+                name: NSView.boundsDidChangeNotification,
+                object: clipView
+            )
         }
     }
     
@@ -313,7 +318,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         needsDisplay = true
         return ok
     }
-
+    
     override func resignFirstResponder() -> Bool {
         //print("\(#function)")
         let ok = super.resignFirstResponder()
@@ -336,14 +341,14 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             return nil
         }
     }
-
+    
     deinit {
         _caretBlinkTimer?.invalidate()
         
         NotificationCenter.default.removeObserver(self)
     }
     
-
+    
     // MARK: - Caret (KTextView methods)
     
     private func updateCaretPosition() {
@@ -354,7 +359,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         restartCaretBlinkTimer()
         
     }
-
+    
     private func startCaretBlinkTimer() {
         _caretBlinkTimer?.invalidate()
         _caretBlinkTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
@@ -362,12 +367,12 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             self._caretView.alphaValue = (self._caretView.alphaValue < 0.5) ? 1.0 : 0.0
         }
     }
-
+    
     private func restartCaretBlinkTimer() {
         _caretBlinkTimer?.invalidate()
         startCaretBlinkTimer()
     }
-
+    
     private func scrollCaretToVisible() {
         guard let scrollView = self.enclosingScrollView else { return }
         DispatchQueue.main.async {
@@ -376,7 +381,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
         
     }
-
+    
     // MARK: - Drawing (NSView methods)
     
     override func draw(_ dirtyRect: NSRect) {
@@ -531,52 +536,52 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         
     }
-   
+    
     
     override func setFrameSize(_ newSize: NSSize) {
         guard let rects = _layoutManager.makeLayoutRects() else {
             print("\(#function) error")
             return
         }
-
+        
         super.setFrameSize(NSSize(width: rects.textRegion.rect.width, height: rects.textRegion.rect.height))
     }
     
     // MARK: - Keyboard Input (NSResponder methods)
-
+    
     override func keyDown(with event: NSEvent) {
         /*
-        window?.makeFirstResponder(self)
-
-        
-        let isShift = event.modifierFlags.contains(.shift)
-        let selector: Selector?
-
-        switch event.keyCode {
-        case 123: // ←
-            selector = isShift ? #selector(moveLeftAndModifySelection(_:)) : #selector(moveLeft(_:))
-        case 124: // →
-            selector = isShift ? #selector(moveRightAndModifySelection(_:)) : #selector(moveRight(_:))
-        case 125: // ↓
-            selector = isShift ? #selector(moveDownAndModifySelection(_:)) : #selector(moveDown(_:))
-        case 126: // ↑
-            selector = isShift ? #selector(moveUpAndModifySelection(_:)) : #selector(moveUp(_:))
-        case 51: // delete
-            selector = #selector(deleteBackward(_:))
-        default:
-            selector = nil
-        }
-
-        if let sel = selector {
-            doCommand(by: sel)
-            return
-        } /*else if let characters = event.characters, !characters.isEmpty, !event.modifierFlags.contains(.control) {
+         window?.makeFirstResponder(self)
+         
+         
+         let isShift = event.modifierFlags.contains(.shift)
+         let selector: Selector?
+         
+         switch event.keyCode {
+         case 123: // ←
+         selector = isShift ? #selector(moveLeftAndModifySelection(_:)) : #selector(moveLeft(_:))
+         case 124: // →
+         selector = isShift ? #selector(moveRightAndModifySelection(_:)) : #selector(moveRight(_:))
+         case 125: // ↓
+         selector = isShift ? #selector(moveDownAndModifySelection(_:)) : #selector(moveDown(_:))
+         case 126: // ↑
+         selector = isShift ? #selector(moveUpAndModifySelection(_:)) : #selector(moveUp(_:))
+         case 51: // delete
+         selector = #selector(deleteBackward(_:))
+         default:
+         selector = nil
+         }
+         
+         if let sel = selector {
+         doCommand(by: sel)
+         return
+         } /*else if let characters = event.characters, !characters.isEmpty, !event.modifierFlags.contains(.control) {
             // 文字入力（直接挿入）用のロジック
             insertDirectText(characters)
-        } else {
+            } else {
             interpretKeyEvents([event])
-        }*/
-        interpretKeyEvents( [event] )
+            }*/
+         interpretKeyEvents( [event] )
          */
         
         //print("\(#function) - keyDown()")
@@ -585,23 +590,23 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         scrollCaretToVisible()
     }
-
-
-
+    
+    
+    
     // MARK: - Horizontal Movement (NSResponder methods)
-
+    
     override func moveLeft(_ sender: Any?) {
         moveCaretHorizontally(to: .backward, extendSelection: false)
     }
-
+    
     override func moveRight(_ sender: Any?) {
         moveCaretHorizontally(to: .forward, extendSelection: false)
     }
-
+    
     override func moveRightAndModifySelection(_ sender: Any?) {
         moveCaretHorizontally(to: .forward, extendSelection: true)
     }
-
+    
     override func moveLeftAndModifySelection(_ sender: Any?) {
         moveCaretHorizontally(to: .backward, extendSelection: true)
     }
@@ -645,26 +650,26 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         updateCaretPosition()
     }
-
-
+    
+    
     // MARK: - Vertical Movement (NSResponder methods)
-
+    
     override func moveUp(_ sender: Any?) {
         moveCaretVertically(to: .backward, extendSelection: false)
     }
-
+    
     override func moveDown(_ sender: Any?) {
         moveCaretVertically(to: .forward, extendSelection: false)
     }
-
+    
     override func moveUpAndModifySelection(_ sender: Any?) {
         moveCaretVertically(to: .backward, extendSelection: true)
     }
-
+    
     override func moveDownAndModifySelection(_ sender: Any?) {
         moveCaretVertically(to: .forward, extendSelection: true)
     }
-
+    
     
     private func moveCaretVertically(to direction: KTextEditDirection, extendSelection: Bool) {
         /*
@@ -684,14 +689,14 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         // 初回使用時に問題が出ないように。
         if _verticalSelectionBase == nil { _verticalSelectionBase = caretIndex }
-
+        
         // 基準インデックス決定（A/Bパターンに基づく）
         let indexForLineSearch: Int = (selectionRange.lowerBound < _verticalSelectionBase!) ? selectionRange.lowerBound : selectionRange.upperBound
-
+        
         // 基準行情報取得
         let info = _layoutManager.line(at: indexForLineSearch)
         guard let currentLine = info.line else { print("\(#function): currentLine is nil.");  return }
-
+        
         let newLineIndex = info.lineIndex + direction.rawValue
         
         // newLineIndexがTextStorageインスタンスのcharacterの領域を越えている場合には両端まで広げる。
@@ -717,14 +722,14 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         guard let layoutRects = _layoutManager.makeLayoutRects() else { print("\(#function); makeLayoutRects error"); return }
         guard let newLineInfo = _layoutManager.lines[newLineIndex] else { log("newLineInfo is nil.", from:self); return }
         guard let ctLine = newLineInfo.ctLine else { print("\(#function): newLineInfo.ctLine nil"); return}
-
+        
         // 初回のみ verticalCaretX をセット
         if isVerticalAction && !wasVerticalAction {
             guard let currentCtLine = currentLine.ctLine else { print("\(#function): currentLine.ctLine nil"); return}
             let indexInLine = caretIndex - currentLine.range.lowerBound
             _verticalCaretX = CTLineGetOffsetForStringIndex(currentCtLine, indexInLine, nil) + layoutRects.horizontalInsets
         }
-
+        
         // 行末補正
         // 次の行のテキストの横幅より右にキャレットが移動する場合、キャレットはテキストの右端へ。
         let lineWidth = CGFloat(CTLineGetTypographicBounds(ctLine, nil, nil, nil))
@@ -733,7 +738,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         // CTLineGetStringIndexForPositionは空行の場合に-1を返すため、その場合のindexは0にする。
         let newCaretIndex = newLineInfo.range.lowerBound + (targetIndexInLine < 0 ? 0 : targetIndexInLine)
-
+        
         // 選択範囲更新（verticalSelectionBaseは常に基準点として使用）
         if extendSelection {
             let lower = min(_verticalSelectionBase!, newCaretIndex)
@@ -788,7 +793,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     @IBAction func cut(_ sender: Any?) {
         copy(sender)
-
+        
         _textStorageRef.replaceCharacters(in: selectionRange, with: [])
         
     }
@@ -801,56 +806,44 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         pasteboard.clearContents()
         pasteboard.setString(selectedText, forType: .string)
     }
-
+    
     @IBAction func paste(_ sender: Any?) {
         let pasteboard = NSPasteboard.general
         guard let rawString = pasteboard.string(forType: .string) else { return }
         
         let string = rawString.normalizedString
-
+        
         _textStorageRef.replaceCharacters(in: selectionRange, with: Array(string))
         
         
     }
-
+    
     @IBAction override func selectAll(_ sender: Any?) {
         selectionRange = 0..<_textStorageRef.count
         
     }
     
-    // MARK: - Undo action
-    
-    @IBAction func undo(_ sender: Any?) {
-        if let textStorage = _textStorageRef as? KTextStorage {
-            textStorage.undo()
-        }
-    }
-    
-    @IBAction func redo(_ sender: Any?) {
-        if let textStorage = _textStorageRef as? KTextStorage {
-            textStorage.redo()
-        }
-    }
 
+    
     
     // MARK: - Option Menu
     
     @IBAction func toggleWordWrap(_ sender: Any?) {
         wordWrap = !wordWrap
     }
-
-
+    
+    
     // MARK: - Deletion (NSResponder methods)
-
+    
     override func deleteBackward(_ sender: Any?) {
         guard caretIndex > 0 else { return }
-
+        
         if !selectionRange.isEmpty {
             _textStorageRef.replaceCharacters(in: selectionRange, with: [])
         } else {
             _textStorageRef.replaceCharacters(in: caretIndex - 1..<caretIndex, with: [])
         }
-
+        
         _verticalCaretX = nil
     }
     
@@ -860,7 +853,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         super.doCommand(by: selector)
         //print(selector)
     }
-
+    
     // MARK: - Mouse Interaction (NSView methods)
     
     override func mouseDown(with event: NSEvent) {
@@ -946,7 +939,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         case .outside:
             break
         }
-
+        
         updateCaretPosition()
         scrollCaretToVisible()
         
@@ -980,10 +973,10 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         // マウスドラッグによる域外選択の際のオートスクロールに関するプロパティを初期化する。
         terminateDraggingOperation()
-
+        
     }
     
-
+    
     
     
     override func mouseDragged(with event: NSEvent) {
@@ -1094,7 +1087,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
         
         _ = self.autoscroll(with: event)
-
+        
         updateCaretPosition()
         scrollCaretToVisible()
     }
@@ -1114,7 +1107,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     func draggingSession(_ session: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation) {
         log("Dragging session ended", from: self)
-
+        
         terminateDraggingOperation()
         updateCaretPosition()
     }
@@ -1137,7 +1130,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
         
         let droppedString = rawDroppedString.normalizedString
-
+        
         let locationInView = convert(sender.draggingLocation, from: nil)
         guard let layoutRects = _layoutManager.makeLayoutRects() else { log("layoutRects is nil", from: self); return false }
         
@@ -1185,7 +1178,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         let isSenderMyself = sender.draggingSource as AnyObject? === self
         let dragOperation: NSDragOperation = isSenderMyself ?  (isOptionKeyPressed ? .copy : .move) : .copy
         //log("dragOperation: \(dragOperation), isSenderMyself: \(isSenderMyself)", from: self)
-
+        
         // 該当位置の文字インデックスを取得
         guard let layoutRects = _layoutManager.makeLayoutRects() else { log("layoutRects is nil", from: self); return []}
         switch layoutRects.regionType(for: locationInView, layoutManagerRef: _layoutManager, textStorageRef: _textStorageRef) {
@@ -1193,7 +1186,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             // キャレットを一時的に移動（選択範囲は変更しない）
             moveDropCaret(to: index)
             return dragOperation
-
+            
         default:
             // テキスト領域外の場合はキャレットを非表示にしてコピーを拒否
             hideDropCaret()
@@ -1212,43 +1205,319 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             scrollView.contentView.scrollToVisible(NSRect(x:point.x, y:point.y, width: 1, height: 1))
         }
     }
-
+    
     // ドロップ候補がなくなった場合にキャレットを非表示に
     private func hideDropCaret() {
         _caretView.isHidden = true
     }
     
     
-    // MARK: - KTextView methods (notification)
+    // MARK: - Search Functions
     
+    @discardableResult
+    func search(for direction:KDirection = .forward) -> Bool {
+        let searchString = KSearchPanel.shared.searchString
+        let isCaseInsensitive = KSearchPanel.shared.ignoreCase
+        let usesRegularExpression = KSearchPanel.shared.useRegex
+        let wholeString = textStorage.string
+        
+        var regexPattern:Regex<Substring>
+        
+        do {
+            if usesRegularExpression {
+                regexPattern = try Regex(searchString)
+            } else {
+                regexPattern = try Regex(NSRegularExpression.escapedPattern(for: searchString))
+            }
+        } catch {
+            log("searchString is invalid.",from:self)
+            NSSound.beep()
+            return false
+        }
+        
+        if isCaseInsensitive {
+            regexPattern = regexPattern.ignoresCase()
+        }
+        
+        if direction == .forward {
+            let searchIndex = selectionRange.upperBound
+            let targetString = wholeString[searchIndex..<wholeString.count]
+            
+            if let match = targetString.firstMatch(of: regexPattern),
+               let range = targetString.integerRange(from:match.range) {
+                
+                selectionRange = searchIndex + range.lowerBound..<searchIndex + range.upperBound
+            }
+        } else {
+            let targetString = wholeString[0..<selectionRange.lowerBound]
+            let matches = targetString.matches(of: regexPattern)
+            if let range = matches.last?.range,
+               let intrange = targetString.integerRange(from: range){
+                selectionRange = intrange
+            }
+        }
+        
+        updateCaretPosition()
+        scrollCaretToVisible()
+        
+        return true
+    }
+    
+    @discardableResult
+    func replace() -> Bool {
+        if selectionRange.isEmpty { NSSound.beep(); return false }
+        
+        let count = replaceAll(for: selectionRange)
+        if count == 0 { return false }
+        
+        updateCaretPosition()
+        scrollCaretToVisible()
+        
+        return true
+    }
+    
+    @discardableResult
+    func replaceAll() -> Bool {
+        if textStorage.count == 0 { NSSound.beep(); return false }
+        let count = replaceAll(for: 0..<textStorage.count)
+        caretIndex = 0
+        
+        updateCaretPosition()
+        scrollCaretToVisible()
+        
+        let alert = NSAlert()
+        alert.messageText = "Replacement"
+        alert.informativeText = "Replacement has done. \(count) times."
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "OK")
+
+        alert.runModal()  // モーダルで表示
+        
+        return true
+    }
+    
+    @discardableResult
+    private func replaceAll(for range: Range<Int>) -> Int {
+        if range.isEmpty { NSSound.beep(); return 0 }
+        guard range.lowerBound >= 0, range.upperBound <= textStorage.count else {
+            log("range is out of bounds.",from:self)
+            return 0
+        }
+
+        let searchString = KSearchPanel.shared.searchString
+        let replaceString = KSearchPanel.shared.replaceString
+        let isCaseInsensitive = KSearchPanel.shared.ignoreCase
+        let usesRegularExpression = KSearchPanel.shared.useRegex
+        
+        guard !searchString.isEmpty else { log("searchString is empty.",from:self); return 0 }
+
+        let wholeString  = textStorage.string
+        let targetString = wholeString[range]
+
+
+        // Regex 準備（OFF のときは検索パターンをリテラル化、テンプレはエスケープ）
+        let pattern  = usesRegularExpression
+            ? searchString
+            : NSRegularExpression.escapedPattern(for: searchString)
+        let template = usesRegularExpression
+            ? replaceString
+            : NSRegularExpression.escapedTemplate(for: replaceString)
+
+        let options: NSRegularExpression.Options = isCaseInsensitive ? [.caseInsensitive] : []
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: options) else {
+            log("regex is nil.",from:self)
+            NSSound.beep(); return 0
+        }
+
+        // 部分文字列を可変化して置換＋件数取得
+        let mutableString = NSMutableString(string: String(targetString))
+        let mutableRange = NSRange(location: 0, length: mutableString.length)
+        let count = regex.replaceMatches(in: mutableString, options: [], range: mutableRange, withTemplate: template)
+
+        guard count > 0 else { NSSound.beep(); return 0 }
+
+        // 置換結果で選択範囲全体を差し替え（nsRange内のみ変更されている）
+        let replacedSub = String(mutableString)
+        _textStorageRef.replaceString(in: range, with: replacedSub)
+        
+        caretIndex = range.lowerBound + replacedSub.count
+        //log("caretIndex: \(caretIndex), range: \(range)",from:self)
+
+
+        return count
+    }
+    
+    
+    /*// MARK: - Public Actions (Responder Chain から呼ばれる)
+    
+    /// Find Next
+    @objc func search(_ sender: Any?) {
+        performSearch(isForward: true)
+    }
+    
+    /// Find Previous
+    @objc func searchBackward(_ sender: Any?) {
+        performSearch(isForward: false)
+    }
+    
+    /// Replace All
+    ///
+    /// - Regex ON: 置換テンプレート（例: `$1`）をそのまま解釈。
+    /// - Regex OFF: リテラル置換（テンプレ解釈なし）。
+    @objc func searchReplaceAll(_ sender: Any?) {
+        let searchPattern        = KSearchPanel.shared.searchString
+        let replacementText      = KSearchPanel.shared.replaceString
+        let isCaseInsensitive    = KSearchPanel.shared.ignoreCase
+        let usesRegularExpression = KSearchPanel.shared.useRegex
+        
+        guard !searchPattern.isEmpty else { NSSound.beep(); return }
+        
+        let documentString = textStorage.string
+        var replacedString = documentString
+        
+        if usesRegularExpression {
+            let regexOptions: NSRegularExpression.Options = isCaseInsensitive ? [.caseInsensitive] : []
+            guard let regex = try? NSRegularExpression(pattern: searchPattern, options: regexOptions) else {
+                NSSound.beep(); return
+            }
+            
+            let fullRange = NSRange(documentString.startIndex..<documentString.endIndex, in: documentString)
+            
+            // 置換テンプレートはそのまま使用（例: `$1`）。
+            // ※ `\1` と入力された場合は展開されません。必要なら `$1` をご使用ください。
+            replacedString = regex.stringByReplacingMatches(in: documentString,
+                                                            options: [],
+                                                            range: fullRange,
+                                                            withTemplate: replacementText)
+        } else {
+            // リテラル置換：テンプレ解釈は一切行わない
+            let compareOptions: String.CompareOptions = isCaseInsensitive ? [.caseInsensitive] : []
+            replacedString = documentString.replacingOccurrences(of: searchPattern,
+                                                                 with: replacementText,
+                                                                 options: compareOptions,
+                                                                 range: nil)
+        }
+        
+        guard replacedString != documentString else { NSSound.beep(); return }
+        
+        _textStorageRef.replaceString(in: 0..<_textStorageRef.count, with: replacedString)
+        
+        let endPosition = _textStorageRef.count
+        selectionRange = endPosition..<endPosition
+        updateCaretPosition()
+        scrollCaretToVisible()
+    }
+    
+    // MARK: - Core
+    
+    /// 前方/後方の検索を行い、ヒット範囲を選択してスクロールする。
+    private func performSearch(isForward: Bool) {
+        
+        
+        let searchPattern         = KSearchPanel.shared.searchString
+        let isCaseInsensitive     = KSearchPanel.shared.ignoreCase
+        let usesRegularExpression = KSearchPanel.shared.useRegex
+        
+        guard !searchPattern.isEmpty else { NSSound.beep(); return }
+        
+        let documentString = textStorage.string
+        
+        // NSRegularExpression の準備（Regex OFF の場合はリテラルとしてエスケープ）
+        let regexOptions: NSRegularExpression.Options = isCaseInsensitive ? [.caseInsensitive] : []
+        let patternForRegex = usesRegularExpression
+        ? searchPattern
+        : NSRegularExpression.escapedPattern(for: searchPattern)
+        
+        guard let regex = try? NSRegularExpression(pattern: patternForRegex, options: regexOptions) else {
+            NSSound.beep(); return
+        }
+        
+        let documentNSRange = NSRange(documentString.startIndex..<documentString.endIndex, in: documentString)
+        
+        // キャレット位置（文字インデックス）→ String.Index → UTF-16 オフセット
+        let caretCharacterIndex = isForward ? selectionRange.upperBound : selectionRange.lowerBound
+        let clampedCaret = max(0, min(caretCharacterIndex, documentString.count))
+        let caretStringIndex = documentString.index(documentString.startIndex, offsetBy: clampedCaret)
+        let caretUTF16Location = NSRange(caretStringIndex..<caretStringIndex, in: documentString).location
+        
+        var matchedNSRange: NSRange?
+        
+        if isForward {
+            // caret ... end
+            let searchRangeAfterCaret = NSRange(location: caretUTF16Location,
+                                                length: max(0, documentNSRange.length - caretUTF16Location))
+            if let first = regex.firstMatch(in: documentString, options: [], range: searchRangeAfterCaret) {
+                matchedNSRange = first.range
+            } else if caretUTF16Location > 0 {
+                // wrap: 先頭 ... caret
+                let searchRangeBeforeCaret = NSRange(location: 0, length: caretUTF16Location)
+                matchedNSRange = regex.firstMatch(in: documentString, options: [], range: searchRangeBeforeCaret)?.range
+            }
+        } else {
+            // backward: 先頭 ... caret の最後
+            let searchRangeBeforeCaret = NSRange(location: 0, length: min(caretUTF16Location, documentNSRange.length))
+            if let last = regex.matches(in: documentString, options: [], range: searchRangeBeforeCaret).last {
+                matchedNSRange = last.range
+            } else if caretUTF16Location < documentNSRange.length {
+                // wrap: caret ... end の最後
+                let searchRangeAfterCaret = NSRange(location: caretUTF16Location,
+                                                    length: documentNSRange.length - caretUTF16Location)
+                matchedNSRange = regex.matches(in: documentString, options: [], range: searchRangeAfterCaret).last?.range
+            }
+        }
+        
+        // ヒットなし
+        guard
+            let nsRange = matchedNSRange,
+            nsRange.length > 0,
+            let stringRange = Range(nsRange, in: documentString)
+        else {
+            NSSound.beep(); return
+        }
+        
+        // UTF-16(NSRange) → 文字インデックス（Int）
+        let lowerIndex = documentString.distance(from: documentString.startIndex, to: stringRange.lowerBound)
+        let upperIndex = documentString.distance(from: documentString.startIndex, to: stringRange.upperBound)
+        
+        selectionRange = lowerIndex..<upperIndex
+        updateCaretPosition()
+        scrollCaretToVisible()
+        needsDisplay = true
+    }
+     */
+
+        // MARK: - Notifications (そのまま保持)
+
     @objc private func windowBecameKey(_ notification: Notification) {
-        //updateActiveState()
+        // updateActiveState()
     }
-        
+
     @objc private func windowResignedKey(_ notification: Notification) {
-        //updateActiveState()
+        // updateActiveState()
+    }
+
+    @objc private func clipViewBoundsDidChange(_ notification: Notification) {
+        guard let contentBounds = enclosingScrollView?.contentView.bounds
+        else { log("cvBounds==nil", from: self); return }
+
+        // ワードラップ時：可視領域サイズが変われば再描画
+        if contentBounds.size != _prevContentViewBounds.size, wordWrap {
+            _prevContentViewBounds = contentBounds
+            needsDisplay = true
+            return
+        }
+
+        // ノーラップ時：スクロールに伴う原点移動で再描画
+        if bounds.origin != _prevContentViewBounds.origin {
+            _prevContentViewBounds = contentBounds
+            needsDisplay = true
+            return
+        }
     }
     
-    @objc private func clipViewBoundsDidChange(_ notification: Notification) {
-        guard let cvBounds = enclosingScrollView?.contentView.bounds else { log("cvBounds==nil", from:self); return }
-        
-        // ワードラップ時、ClipViewの大きさが変化していれば再描画
-        // 描画領域が変更した際の挙動
-        if cvBounds.size != _prevContentViewBounds.size && wordWrap {
-            _prevContentViewBounds = cvBounds
-            needsDisplay = true
-            return
-        }
-        
-        // ClipViewの原点が移動していれば再描画
-        // ワードラップなしで水平スクロールした際の挙動
-        if bounds.origin != _prevContentViewBounds.origin {
-            _prevContentViewBounds = cvBounds
-            needsDisplay = true
-            return
-        }
-        
-    }
+    
+    
+    
     
     
     // MARK: - NSTextInputClient Implementation
