@@ -9,6 +9,32 @@ import Cocoa
 
 class Document: NSDocument {
     
+    private var _characterCode: String.Encoding = .utf32
+    private var _returnCode: String.ReturnCharacter = .lf
+    private var _syntaxType: KSyntaxType = .plain
+    
+    private var _textStorage: KTextStorage = .init()
+    
+    var characterCode: String.Encoding {
+        get { _characterCode }
+        set { _characterCode = newValue }
+    }
+    
+    var returnCode: String.ReturnCharacter {
+        get { _returnCode }
+        set { _returnCode = newValue }
+    }
+    
+    var syntaxType: KSyntaxType {
+        get { _syntaxType }
+        set { _syntaxType = newValue }
+    }
+    
+    var textStorage: KTextStorage {
+        _textStorage
+    }
+    
+    
     override init() {
         super.init()
         // Add your subclass-specific initialization here.
@@ -23,71 +49,6 @@ class Document: NSDocument {
         // If you need to use a subclass of NSWindowController or if your document supports multiple NSWindowControllers, you should remove this property and override -makeWindowControllers instead.
         return NSNib.Name("Document")
     }
-    /*
-    override func makeWindowControllers() {
-        /*
-        let viewController = KViewController()
-
-        let window = NSWindow(
-            contentRect: NSMakeRect(0, 0, 800, 600),
-            styleMask: [.titled, .closable, .resizable, .miniaturizable],
-            backing: .buffered,
-            defer: false
-        )
-        window.title = "Untitled"
-        window.contentViewController = viewController
-        window.titlebarAppearsTransparent = false
-        window.backgroundColor = .windowBackgroundColor
-        window.isOpaque = true
-
-        let windowController = NSWindowController(window: window)
-        self.addWindowController(windowController)
-
-        // 🌙 表示を遅延させることで描画タイミングを明確化
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            window.makeKeyAndOrderFront(nil)
-            window.display()
-        }*/
-        
-        Swift.print("Document.makeWindowControllers")
-        
-        let wc = NSWindowController(windowNibName: "Document")
-        self.addWindowController(wc)
-        
-        guard let w = wc.window else { return }
-        
-        // Document.swift : makeWindowControllers() で window を取得した直後に
-        #if DEBUG
-        DispatchQueue.main.async { [weak w = wc.window] in
-            guard let w = w,
-                  let titlebar = w.standardWindowButton(.closeButton)?.superview,
-                  let contentSuper = w.contentView?.superview else { return }
-
-            let titlebarFrame = titlebar.convert(titlebar.bounds, to: nil) // ウインドウ座標
-            // contentSuper 配下で titlebar と交差する「白の可能性がある」ビューを拾う
-            func scan(_ v: NSView) {
-                let f = v.convert(v.bounds, to: nil)
-                if f.intersects(titlebarFrame) && (v.wantsLayer && (v.layer?.backgroundColor != nil)) {
-                    Swift.print("[TitlebarOverlap] \(type(of: v)) frame=\(NSStringFromRect(f)) bg=\(String(describing: v.layer?.backgroundColor))")
-                }
-                v.subviews.forEach(scan)
-            }
-            scan(contentSuper)
-            Swift.print("contentLayoutRect=\(NSStringFromRect(w.contentLayoutRect))")
-        }
-        #endif
-        
-        Swift.print("— Window Info —")
-        Swift.print("styleMask=\(w.styleMask.rawValue)")
-        Swift.print("titlebarAppearsTransparent=\(w.titlebarAppearsTransparent) titleVisibility=\(w.titleVisibility)")
-        Swift.print("isOpaque=\(w.isOpaque) bg=\(String(describing: w.backgroundColor))")
-        Swift.print("frame=\(NSStringFromRect(w.frame))")
-        Swift.print("contentRect(for:frame)=\(NSStringFromRect(NSWindow.contentRect(forFrameRect: w.frame, styleMask: w.styleMask)))")
-        Swift.print("contentLayoutRect=\(NSStringFromRect(w.contentLayoutRect))")
-        
-        
-        
-    }*/
     
     
     override func makeWindowControllers() {
@@ -110,6 +71,10 @@ class Document: NSDocument {
         wc.window?.contentMinSize = NSSize(width: 480, height: 320)
 
         wc.window?.isRestorable = false             // 復元は引き続き無効
+        
+        if let vc = wc.contentViewController as? KViewController {
+            vc.document = self
+        }
     }
     
     
@@ -121,11 +86,34 @@ class Document: NSDocument {
         throw NSError(domain: NSOSStatusErrorDomain, code: unimpErr, userInfo: nil)
     }
 
+    
+    
     override func read(from data: Data, ofType typeName: String) throws {
-        // Insert code here to read your document from the given data of the specified type, throwing an error in case of failure.
-        // Alternatively, you could remove this method and override read(from:ofType:) instead.
-        // If you do, you should also override isEntireFileLoaded to return false if the contents are lazily loaded.
-        throw NSError(domain: NSOSStatusErrorDomain, code: unimpErr, userInfo: nil)
+        let head = data.prefix(16).map { String(format: "%02X", $0) }.joined(separator: " ")
+        log("[READ] size=\(data.count) head=\(head)",from:self)
+        
+        // 1) 文字コードの推定 → 文字列化
+        let encoding = String.estimateCharacterCode(from: data) ?? .utf8
+        guard let decoded = String(bytes: data, encoding: encoding) else {
+            throw NSError(domain: NSCocoaErrorDomain,
+                          code: NSFileReadUnknownStringEncodingError,
+                          userInfo: [NSLocalizedDescriptionKey: "Unsupported text encoding"])
+        }
+
+        // 2) 改行の正規化（内部は常に LF）、最初に見つかった外部改行を記録
+        let norm = decoded.normalizeNewlinesAndDetect()
+        _characterCode = encoding
+        _returnCode = norm.detected ?? .lf   // 改行が無い場合は LF を既定
+
+        // 3) 本文を TextStorage へ投入（全文置換）
+        _textStorage.replaceString(in: 0..<_textStorage.count, with: norm.normalized)
+
+        // 4) 読み込み完了（未変更状態へ）
+        updateChangeCount(.changeCleared)
+
+        // （必要ならここで _syntaxType を typeName / 拡張子から推定して設定）
+        
+        log("return code: \(_returnCode), character code: \(_characterCode)",from:self)
     }
 
 

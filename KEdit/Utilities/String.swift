@@ -23,6 +23,7 @@ extension String {
         case crlf = "\r\n"
     }
     
+    /*
     enum FuncChar : Int {
         case tab = 0x09         // tab
         case space = 0x20       // space
@@ -44,11 +45,12 @@ extension String {
         case rightBlacket = 0x5d// ]
         case leftBrace = 0x7b   // {
         case rightBrace = 0x7d  // }
-    }
+    }*/
     
     // MARK: - Type Methods
     
     // Stringインスタンスの文字コードを返す。検出不能の場合には.utf8を返す。
+    /*
     static func estimateCharacterCode(from data: Data) -> String.Encoding? {
         /* Unicodeの判定
          BOMなしのUTF-16LE, UTF-16BE, UTF-32LE, UTF-32BEについては対応しない。
@@ -231,9 +233,144 @@ extension String {
         
         print(#function + " - Can't estimate the character code of this document.")
         return nil
+    }*/
+    
+    
+}
+
+extension String {
+    /// 文字コードを推定する（BOM 優先。BOMなし UTF-16/32 は非対応）
+    static func estimateCharacterCode(from data: Data) -> String.Encoding? {
+        let count = data.count
+        if count == 0 { return .utf8 } // 空は UTF-8 扱い
+
+        // --- 1) BOM 判定（必ず BE/LE を明示して返す） ---
+        if count >= 4 {
+            // UTF-32 BE: 00 00 FE FF
+            if data[0] == 0x00, data[1] == 0x00, data[2] == 0xFE, data[3] == 0xFF {
+                return .utf32BigEndian
+            }
+            // UTF-32 LE: FF FE 00 00
+            if data[0] == 0xFF, data[1] == 0xFE, data[2] == 0x00, data[3] == 0x00 {
+                return .utf32LittleEndian
+            }
+        }
+        if count >= 2 {
+            // UTF-16 BE: FE FF
+            if data[0] == 0xFE, data[1] == 0xFF { return .utf16BigEndian }
+            // UTF-16 LE: FF FE
+            if data[0] == 0xFF, data[1] == 0xFE { return .utf16LittleEndian }
+        }
+        if count >= 3 {
+            // UTF-8 BOM: EF BB BF
+            if data[0] == 0xEF, data[1] == 0xBB, data[2] == 0xBF { return .utf8 }
+        }
+
+        // --- 2) ラウンドトリップ（UTF-8 / SJIS / JIS / EUC のみ） ---
+        // ※ UTF-16/32 は BOM なし非対応のため候補に含めない
+        let candidates: [String.Encoding] = [.utf8, .shiftJIS, .iso2022JP, .japaneseEUC]
+        var roundTripHits: [String.Encoding] = []
+        for enc in candidates {
+            if let s = String(bytes: data, encoding: enc), s.data(using: enc) == data {
+                roundTripHits.append(enc)
+            }
+        }
+        if roundTripHits == [.utf8] {
+            // UTF-8 だけが往復一致
+            return .utf8
+        }
+
+        // --- 3) S-JIS / JIS / EUC のヒューリスティック ---
+        enum StrEnc { case newType, oldType, necType, eucType, sjisType, eucOrSJISType, asciiType }
+        struct JISChar {
+            static let esc:  UInt8 = 27
+            static let ss2:  UInt8 = 142
+        }
+
+        var codeType: StrEnc = .asciiType
+        var i = 0
+        while (codeType == .eucOrSJISType || codeType == .asciiType), i < count {
+            var c = data[i]; i += 1
+            if c == 0 { continue }
+
+            if c == JISChar.esc {               // ESC
+                guard i < count else { break }
+                c = data[i]; i += 1
+                if c == 0x24 {                  // '$'
+                    guard i < count else { break }
+                    c = data[i]; i += 1
+                    if c == 0x42 { codeType = .newType }     // 'B'
+                    else if c == 0x40 { codeType = .oldType } // '@'
+                } else if c == 0x4B {            // 'K'
+                    codeType = .necType
+                }
+            } else if (129...141).contains(c) || (143...159).contains(c) {
+                codeType = .sjisType
+            } else if c == JISChar.ss2 {
+                guard i < count else { break }
+                c = data[i]; i += 1
+                if (64...126).contains(c) || (128...160).contains(c) || (224...252).contains(c) {
+                    codeType = .sjisType
+                } else if (161...223).contains(c) {
+                    codeType = .eucOrSJISType
+                }
+            } else if (161...223).contains(c) {
+                guard i < count else { break }
+                c = data[i]; i += 1
+                if (240...254).contains(c) {
+                    codeType = .eucType
+                } else if (161...223).contains(c) {
+                    codeType = .eucOrSJISType
+                } else if (224...239).contains(c) {
+                    codeType = .eucOrSJISType
+                    while c >= 64, c != 0, codeType == .eucOrSJISType, i < count {
+                        if c >= 129 {
+                            if (c <= 141) || (143...159).contains(c) { codeType = .sjisType }
+                            else if (253...254).contains(c)          { codeType = .eucType  }
+                        }
+                        c = data[i]; i += 1
+                    }
+                } else if c <= 159 {
+                    codeType = .sjisType
+                }
+            } else if (240...254).contains(c) {
+                codeType = .eucType
+            } else if (224...239).contains(c) {
+                guard i < count else { break }
+                c = data[i]; i += 1
+                if (64...126).contains(c) || (128...160).contains(c) { codeType = .sjisType }
+                else if (253...254).contains(c)                      { codeType = .eucType  }
+                else if (161...252).contains(c)                      { codeType = .eucOrSJISType }
+            }
+        }
+
+        if codeType == .newType || codeType == .oldType { return .iso2022JP }
+        if codeType == .eucType || codeType == .eucOrSJISType { return .japaneseEUC }
+
+        // --- 4) BOMなし UTF-8 のビットパターン検査 ---
+        var trailingBytesNeeded = 0
+        var looksLikeUTF8 = true
+        for b in data {
+            if trailingBytesNeeded > 0 {
+                if (b & 0xC0) == 0x80 { trailingBytesNeeded -= 1 }
+                else { looksLikeUTF8 = false; break }
+                continue
+            }
+            if (b & 0x80) == 0x00 { continue }           // 0xxxxxxx
+            if (b & 0xE0) == 0xC0 { trailingBytesNeeded = 1 } // 110xxxxx
+            else if (b & 0xF0) == 0xE0 { trailingBytesNeeded = 2 } // 1110xxxx
+            else if (b & 0xF8) == 0xF0 { trailingBytesNeeded = 3 } // 11110xxx
+            else { looksLikeUTF8 = false; break }
+        }
+        if looksLikeUTF8 { return .utf8 }
+
+        // --- 5) 最後に SJIS を確定 ---
+        if codeType == .sjisType { return .shiftJIS }
+
+        // ここまでで確定しなければ不明（BOMなし UTF-16/32 は非対応）
+        print(#function + " - Can't estimate the character code of this document.")
+        return nil
     }
-    
-    
 }
 
 //MARK: - String Extension for Integer Subscripts
@@ -305,14 +442,109 @@ extension StringProtocol {
     
 }
 
-//MARK: - Normalizing
+//MARK: - Normalizing, Treat Return Codes.
 
 extension String {
     
+    // 簡易的に
     var normalizedString: String {
         return self.replacingOccurrences(of: "\r\n", with: "\n")
             .replacingOccurrences(of: "\r", with: "\n")
             .filter { !$0.isControl || $0 == "\n" || $0 == "\t" }
+    }
+    
+    /// 最初に見つかった改行種別（CRLF/CR/LF）を返しつつ、本文は LF 正規化して返す
+        /// Unicode の改行（NEL/LS/PS）も LF に畳み込みます
+    
+    func normalizeNewlinesAndDetect() -> (normalized: String, detected: String.ReturnCharacter?) {
+        
+        let utf8Bytes = self.utf8
+        var outputBytes: [UInt8] = []
+        outputBytes.reserveCapacity(utf8Bytes.count)
+        
+        var detected: String.ReturnCharacter? = nil
+        var i = utf8Bytes.startIndex
+        
+        while i != utf8Bytes.endIndex {
+            let b0 = utf8Bytes[i]
+            
+            // LF
+            if b0 == FuncChar.lf {
+                if detected == nil { detected = .lf }
+                outputBytes.append(FuncChar.lf)
+                utf8Bytes.formIndex(after: &i)
+                continue
+            }
+            
+            // CR / CRLF
+            if b0 == FuncChar.cr {
+                let next = utf8Bytes.index(after: i)
+                if next != utf8Bytes.endIndex, utf8Bytes[next] == FuncChar.lf {
+                    if detected == nil { detected = .crlf }
+                    outputBytes.append(FuncChar.lf)          // CRLF → LF
+                    i = utf8Bytes.index(after: next)          // 2 バイト進める
+                } else {
+                    if detected == nil { detected = .cr }
+                    outputBytes.append(FuncChar.lf)          // CR → LF
+                    utf8Bytes.formIndex(after: &i)
+                }
+                continue
+            }
+            
+            // NEL (U+0085) = 0xC2 0x85
+            if b0 == 0xC2 {
+                let i1 = utf8Bytes.index(after: i)
+                if i1 != utf8Bytes.endIndex, utf8Bytes[i1] == 0x85 {
+                    outputBytes.append(FuncChar.lf)
+                    i = utf8Bytes.index(after: i1)
+                    continue
+                }
+            }
+            
+            // LINE SEPARATOR / PARAGRAPH SEPARATOR (U+2028/U+2029) = 0xE2 0x80 0xA8 / 0xA9
+            if b0 == 0xE2 {
+                let i1 = utf8Bytes.index(after: i)
+                if i1 != utf8Bytes.endIndex, utf8Bytes[i1] == 0x80 {
+                    let i2 = utf8Bytes.index(after: i1)
+                    if i2 != utf8Bytes.endIndex {
+                        let b2 = utf8Bytes[i2]
+                        if b2 == 0xA8 || b2 == 0xA9 {
+                            outputBytes.append(FuncChar.lf)
+                            i = utf8Bytes.index(after: i2)
+                            continue
+                        }
+                    }
+                }
+            }
+            
+            // それ以外はそのままコピー
+            outputBytes.append(b0)
+            utf8Bytes.formIndex(after: &i)
+        }
+        
+        let normalized = String(decoding: outputBytes, as: UTF8.self)
+        return (normalized, detected)
+    }
+    
+    // Stringの改行コードのうち、CR/CRLF/LFの3種類の中で最も最初に出てきたものを返す。なければnil。
+    func firstReturnCharacter() -> String.ReturnCharacter? {
+        let scalars = self.unicodeScalars
+        var i = scalars.startIndex
+        while i != scalars.endIndex {
+            let s = scalars[i]
+            if s == "\n" {
+                return .lf
+            } else if s == "\r" {
+                let next = scalars.index(after: i)
+                if next != scalars.endIndex, scalars[next] == "\n" {
+                    return .crlf
+                } else {
+                    return .cr
+                }
+            }
+            i = scalars.index(after: i)
+        }
+        return nil
     }
 }
 

@@ -10,43 +10,40 @@ import AppKit
 final class KViewController: NSViewController, NSUserInterfaceValidations, NSSplitViewDelegate {
 
     private let _dividerHitWidth: CGFloat = 5.0
-
-    private var _textStorageRef: KTextStorageProtocol = KTextStorage()
+    private weak var _document: Document?
     private var _splitView: KSplitView!
     private var _panes: [KTextViewContainerView] = []
+    private var _needConstruct:Bool = false
 
     @IBAction func splitVertically(_ sender: Any?)   { _ensureSecondPane(orientation: .vertical) }
     @IBAction func splitHorizontally(_ sender: Any?) { _ensureSecondPane(orientation: .horizontal) }
     @IBAction func removeSplit(_ sender: Any?)       { _removeSecondPaneIfExists() }
+    
+    var document: Document? {
+        get { _document }
+        set {
+            guard _document == nil, let doc = newValue else { log("newValue is not Document",from:self); return }
+            _document = doc
+            //constructViews()
+            _needConstruct = true
+        }
+    }
+    
 
     override func loadView() { view = NSView() }
 
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        let sv = KSplitView()
-        sv.translatesAutoresizingMaskIntoConstraints = false
-        sv.dividerStyle = .thin
-        sv.isVertical = true
-        view.addSubview(sv)
-        NSLayoutConstraint.activate([
-            sv.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            sv.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            sv.topAnchor.constraint(equalTo: view.topAnchor),
-            sv.bottomAnchor.constraint(equalTo: view.bottomAnchor)
-        ])
-        _splitView = sv
-
-        // 1枚目（共有 textStorage）
-        let first = KTextViewContainerView(frame: _splitView.bounds, textStorageRef: _textStorageRef)
-        first.translatesAutoresizingMaskIntoConstraints = true     // ★ Auto Layout を切る
-        first.autoresizingMask = [.width, .height]                 // ★ フレーム追従
-        _panes = [first]
-        _splitView.addSubview(first)
-        _splitView.setHoldingPriority(.defaultLow, forSubviewAt: 0)
-
-        _splitView.delegate = self
-        _splitView.adjustSubviews()
+    }
+    
+    override func viewDidAppear() {
+        super.viewDidAppear()
+        
+        if _needConstruct, document != nil {
+            constructViews()
+            _needConstruct = false
+        }
     }
 
     // メニューの有効/無効
@@ -59,6 +56,34 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         default:
             return true
         }
+    }
+    
+    private func constructViews() {
+        let sv = KSplitView()
+        sv.translatesAutoresizingMaskIntoConstraints = false
+        sv.dividerStyle = .thin
+        sv.isVertical = true
+        view.addSubview(sv)
+        NSLayoutConstraint.activate([
+            sv.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            sv.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            sv.topAnchor.constraint(equalTo: view.topAnchor),
+            sv.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+        _splitView = sv
+        
+        guard let textStorage = document?.textStorage else { log("document is nil.",from:self); return }
+
+        // 1枚目（共有 textStorage）
+        let first = KTextViewContainerView(frame: _splitView.bounds, textStorageRef: textStorage)
+        first.translatesAutoresizingMaskIntoConstraints = true     // ★ Auto Layout を切る
+        first.autoresizingMask = [.width, .height]                 // ★ フレーム追従
+        _panes = [first]
+        _splitView.addSubview(first)
+        _splitView.setHoldingPriority(.defaultLow, forSubviewAt: 0)
+
+        _splitView.delegate = self
+        _splitView.adjustSubviews()
     }
 
     // MARK: - 分割操作
@@ -76,8 +101,11 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
             }
             return
         }
+        
+        guard let textStorage = document?.textStorage else { log("document is nil.",from:self); return }
 
-        let second = KTextViewContainerView(frame: _splitView.bounds, textStorageRef: _textStorageRef)
+
+        let second = KTextViewContainerView(frame: _splitView.bounds, textStorageRef: textStorage)
         second.translatesAutoresizingMaskIntoConstraints = true    // ★ ここも同様
         second.autoresizingMask = [.width, .height]
         _panes.append(second)

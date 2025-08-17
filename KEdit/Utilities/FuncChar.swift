@@ -13,6 +13,7 @@ import Foundation
 struct FuncChar {
     // 制御
     static let lf: UInt8          = 0x0A  // \n
+    static let cr: UInt8           = 0x0D // \r
     static let tab: UInt8         = 0x09  // \t
     static let space: UInt8       = 0x20
     
