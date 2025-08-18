@@ -54,6 +54,7 @@ protocol KTextStorageReadable: KTextStorageCommon {
     var string: String { get }
     var skeletonString: KSkeletonStringInUTF8 { get }
     var hardLineCount: Int { get } // if _character is empty, return 1. if end of chars is '\n', add 1.
+    func lineAndColumNumber(at index:Int) -> (line:Int, column:Int) // index(0..), line(1..), column(1..)
     var invisibleCharacters: KInvisibleCharacters? { get }
     var spaceAdvance: CGFloat { get }
     var lineNumberCharacterMaxWidth: CGFloat { get }
@@ -142,6 +143,7 @@ final class KTextStorage: KTextStorageProtocol {
     // caches.
     private var _spaceAdvanceCache: CGFloat?
     private var _hardLineCount: Int?
+    //private var _hardLineRanges: [Range<Int>]?
     private var _invisibleCharacters: KInvisibleCharacters?
     private var _lineNumberCharacterMaxWidth: CGFloat?
     
@@ -258,6 +260,7 @@ final class KTextStorage: KTextStorageProtocol {
     
     // 論理行の数を返す。
     var hardLineCount: Int {
+        
         if let hardLineCount = _hardLineCount {
             return hardLineCount
         }
@@ -265,7 +268,37 @@ final class KTextStorage: KTextStorageProtocol {
         for c in _characters { if c == "\n" { count += 1 } }
         _hardLineCount = count
         return count
+         
     }
+    
+    /*
+    var hardLineRanges: [Range<Int>] {
+        if let hardLineRanges = _hardLineRanges {
+            return hardLineRanges
+        }
+        let n = characters.count
+        if n == 0 { return [0..<0] }
+        
+        var ranges: [Range<Int>] = []
+        var start = 0
+        
+        for (i, ch) in characters.enumerated() {
+            if ch == "\n" {
+                ranges.append(start..<(i + 1)) // 改行を含める
+                start = i + 1
+            }
+        }
+        
+        if start < n {
+            // 末尾が改行で終わらない：残りをそのまま
+            ranges.append(start..<n)
+        } else {
+            // 末尾が改行で終わる：空行を追加
+            ranges.append(n..<n)
+        }
+        _hardLineRanges = ranges
+        return ranges
+    }*/
     
     // タブ幅の元になるspaceの幅を返す。
     var spaceAdvance: CGFloat {
@@ -593,6 +626,26 @@ final class KTextStorage: KTextStorageProtocol {
     // 解除：owner 一致だけ除去
     func removeObserver(_ owner: AnyObject) {
         _observers.removeAll { $0.owner === owner || $0.owner == nil }
+    }
+    
+    // 指定したindexが論理行の何行目で、行頭から何文字目かを返す。いずれも1スタート。
+    func lineAndColumNumber(at index:Int) -> (line:Int, column:Int) {
+        guard index >= 0, index <= _skeletonString.bytes.count else {
+            log("index is out of range.",from:self)
+            return (0,0)
+        }
+        var lineNo = 1
+        var columnNo = 1
+        for i in 0..<index {
+            let ch = _skeletonString.bytes[i]
+            if ch == FuncChar.lf {
+                lineNo += 1
+                columnNo = 1
+                continue
+            }
+            columnNo += 1
+        }
+        return (lineNo, columnNo)
     }
 
     

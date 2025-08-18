@@ -91,6 +91,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     var selectionRange: Range<Int> = 0..<0 {
         didSet {
             _caretView.isHidden = !selectionRange.isEmpty
+            sendStatusBarUpdateAction()
             needsDisplay = true
         }
     }
@@ -315,6 +316,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         let ok = super.becomeFirstResponder()
         _caretView.isHidden = false
         containerView?.setActiveEditor(true)
+        sendStatusBarUpdateAction()
+        
         needsDisplay = true
         return ok
     }
@@ -1686,6 +1689,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 }
             }
             
+            sendStatusBarUpdateAction()
+            
         case let .colorChanged(range):
             print("カラー変更: range = \(range)")
         }
@@ -1785,6 +1790,16 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         _prepareDraggingText = false
         //log("done.",from:self)
     }
+    
+    private func sendStatusBarUpdateAction() {
+        NSApp.sendAction(#selector(KStatusBarUpdateAction.statusBarNeedsUpdate(_:)),
+                                         to: nil, from: self)
+    }
+    
+    
+    
+    
+    
     
     // mouseDown()などのセレクター履歴を残すためのダミー。
     @objc func clearCaretContext(_ sender: Any?) { }

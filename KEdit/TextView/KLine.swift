@@ -397,6 +397,8 @@ final class KLines: CustomStringConvertible {
         guard let layoutManager = _layoutManager else { log("layoutManager is nil", from:self); return }
         guard let layoutRects = layoutManager.makeLayoutRects() else { log("layoutRects is nil", from:self); return }
         
+        let skeleton = textStorageRef.skeletonString
+        
         // storageが空だった場合は空行を追加するのみ。
         if textStorageRef.count == 0 { setLinesEmpty(); return }
         /*
@@ -453,8 +455,8 @@ final class KLines: CustomStringConvertible {
             let endIndex = lastHardLineStartIndex + softCount
             removeRange = startHardLineArrayIndex..<endIndex
             
-            let characters = textStorageRef.characterSlice
-            let newLineCharacter: Character = "\n"
+            //let characters = textStorageRef.characterSlice
+            //let newLineCharacter: Character = "\n"
 
             var lower = info.range.lowerBound
             var upper = info.range.lowerBound + info.insertedCount

@@ -17,17 +17,17 @@ class Document: NSDocument {
     
     var characterCode: String.Encoding {
         get { _characterCode }
-        set { _characterCode = newValue }
+        set { _characterCode = newValue; notifyStatusBarNeedsUpdate()  }
     }
     
     var returnCode: String.ReturnCharacter {
         get { _returnCode }
-        set { _returnCode = newValue }
+        set { _returnCode = newValue; notifyStatusBarNeedsUpdate()  }
     }
     
     var syntaxType: KSyntaxType {
         get { _syntaxType }
-        set { _syntaxType = newValue }
+        set { _syntaxType = newValue; notifyStatusBarNeedsUpdate()  }
     }
     
     var textStorage: KTextStorage {
@@ -89,8 +89,6 @@ class Document: NSDocument {
     
     
     override func read(from data: Data, ofType typeName: String) throws {
-        let head = data.prefix(16).map { String(format: "%02X", $0) }.joined(separator: " ")
-        log("[READ] size=\(data.count) head=\(head)",from:self)
         
         // 1) 文字コードの推定 → 文字列化
         let encoding = String.estimateCharacterCode(from: data) ?? .utf8
@@ -113,9 +111,18 @@ class Document: NSDocument {
 
         // （必要ならここで _syntaxType を typeName / 拡張子から推定して設定）
         
-        log("return code: \(_returnCode), character code: \(_characterCode)",from:self)
+        //log("return code: \(_returnCode), character code: \(_characterCode)",from:self)
     }
 
 
+}
+
+extension Document {
+    /// 自分のウインドウ群だけ確実に更新（レスポンダチェーンに頼らない）
+    func notifyStatusBarNeedsUpdate() {
+        for wc in windowControllers {
+            (wc.contentViewController as? KViewController)?.updateStatusBar()
+        }
+    }
 }
 
