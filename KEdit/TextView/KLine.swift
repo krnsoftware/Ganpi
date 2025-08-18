@@ -410,8 +410,8 @@ final class KLines: CustomStringConvertible {
             return
         }*/
         
-        let newLineCharacter:Character = "\n"
-        let characters = textStorageRef.characterSlice
+        //let newLineCharacter:Character = "\n"
+        //let characters = textStorageRef.characterSlice
         
         var newRange = 0..<textStorageRef.count
         //var startIndex = 0
@@ -463,13 +463,16 @@ final class KLines: CustomStringConvertible {
 
             // 前方：行頭まで戻る
             while lower > 0 {
-                if characters[lower - 1] == newLineCharacter { break }
+                //if characters[lower - 1] == newLineCharacter { break }
+                if skeleton.bytes[lower - 1] == FuncChar.lf { break }
                 lower -= 1
             }
 
             // 後方：行末（改行を含めた直後）まで進む
-            while upper < characters.count {
-                if characters[upper] == newLineCharacter {
+            //while upper < characters.count {
+            while upper < skeleton.bytes.count {
+                //if characters[upper] == newLineCharacter {
+                if skeleton.bytes[upper] == FuncChar.lf {
                     upper += 1 // 改行そのものも範囲に含める
                     break
                 }
@@ -493,7 +496,8 @@ final class KLines: CustomStringConvertible {
         var lineRanges:[Range<Int>] = []
         var start = newRange.lowerBound
         for i in newRange {
-            if characters[i] == newLineCharacter {
+            //if characters[i] == newLineCharacter {
+            if skeleton.bytes[i] == FuncChar.lf {
                 if start < i {
                     lineRanges.append(start..<i)
                 } else {
@@ -535,11 +539,13 @@ final class KLines: CustomStringConvertible {
             return
         }
 
-        let count = characters.count
+        //let count = characters.count
 
         // 最後の文字が改行で、かつ最後のKLineが末尾に達していなければ空行を追加
-        if characters.last == "\n" && newLastLine.range.upperBound < count {
-            let emptyLine = layoutManager.makeEmptyLine(index: textStorageRef.count, hardLineIndex: newLastLine.hardLineIndex + 1)
+        //if characters.last == "\n" && newLastLine.range.upperBound < count {
+        if skeleton.bytes.last == FuncChar.lf && newLastLine.range.upperBound < count {
+            //let emptyLine = layoutManager.makeEmptyLine(index: textStorageRef.count, hardLineIndex: newLastLine.hardLineIndex + 1)
+            let emptyLine = layoutManager.makeEmptyLine(index: skeleton.bytes.count, hardLineIndex: newLastLine.hardLineIndex + 1)
             _lines.append(emptyLine)
         }
         
