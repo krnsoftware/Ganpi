@@ -411,7 +411,7 @@ final class KLines: CustomStringConvertible {
         }*/
         
         //let newLineCharacter:Character = "\n"
-        //let characters = textStorageRef.characterSlice
+        let characters = textStorageRef.characterSlice
         
         var newRange = 0..<textStorageRef.count
         //var startIndex = 0
@@ -543,10 +543,12 @@ final class KLines: CustomStringConvertible {
 
         // 最後の文字が改行で、かつ最後のKLineが末尾に達していなければ空行を追加
         //if characters.last == "\n" && newLastLine.range.upperBound < count {
-        if skeleton.bytes.last == FuncChar.lf && newLastLine.range.upperBound < count {
+        //if skeleton.bytes.last == FuncChar.lf && newLastLine.range.upperBound < count {
+        if skeleton.bytes.last == FuncChar.lf && newLastLine.range.upperBound < skeleton.bytes.count {
             //let emptyLine = layoutManager.makeEmptyLine(index: textStorageRef.count, hardLineIndex: newLastLine.hardLineIndex + 1)
             let emptyLine = layoutManager.makeEmptyLine(index: skeleton.bytes.count, hardLineIndex: newLastLine.hardLineIndex + 1)
             _lines.append(emptyLine)
+            //log("last empty line.",from:self)
         }
         
         //log("isValid: \(isValid)",from:self)
