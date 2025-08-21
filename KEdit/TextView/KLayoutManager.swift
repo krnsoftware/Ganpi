@@ -31,9 +31,9 @@ final class KLayoutManager: KLayoutManagerReadable {
     
     enum KRebuildReason {
         case charactersChanged(info: KStorageModifiedInfo)
-            case attributesChanged
-            case destructiveChange
-        }
+        case attributesChanged
+        case destructiveChange
+    }
 
     // MARK: - Properties
 
@@ -113,12 +113,12 @@ final class KLayoutManager: KLayoutManagerReadable {
         
         _textStorageRef.addObserver(self) { [weak self] note in
                 guard let self else { return }
-                switch note {
+            switch note {
             case .textChanged(let info):
                 self.rebuildLayout(reason: .charactersChanged(info: info))
                 self.textView?.textStorageDidModify(note)
             case .colorChanged(let range):
-                log("colorChanged. range: \(range)")
+                self.textView?.textStorageDidModify(.colorChanged(range: 0..<_textStorageRef.count))
             }
         }
                 
@@ -145,7 +145,6 @@ final class KLayoutManager: KLayoutManagerReadable {
         }
         
         
-        
         switch reason {
         case .charactersChanged(let info):
             let timer = KTimeChecker(name:"rebuidLayout/_lines.rebuildLines()")
@@ -153,8 +152,7 @@ final class KLayoutManager: KLayoutManagerReadable {
             _lines.rebuildLines(with: info)
             timer.stop()
         case .attributesChanged:
-            // 将来的に実装
-            _lines.rebuildLines()
+            log("attributedChanged?", from:self)
         case .destructiveChange:
             _lines.rebuildLines()
         }
@@ -162,11 +160,12 @@ final class KLayoutManager: KLayoutManagerReadable {
           
     }
     
-    
+    /*
     // TextStorageが変更された際に呼び出される。
     func textStorageDidModify(_ modification: KStorageModified) {
         guard let textView = _textView else { log("textView is nil", from:self); return }
-        
+        log("here",from:self)
+
         switch modification {
         case .textChanged(let info):
             rebuildLayout(reason: .charactersChanged(info: info))
@@ -174,9 +173,10 @@ final class KLayoutManager: KLayoutManagerReadable {
 
         case .colorChanged(let range):
             print("🎨 カラー変更: range = \(range)")
+            textView.textStorageDidModify(modification)
             
         }
-    }
+    }*/
     
     // TextViewのframeが変更された際に呼び出される。
     func textViewFrameInvalidated() {

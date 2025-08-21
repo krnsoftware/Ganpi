@@ -11,11 +11,15 @@ import Cocoa
 final class KViewController: NSViewController, NSUserInterfaceValidations, NSSplitViewDelegate {
 
     // MARK: - Private properties
-    private let _dividerHitWidth: CGFloat = 5.0
+    
     private weak var _document: Document?
     private var _splitView: KSplitView?
     private var _panes: [KTextViewContainerView] = []
     private var _needsConstruct: Bool = false
+    
+    private let _dividerHitWidth: CGFloat = 5.0
+    private let _statusBarHeight: CGFloat = 20//26
+    private let _statusBarFont: NSFont = .monospacedSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .regular)
     
     // KViewController 内
     private let _encLabel   = NSTextField(labelWithString: "")
@@ -63,12 +67,12 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         view.addSubview(_contentContainer)
         view.addSubview(_statusBarView)
 
-        let barHeight: CGFloat = 26
+        
         NSLayoutConstraint.activate([
             _statusBarView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             _statusBarView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             _statusBarView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            _statusBarView.heightAnchor.constraint(equalToConstant: barHeight),
+            _statusBarView.heightAnchor.constraint(equalToConstant: _statusBarHeight),
 
             _contentContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             _contentContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
@@ -117,8 +121,8 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         first.autoresizingMask = [.width, .height]
         _panes = [first]
 
-        sv.addSubview(first)          // ← addSubview を使う
-        sv.adjustSubviews()           // ← 必ず呼ぶ
+        sv.addSubview(first)
+        sv.adjustSubviews()
 
         _needsConstruct = false
         
@@ -128,7 +132,7 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
     private func buildStatusBarUI() {
         // 小さめのシステムフォント
         [_encLabel, _eolLabel, _syntaxLabel, _caretLabel].forEach {
-            $0.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+            $0.font = _statusBarFont
             $0.lineBreakMode = .byTruncatingTail
             $0.translatesAutoresizingMaskIntoConstraints = false
         }
@@ -146,6 +150,12 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
 
         _statusBarView.addSubview(leftStack)
         _statusBarView.addSubview(rightStack)
+        
+        
+        addClick(_encLabel,  #selector(openEncodingMenu(_:)))
+        addClick(_eolLabel,  #selector(openEOLMenu(_:)))
+        addClick(_syntaxLabel, #selector(openSyntaxMenu(_:)))
+        
 
         NSLayoutConstraint.activate([
             leftStack.leadingAnchor.constraint(equalTo: _statusBarView.leadingAnchor, constant: 8),
@@ -154,6 +164,98 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
             rightStack.trailingAnchor.constraint(equalTo: _statusBarView.trailingAnchor, constant: -8),
             rightStack.centerYAnchor.constraint(equalTo: _statusBarView.centerYAnchor),
         ])
+    }
+    
+    private func addClick(_ view: NSView, _ action: Selector) {
+        let gr = NSClickGestureRecognizer(target: self, action: action)
+        view.addGestureRecognizer(gr)
+        view.toolTip = "Click to change"
+    }
+    
+    // 候補（必要なら Document から差し替え可）
+    private let _encodingCandidates: [String.Encoding] = [
+        .utf8, .utf16, .utf32, .shiftJIS, .japaneseEUC, .iso2022JP
+    ]
+
+    @objc private func openEncodingMenu(_ sender: NSGestureRecognizer) {
+        guard let label = sender.view, let doc = _document else { return }
+        let menu = NSMenu()
+        for enc in _encodingCandidates {
+            let item = NSMenuItem(
+                title: humanReadableEncoding(enc),
+                action: #selector(didChooseEncoding(_:)),
+                keyEquivalent: ""
+            )
+            item.target = self
+            item.state = (enc == doc.characterCode) ? .on : .off
+            // representedObject に rawValue を入れておくと安全
+            item.representedObject = enc.rawValue
+            menu.addItem(item)
+        }
+        popUp(menu, from: label)
+    }
+
+    @objc private func openEOLMenu(_ sender: NSGestureRecognizer) {
+        guard let label = sender.view, let doc = _document else { return }
+        let menu = NSMenu()
+        for eol in [String.ReturnCharacter.lf, .crlf, .cr] {
+            let title = humanReadableEOL(eol)
+            let item = NSMenuItem(title: title, action: #selector(didChooseEOL(_:)), keyEquivalent: "")
+            item.target = self
+            item.state = (eol == doc.returnCode) ? .on : .off
+            item.representedObject = eol.rawValue
+            menu.addItem(item)
+        }
+        popUp(menu, from: label)
+    }
+
+    @objc private func openSyntaxMenu(_ sender: NSGestureRecognizer) {
+        guard let label = sender.view, let doc = _document else { return }
+        let menu = NSMenu()
+        for ty in KSyntaxType.allCases {
+            let title = humanReadableSyntax(ty)
+            let item = NSMenuItem(title: title, action: #selector(didChooseSyntax(_:)), keyEquivalent: "")
+            item.target = self
+            item.state = (ty == doc.syntaxType) ? .on : .off
+            item.representedObject = ty // そのまま持てる
+            menu.addItem(item)
+        }
+        popUp(menu, from: label)
+    }
+
+    private func popUp(_ menu: NSMenu, from anchor: NSView) {
+        let pt = NSPoint(x: 0, y: anchor.bounds.height - 2)
+        menu.popUp(positioning: nil, at: pt, in: anchor)
+    }
+    
+    @objc private func didChooseEncoding(_ item: NSMenuItem) {
+        guard let raw = item.representedObject as? UInt, let doc = _document else { return }
+        let enc = String.Encoding(rawValue: raw)
+        if doc.characterCode != enc {
+            doc.characterCode = enc
+            updateStatusBar()
+        }
+    }
+
+    @objc private func didChooseEOL(_ item: NSMenuItem) {
+        guard let raw = item.representedObject as? String, let eol = String.ReturnCharacter(rawValue: raw),
+              let doc = _document else { return }
+        if doc.returnCode != eol {
+            doc.returnCode = eol
+            updateStatusBar()
+        }
+    }
+
+    @objc private func didChooseSyntax(_ item: NSMenuItem) {
+        guard let ty = item.representedObject as? KSyntaxType,
+              let doc = _document else { return }
+        if doc.syntaxType != ty {
+            doc.syntaxType = ty
+            let textStorage = doc.textStorage
+            textStorage.parser = ty.makeParser(storage: textStorage)
+            
+            updateStatusBar()
+        }
     }
 
     // MARK: - Split / Merge
@@ -169,8 +271,8 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         second.autoresizingMask = [.width, .height]
 
         _panes.append(second)
-        sv.addSubview(second)         // ← addSubview
-        sv.adjustSubviews()           // ← サイズ分配
+        sv.addSubview(second)
+        sv.adjustSubviews()
 
         // 半分位置へ（任意）
         let mid: CGFloat = sv.isVertical ? sv.bounds.width / 2 : sv.bounds.height / 2
@@ -232,18 +334,18 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
 
         // カーソル位置（アクティブペイン）
         if let textView = activeTextView() {
+            let textStorage = textView.textStorage
+            
             let caret = textView.caretIndex
-            //let count = textView.textStorage.count
-            //let index = caret == count && caret > 0 ? caret - 1 : caret
-            //let index = caret
+            let matrix = textStorage.lineAndColumNumber(at: caret)
             
-            let matrix = textView.textStorage.lineAndColumNumber(at: caret)
+            let totalLineCount = textStorage.hardLineCount.formatted(.number.locale(.init(identifier: "en_US")))
+            let totalCharacterCount = textStorage.count.formatted(.number.locale(.init(identifier: "en_US")))
+            let currentLineNumber = matrix.line.formatted(.number.locale(.init(identifier: "en_US")))
+            let currentLineColumn = matrix.column.formatted(.number.locale(.init(identifier: "en_US")))
             
-            
-            let totalLineCount = textView.textStorage.hardLineCount
-            let totalCharacterCount = textView.textStorage.count
             //_caretLabel.stringValue = "Ln \(line), Col \(col)"
-            _caretLabel.stringValue = "Line: \(matrix.line):\(matrix.column) [ch:\(totalCharacterCount) ln:\(totalLineCount)]"
+            _caretLabel.stringValue = "Line: \(currentLineNumber):\(currentLineColumn)  [ch: \(totalCharacterCount)  ln: \(totalLineCount)]"
         } else {
             _caretLabel.stringValue = ""
         }

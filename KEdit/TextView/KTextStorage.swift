@@ -133,7 +133,7 @@ final class KTextStorage: KTextStorageProtocol {
     // data.
     private(set) var _characters: [Character] = []
     private var _observers: [_ObserverEntry] = []
-    private lazy var _parser: KSyntaxParserProtocol = KSyntaxParserRuby(storage: self)
+    private lazy var _parser: KSyntaxParserProtocol = KSyntaxParserPlain(storage: self)
     private var _skeletonString: KSkeletonStringInUTF8 = .init()
     
     // propaties for appearances.
@@ -272,35 +272,6 @@ final class KTextStorage: KTextStorageProtocol {
          
     }
     
-    /*
-    var hardLineRanges: [Range<Int>] {
-        if let hardLineRanges = _hardLineRanges {
-            return hardLineRanges
-        }
-        let n = characters.count
-        if n == 0 { return [0..<0] }
-        
-        var ranges: [Range<Int>] = []
-        var start = 0
-        
-        for (i, ch) in characters.enumerated() {
-            if ch == "\n" {
-                ranges.append(start..<(i + 1)) // 改行を含める
-                start = i + 1
-            }
-        }
-        
-        if start < n {
-            // 末尾が改行で終わらない：残りをそのまま
-            ranges.append(start..<n)
-        } else {
-            // 末尾が改行で終わる：空行を追加
-            ranges.append(n..<n)
-        }
-        _hardLineRanges = ranges
-        return ranges
-    }*/
-    
     // タブ幅の元になるspaceの幅を返す。
     var spaceAdvance: CGFloat {
         if let cached = _spaceAdvanceCache {
@@ -313,7 +284,12 @@ final class KTextStorage: KTextStorageProtocol {
     
     var parser: KSyntaxParserProtocol {
         get { _parser }
-        set { _parser = newValue }
+        set {
+            _parser = newValue
+            _parser.noteEdit(oldRange: 0..<count, newCount: count)
+            //_parser.ensureUpToDate(for: 0..<count)
+            notifyObservers(.colorChanged(range: 0..<count))
+        }
     }
     
     

@@ -17,7 +17,19 @@ struct AttributedSpan {
     let attributes: [NSAttributedString.Key: Any]
 }
 
-enum KSyntaxType { case plain, ruby, html }
+enum KSyntaxType: CaseIterable {
+    case plain
+    case ruby
+    case html
+    
+    func makeParser(storage:KTextStorageReadable) -> KSyntaxParserProtocol {
+        switch self {
+        case .plain: return KSyntaxParserPlain(storage: storage)
+        case .ruby: return KSyntaxParserRuby(storage: storage)
+        default: return KSyntaxParserPlain(storage: storage) // 暫定。
+        }
+    }
+}
 
 typealias FC = FuncChar
 
@@ -73,18 +85,5 @@ extension KSyntaxParserProtocol {
     }
 }
 
-/*
-extension KSyntaxParserProtocol {
-    static func makeParser(for type:KSyntaxType, storage:KTextStorageReadable) -> KSyntaxParserProtocol? {
-        switch type {
-        case .plain:
-            return KSyntaxParserPlain(storage: storage)
-        case .ruby:
-            return KSyntaxParserRuby(storage: storage)
-        default:
-            log("syntax type is not acceptable.",from:self)
-        }
-        return nil
-    }
 
-}*/
+

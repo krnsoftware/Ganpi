@@ -39,7 +39,7 @@ class Document: NSDocument {
         super.init()
         // Add your subclass-specific initialization here.
         
-        
+        _textStorage.parser = _syntaxType.makeParser(storage: _textStorage)
         
     }
 

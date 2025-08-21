@@ -1693,6 +1693,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             
         case let .colorChanged(range):
             print("カラー変更: range = \(range)")
+            
         }
         
         updateFrameSizeToFitContent()
