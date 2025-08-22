@@ -38,6 +38,7 @@ final class KCaretView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
+        
         caretColor.withAlphaComponent(1.0).setFill()
         NSBezierPath(rect: dirtyRect).fill()
     }

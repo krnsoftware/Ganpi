@@ -356,8 +356,10 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     private func updateCaretPosition() {
         let caretPosition = characterPosition(at: caretIndex)
+        //guard let layoutRects = _layoutManager.makeLayoutRects() else { log("layoutRects is nil.",from:self); return }
         
         _caretView.updateFrame(x: caretPosition.x, y: caretPosition.y, height: _layoutManager.lineHeight)
+        
         _caretView.alphaValue = 1.0
         restartCaretBlinkTimer()
         
@@ -1513,6 +1515,16 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         // ノーラップ時：スクロールに伴う原点移動で再描画
         if bounds.origin != _prevContentViewBounds.origin {
             _prevContentViewBounds = contentBounds
+            
+            // スクロール時にキャレットが行番号表示にかぶった場合は消す。
+            let characterPosition = characterPosition(at: caretIndex)
+            if let layoutRects = _layoutManager.makeLayoutRects(),
+                    let contentView = enclosingScrollView?.contentView {
+                let currentX = characterPosition.x - layoutRects.horizontalInsets - contentView.bounds.minX
+                _caretView.isHidden = currentX < 0
+                
+            }
+            
             needsDisplay = true
             return
         }
