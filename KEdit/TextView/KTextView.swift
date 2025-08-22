@@ -231,13 +231,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         _layoutManager.textView = self
         
-        //updateCaretPosition()
-        //startCaretBlinkTimer()
-        
-        
-        //_layoutManager.rebuildLayout()
-        
-        
         registerForDraggedTypes([.string])
     }
     
@@ -257,11 +250,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         updateCaretPosition()
         startCaretBlinkTimer()
         
-        //test
-        /*
-         let info = KStorageModifiedInfo(range: 0..<_textStorageRef.count, insertedCount: 0, deletedNewlineCount: 0, insertedNewlineCount: 0)
-         _layoutManager.textStorageDidModify(.textChanged(info: info))
-         */
         
         // 古い監視を解除
         NotificationCenter.default.removeObserver(self)
@@ -356,7 +344,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     private func updateCaretPosition() {
         let caretPosition = characterPosition(at: caretIndex)
-        //guard let layoutRects = _layoutManager.makeLayoutRects() else { log("layoutRects is nil.",from:self); return }
         
         _caretView.updateFrame(x: caretPosition.x, y: caretPosition.y, height: _layoutManager.lineHeight)
         
@@ -1353,152 +1340,16 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     }
     
     
-    /*// MARK: - Public Actions (Responder Chain から呼ばれる)
-    
-    /// Find Next
-    @objc func search(_ sender: Any?) {
-        performSearch(isForward: true)
-    }
-    
-    /// Find Previous
-    @objc func searchBackward(_ sender: Any?) {
-        performSearch(isForward: false)
-    }
-    
-    /// Replace All
-    ///
-    /// - Regex ON: 置換テンプレート（例: `$1`）をそのまま解釈。
-    /// - Regex OFF: リテラル置換（テンプレ解釈なし）。
-    @objc func searchReplaceAll(_ sender: Any?) {
-        let searchPattern        = KSearchPanel.shared.searchString
-        let replacementText      = KSearchPanel.shared.replaceString
-        let isCaseInsensitive    = KSearchPanel.shared.ignoreCase
-        let usesRegularExpression = KSearchPanel.shared.useRegex
-        
-        guard !searchPattern.isEmpty else { NSSound.beep(); return }
-        
-        let documentString = textStorage.string
-        var replacedString = documentString
-        
-        if usesRegularExpression {
-            let regexOptions: NSRegularExpression.Options = isCaseInsensitive ? [.caseInsensitive] : []
-            guard let regex = try? NSRegularExpression(pattern: searchPattern, options: regexOptions) else {
-                NSSound.beep(); return
-            }
-            
-            let fullRange = NSRange(documentString.startIndex..<documentString.endIndex, in: documentString)
-            
-            // 置換テンプレートはそのまま使用（例: `$1`）。
-            // ※ `\1` と入力された場合は展開されません。必要なら `$1` をご使用ください。
-            replacedString = regex.stringByReplacingMatches(in: documentString,
-                                                            options: [],
-                                                            range: fullRange,
-                                                            withTemplate: replacementText)
-        } else {
-            // リテラル置換：テンプレ解釈は一切行わない
-            let compareOptions: String.CompareOptions = isCaseInsensitive ? [.caseInsensitive] : []
-            replacedString = documentString.replacingOccurrences(of: searchPattern,
-                                                                 with: replacementText,
-                                                                 options: compareOptions,
-                                                                 range: nil)
-        }
-        
-        guard replacedString != documentString else { NSSound.beep(); return }
-        
-        _textStorageRef.replaceString(in: 0..<_textStorageRef.count, with: replacedString)
-        
-        let endPosition = _textStorageRef.count
-        selectionRange = endPosition..<endPosition
-        updateCaretPosition()
-        scrollCaretToVisible()
-    }
-    
-    // MARK: - Core
-    
-    /// 前方/後方の検索を行い、ヒット範囲を選択してスクロールする。
-    private func performSearch(isForward: Bool) {
-        
-        
-        let searchPattern         = KSearchPanel.shared.searchString
-        let isCaseInsensitive     = KSearchPanel.shared.ignoreCase
-        let usesRegularExpression = KSearchPanel.shared.useRegex
-        
-        guard !searchPattern.isEmpty else { NSSound.beep(); return }
-        
-        let documentString = textStorage.string
-        
-        // NSRegularExpression の準備（Regex OFF の場合はリテラルとしてエスケープ）
-        let regexOptions: NSRegularExpression.Options = isCaseInsensitive ? [.caseInsensitive] : []
-        let patternForRegex = usesRegularExpression
-        ? searchPattern
-        : NSRegularExpression.escapedPattern(for: searchPattern)
-        
-        guard let regex = try? NSRegularExpression(pattern: patternForRegex, options: regexOptions) else {
-            NSSound.beep(); return
-        }
-        
-        let documentNSRange = NSRange(documentString.startIndex..<documentString.endIndex, in: documentString)
-        
-        // キャレット位置（文字インデックス）→ String.Index → UTF-16 オフセット
-        let caretCharacterIndex = isForward ? selectionRange.upperBound : selectionRange.lowerBound
-        let clampedCaret = max(0, min(caretCharacterIndex, documentString.count))
-        let caretStringIndex = documentString.index(documentString.startIndex, offsetBy: clampedCaret)
-        let caretUTF16Location = NSRange(caretStringIndex..<caretStringIndex, in: documentString).location
-        
-        var matchedNSRange: NSRange?
-        
-        if isForward {
-            // caret ... end
-            let searchRangeAfterCaret = NSRange(location: caretUTF16Location,
-                                                length: max(0, documentNSRange.length - caretUTF16Location))
-            if let first = regex.firstMatch(in: documentString, options: [], range: searchRangeAfterCaret) {
-                matchedNSRange = first.range
-            } else if caretUTF16Location > 0 {
-                // wrap: 先頭 ... caret
-                let searchRangeBeforeCaret = NSRange(location: 0, length: caretUTF16Location)
-                matchedNSRange = regex.firstMatch(in: documentString, options: [], range: searchRangeBeforeCaret)?.range
-            }
-        } else {
-            // backward: 先頭 ... caret の最後
-            let searchRangeBeforeCaret = NSRange(location: 0, length: min(caretUTF16Location, documentNSRange.length))
-            if let last = regex.matches(in: documentString, options: [], range: searchRangeBeforeCaret).last {
-                matchedNSRange = last.range
-            } else if caretUTF16Location < documentNSRange.length {
-                // wrap: caret ... end の最後
-                let searchRangeAfterCaret = NSRange(location: caretUTF16Location,
-                                                    length: documentNSRange.length - caretUTF16Location)
-                matchedNSRange = regex.matches(in: documentString, options: [], range: searchRangeAfterCaret).last?.range
-            }
-        }
-        
-        // ヒットなし
-        guard
-            let nsRange = matchedNSRange,
-            nsRange.length > 0,
-            let stringRange = Range(nsRange, in: documentString)
-        else {
-            NSSound.beep(); return
-        }
-        
-        // UTF-16(NSRange) → 文字インデックス（Int）
-        let lowerIndex = documentString.distance(from: documentString.startIndex, to: stringRange.lowerBound)
-        let upperIndex = documentString.distance(from: documentString.startIndex, to: stringRange.upperBound)
-        
-        selectionRange = lowerIndex..<upperIndex
-        updateCaretPosition()
-        scrollCaretToVisible()
-        needsDisplay = true
-    }
-     */
-
-        // MARK: - Notifications (そのまま保持)
+    // MARK: - Notifications
 
     @objc private func windowBecameKey(_ notification: Notification) {
         // updateActiveState()
+        _caretView.isHidden = false
     }
 
     @objc private func windowResignedKey(_ notification: Notification) {
         // updateActiveState()
+        _caretView.isHidden = true
     }
 
     @objc private func clipViewBoundsDidChange(_ notification: Notification) {
