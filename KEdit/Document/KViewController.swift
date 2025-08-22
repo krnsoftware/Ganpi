@@ -252,7 +252,8 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         if doc.syntaxType != ty {
             doc.syntaxType = ty
             let textStorage = doc.textStorage
-            textStorage.parser = ty.makeParser(storage: textStorage)
+            //textStorage.parser = ty.makeParser(storage: textStorage)
+            textStorage.replaceParser(for: ty)
             
             updateStatusBar()
         }

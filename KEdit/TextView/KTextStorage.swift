@@ -53,7 +53,7 @@ protocol KTextStorageCommon: AnyObject {
 protocol KTextStorageReadable: KTextStorageCommon {
     var string: String { get }
     var skeletonString: KSkeletonStringInUTF8 { get }
-    var parser: KSyntaxParserProtocol { get }
+    //var parser: KSyntaxParserProtocol { get }
     var hardLineCount: Int { get } // if _character is empty, return 1. if end of chars is '\n', add 1.
     var invisibleCharacters: KInvisibleCharacters? { get }
     var spaceAdvance: CGFloat { get }
@@ -282,7 +282,7 @@ final class KTextStorage: KTextStorageProtocol {
         return newCache
     }
     
-    var parser: KSyntaxParserProtocol {
+    private var parser: KSyntaxParserProtocol {
         get { _parser }
         set {
             _parser = newValue
@@ -633,6 +633,10 @@ final class KTextStorage: KTextStorageProtocol {
         return (lineNo, columnNo)
     }
 
+    
+    func replaceParser(for type: KSyntaxType) {
+        parser = type.makeParser(storage: self)
+    }
     
     
     // MARK: - Private

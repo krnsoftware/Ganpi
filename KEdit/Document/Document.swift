@@ -37,9 +37,8 @@ class Document: NSDocument {
     
     override init() {
         super.init()
-        // Add your subclass-specific initialization here.
         
-        _textStorage.parser = _syntaxType.makeParser(storage: _textStorage)
+        textStorage.replaceParser(for: _syntaxType)
         
     }
 
@@ -55,28 +54,28 @@ class Document: NSDocument {
     
     
     override func makeWindowControllers() {
-        let wc = NSWindowController(windowNibName: "Document")
-        addWindowController(wc)
+        let windowController = NSWindowController(windowNibName: "Document")
+        addWindowController(windowController)
 
-        _ = wc.window                                // NIB をここでロード
-        wc.contentViewController = KViewController() // 中身はここで決定
+        _ = windowController.window                                // NIB をここでロード
+        windowController.contentViewController = KViewController() // 中身はここで決定
 
         // ① フレームの自動保存名（次回からはこのサイズで開く）
-        wc.windowFrameAutosaveName = "KEditDocumentWindow"
+        windowController.windowFrameAutosaveName = "KEditDocumentWindow"
 
         // ② 初回だけのデフォルトサイズ（自動保存がまだ無い場合）
         if UserDefaults.standard.string(forKey: "NSWindow Frame KEditDocumentWindow") == nil {
-            wc.window?.setContentSize(NSSize(width: 720, height: 520))
-            wc.window?.center()
+            windowController.window?.setContentSize(NSSize(width: 720, height: 520))
+            windowController.window?.center()
         }
 
         // ③ これ以下に縮まない下限（“豆粒ウインドウ”防止）
-        wc.window?.contentMinSize = NSSize(width: 480, height: 320)
+        windowController.window?.contentMinSize = NSSize(width: 480, height: 320)
 
-        wc.window?.isRestorable = false             // 復元は引き続き無効
+        windowController.window?.isRestorable = false             // 復元は引き続き無効
         
-        if let vc = wc.contentViewController as? KViewController {
-            vc.document = self
+        if let viewController = windowController.contentViewController as? KViewController {
+            viewController.document = self
         }
     }
     
@@ -93,28 +92,30 @@ class Document: NSDocument {
     
     override func read(from data: Data, ofType typeName: String) throws {
         
-        // 1) 文字コードの推定 → 文字列化
+        // 文字コードの推定 → 文字列化
         let encoding = String.estimateCharacterCode(from: data) ?? .utf8
-        guard let decoded = String(bytes: data, encoding: encoding) else {
+        guard let decodedString = String(bytes: data, encoding: encoding) else {
             throw NSError(domain: NSCocoaErrorDomain,
                           code: NSFileReadUnknownStringEncodingError,
                           userInfo: [NSLocalizedDescriptionKey: "Unsupported text encoding"])
         }
 
-        // 2) 改行の正規化（内部は常に LF）、最初に見つかった外部改行を記録
-        let norm = decoded.normalizeNewlinesAndDetect()
-        _characterCode = encoding
-        _returnCode = norm.detected ?? .lf   // 改行が無い場合は LF を既定
+        // 改行の正規化（内部は常に LF）、最初に見つかった外部改行を記録
+        let normalizedString = decodedString.normalizeNewlinesAndDetect()
+        characterCode = encoding
+        returnCode = normalizedString.detected ?? .lf   // 改行が無い場合は LF を既定
 
-        // 3) 本文を TextStorage へ投入（全文置換）
-        _textStorage.replaceString(in: 0..<_textStorage.count, with: norm.normalized)
+        // 本文を TextStorage へ投入（全文置換）
+        textStorage.replaceString(in: 0..<_textStorage.count, with: normalizedString.normalized)
+        
+        // シンタックスタイプを推定
+        let fileExt = fileURL?.pathExtension
+        syntaxType = KSyntaxType.detect(fromTypeName: typeName, orExtension: fileExt)
+        textStorage.replaceParser(for: syntaxType)
 
-        // 4) 読み込み完了（未変更状態へ）
+        // 読み込み完了（未変更状態へ）
         updateChangeCount(.changeCleared)
 
-        // （必要ならここで _syntaxType を typeName / 拡張子から推定して設定）
-        
-        //log("return code: \(_returnCode), character code: \(_characterCode)",from:self)
     }
 
 

@@ -17,10 +17,10 @@ struct AttributedSpan {
     let attributes: [NSAttributedString.Key: Any]
 }
 
-enum KSyntaxType: CaseIterable {
-    case plain
-    case ruby
-    case html
+enum KSyntaxType: String, CaseIterable {
+    case plain = "public.plain-text"
+    case ruby  = "public.ruby-script"
+    case html  = "public.html"
     
     func makeParser(storage:KTextStorageReadable) -> KSyntaxParserProtocol {
         switch self {
@@ -29,6 +29,36 @@ enum KSyntaxType: CaseIterable {
         default: return KSyntaxParserPlain(storage: storage) // 暫定。
         }
     }
+    
+    static func detect(fromTypeName typeName: String?, orExtension ext: String?) -> KSyntaxType {
+        // 1) typeName が UTI として一致するか
+        if let t = typeName, let known = KSyntaxType(rawValue: t) {
+            return known
+        }
+        
+        // 2) 拡張子から推定
+        if let e = ext?.lowercased() {
+            if let mapped = _extMap[e] {
+                return mapped
+            }
+        }
+        
+        // 3) デフォルトはプレーンテキスト
+        return .plain
+    }
+
+        /// 拡張子 → SyntaxType マップ
+    private static let _extMap: [String: KSyntaxType] = [
+            "txt": .plain,
+            "text": .plain,
+            "md": .plain,
+            "rb": .ruby,
+            "rake": .ruby,
+            "ru": .ruby,
+            "erb": .ruby,
+            "html": .html,
+            "htm": .html
+        ]
 }
 
 typealias FC = FuncChar
