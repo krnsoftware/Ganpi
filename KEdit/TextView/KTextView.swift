@@ -1553,6 +1553,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             }
             
             sendStatusBarUpdateAction()
+            sendEditedToDocument()
             
         case let .colorChanged(range):
             print("カラー変更: range = \(range)")
@@ -1657,6 +1658,11 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     private func sendStatusBarUpdateAction() {
         NSApp.sendAction(#selector(KStatusBarUpdateAction.statusBarNeedsUpdate(_:)),
+                                         to: nil, from: self)
+    }
+    
+    private func sendEditedToDocument() {
+        NSApp.sendAction(#selector(KTextStorageAction.textStorageDidEdit(_:)),
                                          to: nil, from: self)
     }
     

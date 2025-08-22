@@ -167,3 +167,14 @@ extension Document {
     }
 }
 
+
+@objc protocol KTextStorageAction {
+    @objc func textStorageDidEdit(_ sender: Any?)
+}
+
+extension Document: KTextStorageAction {
+    @IBAction func textStorageDidEdit(_ sender: Any?) {
+        updateChangeCount(.changeDone)
+    }
+}
+
