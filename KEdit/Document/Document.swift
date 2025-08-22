@@ -83,9 +83,46 @@ class Document: NSDocument {
     
 
     override func data(ofType typeName: String) throws -> Data {
-        // Insert code here to write your document to data of the specified type, throwing an error in case of failure.
-        // Alternatively, you could remove this method and override fileWrapper(ofType:), write(to:ofType:), or write(to:ofType:for:originalContentsURL:) instead.
-        throw NSError(domain: NSOSStatusErrorDomain, code: unimpErr, userInfo: nil)
+        let string = _textStorage.string
+        
+        let converted: String
+        switch returnCode {
+        case .lf:
+            converted = string
+        case .crlf:
+            converted = string.replacingOccurrences(of: "\n", with: "\r\n")
+        case .cr:
+            converted = string.replacingOccurrences(of: "\n", with: "\r")
+        }
+        
+        if let data = converted.data(using: characterCode) {
+            return data
+        }
+        
+        let err = NSError(
+                domain: NSCocoaErrorDomain,
+                code: NSFileWriteInapplicableStringEncodingError,
+                userInfo: [
+                    NSLocalizedDescriptionKey: "選択された文字コードでは保存できません。",
+                    NSLocalizedRecoverySuggestionErrorKey: "別の文字コードを選んで再度保存してください。"
+                ]
+            )
+        throw err
+        
+        /*guard let data = converted.data(using: characterCode) else {
+            let alert = NSAlert()
+            alert.messageText = "保存できません"
+            alert.informativeText = "文字コード \(characterCode) では変換できない文字が含まれています。"
+            alert.alertStyle = .critical
+            alert.runModal()
+            
+            throw NSError(domain: NSCocoaErrorDomain,
+                          code: NSFileWriteInapplicableStringEncodingError,
+                          userInfo: [NSLocalizedDescriptionKey:
+                                       "Encoding failed with \(characterCode)"])
+        }
+        
+        return data*/
     }
 
     

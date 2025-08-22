@@ -360,8 +360,8 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
     private func humanReadableEncoding(_ enc: String.Encoding) -> String {
         switch enc {
         case .utf8: return "UTF-8"
-        case .utf16: return "UTF-16"
-        case .utf32: return "UTF-32"
+        case .utf16, .utf16BigEndian, .utf16LittleEndian: return "UTF-16"
+        case .utf32, .utf32BigEndian, .utf32LittleEndian: return "UTF-32"
         case .shiftJIS: return "Shift_JIS"
         case .japaneseEUC: return "EUC-JP"
         case .iso2022JP: return "ISO-2022-JP"
