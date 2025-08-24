@@ -109,20 +109,7 @@ class Document: NSDocument {
             )
         throw err
         
-        /*guard let data = converted.data(using: characterCode) else {
-            let alert = NSAlert()
-            alert.messageText = "保存できません"
-            alert.informativeText = "文字コード \(characterCode) では変換できない文字が含まれています。"
-            alert.alertStyle = .critical
-            alert.runModal()
-            
-            throw NSError(domain: NSCocoaErrorDomain,
-                          code: NSFileWriteInapplicableStringEncodingError,
-                          userInfo: [NSLocalizedDescriptionKey:
-                                       "Encoding failed with \(characterCode)"])
-        }
         
-        return data*/
     }
 
     
@@ -155,6 +142,12 @@ class Document: NSDocument {
 
     }
 
+    override func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
+            if item.action == #selector(save(_:)) {
+                return isDocumentEdited // 編集されている時だけ有効
+            }
+            return super.validateUserInterfaceItem(item)
+        }
 
 }
 
