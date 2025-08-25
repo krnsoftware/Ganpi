@@ -81,7 +81,7 @@ class Document: NSDocument {
     
     
     
-
+/*
     override func data(ofType typeName: String) throws -> Data {
         let string = _textStorage.string
         
@@ -111,26 +111,76 @@ class Document: NSDocument {
         
         
     }
-
+*/
+    
+    override func write(to url:URL, ofType typeName: String) throws {
+        let string = textStorage.string
+        
+        let convertedString: String
+        switch returnCode {
+        case .lf:
+            convertedString = string
+        case .cr:
+            convertedString = string.replacingOccurrences(of: "\n", with: "\r")
+        case .crlf:
+            convertedString = string.replacingOccurrences(of: "\n", with: "\r\n")
+        }
+        
+        if let data = convertedString.data(using: characterCode, allowLossyConversion: false) {
+            try data.write(to:url, options: .atomic)
+            return
+        }
+        
+        if let first = convertedString.unicodeScalars.first {
+            log("First char U+\(String(format: "%04X", first.value))",from:self)
+        }
+        
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "The selected encoding cannot represent some characters in this document."
+        alert.informativeText = "If you choose to save with substitution, characters that cannot be converted will be replaced with alternative symbols."
+        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: "Save with Substitution")
+        
+        let res = alert.runModal()
+        if res == .alertSecondButtonReturn {
+            guard let lossyData = convertedString.data(using: characterCode, allowLossyConversion: true) else {
+                throw NSError(domain: NSCocoaErrorDomain, code: NSFileWriteInapplicableStringEncodingError, userInfo: [NSLocalizedDescriptionKey: "Failed to save with substitution."])
+            }
+            try lossyData.write(to:url, options: .atomic)
+            return
+        } else {
+            throw NSError(domain: NSCocoaErrorDomain, code: NSUserCancelledError, userInfo: nil)
+        }
+        
+    }
     
     
     override func read(from data: Data, ofType typeName: String) throws {
         
         // 文字コードの推定 → 文字列化
         let encoding = String.estimateCharacterCode(from: data) ?? .utf8
-        guard let decodedString = String(bytes: data, encoding: encoding) else {
+        guard var decodedString = String(bytes: data, encoding: encoding) else {
             throw NSError(domain: NSCocoaErrorDomain,
                           code: NSFileReadUnknownStringEncodingError,
                           userInfo: [NSLocalizedDescriptionKey: "Unsupported text encoding"])
         }
-
+        
+        // 先頭にBOM(FEFF)がある場合は先頭一文字を落とす。
+        if decodedString.unicodeScalars.first == "\u{FEFF}" {
+            decodedString.removeFirst()
+            //log("BOM!",from:self)
+        }
+        
         // 改行の正規化（内部は常に LF）、最初に見つかった外部改行を記録
-        let normalizedString = decodedString.normalizeNewlinesAndDetect()
+        let normalizedInfo = decodedString.normalizeNewlinesAndDetect()
         characterCode = encoding
-        returnCode = normalizedString.detected ?? .lf   // 改行が無い場合は LF を既定
-
+        returnCode = normalizedInfo.detected ?? .lf   // 改行が無い場合は LF を既定
+        
+        let normalizedString = normalizedInfo.normalized
         // 本文を TextStorage へ投入（全文置換）
-        textStorage.replaceString(in: 0..<_textStorage.count, with: normalizedString.normalized)
+        textStorage.replaceString(in: 0..<_textStorage.count, with: normalizedString)
+        
         
         // シンタックスタイプを推定
         let fileExt = fileURL?.pathExtension
