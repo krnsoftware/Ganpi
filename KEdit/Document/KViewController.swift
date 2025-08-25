@@ -234,6 +234,7 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         if doc.characterCode != enc {
             doc.characterCode = enc
             updateStatusBar()
+            doc.updateChangeCount(.changeDone)
         }
     }
 
@@ -243,6 +244,7 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         if doc.returnCode != eol {
             doc.returnCode = eol
             updateStatusBar()
+            doc.updateChangeCount(.changeDone)
         }
     }
 
@@ -362,9 +364,9 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         case .utf8: return "UTF-8"
         case .utf16, .utf16BigEndian, .utf16LittleEndian: return "UTF-16"
         case .utf32, .utf32BigEndian, .utf32LittleEndian: return "UTF-32"
-        case .shiftJIS: return "Shift_JIS"
-        case .japaneseEUC: return "EUC-JP"
-        case .iso2022JP: return "ISO-2022-JP"
+        case .shiftJIS: return "SJIS"
+        case .japaneseEUC: return "EUC"
+        case .iso2022JP: return "JIS"
         default: return enc.description // 最低限のフォールバック
         }
     }
