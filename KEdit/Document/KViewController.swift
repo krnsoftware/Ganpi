@@ -328,7 +328,9 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
 
     private func ensureSecondPane(orientation: Orientation) {
         guard let sv = _splitView, _panes.count == 1, let ts = _document?.textStorage else { return }
-
+        guard let firstContainer = _splitView?.arrangedSubviews.first else { return }
+        guard let firstTextView = (firstContainer as? KTextViewContainerView)?.textView else { return }
+        
         sv.isVertical = (orientation == .vertical)
 
         let second = KTextViewContainerView(frame: sv.bounds, textStorageRef: ts)
@@ -338,6 +340,12 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         _panes.append(second)
         sv.addSubview(second)
         sv.adjustSubviews()
+        
+        // adjust settings.
+        second.textView.autoIndent = firstTextView.autoIndent
+        second.textView.wordWrap = firstTextView.wordWrap
+        second.textView.showInvisibleCharacters = firstTextView.showInvisibleCharacters
+        second.textView.showLineNumbers = firstTextView.showLineNumbers
 
         // 半分位置へ（任意）
         let mid: CGFloat = sv.isVertical ? sv.bounds.width / 2 : sv.bounds.height / 2
