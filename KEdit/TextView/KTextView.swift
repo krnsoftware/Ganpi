@@ -119,6 +119,11 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
     }
     
+    var autoIndent: Bool {
+        get { _autoIndent }
+        set { _autoIndent = newValue }
+    }
+    
     var showLineNumbers: Bool {
         get { _showLineNumbers }
         set {

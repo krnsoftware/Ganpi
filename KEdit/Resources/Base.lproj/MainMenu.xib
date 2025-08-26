@@ -200,14 +200,26 @@
                         <items>
                             <menuItem title="Auto Indent" id="BWe-5L-7Yj">
                                 <modifierMask key="keyEquivalentModifierMask"/>
+                                <connections>
+                                    <action selector="toggleAutoIndent:" target="-1" id="DQp-L9-k2Y"/>
+                                </connections>
                             </menuItem>
                             <menuItem title="Word Wrap" keyEquivalent="d" id="OkT-8l-3Pk">
                                 <connections>
-                                    <action selector="toggleWordWrap:" target="-1" id="xB2-W3-DmZ"/>
+                                    <action selector="toggleWordWrap:" target="-1" id="X10-qA-MjQ"/>
                                 </connections>
                             </menuItem>
                             <menuItem title="Show Invisible Characters" id="btp-F5-fp2">
                                 <modifierMask key="keyEquivalentModifierMask"/>
+                                <connections>
+                                    <action selector="toggleShowInvisibleCharacters:" target="-1" id="u2m-Va-X0a"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Show Line Number" id="ZRQ-IC-eWg">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <connections>
+                                    <action selector="toggleShowLineNumbers:" target="-1" id="6mX-oC-1I2"/>
+                                </connections>
                             </menuItem>
                             <menuItem isSeparatorItem="YES" id="DCM-i9-Xef"/>
                             <menuItem title="Split Window" id="f9b-8c-NF8">

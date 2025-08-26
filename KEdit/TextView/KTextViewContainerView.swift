@@ -69,8 +69,8 @@ final class KTextViewContainerView: NSView {
     }
     
     private func _installOverlayIfNeeded() {
-        guard _overlay == nil,
-              let clip = _scrollView.contentView as? NSClipView else { return }
+        guard _overlay == nil else { return }
+        let clip = _scrollView.contentView
 
         let ov = KFocusOverlayView()
         ov.translatesAutoresizingMaskIntoConstraints = false

@@ -38,7 +38,7 @@ class Document: NSDocument {
     override init() {
         super.init()
         
-        textStorage.replaceParser(for: _syntaxType)
+        textStorage.replaceParser(for: syntaxType)
         
     }
 
@@ -79,39 +79,7 @@ class Document: NSDocument {
         }
     }
     
-    
-    
-/*
-    override func data(ofType typeName: String) throws -> Data {
-        let string = _textStorage.string
-        
-        let converted: String
-        switch returnCode {
-        case .lf:
-            converted = string
-        case .crlf:
-            converted = string.replacingOccurrences(of: "\n", with: "\r\n")
-        case .cr:
-            converted = string.replacingOccurrences(of: "\n", with: "\r")
-        }
-        
-        if let data = converted.data(using: characterCode) {
-            return data
-        }
-        
-        let err = NSError(
-                domain: NSCocoaErrorDomain,
-                code: NSFileWriteInapplicableStringEncodingError,
-                userInfo: [
-                    NSLocalizedDescriptionKey: "選択された文字コードでは保存できません。",
-                    NSLocalizedRecoverySuggestionErrorKey: "別の文字コードを選んで再度保存してください。"
-                ]
-            )
-        throw err
-        
-        
-    }
-*/
+
     
     override func write(to url:URL, ofType typeName: String) throws {
         let string = textStorage.string
