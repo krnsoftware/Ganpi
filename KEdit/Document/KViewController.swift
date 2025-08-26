@@ -31,7 +31,7 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
     private let _contentContainer = NSView()
     private let _statusBarView    = NSView()
 
-    // MARK: - Menu actions
+    // MARK: - Menu actions and others.
     @IBAction func splitVertically(_ sender: Any?)   { ensureSecondPane(orientation: .vertical) }
     @IBAction func splitHorizontally(_ sender: Any?) { ensureSecondPane(orientation: .horizontal) }
     @IBAction func removeSplit(_ sender: Any?)       { removeSecondPaneIfExists() }
@@ -57,6 +57,32 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
     @IBAction func toggleShowInvisibleCharacters(_ sender: Any?) {
         if let showInvisibleCharacters = textViews.first?.showInvisibleCharacters {
             textViews.forEach{ $0.showInvisibleCharacters = !showInvisibleCharacters }
+        }
+    }
+    
+    func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
+        guard let textView = textViews.first else { return true }
+        
+        switch item.action {
+        case #selector(toggleShowLineNumbers(_:)):
+            (item as? NSMenuItem)?.state = textView.showLineNumbers ? .on : .off
+            return true
+        case #selector(toggleWordWrap(_:)):
+            (item as? NSMenuItem)?.state = textView.wordWrap ? .on : .off
+            return true
+        case #selector(toggleShowInvisibleCharacters(_:)):
+            (item as? NSMenuItem)?.state = textView.showInvisibleCharacters ? .on : .off
+            return true
+        case #selector(toggleAutoIndent(_:)):
+            (item as? NSMenuItem)?.state = textView.autoIndent ? .on : .off
+            return true
+            
+        case #selector(splitVertically), #selector(splitHorizontally):
+            return _panes.count == 1 && _splitView != nil
+        case #selector(removeSplit):
+            return _panes.count == 2
+        default:
+            return true
         }
     }
 
@@ -347,7 +373,8 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         }
     }
 
-    // MARK: - Menu validation
+    // MARK: - Status Menu
+    /*
     func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
         switch item.action {
         case #selector(splitVertically), #selector(splitHorizontally):
@@ -357,7 +384,7 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         default:
             return true
         }
-    }
+    }*/
     
     
     

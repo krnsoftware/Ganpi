@@ -819,15 +819,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         selectionRange = 0..<_textStorageRef.count
         
     }
-    
 
-    
-    
-    // MARK: - Option Menu
-    
-    @IBAction func toggleWordWrap(_ sender: Any?) {
-        wordWrap = !wordWrap
-    }
     
     
     // MARK: - Deletion (NSResponder methods)
