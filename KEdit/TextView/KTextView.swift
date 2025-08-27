@@ -1561,13 +1561,13 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         updateCaretPosition()
         needsDisplay = true
     }
-/*
-    private func updateActiveState() {
-        let isActive = (window?.isKeyWindow == true) && (window?.firstResponder === self)
-        _caretView.isHidden = !isActive
-        needsDisplay = true
+
+    func loadSettings(from textView:KTextView) {
+        autoIndent = textView.autoIndent
+        wordWrap = textView.wordWrap
+        showInvisibleCharacters = textView.showInvisibleCharacters
+        showLineNumbers = textView.showLineNumbers
     }
-    */
     
     // 現在のところinternalとしているが、将来的に公開レベルを変更する可能性あり。
     func updateFrameSizeToFitContent() {

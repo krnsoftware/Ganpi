@@ -16,6 +16,7 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
     private var _splitView: KSplitView?
     private var _panes: [KTextViewContainerView] = []
     private var _needsConstruct: Bool = false
+    private var _syncOptions: Bool = true
     
     private let _dividerHitWidth: CGFloat = 5.0
     private let _statusBarHeight: CGFloat = 20//26
@@ -37,31 +38,52 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
     @IBAction func removeSplit(_ sender: Any?)       { removeSecondPaneIfExists() }
     
     @IBAction func toggleAutoIndent(_ sender: Any?) {
-        if let autoIndent = textViews.first?.autoIndent {
-            textViews.forEach{ $0.autoIndent = !autoIndent }
+        guard let activeTextView = activeTextView() else { log("activeTextView is nil.",from:self); return }
+        activeTextView.autoIndent = !activeTextView.autoIndent
+        if !syncOptions { return }
+        
+        textViews.forEach{
+            if $0 !== activeTextView { $0.autoIndent = activeTextView.autoIndent}
         }
     }
     
     @IBAction func toggleWordWrap(_ sender: Any?) {
-        if let wordWrap = textViews.first?.wordWrap {
-            textViews.forEach{ $0.wordWrap = !wordWrap }
+        guard let activeTextView = activeTextView() else { log("activeTextView is nil.",from:self); return }
+        activeTextView.wordWrap = !activeTextView.wordWrap
+        if !syncOptions { return }
+        
+        textViews.forEach{
+            if $0 !== activeTextView { $0.wordWrap = activeTextView.wordWrap}
         }
     }
     
     @IBAction func toggleShowLineNumbers(_ sender: Any?) {
-        if let showLineNumbers = textViews.first?.showLineNumbers {
-            textViews.forEach{ $0.showLineNumbers = !showLineNumbers }
+        guard let activeTextView = activeTextView() else { log("activeTextView is nil.",from:self); return }
+        activeTextView.showLineNumbers = !activeTextView.showLineNumbers
+        if !syncOptions { return }
+        
+        textViews.forEach{
+            if $0 !== activeTextView { $0.showLineNumbers = activeTextView.showLineNumbers}
         }
     }
     
     @IBAction func toggleShowInvisibleCharacters(_ sender: Any?) {
-        if let showInvisibleCharacters = textViews.first?.showInvisibleCharacters {
-            textViews.forEach{ $0.showInvisibleCharacters = !showInvisibleCharacters }
+        guard let activeTextView = activeTextView() else { log("activeTextView is nil.",from:self); return }
+        activeTextView.showInvisibleCharacters = !activeTextView.showInvisibleCharacters
+        if !syncOptions { return }
+        
+        textViews.forEach{
+            if $0 !== activeTextView { $0.showInvisibleCharacters = activeTextView.showInvisibleCharacters}
         }
     }
     
+    @IBAction func toggleSyncOptions(_ sender: Any?) {
+        syncOptions = !syncOptions
+    }
+    
     func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
-        guard let textView = textViews.first else { return true }
+        //guard let textView = textViews.first else { return true }
+        guard let textView = activeTextView() else { return true }
         
         switch item.action {
         case #selector(toggleShowLineNumbers(_:)):
@@ -75,6 +97,9 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
             return true
         case #selector(toggleAutoIndent(_:)):
             (item as? NSMenuItem)?.state = textView.autoIndent ? .on : .off
+            return true
+        case #selector(toggleSyncOptions(_:)):
+            (item as? NSMenuItem)?.state = syncOptions ? .on : .off
             return true
             
         case #selector(splitVertically), #selector(splitHorizontally):
@@ -95,6 +120,19 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
             _needsConstruct = true
             updateStatusBar()
             if isViewLoaded, _contentContainer.superview != nil { constructViews() }
+        }
+    }
+    
+    var syncOptions: Bool {
+        get { _syncOptions }
+        set { _syncOptions = newValue
+            if !_syncOptions { return }
+            
+            guard let activeTextView = activeTextView() else { log("activeTextView is nil.",from:self); return }
+
+            textViews.forEach{
+                if $0 !== activeTextView { $0.loadSettings(from: activeTextView)}
+            }
         }
     }
     
@@ -342,10 +380,7 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         sv.adjustSubviews()
         
         // adjust settings.
-        second.textView.autoIndent = firstTextView.autoIndent
-        second.textView.wordWrap = firstTextView.wordWrap
-        second.textView.showInvisibleCharacters = firstTextView.showInvisibleCharacters
-        second.textView.showLineNumbers = firstTextView.showLineNumbers
+        second.textView.loadSettings(from: firstTextView)
 
         // 半分位置へ（任意）
         let mid: CGFloat = sv.isVertical ? sv.bounds.width / 2 : sv.bounds.height / 2
@@ -426,7 +461,15 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
     }
 
     private func activeTextView() -> KTextView? {
-        if let tv = view.window?.firstResponder as? KTextView { return tv }
+        //if let tv = view.window?.firstResponder as? KTextView { return tv }
+        
+        guard let window = view.window else { return nil}
+        
+        for view in textViews {
+            //log("window.firstResponder: \(String(describing: window.firstResponder)), view: \(view)",from:self)
+            if window.firstResponder === view { return view }
+        }
+        //log("no textview",from:self)
         return _panes.first?.textView
     }
 

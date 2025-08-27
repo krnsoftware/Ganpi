@@ -244,6 +244,13 @@
                                                 <action selector="removeSplit:" target="-1" id="HL7-er-Amy"/>
                                             </connections>
                                         </menuItem>
+                                        <menuItem isSeparatorItem="YES" id="QiD-cD-3gC"/>
+                                        <menuItem title="Sync Options" id="cI0-fj-xaD">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="toggleSyncOptions:" target="-1" id="EsM-hn-tY8"/>
+                                            </connections>
+                                        </menuItem>
                                     </items>
                                 </menu>
                             </menuItem>
