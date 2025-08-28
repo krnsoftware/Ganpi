@@ -1571,6 +1571,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         wordWrap = textView.wordWrap
         showInvisibleCharacters = textView.showInvisibleCharacters
         showLineNumbers = textView.showLineNumbers
+        
+        layoutManager.lineSpacing = textView.layoutManager.lineSpacing
     }
     
     // 現在のところinternalとしているが、将来的に公開レベルを変更する可能性あり。
