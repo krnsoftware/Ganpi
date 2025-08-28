@@ -43,7 +43,7 @@ class Document: NSDocument {
     }
 
     override class var autosavesInPlace: Bool {
-        return true
+        return false
     }
 
     override var windowNibName: NSNib.Name? {
@@ -134,6 +134,15 @@ class Document: NSDocument {
                           userInfo: [NSLocalizedDescriptionKey: "Unsupported text encoding"])
         }
         
+        // test
+        /*
+        for (i, scalar) in decodedString.unicodeScalars.enumerated() {
+            if scalar.value < 0x20 || scalar.value == 0xFEFF {
+                log("index \(i): U+\(String(format: "%04X", scalar.value))",from:self)
+            }
+            if i > 100 { break }
+        }*/
+        
         // 先頭にBOM(FEFF)がある場合は先頭一文字を落とす。
         if decodedString.unicodeScalars.first == "\u{FEFF}" {
             decodedString.removeFirst()
@@ -146,6 +155,7 @@ class Document: NSDocument {
         returnCode = normalizedInfo.detected ?? .lf   // 改行が無い場合は LF を既定
         
         let normalizedString = normalizedInfo.normalized
+        
         // 本文を TextStorage へ投入（全文置換）
         textStorage.replaceString(in: 0..<_textStorage.count, with: normalizedString)
         

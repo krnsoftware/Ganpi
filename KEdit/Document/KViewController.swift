@@ -81,6 +81,34 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         syncOptions = !syncOptions
     }
     
+    @IBAction func increaseLineSpacing(_ sender: Any?) {
+        guard let activeTextView = activeTextView() else { log("activeTextView is nil.",from:self); return }
+        
+        let spacing = activeTextView.layoutManager.lineSpacing
+        activeTextView.layoutManager.lineSpacing = spacing + 1.0
+        
+        if !syncOptions { return }
+        
+        textViews.forEach{
+            if $0 !== activeTextView { $0.layoutManager.lineSpacing = activeTextView.layoutManager.lineSpacing }
+        }
+    }
+    
+    @IBAction func decreaseLineSpacing(_ sender: Any?) {
+        guard let activeTextView = activeTextView() else { log("activeTextView is nil.",from:self); return }
+        
+        let spacing = activeTextView.layoutManager.lineSpacing
+        if spacing <= 1 { return }
+        
+        activeTextView.layoutManager.lineSpacing = spacing - 1.0
+        
+        if !syncOptions { return }
+        
+        textViews.forEach{
+            if $0 !== activeTextView { $0.layoutManager.lineSpacing = activeTextView.layoutManager.lineSpacing }
+        }
+    }
+    
     func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
         //guard let textView = textViews.first else { return true }
         guard let textView = activeTextView() else { return true }

@@ -38,7 +38,7 @@ extension KTextView {
         search(for: .forward)
     }
     
-    // MARK: - Font Size and Line Spacing actions
+    // MARK: - Font Size
     
     @IBAction func increaseFontSize(_ sender: Any?) {
         if let storage = textStorage as? KTextStorage {
@@ -53,17 +53,7 @@ extension KTextView {
         }
     }
     
-    @IBAction func increaseLineSpacing(_ sender: Any?) {
-        let spacing = layoutManager.lineSpacing
-        layoutManager.lineSpacing = spacing + 1.0
-    }
     
-    @IBAction func decreaseLineSpacing(_ sender: Any?) {
-        let spacing = layoutManager.lineSpacing
-        if spacing >= 1.0 {
-            layoutManager.lineSpacing = spacing - 1.0
-        }
-    }
     
     // MARK: - Undo actions
     
