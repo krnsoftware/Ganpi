@@ -109,6 +109,42 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         }
     }
     
+    @IBAction func showLineSpacingSheet(_ sender: Any?) {
+        guard let activeTextView = activeTextView(),
+        let documentWindow = view.window else { log("activeTextView is nil.",from:self); return }
+        let layoutManager = activeTextView.layoutManager
+        
+        
+        KPrompt.number(title: "Line Spacing", message: "", defaultValue: Int(layoutManager.lineSpacing), min: 0, max: 10, in: documentWindow){ [weak self, weak activeTextView, weak documentWindow] value in
+            defer {
+                // ★ シート終了直後に必ずフォーカスを戻す
+                DispatchQueue.main.async {
+                    if let window = documentWindow,
+                       let textView = activeTextView {
+                        window.makeFirstResponder(textView)
+                    }
+                }
+            }
+            guard let self = self else { return }
+
+            if let spacing = value {
+                let spacingValue = CGFloat(spacing)
+                activeTextView?.layoutManager.lineSpacing = spacingValue
+                if self.syncOptions {
+                    self.textViews.forEach {
+                        if $0 !== activeTextView {
+                            $0.layoutManager.lineSpacing = spacingValue
+                        }
+                    }
+                }
+            } else {
+                NSSound.beep()
+            }
+        }
+        
+    }
+    
+    
     func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
         //guard let textView = textViews.first else { return true }
         guard let textView = activeTextView() else { return true }
@@ -528,6 +564,9 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         default:     return "\(t)"
         }
     }
+    
+    
+    
 
     
 }

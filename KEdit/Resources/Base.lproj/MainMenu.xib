@@ -268,8 +268,11 @@
                                                 <action selector="decreaseFontSize:" target="-1" id="pVs-WC-xHa"/>
                                             </connections>
                                         </menuItem>
-                                        <menuItem title="Set Font Size..." id="beR-mv-b7K">
+                                        <menuItem title="Font Size..." id="beR-mv-b7K">
                                             <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="showFontSizeSheet:" target="-1" id="Yvr-5n-Xz6"/>
+                                            </connections>
                                         </menuItem>
                                     </items>
                                 </menu>
@@ -290,8 +293,11 @@
                                                 <action selector="decreaseLineSpacing:" target="-1" id="aIt-rD-c4H"/>
                                             </connections>
                                         </menuItem>
-                                        <menuItem title="Set Line Spacing..." id="mBo-ya-UsY">
+                                        <menuItem title="Line Spacing..." id="mBo-ya-UsY">
                                             <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="showLineSpacingSheet:" target="-1" id="tQ0-g3-OpM"/>
+                                            </connections>
                                         </menuItem>
                                     </items>
                                 </menu>

@@ -1345,7 +1345,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
 
     @objc private func windowBecameKey(_ notification: Notification) {
         // updateActiveState()
-        _caretView.isHidden = false
+        //_caretView.isHidden = false
+        _caretView.isHidden = (window?.firstResponder !== self)
     }
 
     @objc private func windowResignedKey(_ notification: Notification) {
@@ -1739,5 +1740,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         NSGraphicsContext.restoreGraphicsState()
     }
 
+    
+    
+    
 }
 
