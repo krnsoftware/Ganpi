@@ -119,6 +119,7 @@ final class KLayoutManager: KLayoutManagerReadable {
                 self.rebuildLayout(reason: .charactersChanged(info: info))
                 self.textView?.textStorageDidModify(note)
             case .colorChanged(let range):
+                self.rebuildLayout(reason: .destructiveChange)
                 self.textView?.textStorageDidModify(.colorChanged(range: 0..<_textStorageRef.count))
             }
         }
@@ -148,10 +149,10 @@ final class KLayoutManager: KLayoutManagerReadable {
         
         switch reason {
         case .charactersChanged(let info):
-            let timer = KTimeChecker(name:"rebuidLayout/_lines.rebuildLines()")
-            timer.start()
+            //let timer = KTimeChecker(name:"rebuidLayout/_lines.rebuildLines()")
+            //timer.start()
             _lines.rebuildLines(with: info)
-            timer.stop()
+            //timer.stop()
         case .attributesChanged:
             log("attributedChanged?", from:self)
         case .destructiveChange:

@@ -9,6 +9,7 @@ import AppKit
 
 extension KTextView {
     
+    // MARK: - Search actions
     
     @IBAction func setSearchStringWithSelectedString(_ sender: Any?) {
         if selectionRange.isEmpty { NSSound.beep(); return }
@@ -37,7 +38,22 @@ extension KTextView {
         search(for: .forward)
     }
     
-    // MARK: - Undo action
+    // MARK: - Font Size and Line Spacing actions
+    
+    @IBAction func fontSizeUp(_ sender: Any?) {
+        if let storage = textStorage as? KTextStorage {
+            storage.fontSize = storage.fontSize + 1
+        }
+    }
+    
+    @IBAction func fontSizeDown(_ sender: Any?) {
+        if let storage = textStorage as? KTextStorage {
+            if storage.fontSize <= 5 { return }
+            storage.fontSize = storage.fontSize - 1
+        }
+    }
+    
+    // MARK: - Undo actions
     
     @IBAction func undo(_ sender: Any?) {
         textStorage.undo()
