@@ -258,17 +258,39 @@
                                 <modifierMask key="keyEquivalentModifierMask"/>
                                 <menu key="submenu" id="Bgz-Tl-Fcm">
                                     <items>
-                                        <menuItem title="Font Size Up" keyEquivalent="=" id="fJk-qh-sEz">
+                                        <menuItem title="Increase Font Size" keyEquivalent="=" id="fJk-qh-sEz">
                                             <connections>
-                                                <action selector="fontSizeUp:" target="-1" id="0t3-Hm-8gX"/>
+                                                <action selector="increaseFontSize:" target="-1" id="1L4-MO-THT"/>
                                             </connections>
                                         </menuItem>
-                                        <menuItem title="Font Size Down" keyEquivalent="-" id="0KG-C0-x3b">
+                                        <menuItem title="Decrease Font Size" keyEquivalent="-" id="0KG-C0-x3b">
                                             <connections>
-                                                <action selector="fontSizeDown:" target="-1" id="cCQ-oH-uCO"/>
+                                                <action selector="decreaseFontSize:" target="-1" id="pVs-WC-xHa"/>
                                             </connections>
                                         </menuItem>
-                                        <menuItem title="Set Font SIze..." id="beR-mv-b7K">
+                                        <menuItem title="Set Font Size..." id="beR-mv-b7K">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                        </menuItem>
+                                    </items>
+                                </menu>
+                            </menuItem>
+                            <menuItem title="Line Spacing" id="Xa3-f0-LzM">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <menu key="submenu" id="kr2-TX-Ahv">
+                                    <items>
+                                        <menuItem title="Increase Line Spacing" keyEquivalent="+" id="MhV-Jx-YxO">
+                                            <modifierMask key="keyEquivalentModifierMask" shift="YES" command="YES"/>
+                                            <connections>
+                                                <action selector="increaseLineSpacing:" target="-1" id="1Un-wO-er8"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Decrease Line Spacing" keyEquivalent="_" id="MZG-nV-k4D">
+                                            <modifierMask key="keyEquivalentModifierMask" shift="YES" command="YES"/>
+                                            <connections>
+                                                <action selector="decreaseLineSpacing:" target="-1" id="aIt-rD-c4H"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Set Line Spacing..." id="mBo-ya-UsY">
                                             <modifierMask key="keyEquivalentModifierMask"/>
                                         </menuItem>
                                     </items>

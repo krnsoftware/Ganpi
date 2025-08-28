@@ -49,13 +49,22 @@ final class KLayoutManager: KLayoutManagerReadable {
     
     private var _prevLineNumberRegionWidth: CGFloat = 0
     
+    private var _lineSpacing: CGFloat = 2.0
+    
     // 表示される行をまとめるKLinesクラスインスタンス。
     private lazy var _lines: KLines = {
         return KLines(layoutManager: self, textStorageRef: _textStorageRef)
     }()
     
     // 行間設定。
-    var lineSpacing: CGFloat = 2.0
+    //var lineSpacing: CGFloat = 2.0
+    var lineSpacing: CGFloat {
+        get { _lineSpacing }
+        set {
+            _lineSpacing = newValue
+            textView?.textStorageDidModify(.colorChanged(range: 0..<_textStorageRef.count))
+        }
+    }
     
     var lineHeight: CGFloat {
         let font = _textStorageRef.baseFont

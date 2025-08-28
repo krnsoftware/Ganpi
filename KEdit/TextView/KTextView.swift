@@ -101,6 +101,10 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         return _textStorageRef
     }
     
+    var layoutManager: KLayoutManager {
+        return _layoutManager
+    }
+    
     var caretIndex: Int {
         get { selectionRange.upperBound }
         set { selectionRange = newValue..<newValue }
