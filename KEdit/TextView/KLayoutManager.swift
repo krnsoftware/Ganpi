@@ -17,7 +17,7 @@ protocol KLayoutManagerReadable: AnyObject {
     var lineSpacing: CGFloat { get }
     var maxLineWidth: CGFloat { get }
     
-    func makeLayoutRects() -> LayoutRects?
+    func makeLayoutRects() -> KLayoutRects?
     func makeEmptyLine(index: Int, hardLineIndex: Int) -> KLine
     func makeLines(range: Range<Int>, hardLineIndex: Int, width: CGFloat?) -> [KLine]?
     func makeFakeLines(from attributedString: NSAttributedString,hardLineIndex: Int, width: CGFloat?) -> [KFakeLine]
@@ -223,10 +223,10 @@ final class KLayoutManager: KLayoutManagerReadable {
     
     
     // 現在のLayoutRectsを生成する。専らTextViewから呼び出される。
-    func makeLayoutRects() -> LayoutRects? {
+    func makeLayoutRects() -> KLayoutRects? {
         guard let textView = _textView else { log("textView = nil", from:self); return nil }
         
-        return LayoutRects(
+        return KLayoutRects(
             layoutManagerRef: self,
             textStorageRef: _textStorageRef,
             visibleRect: textView.visibleRect,

@@ -9,25 +9,25 @@
 import AppKit
 
 
-struct LayoutRects {
+struct KLayoutRects {
     struct Region {
         let rect: CGRect
     }
     
-    struct TextEdgeInsets {
+    struct KTextEdgeInsets {
         let top: CGFloat
         let left: CGFloat
         let bottom: CGFloat
         let right: CGFloat
         
-        static let `default` = TextEdgeInsets(top: 8, left: 8, bottom: 8, right: 8)
+        static let `default` = KTextEdgeInsets(top: 8, left: 8, bottom: 8, right: 8)
     }
     
-    struct LineNumberEdgeInsets {
+    struct KLineNumberEdgeInsets {
         let left: CGFloat
         let right: CGFloat
         
-        static let `default` = LineNumberEdgeInsets(left: 10, right: 10)
+        static let `default` = KLineNumberEdgeInsets(left: 10, right: 10)
     }
     
     //private let _bounds: CGRect
@@ -43,7 +43,7 @@ struct LayoutRects {
     let lineNumberRegion: Region?
     let showLineNumbers: Bool
     let wordWrap: Bool
-    let textEdgeInsets: TextEdgeInsets
+    let textEdgeInsets: KTextEdgeInsets
     
 
     // テキスト表示の右方向のオフセット
@@ -60,8 +60,7 @@ struct LayoutRects {
     }
     
     
-    init(layoutManagerRef: KLayoutManagerReadable, textStorageRef: KTextStorageReadable, visibleRect: CGRect, showLineNumbers: Bool, wordWrap: Bool, textEdgeInsets: TextEdgeInsets = .default) {
-        //_bounds = bounds
+    init(layoutManagerRef: KLayoutManagerReadable, textStorageRef: KTextStorageReadable, visibleRect: CGRect, showLineNumbers: Bool, wordWrap: Bool, textEdgeInsets: KTextEdgeInsets = .default) {
         _visibleRect = visibleRect
         _layoutManagerRef = layoutManagerRef
         _textStorageRef = textStorageRef
@@ -75,7 +74,7 @@ struct LayoutRects {
         if let textStorage = _textStorageRef as? KTextStorage  {
             charWidth = textStorage.lineNumberCharacterMaxWidth
         }
-        let lineNumberWidth = CGFloat(digitCount) * charWidth + LineNumberEdgeInsets.default.left + LineNumberEdgeInsets.default.right
+        let lineNumberWidth = CGFloat(digitCount) * charWidth + KLineNumberEdgeInsets.default.left + KLineNumberEdgeInsets.default.right
         
         let lineNumberRect: CGRect? = showLineNumbers ?
         CGRect(x: visibleRect.origin.x, y: visibleRect.origin.y, width: lineNumberWidth, height: visibleRect.height) :
@@ -124,16 +123,16 @@ struct LayoutRects {
             
             // TextRegion内でLineに含まれる場合
             if 0 <= lineIndex && lineIndex < lineCount {
-                guard let line = lines[lineIndex] else { print("\(#function) - invalid lineIndex \(lineIndex)"); return .outside}
-                guard let ctLine = line.ctLine else { print("regionType - invalid line") ; return .outside }
+                guard let line = lines[lineIndex] else { log("invalid lineIndex \(lineIndex)"); return .outside}
                 let relativeX = max(0, relativePoint.x)
-                let utf16Index = CTLineGetStringIndexForPosition(ctLine, CGPoint(x: relativeX, y: 0))
-                let string = String(textStorageRef.characterSlice[line.range])
-                let indexInLine = characterIndex(fromUTF16Offset: utf16Index, in: string) ?? 0
                 
-                // CTLineGetStringIndexForPosition()は、ドキュメントにはないが、空行の場合に-1を返す仕様らしい。
-                // 空行の場合はindexは0で問題ないことから、-1の場合には0を返す。
-                return .text(index: line.range.lowerBound + (indexInLine >= 0 ? indexInLine : 0))
+                var indexInLine = 0
+                if !line.range.isEmpty {
+                    let edges = line.characterOffsets()
+                    indexInLine = characterIndex(for: relativeX, edges: edges)
+                }
+                
+                return .text(index: line.range.lowerBound + indexInLine)
                 
             } else {
                 // 1行目より上の場合は0を、下の場合は文末のindexを返す。
@@ -148,18 +147,34 @@ struct LayoutRects {
 
         return .outside
     }
+    
+    
+    // relativeX: 行左端=0基準のクリックX
+    // edges: 各文字の左端 + 行末の終端オフセット（count = 文字数 + 1）
+    // 戻り値: caret を置く index（0...文字数）
+    @inline(__always)
+    private func characterIndex(for relativeX: CGFloat, edges: [CGFloat]) -> Int {
+        // 空行（edges==[0] 想定）
+        guard edges.count >= 2 else { return 0 }
 
-    // 与えられた `string` において、UTF16オフセットから Character インデックス（0ベース）を返す。
-    // 存在しないオフセットの場合は nil。
-    private func characterIndex(fromUTF16Offset utf16Index: Int, in string: String) -> Int? {
-        // UTF16オフセットから String.Index を生成
-        guard let stringIndex = string.utf16.index(string.utf16.startIndex, offsetBy: utf16Index, limitedBy: string.utf16.endIndex),
-              stringIndex <= string.utf16.endIndex else {
-            return nil
+        let n = edges.count - 1 // 文字数
+        let x = max(0, relativeX)
+
+        // 端点ケア
+        if x <= edges[0] { return 0 }
+        if x >= edges[n] { return n }
+
+        // 区間 [lo, lo+1) を二分探索で特定（edges[lo] <= x < edges[lo+1]）
+        var lo = 0, hi = n
+        while lo + 1 < hi {
+            let mid = (lo + hi) >> 1
+            if x < edges[mid] { hi = mid } else { lo = mid }
         }
 
-        let characterIndex = string.distance(from: string.startIndex, to: String.Index(stringIndex, within: string)!)
-        return characterIndex
+        // 左75%なら lo、その右25%なら lo+1
+        let left = edges[lo], right = edges[lo + 1]
+        let threshold = left + (right - left) * 0.75
+        return (x < threshold) ? lo : (lo + 1)
     }
     
 }
