@@ -8,10 +8,14 @@
 import Cocoa
 
 class Document: NSDocument {
+    private static var lastCascadeTopLeft: NSPoint?
+    private let _defaultWindowSize = NSSize(width: 600, height: 800)
+    private let _windowMinimumSize = NSSize(width: 480, height: 320)
     
     private var _characterCode: String.Encoding = .utf32
     private var _returnCode: String.ReturnCharacter = .lf
     private var _syntaxType: KSyntaxType = .plain
+    
     
     private var _textStorage: KTextStorage = .init()
     
@@ -41,45 +45,94 @@ class Document: NSDocument {
         textStorage.replaceParser(for: syntaxType)
         
     }
-
+    
     override class var autosavesInPlace: Bool {
         return false
     }
-
+    
     override var windowNibName: NSNib.Name? {
         // Returns the nib file name of the document
         // If you need to use a subclass of NSWindowController or if your document supports multiple NSWindowControllers, you should remove this property and override -makeWindowControllers instead.
         return NSNib.Name("Document")
     }
     
-    
     override func makeWindowControllers() {
-        let windowController = NSWindowController(windowNibName: "Document")
-        addWindowController(windowController)
+        let wc = NSWindowController(windowNibName: "Document")
+        addWindowController(wc)
+        _ = wc.window
+        guard let window = wc.window else { return }
 
-        _ = windowController.window                                // NIB をここでロード
-        windowController.contentViewController = KViewController() // 中身はここで決定
+        // 下限サイズと復元無効（書類復元ではなく自前制御）
+        window.contentMinSize = _windowMinimumSize
+        window.isRestorable = false
 
-        // ① フレームの自動保存名（次回からはこのサイズで開く）
-        windowController.windowFrameAutosaveName = "KEditDocumentWindow"
-
-        // ② 初回だけのデフォルトサイズ（自動保存がまだ無い場合）
-        if UserDefaults.standard.string(forKey: "NSWindow Frame KEditDocumentWindow") == nil {
-            windowController.window?.setContentSize(NSSize(width: 720, height: 520))
-            windowController.window?.center()
+        // コンテンツ VC を差し込む（既に差さっていたら文書だけ渡す）
+        if let vc = window.contentViewController as? KViewController {
+            vc.document = self
+        } else {
+            let vc = KViewController()
+            vc.document = self
+            window.contentViewController = vc
         }
 
-        // ③ これ以下に縮まない下限（“豆粒ウインドウ”防止）
-        windowController.window?.contentMinSize = NSSize(width: 480, height: 320)
+        if let url = fileURL {
+            // 既存ファイル：ファイルごとにフレームを自動保存・復元
+            let autosaveName = "Ganpi:\(url.path)"
+            wc.windowFrameAutosaveName = autosaveName
 
-        windowController.window?.isRestorable = false             // 復元は引き続き無効
-        
-        if let viewController = windowController.contentViewController as? KViewController {
-            viewController.document = self
+            // まだ保存が無い最初のオープンだけはデフォルトで開く
+            let key = "NSWindow Frame \(autosaveName)"
+            if UserDefaults.standard.string(forKey: key) == nil {
+                window.setContentSize(_defaultWindowSize)
+                window.center()
+            }
+        } else {
+            // Untitled：autosave しない。新規はカスケードさせる
+            wc.windowFrameAutosaveName = ""
+            
+            window.setContentSize(_defaultWindowSize)
+            // 初回だけ種位置を作る（中央に出してから左上を記録）
+            if Document.lastCascadeTopLeft == nil {
+                window.center()
+                let f = window.frame
+                Document.lastCascadeTopLeft = NSPoint(x: f.minX, y: f.maxY)
+            }
+
+            // 直前の左上から少しずつ右下にずらす
+            if let start = Document.lastCascadeTopLeft {
+                Document.lastCascadeTopLeft = window.cascadeTopLeft(from: start)
+            }
         }
     }
     
-
+    /*
+     override func makeWindowControllers() {
+     let windowController = NSWindowController(windowNibName: "Document")
+     addWindowController(windowController)
+     
+     _ = windowController.window                                // NIB をここでロード
+     windowController.contentViewController = KViewController() // 中身はここで決定
+     
+     // ① フレームの自動保存名（次回からはこのサイズで開く）
+     windowController.windowFrameAutosaveName = "KEditDocumentWindow"
+     
+     // ② 初回だけのデフォルトサイズ（自動保存がまだ無い場合）
+     if UserDefaults.standard.string(forKey: "NSWindow Frame KEditDocumentWindow") == nil {
+     windowController.window?.setContentSize(NSSize(width: 720, height: 520))
+     windowController.window?.center()
+     }
+     
+     // ③ これ以下に縮まない下限（“豆粒ウインドウ”防止）
+     windowController.window?.contentMinSize = NSSize(width: 480, height: 320)
+     
+     windowController.window?.isRestorable = false             // 復元は引き続き無効
+     
+     if let viewController = windowController.contentViewController as? KViewController {
+     viewController.document = self
+     }
+     }
+     */
+    
     
     override func write(to url:URL, ofType typeName: String) throws {
         let string = textStorage.string
@@ -136,12 +189,12 @@ class Document: NSDocument {
         
         // test
         /*
-        for (i, scalar) in decodedString.unicodeScalars.enumerated() {
-            if scalar.value < 0x20 || scalar.value == 0xFEFF {
-                log("index \(i): U+\(String(format: "%04X", scalar.value))",from:self)
-            }
-            if i > 100 { break }
-        }*/
+         for (i, scalar) in decodedString.unicodeScalars.enumerated() {
+         if scalar.value < 0x20 || scalar.value == 0xFEFF {
+         log("index \(i): U+\(String(format: "%04X", scalar.value))",from:self)
+         }
+         if i > 100 { break }
+         }*/
         
         // 先頭にBOM(FEFF)がある場合は先頭一文字を落とす。
         if decodedString.unicodeScalars.first == "\u{FEFF}" {
@@ -164,19 +217,21 @@ class Document: NSDocument {
         let fileExt = fileURL?.pathExtension
         syntaxType = KSyntaxType.detect(fromTypeName: typeName, orExtension: fileExt)
         textStorage.replaceParser(for: syntaxType)
-
+        
         // 読み込み完了（未変更状態へ）
         updateChangeCount(.changeCleared)
-
+        
     }
-
+    
     override func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
-            if item.action == #selector(save(_:)) {
-                return isDocumentEdited // 編集されている時だけ有効
-            }
-            return super.validateUserInterfaceItem(item)
+        if item.action == #selector(save(_:)) {
+            return isDocumentEdited // 編集されている時だけ有効
         }
-
+        return super.validateUserInterfaceItem(item)
+    }
+    
+    
+    
 }
 
 extension Document {
