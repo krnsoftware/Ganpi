@@ -78,12 +78,13 @@ protocol KSyntaxParserProtocol: AnyObject {
     func attributes(in range: Range<Int>, tabWidth: Int) -> [AttributedSpan]
     
     var storage: KTextStorageReadable { get }
-    func wordRange(at index: Int) -> Range<Int>
+    func wordRange(at index: Int) -> Range<Int>?
     
     //static func makeParser(for type:KSyntaxType) -> KSyntaxParserProtocol?
     
 }
 
+/*
 extension KSyntaxParserProtocol {
     // 既定の“単語”= [A-Za-z0-9_]+
     @inline(__always)
@@ -113,7 +114,7 @@ extension KSyntaxParserProtocol {
 
         return start..<end
     }
-}
+}*/
 
 
 

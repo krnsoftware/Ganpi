@@ -78,10 +78,26 @@ extension Character {
             (0xF900...0xFAFF).contains($0.value)        // 互換漢字
         }
     }
+    
+    @inline(__always) var _isKanaProlong: Bool {
+        unicodeScalars.allSatisfy { $0.value == 0x30FC } // 「ー」
+    }
+    
+    // 反復記号
+    @inline(__always) var _isHiraganaIteration: Bool {
+        unicodeScalars.allSatisfy { $0.value == 0x309D || $0.value == 0x309E } // ゝ ゞ
+    }
+    @inline(__always) var _isKatakanaIteration: Bool {
+        unicodeScalars.allSatisfy { $0.value == 0x30FD || $0.value == 0x30FE } // ヽ ヾ
+    }
+    @inline(__always) var _isKanjiIteration: Bool {
+        unicodeScalars.allSatisfy { $0.value == 0x3005 || $0.value == 0x303B } // 々 〻
+    }
+    
     @inline(__always) var _jpScript: JpScript? {
-        if _isKanji     { return .kanji }
-        if _isHiragana  { return .hiragana }
-        if _isKatakana  { return .katakana }
+        if _isKanji || _isKanjiIteration { return .kanji }
+        if _isHiragana || _isHiraganaIteration  { return .hiragana }
+        if _isKatakana || _isKatakanaIteration  { return .katakana }
         return nil
     }
 }

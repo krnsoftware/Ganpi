@@ -21,8 +21,9 @@ final class KSyntaxParserPlain: KSyntaxParserProtocol {
     func attributes(in range: Range<Int>, tabWidth: Int) -> [AttributedSpan] { [] }
     
     // 欧文のみ（日本語は storage.wordRange が先に処理）
-    func wordRange(at index: Int) -> Range<Int> {
-        return storage.wordRange(at: index)
+    func wordRange(at index: Int) -> Range<Int>? {
+        //return storage.wordRange(at: index)
+        return nil
     }
 }
 

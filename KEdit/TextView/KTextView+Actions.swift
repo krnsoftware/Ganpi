@@ -38,7 +38,7 @@ extension KTextView {
         search(for: .forward)
     }
     
-    // MARK: - Font Size
+    // MARK: - Font Size actions
     
     @IBAction func increaseFontSize(_ sender: Any?) {
         if let storage = textStorage as? KTextStorage {
@@ -84,5 +84,11 @@ extension KTextView {
     
     @IBAction func redo(_ sender: Any?) {
         textStorage.redo()
+    }
+    
+    // MARK: - Others
+    
+    @IBAction func showLineJumpSheet(_ sender: Any?) {
+        
     }
 }

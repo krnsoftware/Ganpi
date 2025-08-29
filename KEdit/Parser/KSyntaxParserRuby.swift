@@ -292,7 +292,7 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
     
     
     // Ruby の “欧文識別子” ルール（日本語は storage 側で完結）
-    func wordRange(at index: Int) -> Range<Int> {
+    func wordRange(at index: Int) -> Range<Int>? {
         let n = storage.count
         if n == 0 { return 0..<0 }
 

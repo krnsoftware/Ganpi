@@ -482,39 +482,11 @@ final class KTextStorage: KTextStorageProtocol {
     // TextStorageのindexを含む単語を返す。
     // 現在の実装では一般的な英単語に準じた単語判定だが、将来的には開発言語毎に調整した方がよいと思われる。
     func wordRange(at index: Int) -> Range<Int>? {
+        if let spaceTabRange = spaceOrTabRunRange(at: index) { return spaceTabRange }
+        if let japaneseRange = japaneseClusterRange(at: index) { return japaneseRange }
+        if let parserRange = _parser.wordRange(at: index) { return parserRange }
+        return asciiIdentifierRange(at: index)
         
-        return _parser.wordRange(at: index)
-        /*
-        guard index >= 0 && index < count else { return nil }
-
-        // Characterベース → String → NSString → UTF16でのインデックス位置を取得
-        let characterArray = Array(characterSlice)
-        let prefixString = String(characterArray.prefix(index))
-        let utf16Offset = prefixString.utf16.count
-        
-        // NSStringでトークンを取得
-        let nsString = NSString(string: String(characterArray))
-        let cfTokenizer = CFStringTokenizerCreate(nil, nsString, CFRangeMake(0, nsString.length), kCFStringTokenizerUnitWord, nil)
-        CFStringTokenizerGoToTokenAtIndex(cfTokenizer, utf16Offset)
-        let tokenRange = CFStringTokenizerGetCurrentTokenRange(cfTokenizer)
-        
-        // tokenRangeが存在しない場合にはnilを返す
-        guard tokenRange.location != kCFNotFound else { return nil }
-        
-        // 範囲の変換（UTF-16 → Characterインデックス）
-        let utf16View = nsString as String
-        guard let fromUTF16 = utf16View.utf16.index(utf16View.utf16.startIndex, offsetBy: tokenRange.location, limitedBy: utf16View.utf16.endIndex),
-              let toUTF16 = utf16View.utf16.index(fromUTF16, offsetBy: tokenRange.length, limitedBy: utf16View.utf16.endIndex),
-              let start = fromUTF16.samePosition(in: utf16View),
-              let end = toUTF16.samePosition(in: utf16View)
-        else {
-            return nil
-        }
-
-        let startIndex = utf16View.distance(from: utf16View.startIndex, to: start)
-        let endIndex = utf16View.distance(from: utf16View.startIndex, to: end)
-        return startIndex..<endIndex
-         */
     }
     
     
@@ -663,87 +635,103 @@ final class KTextStorage: KTextStorageProtocol {
         
     }
     
+    // MARK: - wordRange helpers.
     
-}
-
-
-// MARK: - KTextStorageReadable extension.
-// ============================================================
-// KTextStorageReadable からの「日本語優先 → パーサ」wordRange() 実装
-// - storage は count / characterSlice を持っている前提
-// - storage.parser は現在のパーサ（無い場合は nil でOK）
-// ============================================================
-extension KTextStorageReadable {
-    /// 現在の挿入位置（index, 0基点）が属する “日本語塊（漢字/ひらがな/カタカナ）” を返す。
-        /// 日本語でなければ nil。
-        @inline(__always)
-        private func _japaneseClusterRange(at index: Int) -> Range<Int>? {
-            let n = count
-            if n == 0 { return 0..<0 }
-
-            // caret が末尾なら 1 つ戻って観察（末尾でのダブルクリック対策）
-            let i = max(0, min(index, n == 0 ? 0 : n))
-            let pivot = (i == n) ? max(0, n - 1) : i
-
-            let chars = characterSlice  // ArraySlice<Character>
-            let base  = chars.startIndex
-            let c     = chars[base + pivot]
-            guard let script = c._jpScript else { return nil }
-
-            // 左右に同一スクリプトが続く範囲を拡張
-            var lo = pivot
-            while lo > 0 {
-                if let s = (chars[base + lo - 1]._jpScript), s == script { lo -= 1 } else { break }
-            }
-            var hi = pivot + 1
-            while hi < n {
-                if let s = (chars[base + hi]._jpScript), s == script { hi += 1 } else { break }
-            }
-            return lo..<hi
-        }
-    
-    /// 現在の挿入位置（index, 0基点）が属する “日本語塊（漢字/ひらがな/カタカナ）” を返す。
-    /// 日本語でなければ nil。
+    // 空白文字とタブの連続を検出する。
     @inline(__always)
-       private func _asciiWordRange(at index: Int) -> Range<Int> {
-           let n = count
-           if n == 0 { return 0..<0 }
+    private func spaceOrTabRunRange(at index: Int) -> Range<Int>? {
+        let n = count
+        let chars = characterSlice
+        let base  = chars.startIndex
+        
+        var i = max(0, min(index, n))
+        if i == n { i = max(0, n - 1) }
+        
+        @inline(__always) func isSpaceTab(_ ch: Character) -> Bool { ch == " " || ch == "\t" }
+        
+        let pivot = chars[base + i]
+        guard isSpaceTab(pivot) else { return nil }
+        
+        var lo = i
+        while lo > 0, isSpaceTab(chars[base + lo - 1]) { lo -= 1 }
+        
+        var hi = i + 1
+        while hi < n, isSpaceTab(chars[base + hi]) { hi += 1 }
+        
+        return lo..<hi
+    }
 
-           let chars = characterSlice
-           let base  = chars.startIndex
 
-           // caret が末尾なら 1 つ戻って観察
-           var i = max(0, min(index, n))
-           if i == n { i = max(0, n - 1) }
+    // ひらがな/カタカナ/漢字クラスタ（ーは仮名に結合）
+    @inline(__always)
+    private func japaneseClusterRange(at index: Int) -> Range<Int>? {
+        
+        let n = count
+        if n == 0 { return 0..<0 }
+        
+        let chars = characterSlice
+        let base  = chars.startIndex
+        
+        // 末尾クリックは末尾-1を観察
+        var i = max(0, min(index, n))
+        if i == n { i = max(0, n - 1) }
+        
+        let pivot = chars[base + i]
+        
+        // クリックが長音そのもの → その1文字だけ
+        if pivot._isKanaProlong { return i..<(i + 1) }
+        
+        // ピボットスクリプト（漢字/ひらがな/カタカナ）
+        guard let script = pivot._jpScript else { return nil }
+        
+        // ひらがな/カタカナのときは長音を“同クラスタ扱い”にする
+        @inline(__always)
+        func matchesPivotScript(_ ch: Character) -> Bool {
+            if (script == .hiragana || script == .katakana), ch._isKanaProlong { return true }
+            if let s = ch._jpScript { return s == script }
+            return false
+        }
+        
+        var lo = i
+        while lo > 0, matchesPivotScript(chars[base + lo - 1]) { lo -= 1 }
+        
+        var hi = i + 1
+        while hi < n, matchesPivotScript(chars[base + hi]) { hi += 1 }
+        
+        return lo..<hi
+    }
 
-           @inline(__always)
-           func isAsciiIdent(_ ch: Character) -> Bool {
-               // 日本語など非ASCIIは false
-               guard ch.unicodeScalars.allSatisfy({ $0.value <= 0x7F }) else { return false }
-               // ASCII 英数字 or アンダースコア
-               if let u = ch.unicodeScalars.first?.value {
-                   return (0x30...0x39).contains(u) || (0x41...0x5A).contains(u) ||
-                          (0x61...0x7A).contains(u) || u == 0x5F
-               }
-               return false
-           }
-
-           let pivotCh = chars[base + i]
-           guard isAsciiIdent(pivotCh) else { return i..<i }
-
-           var lo = i
-           while lo > 0, isAsciiIdent(chars[base + lo - 1]) { lo -= 1 }
-           var hi = i + 1
-           while hi < n, isAsciiIdent(chars[base + hi]) { hi += 1 }
-           return lo..<hi
-       }
-
-       // 既存の日本語優先 → パーサ → ASCII 既定の順はそのままでOK
-       public func wordRange(at index: Int) -> Range<Int> {
-           if let jp = _japaneseClusterRange(at: index) { return jp }
-           //if let p = parser { return p.wordRange(at: index) }
-           return _asciiWordRange(at: index)
-       }
+    // --- 3) ASCII 識別子（[A-Za-z0-9_]+）。該当しないなら “空選択” を返す ---
+    @inline(__always)
+    private func asciiIdentifierRange(at index: Int) -> Range<Int>? {
+        let n = count
+        let chars = characterSlice
+        let base  = chars.startIndex
+        
+        var i = max(0, min(index, n))
+        if i == n { i = max(0, n - 1) }
+        
+        @inline(__always)
+        func isAsciiIdent(_ ch: Character) -> Bool {
+            guard ch.unicodeScalars.allSatisfy({ $0.value <= 0x7F }) else { return false }
+            if let u = ch.unicodeScalars.first?.value {
+                return (0x30...0x39).contains(u) || (0x41...0x5A).contains(u) ||
+                (0x61...0x7A).contains(u) || u == 0x5F
+            }
+            return false
+        }
+        
+        let p = chars[base + i]
+        guard isAsciiIdent(p) else { return i..<i }   // 記号などは“空選択”
+        
+        var lo = i
+        while lo > 0, isAsciiIdent(chars[base + lo - 1]) { lo -= 1 }
+        var hi = i + 1
+        while hi < n, isAsciiIdent(chars[base + hi]) { hi += 1 }
+        
+        return lo..<hi
+    }
+    
 }
 
 
