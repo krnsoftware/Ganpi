@@ -27,7 +27,7 @@ struct KLayoutRects {
         let left: CGFloat
         let right: CGFloat
         
-        static let `default` = KLineNumberEdgeInsets(left: 10, right: 10)
+        static let `default` = KLineNumberEdgeInsets(left: 5, right: 10)
     }
     
     //private let _bounds: CGRect
@@ -68,9 +68,9 @@ struct KLayoutRects {
         self.wordWrap = wordWrap
         self.textEdgeInsets = textEdgeInsets
         
-        let digitCount = max(_minimumLineNumberCharacterWidth, Int(log10(Double(textStorageRef.hardLineCount))))
+        let digitCount = max(_minimumLineNumberCharacterWidth, Int(log10(Double(textStorageRef.hardLineCount))) + 1)
         
-        var charWidth: CGFloat = 20
+        var charWidth: CGFloat = 100
         if let textStorage = _textStorageRef as? KTextStorage  {
             charWidth = textStorage.lineNumberCharacterMaxWidth
         }

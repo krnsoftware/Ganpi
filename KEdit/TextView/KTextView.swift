@@ -500,8 +500,10 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 
                 let size = number.size(withAttributes: attrs)
                 
-                let numberPointX = lnRect.maxX - size.width - KLayoutRects.KLineNumberEdgeInsets.default.right// - layoutRects.textEdgeInsets.left
-                let numberPointY = lnRect.origin.y + y - visibleRect.origin.y
+                let numberPointX = lnRect.maxX - size.width - KLayoutRects.KLineNumberEdgeInsets.default.right
+                //let numberPointY = lnRect.origin.y + y - visibleRect.origin.y
+                // 上下がずれないよう、base lineを合わせる。
+                let numberPointY = lnRect.origin.y + y - visibleRect.origin.y + _textStorageRef.baseFont.ascender - _textStorageRef.lineNumberFont.ascender
                 let numberPoint = CGPoint(x: numberPointX, y: numberPointY)
                 
                 if !verticalRange.contains(numberPoint.y) { continue }

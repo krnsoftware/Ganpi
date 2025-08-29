@@ -138,8 +138,13 @@ final class KTextStorage: KTextStorageProtocol {
     
     // propaties for appearances.
     private var _baseFont: NSFont = .monospacedSystemFont(ofSize: 12, weight: .regular)
-    private var _lineNumberFont: NSFont = .monospacedDigitSystemFont(ofSize: 11 ,weight: .regular)
-    private var _lineNumberFontEmph: NSFont = .monospacedDigitSystemFont(ofSize: 11 ,weight: .bold)
+    //private var _lineNumberFont: NSFont = .monospacedDigitSystemFont(ofSize: 11 ,weight: .regular)
+    //private var _lineNumberFontEmph: NSFont = .monospacedDigitSystemFont(ofSize: 11 ,weight: .bold)
+    private var _lineNumberFont: NSFont =
+        NSFont(name: "Menlo-Regular", size: 11) ??
+        .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+    private var _lineNumberFontEmph: NSFont = NSFont(name: "Menlo-Bold", size: 11) ??
+        .monospacedDigitSystemFont(ofSize: 11, weight: .bold)
     
     // caches.
     private var _spaceAdvanceCache: CGFloat?
@@ -221,6 +226,7 @@ final class KTextStorage: KTextStorageProtocol {
     }
     
     // 行番号表示に使用する数字の最大の横幅。
+    /*
     var lineNumberCharacterMaxWidth: CGFloat {
         if let width = _lineNumberCharacterMaxWidth {
             return width
@@ -242,6 +248,36 @@ final class KTextStorage: KTextStorageProtocol {
                 maxWidth = max(maxWidth, advance.width)
             }
         }
+        return maxWidth
+    }*/
+    // 行番号用の数字の最大 advance 幅（通常/強調の両方を考慮してキャッシュ）
+    var lineNumberCharacterMaxWidth: CGFloat {
+        if let cachedWidth = _lineNumberCharacterMaxWidth {
+            return cachedWidth
+        }
+
+        func maxDigitAdvance(for font: NSFont) -> CGFloat {
+            let ctFont = font as CTFont
+            var maxAdvanceWidth: CGFloat = 0
+            for scalar in "0123456789".unicodeScalars {
+                var glyph = CGGlyph()
+                var unicodeValue = UniChar(scalar.value)
+                guard CTFontGetGlyphsForCharacters(ctFont, &unicodeValue, &glyph, 1) else { continue }
+                var advance = CGSize.zero
+                CTFontGetAdvancesForGlyphs(ctFont, .horizontal, &glyph, &advance, 1)
+                if advance.width > maxAdvanceWidth {
+                    maxAdvanceWidth = advance.width
+                }
+            }
+            return maxAdvanceWidth
+        }
+
+        // 通常フォントと強調フォントの両方で確認し、最大値を採用
+        let normalWidth = maxDigitAdvance(for: _lineNumberFont)
+        let emphasizedWidth = maxDigitAdvance(for: _lineNumberFontEmph)
+        let maxWidth = ceil(max(normalWidth, emphasizedWidth))
+
+        _lineNumberCharacterMaxWidth = maxWidth
         return maxWidth
     }
     
