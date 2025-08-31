@@ -292,7 +292,7 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         updateStatusBar()
     }
 
-    // MARK: - Status Bar（ボタン化）
+    // MARK: - Status Bar
 
     private func buildStatusBarUI() {
         // ボタン外観
@@ -304,6 +304,7 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
             $0.setButtonType(.momentaryPushIn)
             $0.translatesAutoresizingMaskIntoConstraints = false
             $0.lineBreakMode = .byTruncatingTail
+            $0.contentTintColor = .labelColor
         }
 
         // 左：Encoding / EOL / Syntax（クリックでメニュー）
