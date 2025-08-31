@@ -38,6 +38,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     private var _prevContentViewBounds: CGRect = .zero
     
     // キャレットの動作に関するプロパティ
+    private var _caretIndex: Int
     private var _verticalCaretX: CGFloat?        // 縦方向にキャレットを移動する際の基準X。
     private var _verticalSelectionBase: Int?     // 縦方向に選択範囲を拡縮する際の基準点。
     private var _horizontalSelectionBase: Int?   // 横方向に選択範囲を拡縮する際の基準点。
@@ -91,8 +92,22 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     var selectionRange: Range<Int> = 0..<0 {
         didSet {
             _caretView.isHidden = !selectionRange.isEmpty
+            _caretIndex = selectionRange.upperBound
             sendStatusBarUpdateAction()
             needsDisplay = true
+        }
+    }
+    
+    /*
+    var caretIndex: Int {
+        get { selectionRange.upperBound }
+        set { selectionRange = newValue..<newValue }
+    }*/
+    var caretIndex: Int {
+        get { _caretIndex }
+        set {
+            _caretIndex = newValue
+            selectionRange = _caretIndex..<_caretIndex
         }
     }
     
@@ -103,11 +118,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     var layoutManager: KLayoutManager {
         return _layoutManager
-    }
-    
-    var caretIndex: Int {
-        get { selectionRange.upperBound }
-        set { selectionRange = newValue..<newValue }
     }
     
     var wordWrap: Bool {
@@ -198,6 +208,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     // Designated Initializer #1（既定: 新規生成）
     override init(frame: NSRect) {
         let storage:KTextStorageProtocol = KTextStorage()
+        _caretIndex = 0
         self._textStorageRef = storage
         _layoutManager = KLayoutManager(textStorageRef: storage)
         super.init(frame: frame)
@@ -210,6 +221,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     init(frame: NSRect, textStorageRef: KTextStorageProtocol) {
         self._textStorageRef = textStorageRef
         self._layoutManager = KLayoutManager(textStorageRef: textStorageRef)
+        _caretIndex = 0
         super.init(frame: frame)
         
         //log("_textStorageRef.count: \(_textStorageRef.count)")
@@ -221,6 +233,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     init(frame: NSRect, textStorageRef: KTextStorageProtocol, layoutManager: KLayoutManager) {
         self._textStorageRef = textStorageRef
         self._layoutManager = layoutManager
+        _caretIndex = 0
         super.init(frame: frame)
         commonInit()
     }
@@ -230,6 +243,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         let storage = KTextStorage()
         self._textStorageRef = storage
         self._layoutManager = KLayoutManager(textStorageRef: storage)
+        _caretIndex = 0
         super.init(coder: coder)
         commonInit()
     }
