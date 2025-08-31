@@ -375,10 +375,32 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     }
     
     private func scrollCaretToVisible() {
+        scrollSelectionToVisible()
+        /*
         guard let scrollView = self.enclosingScrollView else { return }
         DispatchQueue.main.async {
             let caretRect = self._caretView.frame.insetBy(dx: -10, dy: -10)
             scrollView.contentView.scrollToVisible(caretRect)
+        }
+        */
+    }
+    
+    func scrollSelectionToVisible() {
+        guard let scrollView = self.enclosingScrollView else { return }
+        guard let layoutRects = layoutManager.makeLayoutRects() else { return }
+        
+        let startPosition = characterPosition(at: selectionRange.lowerBound)
+        let endPosition = characterPosition(at: selectionRange.upperBound)
+        // 選択範囲の上下1行分・左右に10ptだけ表示領域を増やす。
+        // 行番号表示の横幅分だけ左のinsetを増やしておく。
+        let rect = CGRect(
+            x: min(startPosition.x, endPosition.x) - 10.0 - layoutRects.horizontalInsets,
+            y: min(startPosition.y, endPosition.y) - layoutManager.lineHeight,
+            width: abs(endPosition.x - startPosition.x) + 30.0 + layoutRects.horizontalInsets,
+            height: abs(endPosition.y - startPosition.y) + 3 * layoutManager.lineHeight
+        )
+        DispatchQueue.main.async {
+            scrollView.contentView.scrollToVisible(rect)
         }
         
     }
@@ -1569,6 +1591,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         needsDisplay = true
     }
 
+    // 別のKTextViewインスタンスから下記の設定を複製する。
     func loadSettings(from textView:KTextView) {
         autoIndent = textView.autoIndent
         wordWrap = textView.wordWrap
@@ -1672,7 +1695,62 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                                          to: nil, from: self)
     }
     
-    
+    /// 文字列指定を絶対オフセット/範囲に変換する。
+    ///
+    /// - "L:C"  → L行目・行頭からC文字（自然数・1起点）
+    /// - ":C"   → 文頭からC文字（1起点）
+    /// - "L"    → 行番号のみ＝その行「全体」を選択（改行は含めない）
+    ///
+    /// 存在しない / 無効な指定は `nil` を返す。
+    func selectString(with spec: String) -> Range<Int>? {
+        let query = spec.trimmingCharacters(in: .whitespacesAndNewlines)
+        if query.isEmpty { return nil }
+
+        let skeleton = textStorage.skeletonString
+        let newlineIndices = skeleton.newlineIndices()
+        let documentLength = textStorage.count
+
+        func startOfLine(_ oneBasedLine: Int) -> Int? {
+            if oneBasedLine <= 0 { return nil }
+            if oneBasedLine == 1 { return 0 }
+            let idx = oneBasedLine - 2
+            if idx >= 0, idx < newlineIndices.count {
+                return newlineIndices[idx] + 1
+            } else if let last = newlineIndices.last {
+                // 行番号超過は最終行頭
+                return last + 1
+            }
+            return 0
+        }
+
+        func endOfLine(fromStart start: Int) -> Int {
+            if let nextBreak = newlineIndices.first(where: { $0 >= start }) {
+                return min(nextBreak, documentLength)
+            }
+            return documentLength
+        }
+
+        // "L:C" or ":C"
+        if let colonIndex = query.firstIndex(of: ":") {
+            let linePart = String(query[..<colonIndex]).trimmingCharacters(in: .whitespaces)
+            let columnPart = String(query[query.index(after: colonIndex)...]).trimmingCharacters(in: .whitespaces)
+
+            let oneBasedLine: Int = linePart.isEmpty ? 1 : (Int(linePart) ?? -1)
+            guard oneBasedLine >= 1, let lineStart = startOfLine(oneBasedLine) else { return nil }
+            guard let oneBasedColumn = Int(columnPart), oneBasedColumn >= 1 else { return nil }
+
+            let absoluteOffset = min(lineStart + (oneBasedColumn - 1), documentLength)
+            return absoluteOffset..<absoluteOffset
+        }
+
+        // "L" only → 行全体
+        if let oneBasedLine = Int(query), oneBasedLine >= 1, let lineStart = startOfLine(oneBasedLine) {
+            let lineEnd = endOfLine(fromStart: lineStart)
+            return lineStart..<lineEnd
+        }
+
+        return nil
+    }
     
     
     

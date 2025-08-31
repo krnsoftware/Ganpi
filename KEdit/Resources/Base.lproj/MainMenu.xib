@@ -191,8 +191,7 @@
                                     </items>
                                 </menu>
                             </menuItem>
-                            <menuItem title="Jump to Line..." id="FEa-wC-1Gp">
-                                <modifierMask key="keyEquivalentModifierMask"/>
+                            <menuItem title="Jump to Line..." keyEquivalent="u" id="FEa-wC-1Gp">
                                 <connections>
                                     <action selector="showCaretJumpPopoverFromMenu:" target="-1" id="02L-NE-POT"/>
                                 </connections>

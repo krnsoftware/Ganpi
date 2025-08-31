@@ -429,10 +429,27 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
     @objc private func showCaretPopover(_ sender: NSButton) {
         if _jumpPopover == nil {
             let vc = KJumpPopoverViewController()
-            vc.onConfirm = { [weak self] line in
-                guard let self else { return }
-                // TODO: 実際の行移動は KTextView API に結線
-                NSSound.beep()
+            vc.onConfirm = { [weak self] spec in
+                guard let self = self else { return }
+                guard let activeTextView = activeTextView() else { NSSound.beep(); return }
+
+                // spec を KTextView のパーサへ
+                guard let selection = activeTextView.selectString(with: spec) else {
+                    NSSound.beep()
+                    return
+                }
+
+                // 選択を反映（NSRange に変換）
+                // let nsRange = NSRange(location: selection.lowerBound, length: selection.count)
+                //activeTextView.setSelectedRange(nsRange)// KTextView が NSTextView 互換ならこれでOK
+                activeTextView.selectionRange = selection
+                activeTextView.scrollSelectionToVisible()
+
+                // ステータス更新 & フォーカス復帰
+                self.updateStatusBar()
+                self.view.window?.makeFirstResponder(activeTextView)
+
+                // ジャンプは一発で閉じる方が自然（連続調整したいUIではないため）
                 self.dismissPopovers()
             }
             let pop = NSPopover()
@@ -620,7 +637,7 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
 // MARK: - Popover ViewControllers
 
 final class KJumpPopoverViewController: NSViewController {
-    var onConfirm: ((Int) -> Void)?
+    var onConfirm: ((String) -> Void)?
 
     private let _textField = NSTextField(string: "")
     private let _button = NSButton(title: "Go", target: nil, action: nil)
@@ -661,8 +678,9 @@ final class KJumpPopoverViewController: NSViewController {
     @objc private func didTapGo(_ sender: Any?) { confirm() }
 
     private func confirm() {
-        let s = _textField.stringValue.trimmingCharacters(in: .whitespaces)
-        if let n = Int(s), n >= 1 { onConfirm?(n) } else { NSSound.beep() }
+        let spec = _textField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !spec.isEmpty else { NSSound.beep(); return }
+        onConfirm?(spec)
     }
 }
 
