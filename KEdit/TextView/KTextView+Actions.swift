@@ -39,7 +39,7 @@ extension KTextView {
     }
     
     // MARK: - Font Size actions
-    
+    /*
     @IBAction func increaseFontSize(_ sender: Any?) {
         if let storage = textStorage as? KTextStorage {
             storage.fontSize = storage.fontSize + 1
@@ -51,7 +51,7 @@ extension KTextView {
             if storage.fontSize <= 5 { return }
             storage.fontSize = storage.fontSize - 1
         }
-    }
+    }*/
     
     @IBAction func showFontSizeSheet(_ sender: Any?) {
         guard let documentWindow = window,

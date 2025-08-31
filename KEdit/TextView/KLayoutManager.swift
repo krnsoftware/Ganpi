@@ -69,7 +69,8 @@ final class KLayoutManager: KLayoutManagerReadable {
     var lineHeight: CGFloat {
         let font = _textStorageRef.baseFont
         //return font.ascender + abs(font.descender) + lineSpacing
-        return ceil(font.ascender - font.descender + font.leading + lineSpacing)
+        //return ceil(font.ascender - font.descender + font.leading + lineSpacing)
+        return font.ascender - font.descender + font.leading + lineSpacing
     }
     
     var lineCount: Int {
