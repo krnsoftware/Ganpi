@@ -1752,6 +1752,16 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             }
             return docLen
         }
+        
+        // spec から最大2個の座標トークンを抽出（順序保持）
+        func extractPointTokens(_ s: String) -> [String] {
+            let pattern = #"(\d+:\d+)|(:\d+)|(\d+)"#
+            guard let re = try? NSRegularExpression(pattern: pattern, options: []) else { return [] }
+            let ns = s as NSString
+            let matches = re.matches(in: s, options: [], range: NSRange(location: 0, length: ns.length))
+            // 先頭から2個だけ採用（3個以上は誤入力として捨てる）
+            return matches.prefix(2).map { ns.substring(with: $0.range) }
+        }
 
         // 改行を含めた行末（最終行は含めない）
         func endOfLineIncludingNewline(fromStart start: Int) -> Int {
@@ -1796,15 +1806,15 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
 
         // "A-B" 形式
-        if let dash = query.firstIndex(of: "-") {
-            let left  = String(query[..<dash])
-            let right = String(query[query.index(after: dash)...])
+        let tokens = extractPointTokens(query)
+        if tokens.count == 2 {
+            let left  = tokens[0]
+            let right = tokens[1]
 
             guard let a = parsePoint(left, hint: .normal) else { return nil }
 
-            // 右端が純粋な行番号なら改行込みの終端にする
-            let rightTrim = right.trimmingCharacters(in: .whitespaces)
-            let rightIsPureLine = Int(rightTrim) != nil && !rightTrim.contains(":")
+            // 右端が純粋な行番号なら「改行込みの終端」
+            let rightIsPureLine = Int(right) != nil && !right.contains(":")
             let hint: PointHint = rightIsPureLine ? .rightEdgeLineIncludesNewline : .normal
             guard let b = parsePoint(right, hint: hint) else { return nil }
 
