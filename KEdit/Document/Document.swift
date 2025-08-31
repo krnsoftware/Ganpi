@@ -6,10 +6,11 @@
 //
 
 import Cocoa
+import CryptoKit
 
 class Document: NSDocument {
     private static var lastCascadeTopLeft: NSPoint?
-    private let _defaultWindowSize = NSSize(width: 600, height: 800)
+    private let _defaultWindowSize = NSSize(width: 600, height: 600)
     private let _windowMinimumSize = NSSize(width: 480, height: 320)
     
     private var _characterCode: String.Encoding = .utf32
@@ -57,52 +58,65 @@ class Document: NSDocument {
     }
     
     override func makeWindowControllers() {
+        // ---- 1) NIBロード & Content VC ----
         let wc = NSWindowController(windowNibName: "Document")
         addWindowController(wc)
         _ = wc.window
+        wc.contentViewController = KViewController()
+        wc.window?.contentMinSize = _windowMinimumSize
+        wc.window?.isRestorable = false
+        
+        // Document参照をVCに渡す
+        if let vc = wc.contentViewController as? KViewController { vc.document = self }
+        
+        // ---- 2) ハッシュ化 autosave 名（ネスト関数）----
+        func windowAutosaveKey(for url: URL) -> String {
+            let data = Data(url.path.utf8)
+            let digest = SHA256.hash(data: data)
+            let hex = digest.prefix(16).map { String(format: "%02x", $0) }.joined()
+            return "GanpiWindow:\(hex)"
+        }
+        func hasSavedFrame(for autosaveName: String) -> Bool {
+            UserDefaults.standard.string(forKey: "NSWindow Frame \(autosaveName)") != nil
+        }
+        
         guard let window = wc.window else { return }
-
-        // 下限サイズと復元無効（書類復元ではなく自前制御）
-        window.contentMinSize = _windowMinimumSize
-        window.isRestorable = false
-
-        // コンテンツ VC を差し込む（既に差さっていたら文書だけ渡す）
-        if let vc = window.contentViewController as? KViewController {
-            vc.document = self
-        } else {
-            let vc = KViewController()
-            vc.document = self
-            window.contentViewController = vc
-        }
-
+        
+        // ---- 3) 既存ファイル：保存済みフレームがあれば復元 ----
         if let url = fileURL {
-            // 既存ファイル：ファイルごとにフレームを自動保存・復元
-            let autosaveName = "Ganpi:\(url.path)"
-            wc.windowFrameAutosaveName = autosaveName
-
-            // まだ保存が無い最初のオープンだけはデフォルトで開く
-            let key = "NSWindow Frame \(autosaveName)"
-            if UserDefaults.standard.string(forKey: key) == nil {
+            let name = windowAutosaveKey(for: url)
+            if hasSavedFrame(for: name) {
+                wc.windowFrameAutosaveName = name     // ここで自動復元
+                return
+            } else {
+                // 初回オープン：左上からカスケード配置 → 以後この autosave 名で保存される
                 window.setContentSize(_defaultWindowSize)
-                window.center()
-            }
-        } else {
-            // Untitled：autosave しない。新規はカスケードさせる
-            wc.windowFrameAutosaveName = ""
-            
-            window.setContentSize(_defaultWindowSize)
-            // 初回だけ種位置を作る（中央に出してから左上を記録）
-            if Document.lastCascadeTopLeft == nil {
-                window.center()
-                let f = window.frame
-                Document.lastCascadeTopLeft = NSPoint(x: f.minX, y: f.maxY)
-            }
-
-            // 直前の左上から少しずつ右下にずらす
-            if let start = Document.lastCascadeTopLeft {
-                Document.lastCascadeTopLeft = window.cascadeTopLeft(from: start)
+                let screenFrame = window.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? NSRect(x: 100, y: 100, width: 1200, height: 800)
+                var seedTopLeft = Document.lastCascadeTopLeft ?? NSPoint(x: screenFrame.minX, y: screenFrame.maxY)
+                // 最初の1枚目が中央に寄らないよう、明示的にフレームを作ってからカスケード
+                let baseOrigin = NSPoint(x: seedTopLeft.x,
+                                         y: seedTopLeft.y - _defaultWindowSize.height)
+                window.setFrame(NSRect(origin: baseOrigin, size: _defaultWindowSize), display: false)
+                seedTopLeft = window.cascadeTopLeft(from: seedTopLeft)
+                Document.lastCascadeTopLeft = seedTopLeft
+                
+                wc.windowFrameAutosaveName = name
+                return
             }
         }
+        
+        // ---- 4) 新規書類：左上からカスケード ----
+        window.setContentSize(_defaultWindowSize)
+        let screenFrame = window.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? NSRect(x: 100, y: 100, width: 1200, height: 800)
+        var topLeft = Document.lastCascadeTopLeft ?? NSPoint(x: screenFrame.minX + 20, y: screenFrame.maxY + 20)
+        
+        // 1枚目用に基準フレームを置いてからカスケードさせると、左上スタックが安定します
+        let firstOrigin = NSPoint(x: topLeft.x,
+                                  y: topLeft.y - _defaultWindowSize.height)
+        window.setFrame(NSRect(origin: firstOrigin, size: _defaultWindowSize), display: false)
+        
+        topLeft = window.cascadeTopLeft(from: topLeft)
+        Document.lastCascadeTopLeft = topLeft
     }
     
     /*
