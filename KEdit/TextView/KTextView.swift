@@ -326,7 +326,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     override func becomeFirstResponder() -> Bool {
         //print("\(#function)")
         let ok = super.becomeFirstResponder()
-        _caretView.isHidden = false
+        _caretView.isHidden = !selectionRange.isEmpty
         containerView?.setActiveEditor(true)
         sendStatusBarUpdateAction()
         
@@ -1385,7 +1385,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     @objc private func windowBecameKey(_ notification: Notification) {
         // updateActiveState()
         //_caretView.isHidden = false
-        _caretView.isHidden = (window?.firstResponder !== self)
+        //_caretView.isHidden = (window?.firstResponder !== self)
+        _caretView.isHidden = (window?.firstResponder !== self) || !selectionRange.isEmpty
     }
 
     @objc private func windowResignedKey(_ notification: Notification) {
@@ -1407,16 +1408,17 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         // ノーラップ時：スクロールに伴う原点移動で再描画
         if bounds.origin != _prevContentViewBounds.origin {
             _prevContentViewBounds = contentBounds
-            
-            // スクロール時にキャレットが行番号表示にかぶった場合は消す。
-            let characterPosition = characterPosition(at: caretIndex)
+
+            // ※ ここを“選択優先”に修正
             if let layoutRects = _layoutManager.makeLayoutRects(),
-                    let contentView = enclosingScrollView?.contentView {
-                let currentX = characterPosition.x - layoutRects.horizontalInsets - contentView.bounds.minX
-                _caretView.isHidden = currentX < 0
-                
+               let contentView = enclosingScrollView?.contentView {
+                let pos = characterPosition(at: caretIndex)
+                let currentX = pos.x - layoutRects.horizontalInsets - contentView.bounds.minX
+
+                // 選択が空のときだけ表示可。行番号領域に隠れたら消す。
+                _caretView.isHidden = !selectionRange.isEmpty || (currentX < 0)
             }
-            
+
             needsDisplay = true
             return
         }
@@ -1712,62 +1714,131 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     /// 文字列指定を絶対オフセット/範囲に変換する。
     ///
-    /// - "L:C"  → L行目・行頭からC文字（自然数・1起点）
-    /// - ":C"   → 文頭からC文字（1起点）
-    /// - "L"    → 行番号のみ＝その行「全体」を選択（改行は含めない）
+    /// 受理フォーマット（A/Bそれぞれ）:
+    ///   - "L:C"  → L行目の行頭からC文字（1起点）
+    ///   - "L"    → L行全体（※改行を含める。最終行は含めない）
+    ///   - ":C"   → 文頭からC文字（1起点）
     ///
-    /// 存在しない / 無効な指定は `nil` を返す。
+    /// 組み合わせ:
+    ///   - "A-B"  → Aを開始、Bを終端として範囲を返す
+    ///     * 右端Bが純粋な行番号（"L"）なら、その行の改行までを含める（最終行は含めない）
+    ///
+    /// 無効な指定は `nil` を返す。
     func selectString(with spec: String) -> Range<Int>? {
         let query = spec.trimmingCharacters(in: .whitespacesAndNewlines)
-        if query.isEmpty { return nil }
+        guard !query.isEmpty else { return nil }
 
         let skeleton = textStorage.skeletonString
         let newlineIndices = skeleton.newlineIndices()
-        let documentLength = textStorage.count
+        let docLen = textStorage.count
 
-        func startOfLine(_ oneBasedLine: Int) -> Int? {
-            if oneBasedLine <= 0 { return nil }
-            if oneBasedLine == 1 { return 0 }
-            let idx = oneBasedLine - 2
+        func startOfLine(_ oneBased: Int) -> Int? {
+            guard oneBased >= 1 else { return nil }
+            if oneBased == 1 { return 0 }
+            let idx = oneBased - 2
             if idx >= 0, idx < newlineIndices.count {
                 return newlineIndices[idx] + 1
             } else if let last = newlineIndices.last {
-                // 行番号超過は最終行頭
-                return last + 1
+                return last + 1 // 行超過は最終行頭
+            } else {
+                return 0
             }
-            return 0
         }
 
-        func endOfLine(fromStart start: Int) -> Int {
+        // 改行直前（排他的終端）— 改行は含めない
+        func endOfLineExclusive(fromStart start: Int) -> Int {
             if let nextBreak = newlineIndices.first(where: { $0 >= start }) {
-                return min(nextBreak, documentLength)
+                return min(nextBreak, docLen)
             }
-            return documentLength
+            return docLen
         }
 
-        // "L:C" or ":C"
-        if let colonIndex = query.firstIndex(of: ":") {
-            let linePart = String(query[..<colonIndex]).trimmingCharacters(in: .whitespaces)
-            let columnPart = String(query[query.index(after: colonIndex)...]).trimmingCharacters(in: .whitespaces)
-
-            let oneBasedLine: Int = linePart.isEmpty ? 1 : (Int(linePart) ?? -1)
-            guard oneBasedLine >= 1, let lineStart = startOfLine(oneBasedLine) else { return nil }
-            guard let oneBasedColumn = Int(columnPart), oneBasedColumn >= 1 else { return nil }
-
-            let absoluteOffset = min(lineStart + (oneBasedColumn - 1), documentLength)
-            log("spec: \(spec), range: \(absoluteOffset..<absoluteOffset)",from:self)
-            return absoluteOffset..<absoluteOffset
+        // 改行を含めた行末（最終行は含めない）
+        func endOfLineIncludingNewline(fromStart start: Int) -> Int {
+            let end = endOfLineExclusive(fromStart: start)
+            return (end < docLen) ? end + 1 : end
         }
 
-        // "L" only → 行全体
-        if let oneBasedLine = Int(query), oneBasedLine >= 1, let lineStart = startOfLine(oneBasedLine) {
-            let lineEnd = endOfLine(fromStart: lineStart)
-            return lineStart..<lineEnd
+        enum PointHint { case normal, rightEdgeLineIncludesNewline }
+
+        // 単点指定を絶対位置に
+        func parsePoint(_ s: String, hint: PointHint) -> Int? {
+            let part = s.trimmingCharacters(in: .whitespaces)
+            if part.isEmpty { return nil }
+
+            if let colon = part.firstIndex(of: ":") {
+                // "L:C" or ":C"
+                let lp = String(part[..<colon]).trimmingCharacters(in: .whitespaces)
+                let cp = String(part[part.index(after: colon)...]).trimmingCharacters(in: .whitespaces)
+                let line = lp.isEmpty ? 1 : (Int(lp) ?? -1)
+                guard line >= 1, let lineStart = startOfLine(line) else { return nil }
+                guard let col = Int(cp), col >= 1 else { return nil }
+                return min(lineStart + (col - 1), docLen)
+            }
+
+            if part.hasPrefix(":") {
+                let cp = String(part.dropFirst()).trimmingCharacters(in: .whitespaces)
+                guard let col = Int(cp), col >= 1 else { return nil }
+                return min(col - 1, docLen)
+            }
+
+            if let line = Int(part), line >= 1 {
+                guard let lineStart = startOfLine(line) else { return nil }
+                switch hint {
+                case .normal:
+                    return lineStart // 開始点としての行指定は行頭位置
+                case .rightEdgeLineIncludesNewline:
+                    return endOfLineIncludingNewline(fromStart: lineStart) // 右端は改行込み
+                }
+            }
+
+            return nil
+        }
+
+        // "A-B" 形式
+        if let dash = query.firstIndex(of: "-") {
+            let left  = String(query[..<dash])
+            let right = String(query[query.index(after: dash)...])
+
+            guard let a = parsePoint(left, hint: .normal) else { return nil }
+
+            // 右端が純粋な行番号なら改行込みの終端にする
+            let rightTrim = right.trimmingCharacters(in: .whitespaces)
+            let rightIsPureLine = Int(rightTrim) != nil && !rightTrim.contains(":")
+            let hint: PointHint = rightIsPureLine ? .rightEdgeLineIncludesNewline : .normal
+            guard let b = parsePoint(right, hint: hint) else { return nil }
+
+            let lo = max(0, min(a, b))
+            let hi = min(docLen, max(a, b))
+            return (lo < hi) ? lo..<hi : nil
+        }
+
+        // 単体指定（従来互換＋"L"は改行込みに変更）
+        if let colon = query.firstIndex(of: ":") {
+            let lp = String(query[..<colon]).trimmingCharacters(in: .whitespaces)
+            let cp = String(query[query.index(after: colon)...]).trimmingCharacters(in: .whitespaces)
+            let line = lp.isEmpty ? 1 : (Int(lp) ?? -1)
+            guard line >= 1, let lineStart = startOfLine(line) else { return nil }
+            guard let col = Int(cp), col >= 1 else { return nil }
+            let abs = min(lineStart + (col - 1), docLen)
+            return abs..<abs
+        }
+
+        if query.hasPrefix(":") {
+            let cp = String(query.dropFirst()).trimmingCharacters(in: .whitespaces)
+            guard let col = Int(cp), col >= 1 else { return nil }
+            let abs = min(col - 1, docLen)
+            return abs..<abs
+        }
+
+        // "L" → 行全体（改行を含める。最終行は含めない）
+        if let line = Int(query), line >= 1, let start = startOfLine(line) {
+            let end = endOfLineIncludingNewline(fromStart: start)
+            return start..<end
         }
 
         return nil
     }
-    
     
     
     
