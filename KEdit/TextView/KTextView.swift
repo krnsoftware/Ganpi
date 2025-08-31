@@ -465,7 +465,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 x: textRect.origin.x + startOffset + layoutRects.horizontalInsets,
                 y: y,
                 width: endOffset,
-                height: _layoutManager.lineHeight
+                height: ceil(layoutManager.lineHeight)
             )
             selectedTextBGColor.setFill()
             selectionRect.fill()
