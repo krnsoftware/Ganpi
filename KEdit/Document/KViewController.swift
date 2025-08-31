@@ -93,10 +93,14 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         }
         updateStatusBar()
     }
-
+/*
     @IBAction func showLineSpacingSheet(_ sender: Any?) {
         // 旧KPromptシートは廃止。Popoverで置換するためビープのみに。
         NSSound.beep()
+    }*/
+    
+    @IBAction func showLineSpacingPopoverFromMenu(_ sender: Any?) {
+        _lineSpacingButton.performClick(nil)
     }
 
     // フォントサイズ（VCで集約）
@@ -120,7 +124,17 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         }
         updateStatusBar()
     }
+    
+    @IBAction func showFontSizePopoverFromMenu(_ sender: Any?) {
+        // 既存の _fontSizeButton の action がそのまま使われる
+        _fontSizeButton.performClick(nil)
+    }
+    
+    @IBAction func showCaretJumpPopoverFromMenu(_ sender: Any?) {
+        _caretButton.performClick(nil)
+    }
 
+    /*
     private func setFontSize(_ value: Double) {
         guard let storage = _document?.textStorage else { return }
         storage.fontSize = max(5, value)
@@ -128,7 +142,7 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
             textViews.forEach { _ = $0 }
         }
         updateStatusBar()
-    }
+    }*/
 
     // MARK: - UI validation
 
@@ -451,9 +465,13 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
                 }
                 self.updateStatusBar()
             case .fontSize:
-                // あなたの確認どおり：表示更新＋実適用
                 self.updateStatusBar()
-                self.setFontSize(value)
+                //self.setFontSize(value)
+                //guard let storage = _document?.textStorage else { return }
+                if let storage = _document?.textStorage {
+                    storage.fontSize = max(5, value)
+                    updateStatusBar()
+                }
             }
         }
         let pop = NSPopover()

@@ -191,6 +191,12 @@
                                     </items>
                                 </menu>
                             </menuItem>
+                            <menuItem title="Jump to Line..." id="FEa-wC-1Gp">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <connections>
+                                    <action selector="showCaretJumpPopoverFromMenu:" target="-1" id="02L-NE-POT"/>
+                                </connections>
+                            </menuItem>
                         </items>
                     </menu>
                 </menuItem>
@@ -271,7 +277,7 @@
                                         <menuItem title="Font Size..." id="beR-mv-b7K">
                                             <modifierMask key="keyEquivalentModifierMask"/>
                                             <connections>
-                                                <action selector="showFontSizeSheet:" target="-1" id="Yvr-5n-Xz6"/>
+                                                <action selector="showFontSizePopoverFromMenu:" target="-1" id="zet-ls-M6r"/>
                                             </connections>
                                         </menuItem>
                                     </items>
@@ -296,7 +302,7 @@
                                         <menuItem title="Line Spacing..." id="mBo-ya-UsY">
                                             <modifierMask key="keyEquivalentModifierMask"/>
                                             <connections>
-                                                <action selector="showLineSpacingSheet:" target="-1" id="tQ0-g3-OpM"/>
+                                                <action selector="showLineSpacingPopoverFromMenu:" target="-1" id="61D-5o-As8"/>
                                             </connections>
                                         </menuItem>
                                     </items>

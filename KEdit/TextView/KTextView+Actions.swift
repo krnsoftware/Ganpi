@@ -51,7 +51,7 @@ extension KTextView {
             if storage.fontSize <= 5 { return }
             storage.fontSize = storage.fontSize - 1
         }
-    }*/
+    }
     
     @IBAction func showFontSizeSheet(_ sender: Any?) {
         guard let documentWindow = window,
@@ -72,7 +72,7 @@ extension KTextView {
                 NSSound.beep()
             }
         }
-    }
+    }*/
     
     
     
@@ -86,9 +86,5 @@ extension KTextView {
         textStorage.redo()
     }
     
-    // MARK: - Others
     
-    @IBAction func showLineJumpSheet(_ sender: Any?) {
-        
-    }
 }
