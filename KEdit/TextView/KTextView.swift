@@ -93,6 +93,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         didSet {
             _caretView.isHidden = !selectionRange.isEmpty
             _caretIndex = selectionRange.upperBound
+            updateCaretPosition()
             sendStatusBarUpdateAction()
             needsDisplay = true
         }
@@ -1754,6 +1755,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             guard let oneBasedColumn = Int(columnPart), oneBasedColumn >= 1 else { return nil }
 
             let absoluteOffset = min(lineStart + (oneBasedColumn - 1), documentLength)
+            log("spec: \(spec), range: \(absoluteOffset..<absoluteOffset)",from:self)
             return absoluteOffset..<absoluteOffset
         }
 
