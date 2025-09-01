@@ -1,6 +1,6 @@
 //
 //  KFocusOverlayView.swift
-//  KEdit
+//  Ganpi
 //
 //  Created by KARINO Masatugu on 2025/08/14.
 //

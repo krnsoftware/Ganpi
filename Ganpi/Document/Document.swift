@@ -1,6 +1,6 @@
 //
 //  Document.swift
-//  KEdit
+//  Ganpi
 //
 //  Created by KARINO Masatugu on 2025/05/25.
 //

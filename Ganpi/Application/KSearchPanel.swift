@@ -1,3 +1,10 @@
+//
+//  KSearchPanel.swift
+//  Ganpi
+//
+//  Created by KARINO Masatugu on 2025/05/25.
+//
+
 import AppKit
 
 /// 検索パネル（XIB: "SearchPanel.xib"）

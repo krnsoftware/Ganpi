@@ -1,6 +1,6 @@
 //
 //  KTextStorage.swift
-//  KEdit
+//  Ganpi
 //
 //  Created by KARINO Masatugu on 2025/06/08.
 //
@@ -98,7 +98,7 @@ typealias KTextStorageProtocol = KTextStorageReadable & KTextStorageWritable
 
 // MARK: - KTextStorage
 
-// KEdit用軽量テキストストレージ
+// Ganpi用軽量テキストストレージ
 final class KTextStorage: KTextStorageProtocol {
     // MARK: - Enum and Struct
     

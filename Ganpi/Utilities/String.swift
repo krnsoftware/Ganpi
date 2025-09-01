@@ -1,6 +1,6 @@
 //
 //  String.swift
-//  KEdit
+//  Ganpi
 //
 //  Created by KARINO Masatugu on 2025/06/01.
 //
@@ -611,11 +611,11 @@ extension NSColor {
 
 extension String.Encoding {
     
-    // KEditで扱うことのできるエンコーディングを定義する。
+    // Ganpiで扱うことのできるエンコーディングを定義する。
     static let characterCodeTypeArray: [String.Encoding] = [.shiftJIS, .iso2022JP, .japaneseEUC,
                                                             .utf8, .utf16, .utf32]
     
-    // 与えられたString.EncodingがKEditで扱えるものであるかチェックする。
+    // 与えられたString.EncodingがGanpiで扱えるものであるかチェックする。
     static func isValidType(_ code: String.Encoding) -> Bool {
         return characterCodeTypeArray.contains(code)
     }

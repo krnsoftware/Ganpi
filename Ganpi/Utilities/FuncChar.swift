@@ -1,6 +1,6 @@
 //
 //  FuncChar.swift
-//  KEdit
+//  Ganpi
 //
 //  Created by KARINO Masatugu,
 //  with architectural assistance by Sebastian, his loyal AI butler.

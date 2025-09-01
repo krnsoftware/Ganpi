@@ -1,6 +1,6 @@
 //
 //  KViewController.swift
-//  KEdit
+//  Ganpi
 //
 //  Created by KARINO Masatugu
 //
