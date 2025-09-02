@@ -494,7 +494,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             lines.addFakeLine(replacementRange: repRange, attrString: _markedText)
         }
         for i in 0..<lines.count {
-            let y = CGFloat(i) * lineHeight + layoutRects.textEdgeInsets.top
+            //let y = CGFloat(i) * lineHeight + layoutRects.textEdgeInsets.top
+            let y = ceil(CGFloat(i) * lineHeight + layoutRects.textEdgeInsets.top)
             
             let textPoint = CGPoint(x: textRect.origin.x + layoutRects.horizontalInsets ,
                                     y: textRect.origin.y + y)
