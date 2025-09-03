@@ -539,6 +539,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 let size = number.size(withAttributes: attrs)
                 
                 let numberPointX = lnRect.maxX - size.width - KLayoutRects.KLineNumberEdgeInsets.default.right
+                //let numberPointX = ceil(lnRect.maxX - size.width - KLayoutRects.KLineNumberEdgeInsets.default.right)
+                //log("number: \(number), nuberPointX: \(numberPointX)",from:self)
                 //let numberPointY = lnRect.origin.y + y - visibleRect.origin.y
                 // 上下がずれないよう、base lineを合わせる。
                 let numberPointY = lnRect.origin.y + y - visibleRect.origin.y + _textStorageRef.baseFont.ascender - _textStorageRef.lineNumberFont.ascender
@@ -1398,7 +1400,22 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     @objc private func clipViewBoundsDidChange(_ notification: Notification) {
         guard let contentBounds = enclosingScrollView?.contentView.bounds
         else { log("cvBounds==nil", from: self); return }
+        
+        if contentBounds.origin.x != _prevContentViewBounds.origin.x {
+            if let layoutRects = _layoutManager.makeLayoutRects(),
+               let contentView = enclosingScrollView?.contentView {
+                let pos = characterPosition(at: caretIndex)
+                let currentX = pos.x - layoutRects.horizontalInsets - contentView.bounds.minX
 
+                // 選択が空のときだけ表示可。行番号領域に隠れたら消す。
+                _caretView.isHidden = !selectionRange.isEmpty || (currentX < 0)
+            }
+
+        }
+        _prevContentViewBounds = contentBounds
+        needsDisplay = true
+        
+        /*
         // ワードラップ時：可視領域サイズが変われば再描画
         if contentBounds.size != _prevContentViewBounds.size, wordWrap {
             _prevContentViewBounds = contentBounds
@@ -1407,10 +1424,10 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
 
         // ノーラップ時：スクロールに伴う原点移動で再描画
-        if bounds.origin != _prevContentViewBounds.origin {
+        //if bounds.origin != _prevContentViewBounds.origin {
+        if contentBounds.origin != _prevContentViewBounds.origin {
             _prevContentViewBounds = contentBounds
 
-            // ※ ここを“選択優先”に修正
             if let layoutRects = _layoutManager.makeLayoutRects(),
                let contentView = enclosingScrollView?.contentView {
                 let pos = characterPosition(at: caretIndex)
@@ -1423,6 +1440,11 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             needsDisplay = true
             return
         }
+        
+        // 原点にいる時にワードラップオフの状態で右にスクロールすると行番号が一瞬ブレる問題を解決。
+        if contentBounds.minX != _prevContentViewBounds.minX {
+            needsDisplay = true
+        }*/
     }
     
     

@@ -124,28 +124,16 @@ final class KTextViewContainerView: NSView {
     private func setup() {
         _scrollView.hasVerticalScroller = true
         _scrollView.hasHorizontalScroller = true
+        
         _scrollView.documentView = _textView
+        
         _scrollView.translatesAutoresizingMaskIntoConstraints = false
+        
+        
         _textView.updateFrameSizeToFitContent()
         _textView.containerView = self
         
-        // test
-       
-        // KTextViewContainerView のスクロール設定内
-/*
-        if #available(macOS 11.0, *) {
-            _scrollView.automaticallyAdjustsContentInsets = false
-        }
-
-        // ← ここを .zero ではなく明示初期化に
-        if _scrollView.responds(to: #selector(setter: NSScrollView.contentInsets)) {
-            _scrollView.contentInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
-        }
-        if _scrollView.responds(to: #selector(setter: NSScrollView.scrollerInsets)) {
-            _scrollView.scrollerInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
-        }
-        // end
-*/
+        
         addSubview(_scrollView)
 
         NSLayoutConstraint.activate([
@@ -156,3 +144,5 @@ final class KTextViewContainerView: NSView {
         ])
     }
 }
+
+
