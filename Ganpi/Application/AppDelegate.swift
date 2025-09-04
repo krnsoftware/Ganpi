@@ -9,6 +9,7 @@ import Cocoa
 
 @main
 class AppDelegate: NSObject, NSApplicationDelegate {
+    
     // 起動直後に復元されるウインドウをすべて無効化（macOS標準の状態復元を切る）
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { false }
     
@@ -40,6 +41,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @IBAction func showSearchPanel(_ sender: Any?) {
         KSearchPanel.shared.show()
     }
+    
+    /*
+    @IBAction func toggleLogPanel(_ sender: Any?) {
+        if _logPanelController == nil || _logPanelController?.window == nil {
+            _logPanelController = KLogPanelController(windowNibName: "LogPanel")
+        }
+        _logPanelController?.toggle()
+    }
+    @IBAction func toggleLogPanel(_ sender: Any?) {
+        _logPanelController.toggle()
+    }*/
+    
+    @IBAction func showLogPanel(_ sender: Any?) {
+        KLogPanel.shared.show()
+    }
+    
+    
+    
     
 }
 
