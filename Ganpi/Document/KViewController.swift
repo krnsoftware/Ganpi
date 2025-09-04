@@ -320,13 +320,13 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         let leftStack = NSStackView(views: [_encButton, _eolButton, _syntaxButton])
         leftStack.orientation = .horizontal
         leftStack.alignment = .centerY
-        leftStack.spacing = 12
+        leftStack.spacing = 4//12
         leftStack.translatesAutoresizingMaskIntoConstraints = false
 
         let rightStack = NSStackView(views: [_caretButton, _fontSizeButton, _lineSpacingButton])
         rightStack.orientation = .horizontal
         rightStack.alignment = .centerY
-        rightStack.spacing = 12
+        rightStack.spacing = 4//12
         rightStack.translatesAutoresizingMaskIntoConstraints = false
 
         _statusBarView.addSubview(leftStack)
@@ -579,22 +579,22 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
             let totalCharacterCount = ts.count.formatted(.number.locale(.init(identifier: "en_US")))
             let currentLineNumber = m.line.formatted(.number.locale(.init(identifier: "en_US")))
             let currentLineColumn = m.column.formatted(.number.locale(.init(identifier: "en_US")))
-            _caretButton.title = "Line: \(currentLineNumber):\(currentLineColumn)  [ch: \(totalCharacterCount)  ln: \(totalLineCount)]"
+            _caretButton.title = "Line: \(currentLineNumber):\(currentLineColumn)  [ch:\(totalCharacterCount) ln:\(totalLineCount)]"
         } else {
             _caretButton.title = ""
         }
 
         if let fs = _document?.textStorage.fontSize {
-            _fontSizeButton.title = "FS: " + String(format: "%.1f", fs)
+            _fontSizeButton.title = "FS:" + String(format: "%.1f", fs)
         } else {
-            _fontSizeButton.title = "FS: —"
+            _fontSizeButton.title = "FS:—"
         }
 
         if let tv = activeTextView() {
             let ls = Double(tv.layoutManager.lineSpacing)
-            _lineSpacingButton.title = "LS: " + String(format: "%.2f", ls)
+            _lineSpacingButton.title = "LS:" + String(format: "%.1f", ls)
         } else {
-            _lineSpacingButton.title = "LS: —"
+            _lineSpacingButton.title = "LS:—"
         }
     }
 
