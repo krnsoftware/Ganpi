@@ -548,7 +548,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 
                 if !verticalRange.contains(numberPoint.y) { continue }
                 
-                
+                log("line: \(line)",from:self)
                 let lineRange = _textStorageRef.lineRange(at: line.range.lowerBound) ?? line.range
                 let isActive =
                 selectionRange.overlaps(lineRange)
@@ -637,7 +637,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     
     // MARK: - Horizontal Movement (NSResponder methods)
-    
+    /*
     override func moveLeft(_ sender: Any?) {
         moveCaretHorizontally(to: .backward, extendSelection: false)
     }
@@ -653,6 +653,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     override func moveLeftAndModifySelection(_ sender: Any?) {
         moveCaretHorizontally(to: .backward, extendSelection: true)
     }
+    */
     
     private func moveCaretHorizontally(to direction: KTextEditDirection, extendSelection: Bool) {
         if !wasHorizontalActionWithModifySelection && extendSelection {
@@ -697,6 +698,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     // MARK: - Vertical Movement (NSResponder methods)
     
+    /*
     override func moveUp(_ sender: Any?) {
         moveCaretVertically(to: .backward, extendSelection: false)
     }
@@ -712,6 +714,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     override func moveDownAndModifySelection(_ sender: Any?) {
         moveCaretVertically(to: .forward, extendSelection: true)
     }
+     */
     
     
     private func moveCaretVertically(to direction: KTextEditDirection, extendSelection: Bool) {
@@ -800,7 +803,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     
     // MARK: - Text Editing
-    
+    /*
     override func insertNewline(_ sender: Any?) {
         let newlineChar:Character = "\n"
         
@@ -880,7 +883,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
         
         _verticalCaretX = nil
-    }
+    }*/
     
     // 前回のアクションのセレクタを保存するために実装
     override func doCommand(by selector: Selector) {
@@ -1938,6 +1941,123 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         path.lineWidth = 1.0
         path.stroke()
         NSGraphicsContext.restoreGraphicsState()
+    }
+
+    
+    // MARK: - Vertical Movement
+    
+    override func moveUp(_ sender: Any?) {
+        moveCaretVertically(to: .backward, extendSelection: false)
+    }
+    
+    override func moveDown(_ sender: Any?) {
+        moveCaretVertically(to: .forward, extendSelection: false)
+    }
+    
+    override func moveUpAndModifySelection(_ sender: Any?) {
+        moveCaretVertically(to: .backward, extendSelection: true)
+    }
+    
+    override func moveDownAndModifySelection(_ sender: Any?) {
+        moveCaretVertically(to: .forward, extendSelection: true)
+    }
+    
+    // MARK: - Horizontal Movement
+    
+    override func moveLeft(_ sender: Any?) {
+        moveCaretHorizontally(to: .backward, extendSelection: false)
+    }
+    
+    override func moveRight(_ sender: Any?) {
+        moveCaretHorizontally(to: .forward, extendSelection: false)
+    }
+    
+    override func moveLeftAndModifySelection(_ sender: Any?) {
+        moveCaretHorizontally(to: .backward, extendSelection: true)
+    }
+    
+    override func moveRightAndModifySelection(_ sender: Any?) {
+        moveCaretHorizontally(to: .forward, extendSelection: true)
+    }
+    
+    
+    // MARK: - Insert and Delete Functional Characters
+    
+    override func insertNewline(_ sender: Any?) {
+        let newlineChar:Character = "\n"
+        
+        var spaces:[Character] = [newlineChar]
+        
+        if _autoIndent && selectionRange.lowerBound != 0 && _textStorageRef[selectionRange.lowerBound - 1] != newlineChar {
+            var range = 0..<0
+            for i in (0..<selectionRange.lowerBound - 1).reversed() {
+                if i == 0 {
+                    range = 0..<selectionRange.lowerBound
+                } else if _textStorageRef[i] == newlineChar {
+                    range = (i + 1)..<selectionRange.lowerBound
+                    break
+                }
+            }
+            
+            for i in range {
+                if let c = _textStorageRef[i] {
+                    if !" \t".contains(c) { break }
+                    spaces.append(c)
+                }
+            }
+        }
+        
+        _textStorageRef.replaceString(in: selectionRange, with: String(spaces))
+    }
+    
+    override func insertTab(_ sender: Any?) {
+        _textStorageRef.replaceString(in: selectionRange, with: "\t")
+    }
+    
+    override func deleteBackward(_ sender: Any?) {
+        guard caretIndex > 0 else { return }
+        
+        if !selectionRange.isEmpty {
+            _textStorageRef.replaceCharacters(in: selectionRange, with: [])
+        } else {
+            _textStorageRef.replaceCharacters(in: caretIndex - 1..<caretIndex, with: [])
+        }
+        
+        _verticalCaretX = nil
+    }
+    
+    // MARK: - COPY and Paste (NSResponder method)
+    
+    @IBAction func cut(_ sender: Any?) {
+        copy(sender)
+        
+        _textStorageRef.replaceCharacters(in: selectionRange, with: [])
+        
+    }
+    
+    @IBAction func copy(_ sender: Any?) {
+        guard !selectionRange.isEmpty else { return }
+        guard let slicedCharacters = _textStorageRef[selectionRange] else { return }
+        let selectedText = String(slicedCharacters)
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(selectedText, forType: .string)
+    }
+    
+    @IBAction func paste(_ sender: Any?) {
+        let pasteboard = NSPasteboard.general
+        guard let rawString = pasteboard.string(forType: .string) else { return }
+        
+        let string = rawString.normalizedString
+        
+        _textStorageRef.replaceCharacters(in: selectionRange, with: Array(string))
+        
+        
+    }
+    
+    @IBAction override func selectAll(_ sender: Any?) {
+        selectionRange = 0..<_textStorageRef.count
+        
     }
 
     

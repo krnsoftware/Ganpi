@@ -486,8 +486,9 @@ final class KTextStorage: KTextStorageProtocol {
     
     // index文字目のある場所を含む行のRangeを返す。改行は含まない。
     func lineRange(at index: Int) -> Range<Int>? {
-        guard index >= 0 && index < _characters.count else { return nil }
-
+        //guard index >= 0 && index < _characters.count else { log("index out of range.",from:self); return nil }
+        guard index >= 0 && index <= _characters.count else { log("index out of range.",from:self); return nil }
+        /*
         var lower = index
         while lower > 0 {
             if _characters[lower - 1].isNewline {
@@ -504,6 +505,19 @@ final class KTextStorage: KTextStorageProtocol {
             upper += 1
         }
 
+        return lower..<upper
+         */
+        
+        var lower = index
+        while lower > 0 {
+            if skeletonString.bytes[lower - 1] == FuncChar.lf { break }
+            lower -= 1
+        }
+        var upper = index
+        while upper < count {
+            if skeletonString.bytes[upper] == FuncChar.lf { break }
+            upper += 1
+        }
         return lower..<upper
     }
 
