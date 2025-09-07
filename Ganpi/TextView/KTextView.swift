@@ -539,16 +539,12 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 let size = number.size(withAttributes: attrs)
                 
                 let numberPointX = lnRect.maxX - size.width - KLayoutRects.KLineNumberEdgeInsets.default.right
-                //let numberPointX = ceil(lnRect.maxX - size.width - KLayoutRects.KLineNumberEdgeInsets.default.right)
-                //log("number: \(number), nuberPointX: \(numberPointX)",from:self)
-                //let numberPointY = lnRect.origin.y + y - visibleRect.origin.y
                 // 上下がずれないよう、base lineを合わせる。
                 let numberPointY = lnRect.origin.y + y - visibleRect.origin.y + _textStorageRef.baseFont.ascender - _textStorageRef.lineNumberFont.ascender
                 let numberPoint = CGPoint(x: numberPointX, y: numberPointY)
                 
                 if !verticalRange.contains(numberPoint.y) { continue }
                 
-                log("line: \(line)",from:self)
                 let lineRange = _textStorageRef.lineRange(at: line.range.lowerBound) ?? line.range
                 let isActive =
                 selectionRange.overlaps(lineRange)
@@ -572,9 +568,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
          NSColor.red.setStroke()
          path.lineWidth = 2
          path.stroke()*/
-        
-        // フォーカスリングを描く
-        //_drawFocusBorderIfNeeded()
         
         
         
@@ -1942,48 +1935,244 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         path.stroke()
         NSGraphicsContext.restoreGraphicsState()
     }
+    
+    enum KCaretMoveKind {
+        case word
+        case line
+        case paragraph
+        case document
+    }
+    
+    // キーアサイン用のキャレット移動をサポートする関数
+    // 水平方向の移動をサポート
+    @discardableResult
+    private func moveSelection(for kind: KCaretMoveKind, to direction: KTextEditDirection, extendSelection: Bool, remove: Bool = false) -> Bool {
+        
+        let selection = selectionRange
+        let count = textStorage.count
+        var newRange = selectionRange
+        
+        if kind == .document {
+            if direction == .forward {
+                if extendSelection { newRange = selection.lowerBound..<count }
+                else { newRange = count..<count }
+            } else {
+                if extendSelection { newRange = 0..<selection.upperBound }
+                else { newRange = 0..<0 }
+            }
+        }
+        
+        if kind == .paragraph {
+            if direction == .forward {
+                guard let range = textStorage.lineRange(at: selection.upperBound) else {
+                    log("lineRange is nil.",from:self); return false }
+                let upper = range.upperBound
+                if extendSelection { newRange = selection.lowerBound..<upper }
+                else { newRange = upper..<upper }
+            } else {
+                guard let range = textStorage.lineRange(at: selection.lowerBound) else {
+                    log("lineRange is nil.",from:self); return false }
+                let lower = range.lowerBound
+                if extendSelection { newRange = lower..<selection.upperBound }
+                else { newRange = lower..<lower }
+            }
+        }
+        
+        if kind == .line {
+            if direction == .forward {
+                let info = layoutManager.line(at: selection.upperBound)
+                guard let line = info.line else { log("line is nil.",from:self); return false }
+                let upper = line.range.upperBound
+                if extendSelection { newRange = selection.lowerBound..<upper }
+                else { newRange = upper..<upper }
+            } else {
+                let info = layoutManager.line(at: selection.lowerBound)
+                guard let line = info.line else { log("line is nil.",from:self); return false }
+                let lower = line.range.lowerBound
+                if extendSelection { newRange =  lower..<selection.upperBound }
+                else { newRange = lower..<lower }
+            }
+        }
+        
+        if kind == .word {
+            
+        }
+        
+        if remove {
+            _textStorageRef.deleteCharacters(in: newRange)
+            selectionRange = newRange.lowerBound..<newRange.lowerBound
+            
+        } else {
+            selectionRange = newRange
+        }
+        _verticalCaretX = nil
+        
+        return true
+    }
+    
 
     
     // MARK: - Vertical Movement
     
-    override func moveUp(_ sender: Any?) {
+    @IBAction override func moveUp(_ sender: Any?) {
         moveCaretVertically(to: .backward, extendSelection: false)
     }
     
-    override func moveDown(_ sender: Any?) {
+    @IBAction override func moveDown(_ sender: Any?) {
         moveCaretVertically(to: .forward, extendSelection: false)
     }
     
-    override func moveUpAndModifySelection(_ sender: Any?) {
+    @IBAction override func moveUpAndModifySelection(_ sender: Any?) {
         moveCaretVertically(to: .backward, extendSelection: true)
     }
     
-    override func moveDownAndModifySelection(_ sender: Any?) {
+    @IBAction override func moveDownAndModifySelection(_ sender: Any?) {
         moveCaretVertically(to: .forward, extendSelection: true)
     }
     
     // MARK: - Horizontal Movement
     
-    override func moveLeft(_ sender: Any?) {
+    // Character.
+    @IBAction override func moveLeft(_ sender: Any?) {
         moveCaretHorizontally(to: .backward, extendSelection: false)
     }
     
-    override func moveRight(_ sender: Any?) {
+    @IBAction override func moveRight(_ sender: Any?) {
         moveCaretHorizontally(to: .forward, extendSelection: false)
     }
     
-    override func moveLeftAndModifySelection(_ sender: Any?) {
+    @IBAction override func moveLeftAndModifySelection(_ sender: Any?) {
         moveCaretHorizontally(to: .backward, extendSelection: true)
     }
     
-    override func moveRightAndModifySelection(_ sender: Any?) {
+    @IBAction override func moveRightAndModifySelection(_ sender: Any?) {
         moveCaretHorizontally(to: .forward, extendSelection: true)
     }
     
     
+    // Word.
+    @IBAction override func moveWordLeft(_ sender: Any?) {
+        moveSelection(for: .word, to: .backward, extendSelection: false)
+    }
+    
+    @IBAction override func moveWordRight(_ sender: Any?) {
+        moveSelection(for: .word, to: .forward, extendSelection: false)
+    }
+    
+    @IBAction override func moveWordLeftAndModifySelection(_ sender: Any?) {
+        moveSelection(for: .word, to: .backward, extendSelection: true)
+    }
+    
+    @IBAction override func moveWordRightAndModifySelection(_ sender: Any?) {
+        moveSelection(for: .word, to: .forward, extendSelection: true)
+    }
+    
+    
+    // Line.
+    @IBAction override func moveToBeginningOfLine(_ sender: Any?) {
+        moveSelection(for: .line, to: .backward, extendSelection: false)
+    }
+    
+    @IBAction override func moveToEndOfLine(_ sender: Any?) {
+        moveSelection(for: .line, to: .forward, extendSelection: false)
+    }
+    
+    @IBAction override func moveToBeginningOfLineAndModifySelection(_ sender: Any?) {
+        moveSelection(for: .line, to: .backward, extendSelection: true)
+    }
+    
+    @IBAction override func moveToEndOfLineAndModifySelection(_ sender: Any?) {
+        moveSelection(for: .line, to: .forward, extendSelection: true)
+    }
+    
+    
+    // Paragraph.
+    @IBAction override func moveToBeginningOfParagraph(_ sender: Any?) {
+        moveSelection(for: .paragraph, to: .backward, extendSelection: false)
+    }
+    
+    @IBAction override func moveToEndOfParagraph(_ sender: Any?) {
+        moveSelection(for: .paragraph, to: .forward, extendSelection: false)
+    }
+    
+    @IBAction override func moveToBeginningOfParagraphAndModifySelection(_ sender: Any?) {
+        moveSelection(for: .paragraph, to: .backward, extendSelection: true)
+    }
+    
+    @IBAction override func moveToEndOfParagraphAndModifySelection(_ sender: Any?) {
+        moveSelection(for: .paragraph, to: .forward, extendSelection: true)
+    }
+    
+    // Document.
+    @IBAction override func moveToBeginningOfDocument(_ sender: Any?) {
+        moveSelection(for: .document, to: .backward, extendSelection: false)
+    }
+    
+    @IBAction override func moveToEndOfDocument(_ sender: Any?) {
+        moveSelection(for: .document, to: .forward, extendSelection: false)
+    }
+    
+    @IBAction override func moveToBeginningOfDocumentAndModifySelection(_ sender: Any?) {
+        moveSelection(for: .document, to: .backward, extendSelection: true)
+    }
+    
+    @IBAction override func moveToEndOfDocumentAndModifySelection(_ sender: Any?) {
+        moveSelection(for: .document, to: .forward, extendSelection: true)
+    }
+    
+    //MARK: - Remove
+    
+    @IBAction override func deleteBackward(_ sender: Any?) {
+        guard caretIndex >= 0, caretIndex <= textStorage.count else { log("caret Index is out of range.",from:self); return }
+        
+        if !selectionRange.isEmpty {
+            _textStorageRef.replaceCharacters(in: selectionRange, with: [])
+        } else if caretIndex > 0 {
+            _textStorageRef.replaceCharacters(in: caretIndex - 1..<caretIndex, with: [])
+        }
+        _verticalCaretX = nil
+    }
+    
+    @IBAction override func deleteForward(_ sender: Any?) {
+        guard caretIndex >= 0, caretIndex <= textStorage.count else { log("caret Index is out of range.",from:self); return }
+        
+        if !selectionRange.isEmpty {
+            _textStorageRef.deleteCharacters(in: selectionRange)
+        } else if caretIndex < textStorage.count {
+            _textStorageRef.deleteCharacters(in: caretIndex..<caretIndex + 1)
+        }
+        _verticalCaretX = nil
+    }
+    
+    @IBAction override func deleteWordBackward(_ sender: Any?) {
+        moveSelection(for: .word, to: .backward, extendSelection: true, remove: true)
+    }
+    
+    @IBAction override func deleteWordForward(_ sender: Any?) {
+        moveSelection(for: .word, to: .forward, extendSelection: true, remove: true)
+    }
+    
+    @IBAction override func deleteToBeginningOfLine(_ sender: Any?) {
+        moveSelection(for: .line, to: .backward, extendSelection: true, remove: true)
+    }
+    
+    @IBAction override func deleteToEndOfLine(_ sender: Any?) {
+        moveSelection(for: .line, to: .forward, extendSelection: true, remove: true)
+    }
+    
+    @IBAction override func deleteToBeginningOfParagraph(_ sender: Any?) {
+        moveSelection(for: .paragraph, to: .backward, extendSelection: true, remove: true)
+    }
+    
+    @IBAction override func deleteToEndOfParagraph(_ sender: Any?) {
+        moveSelection(for: .paragraph, to: .forward, extendSelection: true, remove: true)
+    }
+    
+    
+    
     // MARK: - Insert and Delete Functional Characters
     
-    override func insertNewline(_ sender: Any?) {
+    @IBAction override func insertNewline(_ sender: Any?) {
         let newlineChar:Character = "\n"
         
         var spaces:[Character] = [newlineChar]
@@ -2010,21 +2199,14 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         _textStorageRef.replaceString(in: selectionRange, with: String(spaces))
     }
     
-    override func insertTab(_ sender: Any?) {
+    @IBAction override func insertTab(_ sender: Any?) {
         _textStorageRef.replaceString(in: selectionRange, with: "\t")
     }
     
-    override func deleteBackward(_ sender: Any?) {
-        guard caretIndex > 0 else { return }
-        
-        if !selectionRange.isEmpty {
-            _textStorageRef.replaceCharacters(in: selectionRange, with: [])
-        } else {
-            _textStorageRef.replaceCharacters(in: caretIndex - 1..<caretIndex, with: [])
-        }
-        
-        _verticalCaretX = nil
+    @IBAction override func insertBacktab(_ sender: Any?) {
+        log("do nothing.",from:self)
     }
+    
     
     // MARK: - COPY and Paste (NSResponder method)
     
