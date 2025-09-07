@@ -1995,7 +1995,17 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
         
         if kind == .word {
-            
+            if direction == .forward {
+                let upper = max(selectionRange.upperBound - 1, selectionRange.lowerBound)
+                guard let upperRange = textStorage.wordRange(at: upper) else { log("no upper.",from:self); return false }
+                if extendSelection { newRange = selection.lowerBound..<upperRange.upperBound }
+                else { newRange = upperRange.upperBound..<upperRange.upperBound }
+            } else {
+                let lower = min(selectionRange.lowerBound, selectionRange.upperBound - 1 )
+                guard let lowerRange = textStorage.wordRange(at: lower) else { log("no lower.",from:self); return false }
+                if extendSelection { newRange = lowerRange.lowerBound..<selection.upperBound }
+                else { newRange = lowerRange.lowerBound..<lowerRange.lowerBound }
+            }
         }
         
         if remove {
@@ -2118,6 +2128,30 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     @IBAction override func moveToEndOfDocumentAndModifySelection(_ sender: Any?) {
         moveSelection(for: .document, to: .forward, extendSelection: true)
+    }
+    
+    
+    //MARK: - Select.
+    
+    @IBAction override func selectWord(_ sender: Any?) {
+        let upper = max(selectionRange.upperBound - 1, selectionRange.lowerBound)
+        guard let lowerRange = textStorage.wordRange(at: selectionRange.lowerBound) else { log("no lower.",from:self); return }
+        guard let upperRange = textStorage.wordRange(at: upper) else { log("no upper.",from:self); return }
+        selectionRange = lowerRange.lowerBound..<upperRange.upperBound
+    }
+    
+    @IBAction override func selectLine(_ sender: Any?) {
+        let lowerInfo = layoutManager.line(at: selectionRange.lowerBound)
+        let upperInfo = layoutManager.line(at: selectionRange.upperBound)
+        guard let lowerLine = lowerInfo.line else { log("no lower.",from:self); return }
+        guard let upperLine = upperInfo.line else { log("no upper.",from:self); return }
+        selectionRange = lowerLine.range.lowerBound..<upperLine.range.upperBound
+    }
+    
+    @IBAction override func selectParagraph(_ sender: Any?) {
+        guard let lowerRange = textStorage.lineRange(at: selectionRange.lowerBound) else { log("no lower.",from:self); return }
+        guard let upperRange = textStorage.lineRange(at: selectionRange.upperBound) else { log("no upper.",from:self); return }
+        selectionRange = lowerRange.lowerBound..<upperRange.upperBound
     }
     
     //MARK: - Remove
