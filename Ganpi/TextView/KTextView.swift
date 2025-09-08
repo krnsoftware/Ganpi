@@ -1289,7 +1289,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
         
         updateCaretPosition()
-        scrollCaretToVisible()
+        //scrollCaretToVisible()
+        centerSelectionInVisibleArea(nil)
         
         return true
     }
@@ -2166,7 +2167,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         selectionRange = lowerRange.lowerBound..<upperRange.upperBound
     }
     
-    //MARK: - Remove
+    //MARK: - Delete.
     
     @IBAction override func deleteBackward(_ sender: Any?) {
         guard caretIndex >= 0, caretIndex <= textStorage.count else { log("caret Index is out of range.",from:self); return }
@@ -2216,7 +2217,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     
     
-    // MARK: - Insert and Delete Functional Characters
+    // MARK: - Insert Functional Characters
     
     @IBAction override func insertNewline(_ sender: Any?) {
         let newlineChar:Character = "\n"
@@ -2287,8 +2288,55 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         selectionRange = 0..<_textStorageRef.count
         
     }
-
     
+    //MARK: - Scrolling.
+
+    @IBAction override func scrollPageUp(_ sender: Any?) {
+        
+    }
+    
+    @IBAction override func scrollPageDown(_ sender: Any?) {
+        
+    }
+    
+    @IBAction override func scrollLineUp(_ sender: Any?) {
+        
+    }
+    
+    @IBAction override func scrollLineDown(_ sender: Any?) {
+        
+    }
+    
+    @IBAction override func centerSelectionInVisibleArea(_ sender: Any?) {
+        guard let scrollView = enclosingScrollView else { return }
+        let clipView = scrollView.contentView
+
+        let caretPosition = characterPosition(at: caretIndex)
+        let lineHeight = layoutManager.lineHeight
+        let caretRect = NSRect(x: caretPosition.x,
+                               y: caretPosition.y - lineHeight * 0.7,
+                               width: 2,
+                               height: lineHeight)
+
+        let visibleSize = clipView.bounds.size
+        let documentBounds = bounds
+
+        // wrap=false のときだけ横スクロールを考慮
+        let targetX: CGFloat = {
+            guard !wordWrap else { return clipView.bounds.origin.x }
+            let rawX = caretRect.midX - visibleSize.width / 2
+            let maxX = max(0, documentBounds.width - visibleSize.width)
+            return max(0, min(rawX, maxX))
+        }()
+
+        // 縦方向
+        let rawY = caretRect.midY - visibleSize.height / 2
+        let maxY = max(0, documentBounds.height - visibleSize.height)
+        let targetY = max(0, min(rawY, maxY))
+
+        clipView.scroll(to: NSPoint(x: targetX, y: targetY))
+        scrollView.reflectScrolledClipView(clipView)
+    }
     
     
 }

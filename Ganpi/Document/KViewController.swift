@@ -443,7 +443,8 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
                 // let nsRange = NSRange(location: selection.lowerBound, length: selection.count)
                 //activeTextView.setSelectedRange(nsRange)// KTextView が NSTextView 互換ならこれでOK
                 activeTextView.selectionRange = selection
-                activeTextView.scrollSelectionToVisible()
+                //activeTextView.scrollSelectionToVisible()
+                activeTextView.centerSelectionInVisibleArea(nil)
 
                 // ステータス更新 & フォーカス復帰
                 self.updateStatusBar()
