@@ -1994,6 +1994,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             }
         }
         
+        /*
         if kind == .word {
             if direction == .forward {
                 let upper = max(selectionRange.upperBound - 1, selectionRange.lowerBound)
@@ -2006,6 +2007,26 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 if extendSelection { newRange = lowerRange.lowerBound..<selection.upperBound }
                 else { newRange = lowerRange.lowerBound..<lowerRange.lowerBound }
             }
+        }*/
+        if kind == .word {
+            
+            if direction == .forward {
+                var wordRange = selectionRange.upperBound..<count
+                for i in wordRange {
+                    if let range = textStorage.wordRange(at: i){ wordRange = range; break }
+                }
+                if extendSelection { newRange = selectionRange.lowerBound..<wordRange.upperBound }
+                else { newRange = wordRange.upperBound..<wordRange.upperBound }
+            } else {
+                var wordRange = 0..<max(selectionRange.lowerBound - 1, 0)
+                for i in wordRange.reversed() {
+                    if let range = textStorage.wordRange(at: i){ wordRange = range; break }
+                }
+                if extendSelection { newRange = wordRange.lowerBound..<selectionRange.upperBound }
+                else { newRange = wordRange.lowerBound..<wordRange.lowerBound }
+            }
+            
+            
         }
         
         if remove {
