@@ -95,6 +95,10 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             _caretIndex = selectionRange.upperBound
             updateCaretPosition()
             sendStatusBarUpdateAction()
+            
+            // test
+            scrollCaretToVisible()
+            
             needsDisplay = true
         }
     }
@@ -624,7 +628,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         //print("inputContext = \(inputContext?.debugDescription ?? "nil")")
         interpretKeyEvents( [event] )
         
-        scrollCaretToVisible()
+        //scrollCaretToVisible()
     }
     
     
@@ -763,7 +767,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         guard let ctLine = newLineInfo.ctLine else { print("\(#function): newLineInfo.ctLine nil"); return}
         
         // 初回のみ verticalCaretX をセット
-        if isVerticalAction && !wasVerticalAction {
+        //if isVerticalAction && !wasVerticalAction { 最初に垂直方向の移動で空打ちをした場合に_verticalCaretXがnilのまま残る問題に対処
+        if (isVerticalAction && !wasVerticalAction) || _verticalCaretX == nil {
             guard let currentCtLine = currentLine.ctLine else { print("\(#function): currentLine.ctLine nil"); return}
             let indexInLine = caretIndex - currentLine.range.lowerBound
             _verticalCaretX = CTLineGetOffsetForStringIndex(currentCtLine, indexInLine, nil) + layoutRects.horizontalInsets
@@ -2040,6 +2045,32 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     private func scrollVertically(for kind:KVerticalMoveKind, to direction:KTextEditDirection, caretMovement:Bool, extendSelection: Bool) {
         
+        guard let scrollView = enclosingScrollView else { log("enclosingScrollView is nil",from: self); return }
+        let clipView = scrollView.contentView
+        let lineHeight = layoutManager.lineHeight
+        let pageHeight = clipView.bounds.height
+        let clipViewOrigin = clipView.bounds.origin
+        log("clipView.bounds: \(clipView.bounds), frame: \(frame)",from:self)
+        
+        guard let layoutRects = layoutManager.makeLayoutRects() else { log("layoutRects is nil",from: self); return }
+        let topInset = layoutRects.textEdgeInsets.top
+        
+        switch kind {
+        case .page:
+            switch direction {
+            case .forward:
+                let y = min(frame.height - clipView.bounds.height, clipViewOrigin.y + pageHeight - lineHeight)
+                let point = CGPoint(x: clipViewOrigin.x, y: y)
+                clipView.scroll(to: point)
+                scrollView.reflectScrolledClipView(clipView)
+                
+                break
+            case .backward:
+                break
+            }
+        case .line:
+            break
+        }
     }
     
 
@@ -2245,11 +2276,11 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     //MARK: - Scrolling.
 
     @IBAction override func scrollPageUp(_ sender: Any?) {
-        
+        scrollVertically(for: .page, to: .backward, caretMovement:false, extendSelection: false)
     }
     
     @IBAction override func scrollPageDown(_ sender: Any?) {
-        
+        scrollVertically(for: .page, to: .forward, caretMovement:false, extendSelection: false)
     }
     
     @IBAction override func scrollLineUp(_ sender: Any?) {
