@@ -26,8 +26,7 @@ class KLine: CustomStringConvertible {
     
     // 行の幅をCGFloatで返す。
     var width: CGFloat {
-        let offsets = characterOffsets()
-        return offsets.last ?? 0.0
+        return characterOffsets.last ?? 0.0
     }
     
     
@@ -55,25 +54,49 @@ class KLine: CustomStringConvertible {
         hardLineIndex += delta
     }
     
-    // この行における文字のオフセットを行の左端を0.0とした相対座標のx位置のリストで返す。
-    func characterOffsets() -> [CGFloat] {
+    @inline(__always)
+    var characterOffsets:[CGFloat] {
         if !_widthAndOffsetsFixed {
             _ = makeCTLine(withoutColors: true)
         }
-        
         return _cachedOffsets
     }
     
-    // この行におけるindex文字目の相対位置を返す。
+    @inline(__always)
     func characterOffset(at index:Int) -> CGFloat {
-        let offsets = characterOffsets()
-        
-        if index < 0 || index >= offsets.count {
+        if index < 0 || index >= characterOffsets.count {
             log("index(\(index)) out of range.",from:self)
             return 0.0
         }
-        
-        return offsets[index]
+        return characterOffsets[index]
+    }
+    
+    
+    // この行における左端を0.0としたx座標がpositionである文字のインデックス(左端0)を返す。
+    // relativeX: 行左端=0基準のクリックX
+    @inline(__always)
+    func characterIndex(for relativeX: CGFloat) -> Int {
+        // 空行（edges==[0] 想定）
+        guard characterOffsets.count >= 2 else { return 0 }
+
+        let n = characterOffsets.count - 1 // 文字数
+        let x = max(0, relativeX)
+
+        // 端点ケア
+        if x <= characterOffsets[0] { return 0 }
+        if x >= characterOffsets[n] { return n }
+
+        // 区間 [lo, lo+1) を二分探索で特定（edges[lo] <= x < edges[lo+1]）
+        var lower = 0, upper = n
+        while lower + 1 < upper {
+            let mid = (lower + upper) >> 1
+            if x < characterOffsets[mid] { upper = mid } else { lower = mid }
+        }
+
+        // 左75%なら lo、その右25%なら lo+1
+        let left = characterOffsets[lower], right = characterOffsets[lower + 1]
+        let threshold = left + (right - left) * 0.67
+        return (x < threshold) ? lower : (lower + 1)
     }
     
     // KTextView.draw()から利用される描画メソッド
@@ -411,7 +434,7 @@ final class KLines: CustomStringConvertible {
         }*/
         
         //let newLineCharacter:Character = "\n"
-        let characters = textStorageRef.characterSlice
+        //let characters = textStorageRef.characterSlice
         
         var newRange = 0..<textStorageRef.count
         //var startIndex = 0

@@ -260,7 +260,8 @@ final class KLayoutManager: KLayoutManagerReadable {
         }
         
         // オフセットリストを取得
-        let offsets = hardLine.characterOffsets()
+        //let offsets = hardLine.characterOffsets()
+        let offsets = hardLine.characterOffsets
 
         if offsets.count == 0 {
             return [hardLine]

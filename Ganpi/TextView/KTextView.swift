@@ -1709,76 +1709,59 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
          private var horizontalSelectionBase: Int?   // 横方向に選択範囲を拡縮する際の基準点。
          */
         
-        // anchor（verticalSelectionBase）を初回のみセット
         if !wasVerticalActionWithModifySelection && extendSelection {
             _verticalSelectionBase = selectionRange.lowerBound
         }
         
-        // 初回使用時に問題が出ないように。
-        if _verticalSelectionBase == nil { _verticalSelectionBase = caretIndex }
+        if _verticalSelectionBase == nil {
+            _verticalSelectionBase = selectionRange.upperBound
+        }
         
-        // 基準インデックス決定（A/Bパターンに基づく）
-        let indexForLineSearch: Int = (selectionRange.lowerBound < _verticalSelectionBase!) ? selectionRange.lowerBound : selectionRange.upperBound
+        guard let verticalSelectionBase = _verticalSelectionBase else { log("_verticalSelectionBase is nil.",from:self); return }
         
-        // 基準行情報取得
-        let info = _layoutManager.line(at: indexForLineSearch)
-        guard let currentLine = info.line else { print("\(#function): currentLine is nil.");  return }
+        let indexForLineSearch: Int = (selectionRange.lowerBound < verticalSelectionBase) ? selectionRange.lowerBound : selectionRange.upperBound
         
+        let info = layoutManager.line(at: indexForLineSearch)
+        guard let currentLine = info.line else { log("currentLine is nil.",from:self); return }
         let newLineIndex = info.lineIndex + direction.rawValue
         
-        // newLineIndexがTextStorageインスタンスのcharacterの領域を越えている場合には両端まで広げる。
         if newLineIndex < 0 {
             if extendSelection {
                 selectionRange = 0..<selectionRange.upperBound
             } else {
                 caretIndex = 0
             }
-            //updateCaretPosition()
             return
         }
-        if newLineIndex >= _layoutManager.lines.count {
+        
+        if newLineIndex >= layoutManager.lines.count {
             if extendSelection {
-                selectionRange = selectionRange.lowerBound..<_textStorageRef.count
+                selectionRange = selectionRange.lowerBound..<textStorage.count
             } else {
-                caretIndex = _textStorageRef.count
+                caretIndex = textStorage.count
             }
-            //updateCaretPosition()
             return
         }
         
-        guard let layoutRects = _layoutManager.makeLayoutRects() else { print("\(#function); makeLayoutRects error"); return }
-        guard let newLineInfo = _layoutManager.lines[newLineIndex] else { log("newLineInfo is nil.", from:self); return }
-        guard let ctLine = newLineInfo.ctLine else { print("\(#function): newLineInfo.ctLine nil"); return}
+        guard let newLine = layoutManager.lines[newLineIndex] else { log("newLine is nil.",from:self); return }
         
-        // 初回のみ verticalCaretX をセット
-        //if isVerticalAction && !wasVerticalAction { //最初に垂直方向の移動で空打ちをした場合に_verticalCaretXがnilのまま残る問題に対処
-        if (isVerticalAction && !wasVerticalAction) || _verticalCaretX == nil {
-            guard let currentCtLine = currentLine.ctLine else { print("\(#function): currentLine.ctLine nil"); return}
+        if isVerticalAction && !wasVerticalAction || _verticalCaretX == nil {
             let indexInLine = caretIndex - currentLine.range.lowerBound
-            _verticalCaretX = CTLineGetOffsetForStringIndex(currentCtLine, indexInLine, nil) + layoutRects.horizontalInsets
+            _verticalCaretX = currentLine.characterOffset(at: indexInLine)
         }
+        guard let verticalCaretX = _verticalCaretX else { log("_verticalCaretX is nil.",from:self); return }
         
-        // 行末補正
-        // 次の行のテキストの横幅より右にキャレットが移動する場合、キャレットはテキストの右端へ。
-        let lineWidth = CGFloat(CTLineGetTypographicBounds(ctLine, nil, nil, nil))
-        let adjustedX = min(_verticalCaretX! - layoutRects.horizontalInsets, lineWidth)
-        let targetIndexInLine = CTLineGetStringIndexForPosition(ctLine, CGPoint(x: adjustedX, y: 0))
+        let adjustedX = min(verticalCaretX, newLine.width)
+        let newIndex = newLine.characterIndex(for: adjustedX) + newLine.range.lowerBound
         
-        // CTLineGetStringIndexForPositionは空行の場合に-1を返すため、その場合のindexは0にする。
-        let newCaretIndex = newLineInfo.range.lowerBound + (targetIndexInLine < 0 ? 0 : targetIndexInLine)
-        
-        // 選択範囲更新（verticalSelectionBaseは常に基準点として使用）
         if extendSelection {
-            let lower = min(_verticalSelectionBase!, newCaretIndex)
-            let upper = max(_verticalSelectionBase!, newCaretIndex)
+            let lower = min(verticalSelectionBase, newIndex)
+            let upper = max(verticalSelectionBase, newIndex)
             selectionRange = lower..<upper
-            
-            
         } else {
-            selectionRange = newCaretIndex..<newCaretIndex
+            caretIndex = newIndex
         }
         
-        //updateCaretPosition()
     }
     
     enum KCaretHorizontalMoveKind {
@@ -1946,6 +1929,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
     }
     
+    
+    
 
     
     // MARK: - Vertical Movement
@@ -1987,22 +1972,18 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     // Character.
     @IBAction override func moveLeft(_ sender: Any?) {
-        //moveCaretHorizontally(to: .backward, extendSelection: false)
         moveSelectionHorizontally(for: .character, to: .backward, extendSelection: false)
     }
     
     @IBAction override func moveRight(_ sender: Any?) {
-        //moveCaretHorizontally(to: .forward, extendSelection: false)
         moveSelectionHorizontally(for: .character, to: .forward, extendSelection: false)
     }
     
     @IBAction override func moveLeftAndModifySelection(_ sender: Any?) {
-        //moveCaretHorizontally(to: .backward, extendSelection: true)
         moveSelectionHorizontally(for: .character, to: .backward, extendSelection: true)
     }
     
     @IBAction override func moveRightAndModifySelection(_ sender: Any?) {
-        //moveCaretHorizontally(to: .forward, extendSelection: true)
         moveSelectionHorizontally(for: .character, to: .forward, extendSelection: true)
     }
     
@@ -2104,28 +2085,10 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     //MARK: - Delete.
     
     @IBAction override func deleteBackward(_ sender: Any?) {
-        /*
-        guard caretIndex >= 0, caretIndex <= textStorage.count else { log("caret Index is out of range.",from:self); return }
-        
-        if !selectionRange.isEmpty {
-            _textStorageRef.replaceCharacters(in: selectionRange, with: [])
-        } else if caretIndex > 0 {
-            _textStorageRef.replaceCharacters(in: caretIndex - 1..<caretIndex, with: [])
-        }
-        _verticalCaretX = nil*/
         moveSelectionHorizontally(for: .character, to: .backward, extendSelection: false, remove: true)
     }
     
     @IBAction override func deleteForward(_ sender: Any?) {
-        /*
-        guard caretIndex >= 0, caretIndex <= textStorage.count else { log("caret Index is out of range.",from:self); return }
-        
-        if !selectionRange.isEmpty {
-            _textStorageRef.deleteCharacters(in: selectionRange)
-        } else if caretIndex < textStorage.count {
-            _textStorageRef.deleteCharacters(in: caretIndex..<caretIndex + 1)
-        }
-        _verticalCaretX = nil*/
         moveSelectionHorizontally(for: .character, to: .forward, extendSelection: false, remove: true)
     }
     

@@ -128,8 +128,7 @@ struct KLayoutRects {
                 
                 var indexInLine = 0
                 if !line.range.isEmpty {
-                    let edges = line.characterOffsets()
-                    indexInLine = characterIndex(for: relativeX, edges: edges)
+                    indexInLine = line.characterIndex(for: relativeX)
                 }
                 
                 return .text(index: line.range.lowerBound + indexInLine)
@@ -148,33 +147,5 @@ struct KLayoutRects {
         return .outside
     }
     
-    
-    // relativeX: 行左端=0基準のクリックX
-    // edges: 各文字の左端 + 行末の終端オフセット（count = 文字数 + 1）
-    // 戻り値: caret を置く index（0...文字数）
-    @inline(__always)
-    private func characterIndex(for relativeX: CGFloat, edges: [CGFloat]) -> Int {
-        // 空行（edges==[0] 想定）
-        guard edges.count >= 2 else { return 0 }
-
-        let n = edges.count - 1 // 文字数
-        let x = max(0, relativeX)
-
-        // 端点ケア
-        if x <= edges[0] { return 0 }
-        if x >= edges[n] { return n }
-
-        // 区間 [lo, lo+1) を二分探索で特定（edges[lo] <= x < edges[lo+1]）
-        var lo = 0, hi = n
-        while lo + 1 < hi {
-            let mid = (lo + hi) >> 1
-            if x < edges[mid] { hi = mid } else { lo = mid }
-        }
-
-        // 左75%なら lo、その右25%なら lo+1
-        let left = edges[lo], right = edges[lo + 1]
-        let threshold = left + (right - left) * 0.75
-        return (x < threshold) ? lo : (lo + 1)
-    }
     
 }
