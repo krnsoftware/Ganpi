@@ -57,6 +57,7 @@ class KLine: CustomStringConvertible {
     @inline(__always)
     var characterOffsets:[CGFloat] {
         if !_widthAndOffsetsFixed {
+            
             _ = makeCTLine(withoutColors: true)
         }
         return _cachedOffsets
@@ -101,7 +102,9 @@ class KLine: CustomStringConvertible {
     
     // KTextView.draw()から利用される描画メソッド
     func draw(at point: CGPoint, in bounds: CGRect) {
+
         guard let context = NSGraphicsContext.current?.cgContext else { log("NSGraphicsContext.current is nil.", from: self); return }
+        
         guard let ctLine = self.ctLine else { log("ctLine is nil.", from: self); return }
         guard let textStorageRef = _textStorageRef else { log("_textStorageRef is nil.", from: self); return }
         guard let layoutManager = _layoutManager else { log("_layoutManager is nil.", from: self); return }
@@ -116,9 +119,7 @@ class KLine: CustomStringConvertible {
         context.textPosition = CGPoint(x: point.x, y: lineOriginY)
         
         CTLineDraw(ctLine, context)
-        
         // 不可視文字を表示。
-        // 最初はattributedstring.draw(at:)で描画する予定だったが、contextの混乱が生じてどうやっても上手く描画できずCTLineを使用することになった。
         if layoutManager.showInvisibleCharacters {
             let newlineChar:Character = "\n"
             var index = 0
@@ -140,14 +141,13 @@ class KLine: CustomStringConvertible {
         }
         
         context.restoreGState()
-        
     }
     
     // この行のCTLineを作成する。
     // 作成時にCTLineから文字のoffsetを取得して格納する。
     private func makeCTLine(withoutColors:Bool = false) -> CTLine? {
-        //guard !range.isEmpty else { return }
         
+        //guard !range.isEmpty else { return }
         guard let textStorageRef = _textStorageRef else {
             log("textStorageRef is nil.", from: self)
             return nil
@@ -164,9 +164,9 @@ class KLine: CustomStringConvertible {
         }
 
         let ctLine = CTLineCreateWithAttributedString(attrString)
-
         // CTLineから文字のoffsetを算出してcacheを入れ替える。
         // 一度offsetを算出して_cachedOffsetsにセットしたら、次からはパスする。
+        /*
         if !_widthAndOffsetsFixed {
             let string = attrString.string
             var offsets: [CGFloat] = []
@@ -178,7 +178,77 @@ class KLine: CustomStringConvertible {
             }
             _cachedOffsets = offsets.isEmpty ? [0.0] : offsets
             _widthAndOffsetsFixed = true
+        }*/
+        // ここから新設
+        if !_widthAndOffsetsFixed {
+            // 1) UTF-16 境界ごとの x を用意（runs 一括で O(n) ）
+            let ns = (attrString.string as NSString)
+            let utf16Count = ns.length
+
+            // NaN で初期化して「未設定」を表す
+            var u16ToX = Array<CGFloat>(repeating: .nan, count: utf16Count + 1)
+
+            let runs = CTLineGetGlyphRuns(ctLine) as NSArray
+            for anyRun in runs {
+                let run = anyRun as! CTRun
+                let gCount = CTRunGetGlyphCount(run)
+                if gCount == 0 { continue }
+
+                // glyph -> UTF-16 string index（先頭位置）
+                var stringIndices = Array<CFIndex>(repeating: 0, count: gCount)
+                CTRunGetStringIndices(run, CFRange(location: 0, length: 0), &stringIndices)
+
+                // glyph の描画位置（x）
+                var positions = Array<CGPoint>(repeating: .zero, count: gCount)
+                CTRunGetPositions(run, CFRange(location: 0, length: 0), &positions)
+
+                // 各 glyph 先頭の UTF-16 インデックスに x を割り当てる
+                // （合字や結合文字は「先頭コードユニットの x」を採用）
+                for g in 0..<gCount {
+                    let u16 = max(0, min(Int(stringIndices[g]), utf16Count))
+                    u16ToX[u16] = positions[g].x
+                }
+
+                // Run 終端の UTF-16 位置も、直前 glyph の x で穴埋めできるようにする
+                let rs = CTRunGetStringRange(run)
+                let runEnd = Int(rs.location + rs.length)
+                if runEnd <= utf16Count, u16ToX[runEnd].isNaN, gCount > 0 {
+                    u16ToX[runEnd] = positions[gCount - 1].x
+                }
+            }
+
+            // 行幅を取得して「末尾の境界」を確定
+            let lineWidth = CGFloat(CTLineGetTypographicBounds(ctLine, nil, nil, nil))
+            u16ToX[utf16Count] = lineWidth
+
+            // 未設定穴（NaN）を左から前方値で埋める（結合文字など）
+            var lastX: CGFloat = 0
+            for i in 0...utf16Count {
+                if u16ToX[i].isNaN { u16ToX[i] = lastX } else { lastX = u16ToX[i] }
+            }
+
+            // 2) UTF-16 → Character 境界へ写像して _cachedOffsets を構築（O(n)）
+            let s = attrString.string
+            var offsets: [CGFloat] = []
+            offsets.reserveCapacity(s.count + 1)
+
+            var u16Pos = 0
+            offsets.append(u16ToX[0])     // 先頭境界
+
+            // 各 Character の UTF-16 長を足し込みながら境界 x を拾う
+            for ch in s {
+                // Character の UTF-16 長（結合文字等も正しくカバー）
+                let len = ch.utf16.count
+                u16Pos &+= len
+                // 範囲防御
+                let clamped = (u16Pos <= utf16Count) ? u16Pos : utf16Count
+                offsets.append(u16ToX[clamped])
+            }
+
+            _cachedOffsets = offsets.isEmpty ? [0.0] : offsets
+            _widthAndOffsetsFixed = true
         }
+        // ここまで
         
         return ctLine
     }
@@ -515,6 +585,7 @@ final class KLines: CustomStringConvertible {
             }*/
         }
         
+
         // その領域の文字列に含まれる行の領域の配列を得る。
         var lineRanges:[Range<Int>] = []
         var start = newRange.lowerBound
@@ -533,6 +604,7 @@ final class KLines: CustomStringConvertible {
             lineRanges.append(start..<newRange.upperBound)
         }
         
+        
         // 並列処理を導入する。15000行のデータで1200ms->460msに短縮。
         guard let newStartLine = lineContainsCharacter(index: newRange.lowerBound) else {
             log("newStartLine is nil", from: self)
@@ -543,7 +615,7 @@ final class KLines: CustomStringConvertible {
         
         var newLinesBuffer = Array(repeating: [KLine](), count: lineRanges.count)
         let width = layoutRects.textRegionWidth - layoutRects.textEdgeInsets.right
-
+        
         DispatchQueue.concurrentPerform(iterations: lineRanges.count) { i in
             let range = lineRanges[i]
             let hardLineIndex = newStartHardLineIndex + i
@@ -553,7 +625,7 @@ final class KLines: CustomStringConvertible {
                 log("lineArray is nil for index \(i)", from: self)
             }
         }
-
+        
         let newLines = newLinesBuffer.flatMap { $0 }
         _lines.replaceSubrange(removeRange, with: newLines)
                 
@@ -581,7 +653,6 @@ final class KLines: CustomStringConvertible {
         for (i, line) in _lines.enumerated() where line.softLineIndex == 0 {
             _hardLineIndexMap[line.hardLineIndex] = i
         }
-        
     }
     
     

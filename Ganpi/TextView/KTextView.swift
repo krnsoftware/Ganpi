@@ -497,6 +497,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         if hasMarkedText(), let repRange = _replacementRange{
             lines.addFakeLine(replacementRange: repRange, attrString: _markedText)
         }
+
         for i in 0..<lines.count {
             //let y = CGFloat(i) * lineHeight + layoutRects.textEdgeInsets.top
             let y = ceil(CGFloat(i) * lineHeight + layoutRects.textEdgeInsets.top)
@@ -507,9 +508,12 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             guard let line = lines[i] else { continue }
             
             if verticalRange.contains(textPoint.y) {
+                
                 line.draw(at: textPoint, in: bounds)
+                
             }
         }
+        
         lines.removeFakeLines()
         
         

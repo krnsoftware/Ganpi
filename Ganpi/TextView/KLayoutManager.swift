@@ -146,7 +146,8 @@ final class KLayoutManager: KLayoutManagerReadable {
     // MARK: - Layout
     
     func rebuildLayout(reason: KRebuildReason = .destructiveChange) {
-        
+       
+
         guard let layoutRects = makeLayoutRects() else { log("layoutRects is nil", from:self); return }
         
         let lineNumberRegionWidth = layoutRects.lineNumberRegion?.rect.width ?? 0
@@ -159,17 +160,13 @@ final class KLayoutManager: KLayoutManagerReadable {
         
         switch reason {
         case .charactersChanged(let info):
-            //let timer = KTimeChecker(name:"rebuidLayout/_lines.rebuildLines()")
-            //timer.start()
             _lines.rebuildLines(with: info)
-            //timer.stop()
         case .attributesChanged:
             log("attributedChanged?", from:self)
         case .destructiveChange:
             _lines.rebuildLines()
         }
         
-          
     }
     
     /*
@@ -248,6 +245,7 @@ final class KLayoutManager: KLayoutManagerReadable {
     
     // KLineインスタンスを作成する。
     func makeLines(range: Range<Int>, hardLineIndex: Int, width: CGFloat?) -> [KLine]? {
+        
         let hardLine = KLine(range: range, hardLineIndex: hardLineIndex, softLineIndex: 0, layoutManager: self, textStorageRef: _textStorageRef)
         
         if hardLine.range.count == 0 {
@@ -266,13 +264,12 @@ final class KLayoutManager: KLayoutManagerReadable {
         if offsets.count == 0 {
             return [hardLine]
         }
-
         var softLines: [KLine] = []
 
         var startIndex = range.lowerBound
         var lastOffset: CGFloat = 0.0
         var softLineIndex = 0
-
+       
         for i in 0..<offsets.count {
             let currentOffset = offsets[i]
 
@@ -290,7 +287,7 @@ final class KLayoutManager: KLayoutManagerReadable {
                 lastOffset = currentOffset
             }
         }
-
+        
         // 残りを追加
         if startIndex < range.upperBound {
             let softLine = KLine(range: startIndex..<range.upperBound,
@@ -300,6 +297,7 @@ final class KLayoutManager: KLayoutManagerReadable {
                                  textStorageRef: _textStorageRef)
             softLines.append(softLine)
         }
+        
         return softLines
     }
     
