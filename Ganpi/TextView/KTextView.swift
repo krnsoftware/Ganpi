@@ -689,7 +689,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             }
         }
         
-        updateCaretPosition()
+        //updateCaretPosition()
     }
     
     
@@ -2063,7 +2063,10 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 let point = CGPoint(x: clipViewOrigin.x, y: y)
                 clipView.scroll(to: point)
                 scrollView.reflectScrolledClipView(clipView)
-                
+                let lineNumber = Int((clipView.bounds.origin.y - topInset) / lineHeight)
+                if let line = layoutManager.lines[lineNumber] {
+                    selectionRange = line.range.lowerBound..<line.range.lowerBound
+                }
                 break
             case .backward:
                 break
