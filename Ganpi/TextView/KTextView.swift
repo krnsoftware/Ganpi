@@ -1929,7 +1929,26 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
     }
     
-    
+    // ページスクロール専用のメソッド。キャレット移動なし。
+    private func scrollPage(to direction:KTextEditDirection) {
+        guard let scrollView = enclosingScrollView else { log("enclosingScrollView is nil",from: self); return }
+        let clipView = scrollView.contentView
+        let lineHeight = layoutManager.lineHeight
+        let pageHeight = clipView.bounds.height
+        let clipViewOrigin = clipView.bounds.origin
+                
+        var y = 0.0
+        switch direction {
+        case .forward:
+            y = min(frame.height - clipView.bounds.height, clipViewOrigin.y + pageHeight - lineHeight)
+        case .backward:
+            y = max(0, clipViewOrigin.y - pageHeight + lineHeight)
+            
+        }
+        let point = CGPoint(x: clipViewOrigin.x, y: y)
+        clipView.scroll(to: point)
+        scrollView.reflectScrolledClipView(clipView)
+    }
     
 
     
@@ -2120,11 +2139,11 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     //MARK: - Scrolling.
 
     @IBAction override func scrollPageUp(_ sender: Any?) {
-        scrollVertically(for: .page, to: .backward, caretMovement:false, extendSelection: false)
+        scrollPage(to: .backward)
     }
     
     @IBAction override func scrollPageDown(_ sender: Any?) {
-        scrollVertically(for: .page, to: .forward, caretMovement:false, extendSelection: false)
+        scrollPage(to: .forward)
     }
     
     @IBAction override func scrollLineUp(_ sender: Any?) {
