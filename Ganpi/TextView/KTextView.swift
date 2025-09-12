@@ -97,7 +97,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             sendStatusBarUpdateAction()
             
             // test
-            scrollCaretToVisible()
+            //scrollCaretToVisible()
             
             needsDisplay = true
         }
@@ -1343,6 +1343,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         updateFrameSizeToFitContent()
         updateCaretPosition()
+        scrollCaretToVisible()
         needsDisplay = true
     }
 
@@ -1761,7 +1762,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         } else {
             caretIndex = newIndex
         }
-        
+        scrollCaretToVisible()
     }
     
     enum KCaretHorizontalMoveKind {
@@ -1887,6 +1888,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             selectionRange = newRange
         }
         _verticalCaretX = nil
+        scrollCaretToVisible()
         
         return true
     }
