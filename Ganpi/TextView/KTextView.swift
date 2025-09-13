@@ -1902,7 +1902,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         case line
     }
     
-    private func scrollVertically(for kind:KPageVerticalMoveKind, to direction:KTextEditDirection, caretMovement:Bool, extendSelection: Bool) {
+    private func moveSelectionVertically(for kind:KPageVerticalMoveKind, to direction:KTextEditDirection, caretMovement:Bool, extendSelection: Bool) {
         
         guard let scrollView = enclosingScrollView else { log("enclosingScrollView is nil",from: self); return }
         let clipView = scrollView.contentView
@@ -1936,21 +1936,33 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     }
     
     // ページスクロール専用のメソッド。キャレット移動なし。
-    private func scrollPage(to direction:KTextEditDirection) {
+    private func scrollVertically(for kind:KPageVerticalMoveKind, to direction:KTextEditDirection) {
         guard let scrollView = enclosingScrollView else { log("enclosingScrollView is nil",from: self); return }
+        guard let documentBounds = scrollView.documentView?.bounds else { log("documentView is nil",from: self); return }
         let clipView = scrollView.contentView
         let lineHeight = layoutManager.lineHeight
         let pageHeight = clipView.bounds.height
         let clipViewOrigin = clipView.bounds.origin
+        
+        let overlapLineCount = 1.0
+        let overLapHeight = overlapLineCount * lineHeight
                 
         var y = 0.0
         switch direction {
         case .forward:
-            y = min(frame.height - clipView.bounds.height, clipViewOrigin.y + pageHeight - lineHeight)
+            switch kind {
+            case .page: y = min(documentBounds.height - clipView.bounds.height, clipViewOrigin.y + pageHeight - overLapHeight)
+            case .line: y = min(documentBounds.height - clipView.bounds.height, clipViewOrigin.y + lineHeight)
+            }
         case .backward:
-            y = max(0, clipViewOrigin.y - pageHeight + lineHeight)
-            
+            switch kind {
+            case .page: y = max(0, clipViewOrigin.y - pageHeight + overLapHeight)
+            case .line: y = max(0, clipViewOrigin.y - lineHeight)
+            }
         }
+        // サブピクセル丸め
+        y = y.rounded(.toNearestOrAwayFromZero)
+        
         let point = CGPoint(x: clipViewOrigin.x, y: y)
         clipView.scroll(to: point)
         scrollView.reflectScrolledClipView(clipView)
@@ -2145,19 +2157,19 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     //MARK: - Scrolling.
 
     @IBAction override func scrollPageUp(_ sender: Any?) {
-        scrollPage(to: .backward)
+        scrollVertically(for: .page, to: .backward)
     }
     
     @IBAction override func scrollPageDown(_ sender: Any?) {
-        scrollPage(to: .forward)
+        scrollVertically(for: .page, to: .forward)
     }
     
     @IBAction override func scrollLineUp(_ sender: Any?) {
-        
+        scrollVertically(for: .line, to: .backward)
     }
     
     @IBAction override func scrollLineDown(_ sender: Any?) {
-        
+        scrollVertically(for: .line, to: .forward)
     }
     
     @IBAction override func centerSelectionInVisibleArea(_ sender: Any?) {
