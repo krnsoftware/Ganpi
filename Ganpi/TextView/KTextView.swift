@@ -1758,7 +1758,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         let adjustedX = min(verticalCaretX, newLine.width)
         let newIndex = newLine.characterIndex(for: adjustedX) + newLine.range.lowerBound
-        
+                
         if extendSelection {
             let lower = min(verticalSelectionBase, newIndex)
             let upper = max(verticalSelectionBase, newIndex)
