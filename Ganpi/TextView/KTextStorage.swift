@@ -290,7 +290,11 @@ final class KTextStorage: KTextStorageProtocol {
         if let invisibleCharacters = _invisibleCharacters {
             return invisibleCharacters
         }
-        _invisibleCharacters = KInvisibleCharacters()
+        let attr: [NSAttributedString.Key: Any] = [
+            .font: baseFont,
+            .foregroundColor: NSColor.secondaryLabelColor
+        ]
+        _invisibleCharacters = KInvisibleCharacters(attributes: attr)
         return _invisibleCharacters
     }
     
