@@ -96,9 +96,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             updateCaretPosition()
             sendStatusBarUpdateAction()
             
-            // test
-            //scrollCaretToVisible()
-            
             needsDisplay = true
         }
     }
@@ -689,6 +686,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             let isLastLine = hardLineRange.upperBound == _textStorageRef.count
             selectionRange = hardLineRange.lowerBound..<hardLineRange.upperBound + (isLastLine ? 0 : 1)
             _horizontalSelectionBase = hardLineRange.lowerBound
+            log("hardLineRange:\(hardLineRange), isLastLine: \(isLastLine)",from:self)
+            log("  selectionRange: \(selectionRange)",from:self)
             
             //_horizontalSelectionBase = lineInfo.range.lowerBound
         case .outside:
@@ -821,7 +820,9 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             let lineRange = line.range
             let base = _horizontalSelectionBase ?? caretIndex
             if lineRange.upperBound > base {
-                selectionRange = base..<lineRange.upperBound
+                let endsWithLF:Bool = lineRange.upperBound < textStorage.count
+                        && textStorage.skeletonString[lineRange.upperBound] == FuncChar.lf
+                selectionRange = base..<lineRange.upperBound + (endsWithLF ? 1 : 0) // if the line ends with LF, include it.
             } else {
                 selectionRange = lineRange.lowerBound..<base
             }
@@ -906,7 +907,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                     if index < selectionRange.lowerBound {
                         _textStorageRef.replaceCharacters(in: selectionRange, with: Array(""))
                         _textStorageRef.replaceCharacters(in: index..<index, with: Array(droppedString))
-                        selectionRange = index..<index + droppedString.count
                     } else {
                         let selectionLengh = selectionRange.upperBound - selectionRange.lowerBound
                         _textStorageRef.replaceCharacters(in: selectionRange, with: Array(""))
