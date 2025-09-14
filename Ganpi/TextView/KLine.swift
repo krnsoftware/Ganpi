@@ -102,23 +102,45 @@ class KLine: CustomStringConvertible {
     
     // KTextView.draw()から利用される描画メソッド
     func draw(at point: CGPoint, in bounds: CGRect) {
-
-        guard let context = NSGraphicsContext.current?.cgContext else { log("NSGraphicsContext.current is nil.", from: self); return }
-        
-        guard let ctLine = self.ctLine else { log("ctLine is nil.", from: self); return }
+        guard let context = NSGraphicsContext.current?.cgContext else { return }
+        guard let ctLine = self.ctLine else { return }
         guard let textStorageRef = _textStorageRef else { log("_textStorageRef is nil.", from: self); return }
         guard let layoutManager = _layoutManager else { log("_layoutManager is nil.", from: self); return }
-
+        
+        
+        func _alignToDevicePixel(_ yFromTop: CGFloat) -> CGFloat {
+            // ウインドウが無いケースもあるので 1.0 をフォールバック
+            let scale = NSApp.mainWindow?.backingScaleFactor
+            ?? NSScreen.main?.backingScaleFactor
+            ?? 1.0
+            return (yFromTop * scale).rounded(.toNearestOrAwayFromZero) / scale
+        }
+        
         context.saveGState()
-            
         context.translateBy(x: 0, y: bounds.height)
-        context.scaleBy(x: 1.0, y: -1.0)
-            
-        let ascent = CTFontGetAscent(textStorageRef.baseFont)
-        let lineOriginY = bounds.height - point.y - ascent
+        context.scaleBy(x: 1, y: -1)
+        
+        // ← ここを CTFontGetAscent(baseFont) ではなく、CTLine の実測に
+        var asc: CGFloat = 0, des: CGFloat = 0, lead: CGFloat = 0
+        _ = CTLineGetTypographicBounds(ctLine, &asc, &des, &lead)
+        
+        // 空行ガード：CTLine が実質空（asc/des ≒ 0）のときはベースフォントで補う
+        if asc == 0 && des == 0 {
+            let font = textStorageRef.baseFont
+            asc = CTFontGetAscent(font)
+            des = CTFontGetDescent(font)
+        }
+        
+        // 後述の「ピクセル合わせ」を噛ませたベースライン
+        let baselineFromTop = point.y + asc
+        let baselineAligned = _alignToDevicePixel(baselineFromTop)
+        
+        let lineOriginY = bounds.height - baselineAligned
         context.textPosition = CGPoint(x: point.x, y: lineOriginY)
         
         CTLineDraw(ctLine, context)
+        
+        
         // 不可視文字を表示。
         if layoutManager.showInvisibleCharacters {
             let newlineChar:Character = "\n"

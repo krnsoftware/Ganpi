@@ -431,6 +431,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         //log("dirtyRect: \(dirtyRect)",from:self)
         
+        
         guard let layoutRects = _layoutManager.makeLayoutRects() else {
             print("\(#function): layoutRects is nil")
             return
@@ -499,8 +500,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
 
         for i in 0..<lines.count {
-            //let y = CGFloat(i) * lineHeight + layoutRects.textEdgeInsets.top
-            let y = ceil(CGFloat(i) * lineHeight + layoutRects.textEdgeInsets.top)
+            let y = CGFloat(i) * lineHeight + layoutRects.textEdgeInsets.top
+            //let y = ceil(CGFloat(i) * lineHeight + layoutRects.textEdgeInsets.top)
             
             let textPoint = CGPoint(x: textRect.origin.x + layoutRects.horizontalInsets ,
                                     y: textRect.origin.y + y)
@@ -519,6 +520,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         
         // 行番号部分を描画。
+        
         if _showLineNumbers, let lnRect = layoutRects.lineNumberRegion?.rect {
             NSColor.white.setFill()
             lnRect.fill()
