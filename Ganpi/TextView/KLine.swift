@@ -86,6 +86,7 @@ class KLine: CustomStringConvertible {
         // 端点ケア
         if x <= characterOffsets[0] { return 0 }
         if x >= characterOffsets[n] { return n }
+        //if x >= characterOffsets[n] { return n + 1 }
 
         // 区間 [lo, lo+1) を二分探索で特定（edges[lo] <= x < edges[lo+1]）
         var lower = 0, upper = n
@@ -730,6 +731,7 @@ final class KLines: CustomStringConvertible {
     }
     
     // index文字目を含む行の_lines上のindexを返す。ソフト・ハードを問わない。
+    // ソフト行とソフト行の界面のindexだった場合、indexをlowerBoundとするソフト行を返す。
     func lineIndexContainsCharacter(index: Int) -> Int? {
         guard let textStorageRef = _textStorageRef else {
             log("\(#function): textStorageRef is nil",from:self)
@@ -757,6 +759,11 @@ final class KLines: CustomStringConvertible {
             let range = line.range.lowerBound ..< (line.range.upperBound + 1)  // include newline
 
             if range.contains(index) {
+                // test
+                if mid > 0, mid < _lines.count - 1, _lines[mid].range.upperBound == index, _lines[mid].range.upperBound == _lines[mid + 1].range.lowerBound {
+                    log("mid:\(mid), index:\(index), range:\(_lines[mid].range)",from:self)
+                    return mid + 1
+                }
                 return mid
             } else if index < range.lowerBound {
                 high = mid - 1
@@ -767,6 +774,28 @@ final class KLines: CustomStringConvertible {
 
         log("no match for index \(index)", from: self)
         return nil
+    }
+    
+    // index文字目がソフト行同士の界面か否か返す。
+    func isBoundaryBetweenSoftwareLines(index: Int) -> Bool {
+        guard let textStorage = _textStorageRef else { log("_textStorage is nil.",from:self); return false }
+        guard index >= 0, index < textStorage.count else { log("index is out of range.",from:self); return false }
+        
+        var low = 0
+        var high = _lines.count - 1
+        while low <= high {
+            let mid = (low + high) >> 1
+            let line = _lines[mid]
+            let head = line.range.lowerBound
+            if head == index, mid > 0, _lines[mid - 1].range.upperBound == index {
+                return true
+            } else if index < head {
+                high = mid - 1
+            } else {
+                low = mid + 1
+            }
+        }
+        return false
     }
     
     // index文字目の文字を含む行のKLineインスタンスを返す。

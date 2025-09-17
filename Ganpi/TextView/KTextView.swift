@@ -28,6 +28,9 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     private let _caretView = KCaretView()
     private var _containerView: KTextViewContainerView?
     
+    // 選択範囲
+    var _selectionRange: Range<Int> = 0..<0
+    
     // キャレットの表示に関するプロパティ
     private var _caretBlinkTimer: Timer?
     
@@ -46,6 +49,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     private var _currentActionSelector: Selector? { // 今回受け取ったセレクタ。
         willSet { _lastActionSelector = _currentActionSelector }
     }
+    private var _lastCaretIndex = 0 // 前回のキャレット位置。
     
     // マウスによる領域選択に関するプロパティ
     private var _latestClickedCharacterIndex: Int?
@@ -89,8 +93,14 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     // MARK: - Computed variables
     
-    var selectionRange: Range<Int> = 0..<0 {
-        didSet {
+    
+    var selectionRange: Range<Int> {
+        get { _selectionRange }
+        set {
+            _lastCaretIndex = _selectionRange.upperBound
+            
+            _selectionRange = newValue
+
             _caretView.isHidden = !selectionRange.isEmpty
             _caretIndex = selectionRange.upperBound
             updateCaretPosition()
@@ -100,18 +110,12 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
     }
     
-    /*
+    
     var caretIndex: Int {
         get { selectionRange.upperBound }
         set { selectionRange = newValue..<newValue }
-    }*/
-    var caretIndex: Int {
-        get { _caretIndex }
-        set {
-            _caretIndex = newValue
-            selectionRange = _caretIndex..<_caretIndex
-        }
     }
+    
     
     // 読み取り専用として公開
     var textStorage: KTextStorageReadable {
