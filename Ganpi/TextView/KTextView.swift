@@ -49,7 +49,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     private var _currentActionSelector: Selector? { // 今回受け取ったセレクタ。
         willSet { _lastActionSelector = _currentActionSelector }
     }
-    private var _lastCaretIndex = 0 // 前回のキャレット位置。
+    //private var _lastCaretIndex = 0 // 前回のキャレット位置。
+    private var _currentLineIndex: Int = 0
     
     // マウスによる領域選択に関するプロパティ
     private var _latestClickedCharacterIndex: Int?
@@ -97,17 +98,34 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     var selectionRange: Range<Int> {
         get { _selectionRange }
         set {
-            _lastCaretIndex = _selectionRange.upperBound
+            //_lastCaretIndex = _selectionRange.upperBound
             
             _selectionRange = newValue
+            
+            //test
+            setCurrentLineIndex()
 
             _caretView.isHidden = !selectionRange.isEmpty
-            _caretIndex = selectionRange.upperBound
+            //_caretIndex = selectionRange.upperBound
             updateCaretPosition()
             sendStatusBarUpdateAction()
             
             needsDisplay = true
         }
+    }
+    
+    // 一時的にここに置く。
+    private func setCurrentLineIndex() {
+        let lines = layoutManager.lines
+        guard let currentLine = lines[_currentLineIndex] else { log("currentLine is nil.",from:self); return }
+        let newLineInfo = lines.lineInfo(at: caretIndex)
+        guard let newLine = newLineInfo.line else { log("newLine is nil.",from:self); return }
+        
+        if currentLine.range.upperBound == caretIndex || currentLine.range.lowerBound == caretIndex {
+            log("current",from:self)
+            return
+        }
+        _currentLineIndex = newLineInfo.lineIndex
     }
     
     
@@ -377,25 +395,24 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         _caretView.updateFrame(x: caretPosition.x, y: caretPosition.y, height: _layoutManager.lineHeight)
          */
         guard let layoutRects = layoutManager.makeLayoutRects() else { log("layoutRects is nil.", from:self); return }
-        var caretPosition:CGPoint
         let lines = layoutManager.lines
         guard let lineIndex = lines.lineIndex(at: caretIndex) else { log("lineIndex is nil.", from:self); return }
+        //let caretPosition:CGPoint = layoutRects.characterPosition(lineIndex: lineIndex, characterIndex: caretIndex)
+        let caretPosition:CGPoint = layoutRects.characterPosition(lineIndex: _currentLineIndex, characterIndex: caretIndex)
         
-        // ソフトラップ行同士の界面である場合でかつ前回の選択範囲がcaretIndexの前であれば前行の右端にキャレットを描く。
-        if lines.isBoundaryBetweenSoftwareLines(index: caretIndex),
-                _lastCaretIndex < caretIndex,
-                lineIndex > 0 {
-            caretPosition = layoutRects.characterPosition(lineIndex: lineIndex - 1, characterIndex: caretIndex)
-            
-        } else {
-            caretPosition = layoutRects.characterPosition(lineIndex: lineIndex, characterIndex: caretIndex)
-        }
+        
         _caretView.updateFrame(x: caretPosition.x, y: caretPosition.y, height: layoutManager.lineHeight)
         
         _caretView.alphaValue = 1.0
         restartCaretBlinkTimer()
         
     }
+    
+    /*
+    private var doesCaretStayRight:Bool {
+        guard let lineIndex = layoutManager.lines.lineIndex(at: caretIndex) else { log("lineIndex is nil.", from:self); return false }
+        return layoutManager.lines.isBoundaryBetweenSoftwareLines(index: caretIndex) && _lastCaretIndex < caretIndex && lineIndex > 0
+    }*/
     
     
     private func startCaretBlinkTimer() {
@@ -652,7 +669,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         
         switch layoutRects.regionType(for: location, layoutManagerRef: _layoutManager, textStorageRef: _textStorageRef){
-        case .text(let index):
+        case .text(let index, let lineIndex):
             _latestClickedCharacterIndex = index
             _singleClickPending = false
             
@@ -681,9 +698,11 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 
                 // ソフトウェア行の右端をクリックした際に右端にキャレットを移動させる。
                 //「前回のキャレット位置より現在のキャレット位置の方が右なら自動的に右端に表示される。
-                if layoutManager.lines.isBoundaryBetweenSoftwareLines(index: index) {
+                /*if layoutManager.lines.isBoundaryBetweenSoftwareLines(index: index) {
                     caretIndex = index - 1
-                }
+                }*/
+                
+                _currentLineIndex = lineIndex
                 
                 caretIndex = index
                 
@@ -739,7 +758,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             let location = convert(event.locationInWindow, from: nil)
             if let layoutRect = _layoutManager.makeLayoutRects() {
                 switch layoutRect.regionType(for: location, layoutManagerRef: _layoutManager, textStorageRef: _textStorageRef) {
-                case .text(let index):
+                case .text(let index, _):
                     caretIndex = index
                     updateCaretPosition()
                     //log("text: \(index)", from:self)
@@ -806,7 +825,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
         
         switch layoutRects.regionType(for: location, layoutManagerRef: _layoutManager, textStorageRef: _textStorageRef){
-        case .text(let index):
+        case .text(let index, _):
             guard let anchor = _latestClickedCharacterIndex else { log("_latestClickedCharacterIndex is nil", from:self); return }
             
             switch _mouseSelectionMode {
@@ -918,7 +937,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         guard let layoutRects = _layoutManager.makeLayoutRects() else { log("layoutRects is nil", from: self); return false }
         
         switch layoutRects.regionType(for: locationInView, layoutManagerRef: _layoutManager, textStorageRef: _textStorageRef) {
-        case .text(let index):
+        case .text(let index, _):
             let isSenderMyself = sender.draggingSource as AnyObject? === self
             let isOptionKeyPressed = NSEvent.modifierFlags.contains(.option)
             
@@ -964,7 +983,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         // 該当位置の文字インデックスを取得
         guard let layoutRects = _layoutManager.makeLayoutRects() else { log("layoutRects is nil", from: self); return []}
         switch layoutRects.regionType(for: locationInView, layoutManagerRef: _layoutManager, textStorageRef: _textStorageRef) {
-        case .text(let index):
+        case .text(let index, _):
             // キャレットを一時的に移動（選択範囲は変更しない）
             moveDropCaret(to: index)
             return dragOperation
@@ -1416,18 +1435,23 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     // characterIndex文字目の文字が含まれる行の位置。textRegion左上原点。
     private func linePosition(at characterIndex:Int) -> CGPoint {
         guard let layoutRects = _layoutManager.makeLayoutRects() else {
-            print("\(#function): failed to make layoutRects"); return .zero }
-        let lineInfo = _layoutManager.line(at: characterIndex)
+        print("\(#function): failed to make layoutRects"); return .zero }
+        //let lineInfo = _layoutManager.line(at: characterIndex)
         /*guard let line = lineInfo.line else {
             print("\(#function): failed to make line"); return .zero }*/
                 
-        let x = layoutRects.textRegion.rect.origin.x + layoutRects.horizontalInsets
+        /*let x = layoutRects.textRegion.rect.origin.x + layoutRects.horizontalInsets
         let y = layoutRects.textRegion.rect.origin.y + CGFloat(lineInfo.lineIndex) * _layoutManager.lineHeight + layoutRects.textEdgeInsets.top
-        return CGPoint(x: x, y: y)
+        return CGPoint(x: x, y: y)*/
+        
+        guard let lineIndex = layoutManager.lines.lineIndex(at: characterIndex) else { log("lineIndex is nil.",from:self); return .zero }
+        return layoutRects.linePosition(at: lineIndex)
+        
     }
     
     // characterIndex文字目の文字の位置。textRegion左上原点。
     private func characterPosition(at characterIndex:Int) -> CGPoint {
+        /*
         let lineInfo = _layoutManager.line(at: characterIndex)
         guard let line = lineInfo.line else {
             log("failed to make line", from:self); return .zero }
@@ -1437,6 +1461,10 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         let indexInLine = characterIndex - line.range.lowerBound
         return CGPoint(x: linePoint.x + line.characterOffset(at: indexInLine), y: linePoint.y)
+         */
+        guard let layoutRects = layoutManager.makeLayoutRects() else { log("lineIndex is nil.",from:self); return .zero }
+        guard let lineIndex = layoutManager.lines.lineIndex(at: characterIndex) else { log("lineIndex is nil.",from:self); return .zero }
+        return layoutRects.characterPosition(lineIndex: lineIndex, characterIndex: characterIndex)
 
     }
     
@@ -1755,8 +1783,13 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         let indexForLineSearch: Int = (selectionRange.lowerBound < verticalSelectionBase) ? selectionRange.lowerBound : selectionRange.upperBound
         
-        let info = layoutManager.line(at: indexForLineSearch)
+        //let info = layoutManager.line(at: indexForLineSearch)
+        //let info = layoutManager.lines.lineInfo(at: indexForLineSearch)
+        let info = layoutManager.lines.lineInfo(at: _currentLineIndex)
+        
         guard let currentLine = info.line else { log("currentLine is nil.",from:self); return }
+        
+        
         let newLineIndex = info.lineIndex + direction.rawValue
         
         if newLineIndex < 0 {
@@ -1782,8 +1815,10 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         if isVerticalAction && !wasVerticalAction || _verticalCaretX == nil {
             let indexInLine = caretIndex - currentLine.range.lowerBound
             _verticalCaretX = currentLine.characterOffset(at: indexInLine)
+            //log("_verticalCaretX: \(_verticalCaretX), indexInLine:\(indexInLine)",from:self)
         }
         guard let verticalCaretX = _verticalCaretX else { log("_verticalCaretX is nil.",from:self); return }
+        //log("verticalCaretX: \(verticalCaretX)",from:self)
         
         let adjustedX = min(verticalCaretX, newLine.width)
         let newIndex = newLine.characterIndex(for: adjustedX) + newLine.range.lowerBound
@@ -1793,6 +1828,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             let upper = max(verticalSelectionBase, newIndex)
             selectionRange = lower..<upper
         } else {
+            
             caretIndex = newIndex
         }
         scrollCaretToVisible()
@@ -1843,13 +1879,15 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         if kind == .line {
             if direction == .forward {
-                let info = layoutManager.line(at: selection.upperBound)
+                //let info = layoutManager.line(at: selection.upperBound)
+                let info = layoutManager.lines.lineInfo(at: selection.upperBound)
                 guard let line = info.line else { log("line is nil.",from:self); return false }
                 let upper = line.range.upperBound
                 if extendSelection { newRange = selection.lowerBound..<upper }
                 else { newRange = upper..<upper }
             } else {
-                let info = layoutManager.line(at: selection.lowerBound)
+                //let info = layoutManager.line(at: selection.lowerBound)
+                let info = layoutManager.lines.lineInfo(at: selection.lowerBound)
                 guard let line = info.line else { log("line is nil.",from:self); return false }
                 let lower = line.range.lowerBound
                 if extendSelection { newRange =  lower..<selection.upperBound }
@@ -2135,8 +2173,10 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     }
     
     @IBAction override func selectLine(_ sender: Any?) {
-        let lowerInfo = layoutManager.line(at: selectionRange.lowerBound)
-        let upperInfo = layoutManager.line(at: selectionRange.upperBound)
+        //let lowerInfo = layoutManager.line(at: selectionRange.lowerBound)
+        //let upperInfo = layoutManager.line(at: selectionRange.upperBound)
+        let lowerInfo = layoutManager.lines.lineInfo(at: selectionRange.lowerBound)
+        let upperInfo = layoutManager.lines.lineInfo(at: selectionRange.upperBound)
         guard let lowerLine = lowerInfo.line else { log("no lower.",from:self); return }
         guard let upperLine = upperInfo.line else { log("no upper.",from:self); return }
         selectionRange = lowerLine.range.lowerBound..<upperLine.range.upperBound

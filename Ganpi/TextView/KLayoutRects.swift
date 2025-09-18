@@ -92,7 +92,7 @@ struct KLayoutRects {
     }
 
     enum RegionType {
-        case text(index: Int)
+        case text(index: Int, lineIndex: Int)
         case lineNumber(line: Int)
         case outside
     }
@@ -131,14 +131,14 @@ struct KLayoutRects {
                     indexInLine = line.characterIndex(for: relativeX)
                 }
                 
-                return .text(index: line.range.lowerBound + indexInLine)
+                return .text(index: line.range.lowerBound + indexInLine, lineIndex: lineIndex)
                 
             } else {
                 // 1行目より上の場合は0を、下の場合は文末のindexを返す。
                 if relativePoint.y < textEdgeInsets.top {
-                    return .text(index: 0)
+                    return .text(index: 0, lineIndex: 0)
                 } else if relativePoint.y >= (CGFloat(lineCount) * lineHeight - textEdgeInsets.bottom) {
-                    return .text(index: textStorageRef.count)
+                    return .text(index: textStorageRef.count, lineIndex: lines.count - 1)
                 }
                 
             }

@@ -198,7 +198,9 @@ final class KLayoutManager: KLayoutManagerReadable {
     
     // characterIndex文字目の文字が含まれるKLineとその行番号(ソフトラップの)を返す。
     // 現在の文字がテキストの最後の場合には(nil, -1)が返る。
-    func line(at characterIndex: Int) -> (line: KLine?, lineIndex: Int) {
+    /*func line(at characterIndex: Int) -> (line: KLine?, lineIndex: Int) {
+        
+       
         let count = _textStorageRef.count
         if characterIndex == 0 { return (line: _lines[0], lineIndex: 0)}
         if characterIndex == count { return (line: _lines[_lines.count - 1], lineIndex: _lines.count - 1)}
@@ -221,7 +223,7 @@ final class KLayoutManager: KLayoutManagerReadable {
         log("no match. characterIndex: \(characterIndex)", from:self)
         return (nil, -1)
         
-    }
+    }*/
     
     
     // 現在のLayoutRectsを生成する。専らTextViewから呼び出される。
