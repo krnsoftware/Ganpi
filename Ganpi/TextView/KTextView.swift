@@ -679,6 +679,12 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                     return
                 }
                 
+                // ソフトウェア行の右端をクリックした際に右端にキャレットを移動させる。
+                //「前回のキャレット位置より現在のキャレット位置の方が右なら自動的に右端に表示される。
+                if layoutManager.lines.isBoundaryBetweenSoftwareLines(index: index) {
+                    caretIndex = index - 1
+                }
+                
                 caretIndex = index
                 
             case 2: // ダブルクリック - クリックした部分を単語選択。
