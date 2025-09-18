@@ -147,5 +147,23 @@ struct KLayoutRects {
         return .outside
     }
     
+    // lineIndexで指定された行の左上の位置を返す。textRegion左上原点。実際に行があるかどうかは判断しない。
+    func linePosition(at lineIndex: Int) -> CGPoint {
+        let x = textRegion.rect.origin.x + horizontalInsets
+        let y = textRegion.rect.origin.y + CGFloat(lineIndex) * _layoutManagerRef.lineHeight + textEdgeInsets.top
+        return CGPoint(x: x, y: y)
+    }
+    
+    // lineIndex行に於ける文頭からcharacterIndexの文字の位置を返す。textRegion左上原点。
+    func characterPosition(lineIndex: Int, characterIndex: Int) -> CGPoint {
+        guard let line = _layoutManagerRef.lines[lineIndex] else { log("line is nil."); return .zero }
+        let range = line.range
+        if characterIndex >= range.lowerBound, characterIndex <= range.upperBound {
+            let offset = line.characterOffset(at: characterIndex - range.lowerBound)
+            let linePosition = linePosition(at: lineIndex)
+            return CGPoint(x: linePosition.x + offset, y: linePosition.y)
+        }
+        return .zero
+    }
     
 }

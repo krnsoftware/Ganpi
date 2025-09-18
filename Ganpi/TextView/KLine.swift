@@ -517,17 +517,6 @@ final class KLines: CustomStringConvertible {
         
         // storageが空だった場合は空行を追加するのみ。
         if textStorageRef.count == 0 { setLinesEmpty(); return }
-        /*
-        if textStorageRef.count == 0 {
-            _lines.removeAll()
-            _lines.append(layoutManager.makeEmptyLine(index: 0, hardLineIndex: 0))
-            _hardLineIndexMap.removeAll()
-            _hardLineIndexMap[0] = 0
-            return
-        }*/
-        
-        //let newLineCharacter:Character = "\n"
-        //let characters = textStorageRef.characterSlice
         
         var newRange = 0..<textStorageRef.count
         //var startIndex = 0
@@ -570,22 +559,17 @@ final class KLines: CustomStringConvertible {
             /// 削除対象の範囲
             let endIndex = lastHardLineStartIndex + softCount
             removeRange = startHardLineArrayIndex..<endIndex
-            
-            //let characters = textStorageRef.characterSlice
-            //let newLineCharacter: Character = "\n"
 
             var lower = info.range.lowerBound
             var upper = info.range.lowerBound + info.insertedCount
 
             // 前方：行頭まで戻る
             while lower > 0 {
-                //if characters[lower - 1] == newLineCharacter { break }
                 if skeleton.bytes[lower - 1] == FuncChar.lf { break }
                 lower -= 1
             }
 
             // 後方：行末（改行を含めた直後）まで進む
-            //while upper < characters.count {
             while upper < skeleton.bytes.count {
                 //if characters[upper] == newLineCharacter {
                 if skeleton.bytes[upper] == FuncChar.lf {
@@ -602,10 +586,6 @@ final class KLines: CustomStringConvertible {
                 line.shiftRange(by: info.insertedCount - info.range.count)
                 line.shiftHardLineIndex(by: info.insertedNewlineCount - info.deletedNewlineCount)
             }
-            /*
-            DispatchQueue.concurrentPerform(iterations: _lines.count) { i in
-                _lines[i].removeCTLine()
-            }*/
         }
         
 
@@ -657,19 +637,13 @@ final class KLines: CustomStringConvertible {
             return
         }
 
-        //let count = characters.count
-
         // 最後の文字が改行で、かつ最後のKLineが末尾に達していなければ空行を追加
-        //if characters.last == "\n" && newLastLine.range.upperBound < count {
-        //if skeleton.bytes.last == FuncChar.lf && newLastLine.range.upperBound < count {
         if skeleton.bytes.last == FuncChar.lf && newLastLine.range.upperBound < skeleton.bytes.count {
-            //let emptyLine = layoutManager.makeEmptyLine(index: textStorageRef.count, hardLineIndex: newLastLine.hardLineIndex + 1)
             let emptyLine = layoutManager.makeEmptyLine(index: skeleton.bytes.count, hardLineIndex: newLastLine.hardLineIndex + 1)
             _lines.append(emptyLine)
-            //log("last empty line.",from:self)
         }
         
-        //log("isValid: \(isValid)",from:self)
+        log("isValid: \(isValid)",from:self)
 
         // mapも再構築
         _hardLineIndexMap.removeAll()
@@ -730,8 +704,24 @@ final class KLines: CustomStringConvertible {
         return lines.first!.range.lowerBound..<lines.last!.range.upperBound
     }
     
-    // index文字目を含む行の_lines上のindexを返す。ソフト・ハードを問わない。
+    
+    
+    // index文字目を含む行と_lines上のindexを返す。
+    func lineInfo(at characterIndex: Int) -> (line:KLine?, lineIndex:Int) {
+        guard let lineIndex = lineIndex(at: characterIndex) else { log("lineIndex is nil.",from:self); return (nil, -1) }
+        guard lineIndex >= 0, lineIndex < _lines.count - 1 else { log("lineIndex is nil.",from:self); return (nil, -1) }
+        let line = _lines[lineIndex]
+        return (line, lineIndex)
+    }
+    
+    // index文字目を含む行の_lines上のindexを返す。
     // ソフト行とソフト行の界面のindexだった場合、indexをlowerBoundとするソフト行を返す。
+    func lineIndex(at characterIndex: Int) -> Int? {
+        return Self.lineIndex(in: _lines, at: characterIndex)
+    }
+    
+    // 検証用に残してある。
+    /*
     func lineIndexContainsCharacter(index: Int) -> Int? {
         guard let textStorageRef = _textStorageRef else {
             log("\(#function): textStorageRef is nil",from:self)
@@ -774,12 +764,12 @@ final class KLines: CustomStringConvertible {
 
         log("no match for index \(index)", from: self)
         return nil
-    }
+    }*/
     
     // index文字目がソフト行同士の界面か否か返す。
     func isBoundaryBetweenSoftwareLines(index: Int) -> Bool {
         guard let textStorage = _textStorageRef else { log("_textStorage is nil.",from:self); return false }
-        guard index >= 0, index < textStorage.count else { log("index is out of range.",from:self); return false }
+        guard index >= 0, index <= textStorage.count else { log("index is out of range.",from:self); return false }
         
         var low = 0
         var high = _lines.count - 1
@@ -800,7 +790,7 @@ final class KLines: CustomStringConvertible {
     
     // index文字目の文字を含む行のKLineインスタンスを返す。
     func lineContainsCharacter(index: Int) -> KLine? {
-        guard let lineIndex = lineIndexContainsCharacter(index: index) else { log("no line contains character at index \(index)"); return nil }
+        guard let lineIndex = lineIndex(at: index) else { log("no line contains character at index \(index)"); return nil }
         return _lines[lineIndex]
     }
  
@@ -833,7 +823,7 @@ final class KLines: CustomStringConvertible {
         guard let layoutManager = _layoutManager else { log("layoutManager not found.", from: self); return nil }
         guard let layoutRects = layoutManager.makeLayoutRects() else { log("layoutRects not found.", from: self); return nil }
         
-        guard let lineIndex = lineIndexContainsCharacter(index: characterIndex) else { log("lineIndex not found.", from: self); return .zero}
+        guard let lineIndex = lineIndex(at: characterIndex) else { log("lineIndex not found.", from: self); return .zero}
         
         
         let line = _lines[lineIndex]
@@ -852,5 +842,39 @@ final class KLines: CustomStringConvertible {
         _lines.append(layoutManager.makeEmptyLine(index: 0, hardLineIndex: 0))
         _hardLineIndexMap.removeAll()
         _hardLineIndexMap[0] = 0
+    }
+    
+    //MARK: - Static func.
+    // index文字目を含む行の_lines上のindexを返す。
+    // ソフト行とソフト行の界面のindexだった場合、indexをlowerBoundとするソフト行を返す。
+    // rebuildLines()内でテキストが変更された後に利用されることがあるため、storageにアクセスしてはならない。
+    static func lineIndex(in lines: [KLine], at characterIndex: Int) -> Int? {
+        guard let characterCount = lines.last?.range.upperBound else {log("last item of _lines is nil.", from: self); return nil }
+        guard characterIndex >= 0, characterIndex <= characterCount else { log("characterIndex is out of range.", from: self); return nil }
+        if characterIndex == 0 { return 0 }
+        if characterIndex == characterCount { return lines.count - 1 }
+        if lines.isEmpty { return nil }
+        
+        var low = 0, high = lines.count - 1
+        while low <= high {
+            let mid = (low + high) >> 1
+            let range = lines[mid].range
+            if characterIndex >= range.lowerBound && characterIndex < range.upperBound {
+                return mid
+            } else if characterIndex == range.upperBound {
+                if mid < lines.count - 1, lines[mid + 1].range.lowerBound == characterIndex {
+                    return mid + 1
+                }
+                return mid
+            }
+            if characterIndex < range.lowerBound {
+                high = mid - 1
+            } else {
+                low = mid + 1
+            }
+        }
+        log("no match.",from:self)
+        return nil
+        
     }
 }

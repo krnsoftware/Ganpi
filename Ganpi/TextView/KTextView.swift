@@ -372,14 +372,31 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     // MARK: - Caret (KTextView methods)
     
     private func updateCaretPosition() {
+        /*
         let caretPosition = characterPosition(at: caretIndex)
-        
         _caretView.updateFrame(x: caretPosition.x, y: caretPosition.y, height: _layoutManager.lineHeight)
+         */
+        guard let layoutRects = layoutManager.makeLayoutRects() else { log("layoutRects is nil.", from:self); return }
+        var caretPosition:CGPoint
+        let lines = layoutManager.lines
+        guard let lineIndex = lines.lineIndex(at: caretIndex) else { log("lineIndex is nil.", from:self); return }
+        
+        // ソフトラップ行同士の界面である場合でかつ前回の選択範囲がcaretIndexの前であれば前行の右端にキャレットを描く。
+        if lines.isBoundaryBetweenSoftwareLines(index: caretIndex),
+                _lastCaretIndex < caretIndex,
+                lineIndex > 0 {
+            caretPosition = layoutRects.characterPosition(lineIndex: lineIndex - 1, characterIndex: caretIndex)
+            
+        } else {
+            caretPosition = layoutRects.characterPosition(lineIndex: lineIndex, characterIndex: caretIndex)
+        }
+        _caretView.updateFrame(x: caretPosition.x, y: caretPosition.y, height: layoutManager.lineHeight)
         
         _caretView.alphaValue = 1.0
         restartCaretBlinkTimer()
         
     }
+    
     
     private func startCaretBlinkTimer() {
         _caretBlinkTimer?.invalidate()
