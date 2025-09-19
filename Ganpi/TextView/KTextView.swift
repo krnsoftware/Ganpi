@@ -503,7 +503,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             // 選択範囲の描画
             let lineRange = line.range
             let selection = selectionRange.clamped(to: lineRange)
-            if selection.isEmpty && !lineRange.isEmpty{ continue } // lineRange.isEmpty==trueなら空行のため処理対象
+            if selection.isEmpty && !lineRange.isEmpty && !selectionRange.contains(lineRange.upperBound){ continue } 
             
             
             let startOffset = line.characterOffset(at: selection.lowerBound - lineRange.lowerBound)
