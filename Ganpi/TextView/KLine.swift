@@ -427,7 +427,7 @@ final class KLines: CustomStringConvertible {
         guard let textStorageRef = _textStorageRef else { print("\(#function) - textStorageRef is nil"); return }
         guard let layoutManager = _layoutManager else { print("\(#function) - layoutManagerRef is nil"); return }
         
-        guard let  hardLineIndex = line(at: replacementRange.lowerBound)?.hardLineIndex else { print("\(#function) - replacementRange.lowerBound is out of range"); return }
+        guard let  hardLineIndex = lineAt(characterIndex: replacementRange.lowerBound)?.hardLineIndex else { print("\(#function) - replacementRange.lowerBound is out of range"); return }
         _replaceLineNumber = hardLineIndex
         
         guard let range = hardLineRange(hardLineIndex: hardLineIndex) else { print("\(#function) - hardLineIndex:\(hardLineIndex) is out of range"); return }
@@ -524,7 +524,7 @@ final class KLines: CustomStringConvertible {
         
         if let info = info {
             /// 削除前の range.lowerBound に属していた KLine を特定
-            guard let startSoftLine = line(at: info.range.lowerBound) else {
+            guard let startSoftLine = lineAt(characterIndex: info.range.lowerBound) else {
                 log("startLine not found", from: self)
                 return
             }
@@ -609,7 +609,7 @@ final class KLines: CustomStringConvertible {
         
         
         // 並列処理を導入する。15000行のデータで1200ms->460msに短縮。
-        guard let newStartLine = line(at: newRange.lowerBound) else {
+        guard let newStartLine = lineAt(characterIndex: newRange.lowerBound) else {
             log("newStartLine is nil", from: self)
             return
         }
@@ -789,8 +789,8 @@ final class KLines: CustomStringConvertible {
     }
     
     // index文字目の文字を含む行のKLineインスタンスを返す。
-    func line(at index: Int) -> KLine? {
-        guard let lineIndex = lineIndex(at: index) else { log("no line contains character at index \(index)"); return nil }
+    func lineAt(characterIndex: Int) -> KLine? {
+        guard let lineIndex = lineIndex(at: characterIndex) else { log("no line contains character at index \(characterIndex)"); return nil }
         //log("lineIndex:\(lineIndex)",from:self)
         return _lines[lineIndex]
     }

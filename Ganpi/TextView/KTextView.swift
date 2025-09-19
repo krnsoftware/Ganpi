@@ -1879,16 +1879,12 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         if kind == .line {
             if direction == .forward {
-                //let info = layoutManager.line(at: selection.upperBound)
-                let info = layoutManager.lines.lineInfo(at: selection.upperBound)
-                guard let line = info.line else { log("line is nil.",from:self); return false }
+                guard let line = layoutManager.lines[_currentLineIndex] else { log("line is nil.",from:self); return false }
                 let upper = line.range.upperBound
                 if extendSelection { newRange = selection.lowerBound..<upper }
                 else { newRange = upper..<upper }
             } else {
-                //let info = layoutManager.line(at: selection.lowerBound)
-                let info = layoutManager.lines.lineInfo(at: selection.lowerBound)
-                guard let line = info.line else { log("line is nil.",from:self); return false }
+                guard let line = layoutManager.lines[_currentLineIndex] else { log("line is nil.",from:self); return false }
                 let lower = line.range.lowerBound
                 if extendSelection { newRange =  lower..<selection.upperBound }
                 else { newRange = lower..<lower }
