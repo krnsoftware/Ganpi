@@ -469,6 +469,7 @@ final class KLines: CustomStringConvertible {
     }
     
     subscript(i: Int) -> KLine? {
+        //guard  i >= 0, i < _lines.count else { log("i(\(i)) is out of range.", from:self); return nil }
         if !hasFakeLine { return _lines[i] }
         
         guard let lineArrayIndex = _replaceLineIndex else { log("_fakeLineIndex = nil.", from:self); return nil}
@@ -709,7 +710,7 @@ final class KLines: CustomStringConvertible {
     // index文字目を含む行と_lines上のindexを返す。
     func lineInfo(at characterIndex: Int) -> (line:KLine?, lineIndex:Int) {
         guard let lineIndex = lineIndex(at: characterIndex) else { log("lineIndex is nil.",from:self); return (nil, -1) }
-        guard lineIndex >= 0, lineIndex < _lines.count - 1 else { log("lineIndex is nil.",from:self); return (nil, -1) }
+        guard lineIndex >= 0, lineIndex < _lines.count else { log("lineIndex(\(lineIndex) is out of range.",from:self); return (nil, -1) }
         let line = _lines[lineIndex]
         return (line, lineIndex)
     }
