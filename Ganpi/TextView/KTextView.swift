@@ -50,7 +50,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         willSet { _lastActionSelector = _currentActionSelector }
     }
     //private var _lastCaretIndex = 0 // 前回のキャレット位置。
-    private var _currentLineIndex: Int = 0
+    private var _currentLineIndex: Int? = nil
     
     // マウスによる領域選択に関するプロパティ
     private var _latestClickedCharacterIndex: Int?
@@ -103,7 +103,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             _selectionRange = newValue
             
             //test
-            setCurrentLineIndex()
+            //setCurrentLineIndex()
+            _ = currentLineIndex
 
             _caretView.isHidden = !selectionRange.isEmpty
             //_caretIndex = selectionRange.upperBound
@@ -115,19 +116,38 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     }
     
     // 一時的にここに置く。
+    /*
     private func setCurrentLineIndex() {
         
         let lines = layoutManager.lines
         
         // 現在の行が存在しており、その左端・右端にキャレットがある場合、現在の行のインデックスはそのままにする。
-        if _currentLineIndex < lines.count,
-            let currentLine = lines[_currentLineIndex],
+        if let currentLineIndex = _currentLineIndex,
+            currentLineIndex < lines.count,
+            let currentLine = lines[currentLineIndex],
             (currentLine.range.upperBound == caretIndex || currentLine.range.lowerBound == caretIndex) {
             return
         }
         // そうでなければ新規に計算する。
         let newLineInfo = lines.lineInfo(at: caretIndex)
         _currentLineIndex = newLineInfo.lineIndex < 0 ? 0 : newLineInfo.lineIndex
+    }*/
+    
+    private var currentLineIndex: Int {
+        let lines = layoutManager.lines
+        
+        // 現在の行が存在しており、その左端・右端にキャレットがある場合、現在の行のインデックスはそのままにする。
+        if let currentLineIndex = _currentLineIndex,
+            currentLineIndex < lines.count,
+            let currentLine = lines[currentLineIndex],
+            (currentLine.range.upperBound == caretIndex || currentLine.range.lowerBound == caretIndex) {
+            return currentLineIndex
+        }
+        // そうでなければ新規に計算する。
+        let newLineInfo = lines.lineInfo(at: caretIndex)
+        let newLineIndex = newLineInfo.lineIndex < 0 ? 0 : newLineInfo.lineIndex
+        _currentLineIndex = newLineIndex
+        return newLineIndex
     }
     
     
@@ -398,9 +418,9 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
          */
         guard let layoutRects = layoutManager.makeLayoutRects() else { log("layoutRects is nil.", from:self); return }
         let lines = layoutManager.lines
-        guard let lineIndex = lines.lineIndex(at: caretIndex) else { log("lineIndex is nil.", from:self); return }
+        //guard let lineIndex = lines.lineIndex(at: caretIndex) else { log("lineIndex is nil.", from:self); return }
         //let caretPosition:CGPoint = layoutRects.characterPosition(lineIndex: lineIndex, characterIndex: caretIndex)
-        let caretPosition:CGPoint = layoutRects.characterPosition(lineIndex: _currentLineIndex, characterIndex: caretIndex)
+        let caretPosition:CGPoint = layoutRects.characterPosition(lineIndex: currentLineIndex, characterIndex: caretIndex)
         
         
         _caretView.updateFrame(x: caretPosition.x, y: caretPosition.y, height: layoutManager.lineHeight)
@@ -503,7 +523,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             // 選択範囲の描画
             let lineRange = line.range
             let selection = selectionRange.clamped(to: lineRange)
-            if selection.isEmpty && !lineRange.isEmpty && !selectionRange.contains(lineRange.upperBound){ continue } 
+            if selection.isEmpty && !lineRange.isEmpty && !selectionRange.contains(lineRange.upperBound){ continue }
             
             
             let startOffset = line.characterOffset(at: selection.lowerBound - lineRange.lowerBound)
@@ -1780,8 +1800,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             _verticalSelectionBase = caretIndex
         }
         
-        guard let verticalSelectionBase = _verticalSelectionBase else { log("_verticalSelectionBase is nil.",from:self); return }
-        guard let currentLine = layoutManager.lines[_currentLineIndex] else { log("currentLine is nil.",from:self); return }
+        //guard let verticalSelectionBase = _verticalSelectionBase else { log("_verticalSelectionBase is nil.",from:self); return }
+        guard let currentLine = layoutManager.lines[currentLineIndex] else { log("currentLine is nil.",from:self); return }
         
         
         if _verticalCaretX == nil || !wasVerticalAction {
@@ -1806,7 +1826,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 newCharacterIndex = 0
             }
         } else {
-            let newLineIndex = _currentLineIndex + direction.rawValue
+            let newLineIndex = currentLineIndex + direction.rawValue
             if newLineIndex < 0 || newLineIndex > layoutManager.lines.count - 1 { log("<ok.newLineIndex is out of range.>",from:self); return }
             guard let newLine = layoutManager.lines[newLineIndex] else { log("newLine is nil.",from:self); return }
             let indexInLine = newLine.characterIndex(for: verticalCaretX)
@@ -1933,12 +1953,12 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         if kind == .line {
             if direction == .forward {
-                guard let line = layoutManager.lines[_currentLineIndex] else { log("line is nil.",from:self); return false }
+                guard let line = layoutManager.lines[currentLineIndex] else { log("line is nil.",from:self); return false }
                 let upper = line.range.upperBound
                 if extendSelection { newRange = selection.lowerBound..<upper }
                 else { newRange = upper..<upper }
             } else {
-                guard let line = layoutManager.lines[_currentLineIndex] else { log("line is nil.",from:self); return false }
+                guard let line = layoutManager.lines[currentLineIndex] else { log("line is nil.",from:self); return false }
                 let lower = line.range.lowerBound
                 if extendSelection { newRange =  lower..<selection.upperBound }
                 else { newRange = lower..<lower }
