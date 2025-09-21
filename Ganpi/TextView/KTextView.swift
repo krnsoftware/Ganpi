@@ -70,6 +70,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     private var _showInvisibleCharacters: Bool = true
     private var _autoIndent: Bool = true
     private var _wordWrap: Bool = true
+    private var _useStandardKeyAssign: Bool = false
     
     // Text Input Clientの実装。
     // IME変換中のテキスト（確定前）
@@ -653,8 +654,25 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     // MARK: - Keyboard Input (NSResponder methods)
     
     override func keyDown(with event: NSEvent) {
+        // 標準キーアサインを使用する場合
+        if _useStandardKeyAssign {
+            if inputContext?.handleEvent(event) == true { return }
+            interpretKeyEvents([event])
+            return
+        }
         
-        interpretKeyEvents( [event] )
+        // Application専用キーアサインを使用する場合
+        if hasMarkedText() {
+            _ = inputContext?.handleEvent(event)
+            return
+        }
+        
+        let status = KKeyAssign.shared.estimateKeyStroke(KKeyStroke(event: event), requester: self)
+        if status == .passthrough {
+            if inputContext?.handleEvent(event) == true { return }
+            nextResponder?.keyDown(with: event)
+        }
+        
         
     }
     
