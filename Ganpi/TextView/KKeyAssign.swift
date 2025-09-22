@@ -100,7 +100,7 @@ class KKeyAssign {
         .init(keys:[KKeyStroke("G", [.control])], actions: ["deleteForward:"]),
         .init(keys:[KKeyStroke("Y", [.control])], actions: ["deleteToEndOfParagraph:"]),
         .init(keys:[KKeyStroke("I", [.control])], actions: ["insertTab:"]),
-        .init(keys:[KKeyStroke("M", [.control])], actions: ["insertNewLine:"]),
+        .init(keys:[KKeyStroke("M", [.control])], actions: ["insertNewline:"]),
         .init(keys:[KKeyStroke("U", [.control])], actions: ["uppercaseWord:"]),
         .init(keys:[KKeyStroke("L", [.control])], actions: ["lowercaseWord:"]),
 
@@ -112,14 +112,14 @@ class KKeyAssign {
         .init(keys:[KKeyStroke.init(keys.downArrow, [.control])], actions: ["makeFirstResponderToLowerTextView:"]),
 */
         .init(keys:[KKeyStroke("A", [.control, .shift])], actions: ["moveToBeginningOfParagraphAndModifySelection:"]),
-        .init(keys:[KKeyStroke("S", [.control, .shift])], actions: ["moveBackwardAndModifySelection:"]),
-        .init(keys:[KKeyStroke("D", [.control, .shift])], actions: ["moveForwardAndModifySelection:"]),
+        .init(keys:[KKeyStroke("S", [.control, .shift])], actions: ["moveLeftAndModifySelection:"]),
+        .init(keys:[KKeyStroke("D", [.control, .shift])], actions: ["moveRightAndModifySelection:"]),
         .init(keys:[KKeyStroke("F", [.control, .shift])], actions: ["moveToEndOfParagraphAndModifySelection:"]),
 
         .init(keys:[KKeyStroke("Q", [.control]), KKeyStroke("R", [.control])], actions: ["moveToBeginningOfDocument:"]),
         .init(keys:[KKeyStroke("Q", [.control]), KKeyStroke("C", [.control])], actions: ["moveToEndOfDocument:"]),
-        .init(keys:[KKeyStroke("Q", [.control]), KKeyStroke("1", [.control])], actions: ["mergeTextView:"]),
-        .init(keys:[KKeyStroke("Q", [.control]), KKeyStroke("2", [.control])], actions: ["splitTextView:"])
+        .init(keys:[KKeyStroke("Q", [.control]), KKeyStroke("1", [.control])], actions: ["removeSplit:"]),
+        .init(keys:[KKeyStroke("Q", [.control]), KKeyStroke("2", [.control])], actions: ["splitVertically:"])
     ]
 }
 
