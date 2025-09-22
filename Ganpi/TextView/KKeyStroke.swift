@@ -33,11 +33,9 @@ struct KKeyStroke: Equatable, Hashable {
     init(event: NSEvent) {
         if let character = event.charactersIgnoringModifiers {
             self.init(character, event.modifierFlags)
-            log("KKeyStoroke.init(): char:\(character)")
             return
         }
         self.init("")
-        log("KKeyStoroke.init(): character is nil.")
     }
     
     func hash(into hasher: inout Hasher) {

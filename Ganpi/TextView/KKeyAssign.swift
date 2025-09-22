@@ -63,8 +63,13 @@ class KKeyAssign {
             hasLongCandidate = true
         }
         if let exec = executeShortcut {
+            for action in exec.actions {
+                //NSApp.sendAction(Selector(action), to: nil, from: self)
+                if let owner = _pendingOwner {
+                    owner.doCommand(by: Selector(action))
+                }
+            }
             reset()
-            for action in exec.actions { NSApp.sendAction(Selector(action), to: nil, from: self) }
             return .execute
         } else if hasLongCandidate {
             return .preserve
