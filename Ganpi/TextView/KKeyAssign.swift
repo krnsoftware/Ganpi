@@ -119,7 +119,10 @@ class KKeyAssign {
         .init(keys:[KKeyStroke("Q", [.control]), KKeyStroke("R", [.control])], actions: ["moveToBeginningOfDocument:"]),
         .init(keys:[KKeyStroke("Q", [.control]), KKeyStroke("C", [.control])], actions: ["moveToEndOfDocument:"]),
         .init(keys:[KKeyStroke("Q", [.control]), KKeyStroke("1", [.control])], actions: ["removeSplit:"]),
-        .init(keys:[KKeyStroke("Q", [.control]), KKeyStroke("2", [.control])], actions: ["splitVertically:"])
+        .init(keys:[KKeyStroke("Q", [.control]), KKeyStroke("2", [.control])], actions: ["splitHorizontally:"]),
+        .init(keys:[KKeyStroke("Q", [.control]), KKeyStroke("3", [.control])], actions: ["focusForwardTextView:"])
+        
+        
     ]
 }
 

@@ -75,6 +75,15 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
     }
 
     @IBAction func toggleSyncOptions(_ sender: Any?) { syncOptions.toggle() }
+    
+    // 現在アクティブなTextViewの次(右または下)のTextViewをフォーカスする。
+    @IBAction func focusForwardTextView(_ sender: Any?) {
+        focusAdjoiningTextView(for: .forward)
+    }
+    
+    @IBAction func focusBackwardTextView(_ sender: Any?) {
+        focusAdjoiningTextView(for: .backward)
+    }
 
     @IBAction func increaseLineSpacing(_ sender: Any?) {
         guard let tv = activeTextView() else { log("activeTextView is nil.", from: self); return }
@@ -93,11 +102,6 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         }
         updateStatusBar()
     }
-/*
-    @IBAction func showLineSpacingSheet(_ sender: Any?) {
-        // 旧KPromptシートは廃止。Popoverで置換するためビープのみに。
-        NSSound.beep()
-    }*/
     
     @IBAction func showLineSpacingPopoverFromMenu(_ sender: Any?) {
         _lineSpacingButton.performClick(nil)
@@ -134,15 +138,6 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         _caretButton.performClick(nil)
     }
 
-    /*
-    private func setFontSize(_ value: Double) {
-        guard let storage = _document?.textStorage else { return }
-        storage.fontSize = max(5, value)
-        if syncOptions {
-            textViews.forEach { _ = $0 }
-        }
-        updateStatusBar()
-    }*/
 
     // MARK: - UI validation
 
@@ -542,6 +537,16 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         sv.adjustSubviews()
         if let first = _panes.first { view.window?.makeFirstResponder(first.textView) }
         updateStatusBar()
+    }
+    
+    private func focusAdjoiningTextView(for direction: KDirection) {
+        if _panes.count <= 1 { return }
+        for (i, textView) in textViews.enumerated() {
+            if textView === view.window?.firstResponder {
+                view.window?.makeFirstResponder( textViews[(i + direction.rawValue) % textViews.count])
+                return
+            }
+        }
     }
 
     // MARK: - Wider hit area for divider

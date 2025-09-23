@@ -662,11 +662,13 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
         
         // Application専用キーアサインを使用する場合
+        // IM変換中はそちらを優先
         if hasMarkedText() {
             _ = inputContext?.handleEvent(event)
             return
         }
         
+        // キーアサインに適合するかチェック。適合しなければinputContextに投げて、そちらでも使われなければkeyDown()へ。
         let status = KKeyAssign.shared.estimateKeyStroke(KKeyStroke(event: event), requester: self)
         if status == .passthrough {
             if inputContext?.handleEvent(event) == true { return }
