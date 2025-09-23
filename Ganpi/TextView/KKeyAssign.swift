@@ -104,7 +104,7 @@ class KKeyAssign {
         .init(keys:[KKeyStroke("U", [.control])], actions: ["uppercaseWord:"]),
         .init(keys:[KKeyStroke("L", [.control])], actions: ["lowercaseWord:"]),
 
-        .init(keys:[KKeyStroke("P", [.control])], actions: ["uppercaseWord:"]),
+        .init(keys:[KKeyStroke("P", [.control])], actions: ["transpose:"]),
 /*
         .init(keys:[KKeyStroke.init(keys.leftArrow, [.control])], actions: ["moveDividerUp:"]),
         .init(keys:[KKeyStroke.init(keys.rightArrow, [.control])], actions: ["moveDividerDown:"]),

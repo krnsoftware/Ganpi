@@ -2403,7 +2403,19 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     // MARK: - Edit Characters.
     
     @IBAction override func transpose(_ sender: Any?) {
-        
+        let caret = caretIndex
+        if textStorage.count < 2 || caret == 0 { return }
+        var replace:Range<Int>
+        if caret == textStorage.count || textStorage.skeletonString[caret] == FuncChar.lf {
+            replace = caret - 2..<caret // if the caret stays end of the text, last 2 characters will transpose.
+        } else {
+            replace = caret - 1..<caret + 1
+        }
+        guard let left = textStorage[replace.lowerBound], let right = textStorage[replace.lowerBound + 1] else { log("left or right char is nil.",from:self); return }
+        // if target characters contain LF, no transpose.
+        if (textStorage.skeletonString[replace.lowerBound] == FuncChar.lf || textStorage.skeletonString[replace.lowerBound + 1] == FuncChar.lf) { return }
+        _textStorageRef.replaceCharacters(in: replace, with: [right, left])
+        caretIndex = replace.lowerBound + 1
     }
     
     @IBAction override func capitalizeWord(_ sender: Any?) {
