@@ -225,31 +225,6 @@ final class KTextStorage: KTextStorageProtocol {
         }
     }
     
-    // 行番号表示に使用する数字の最大の横幅。
-    /*
-    var lineNumberCharacterMaxWidth: CGFloat {
-        if let width = _lineNumberCharacterMaxWidth {
-            return width
-        }
-        
-        let digits: [Character] = Array("0123456789")
-        let ctFont = _lineNumberFontEmph as CTFont
-
-        var maxWidth: CGFloat = 0
-
-        for char in digits {
-            guard let scalar = char.unicodeScalars.first else { continue }
-            let uniChar = UniChar(scalar.value)
-            var glyph = CGGlyph()
-            let success = CTFontGetGlyphsForCharacters(ctFont, [uniChar], &glyph, 1)
-            if success {
-                var advance: CGSize = .zero
-                CTFontGetAdvancesForGlyphs(ctFont, .horizontal, [glyph], &advance, 1)
-                maxWidth = max(maxWidth, advance.width)
-            }
-        }
-        return maxWidth
-    }*/
     // 行番号用の数字の最大 advance 幅（通常/強調の両方を考慮してキャッシュ）
     var lineNumberCharacterMaxWidth: CGFloat {
         if let cachedWidth = _lineNumberCharacterMaxWidth {

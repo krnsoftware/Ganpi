@@ -2263,8 +2263,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     }
     
     @IBAction override func selectLine(_ sender: Any?) {
-        //let lowerInfo = layoutManager.line(at: selectionRange.lowerBound)
-        //let upperInfo = layoutManager.line(at: selectionRange.upperBound)
         let lowerInfo = layoutManager.lines.lineInfo(at: selectionRange.lowerBound)
         let upperInfo = layoutManager.lines.lineInfo(at: selectionRange.upperBound)
         guard let lowerLine = lowerInfo.line else { log("no lower.",from:self); return }
@@ -2399,6 +2397,56 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     @IBAction override func insertBacktab(_ sender: Any?) {
         log("do nothing.",from:self)
+    }
+    
+    
+    // MARK: - Edit Characters.
+    
+    @IBAction override func transpose(_ sender: Any?) {
+        
+    }
+    
+    @IBAction override func capitalizeWord(_ sender: Any?) {
+        convertCaseOfWord(for: .capitalized)
+    }
+    
+    @IBAction override func lowercaseWord(_ sender: Any?) {
+        convertCaseOfWord(for: .lowercased)
+    }
+    
+    @IBAction override func uppercaseWord(_ sender: Any?) {
+        convertCaseOfWord(for: .uppercased)
+    }
+    
+    enum KCaseCoversionType {
+        case lowercased
+        case uppercased
+        case capitalized
+    }
+    
+    private func convertCaseOfWord(for type:KCaseCoversionType) {
+        let upper = max(selectionRange.upperBound - 1, selectionRange.lowerBound)
+        guard let lowerRange = textStorage.wordRange(at: selectionRange.lowerBound) else { log("no lower.",from:self); return }
+        guard let upperRange = textStorage.wordRange(at: upper) else { log("no upper.",from:self); return }
+        
+        let newSelection = lowerRange.lowerBound..<upperRange.upperBound
+        if newSelection.isEmpty { return }
+        
+        let string = textStorage.string[newSelection]
+        var newString:String
+        
+        switch type {
+        case .lowercased: newString = string.lowercased()
+        case .uppercased: newString = string.uppercased()
+        case .capitalized: newString = string.capitalized
+        }
+        _textStorageRef.replaceString(in: newSelection, with: newString)
+        selectionRange = newSelection
+        
+    }
+    
+    @IBAction override func yank(_ sender: Any?) {
+        paste(sender)
     }
     
     
