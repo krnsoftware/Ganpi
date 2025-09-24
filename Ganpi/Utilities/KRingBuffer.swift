@@ -48,6 +48,7 @@ struct KRingBuffer<Element> {
         return _buffer[realIndex]
     }
 
+    // 非推奨 discardLatest()を使用すること。
     mutating func removeNewerThan(index: Int) {
         precondition(index >= 0, "Index must be non-negative")
         guard index < _count else { return }
@@ -59,6 +60,17 @@ struct KRingBuffer<Element> {
         }
         _count = index
         _nextIndex = (_nextIndex - removeCount + _capacity) % _capacity
+    }
+    
+    mutating func discardLatest(_ count: Int) {
+        guard count > 0, _count > 0 else { return }
+        let n = min(count, _count)
+        for i in 0..<n {
+            let realIndex = (_nextIndex - 1 - i + _capacity) % _capacity
+            _buffer[realIndex] = nil
+        }
+        _count -= n
+        _nextIndex = (_nextIndex - n + _capacity) % _capacity
     }
 
     mutating func reset() {

@@ -309,7 +309,7 @@ final class KTextStorage: KTextStorageProtocol {
         }
         
         // undo. registering.
-        _undoManager.register(range: range, oldCharacters: Array(_characters[range]), newCharacters: newCharacters)
+        _undoManager.register(range: range, oldString: String(_characters[range]), newString: String(newCharacters))
         
         
         // 改行の数が旧テキストと新テキストで異なれば_hardLineCountが変化する。
@@ -340,7 +340,7 @@ final class KTextStorage: KTextStorageProtocol {
         timer.stop()
         
         // undo. recovery.
-        _undoManager.appendUndoAction(with: .none)
+        //_undoManager.appendUndoAction(with: .none)
         
         
         return true
