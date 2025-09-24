@@ -109,19 +109,6 @@ final class KTextStorage: KTextStorageProtocol {
         let attributes: [NSAttributedString.Key: Any]
     }
     
-    // Undo用
-    struct KUndoUnit {
-        let range: Range<Int>
-        let oldCharacters: [Character]
-        let newCharacters: [Character]
-    }
-    
-    enum KUndoAction {
-        case undo
-        case redo
-        case none
-    }
-    
     private struct _ObserverEntry {
         weak var owner: AnyObject?
         let handler: (KStorageModified) -> Void
@@ -154,9 +141,7 @@ final class KTextStorage: KTextStorageProtocol {
     private var _lineNumberCharacterMaxWidth: CGFloat?
     
     // for undo.
-    private var _history: KRingBuffer<KUndoUnit> = .init(capacity: 5000)
-    private var _undoDepth: Int = 0
-    private var _undoActions: KRingBuffer<KUndoAction> = .init(capacity: 2)
+    private lazy var _undoManager: KUndoManager = .init(with: self)
     
     // constants.
     private let _characterCacheLoadLimit: Int = 100_000
@@ -309,13 +294,9 @@ final class KTextStorage: KTextStorageProtocol {
     
     
     init() {
-        // undoのアクションを先に2回分埋めておく。
-        _undoActions.append(.none)
-        _undoActions.append(.none)
         
         _invisibleCharacters = KInvisibleCharacters()
-        
-        
+                
     }
 
     // 最終的に全ての文字列の変更はこのメソッドを通じて行う。
@@ -328,15 +309,8 @@ final class KTextStorage: KTextStorageProtocol {
         }
         
         // undo. registering.
-        if _undoActions.element(at: 0)! == .none {
-            let undoUnit = KUndoUnit(range: range, oldCharacters: Array(_characters[range]), newCharacters: newCharacters)
-            if _undoActions.element(at: 1)! != .none {
-                _history.removeNewerThan(index: _undoDepth)
-                _undoDepth = 0
-            }
-            
-            _history.append(undoUnit)
-        }
+        _undoManager.register(range: range, oldCharacters: Array(_characters[range]), newCharacters: newCharacters)
+        
         
         // 改行の数が旧テキストと新テキストで異なれば_hardLineCountが変化する。
         let oldReturnCount = _characters[range].filter { $0 == "\n" }.count
@@ -366,7 +340,7 @@ final class KTextStorage: KTextStorageProtocol {
         timer.stop()
         
         // undo. recovery.
-        _undoActions.append(.none)
+        _undoManager.appendUndoAction(with: .none)
         
         
         return true
@@ -411,81 +385,19 @@ final class KTextStorage: KTextStorageProtocol {
     
     // MARK: - Undo functions
     
-    func undo() {
-        guard _undoDepth < _history.count else {
-            NSSound.beep() // NSBeep()がなぜか使用できないためObjective-Cブリッジ経由で。
-            log("undo: no more history", from: self)
-            return
-        }
-
-        _undoActions.append(.undo)
-
-        guard let undoUnit = _history.element(at: _undoDepth) else { log("undo: failed to get undoUnit at \(_undoDepth)", from: self); return }
-
-        let range = undoUnit.range.lowerBound..<undoUnit.range.lowerBound + undoUnit.newCharacters.count
-        replaceCharacters(in: range, with: undoUnit.oldCharacters)
-
-        _undoDepth += 1
-    }
-    
-    func redo() {
-        guard _undoDepth > 0 else {
-            NSSound.beep()
-            log("redo: no redo available", from: self)
-            return
-        }
-
-        _undoActions.append(.redo)
-
-        let redoIndex = _undoDepth - 1
-
-        guard let undoUnit = _history.element(at: redoIndex) else { log("redo: failed to get redoUnit at \(redoIndex)", from: self); return }
-
-        replaceCharacters(in: undoUnit.range, with: undoUnit.newCharacters)
-
-        _undoDepth -= 1
-    }
-    
-    func canUndo() -> Bool {
-        return _undoDepth < _history.count
-    }
-
-    func canRedo() -> Bool {
-        return _undoDepth > 0
-    }
-    
-    func resetUndoHistory() {
-        _history.reset()
-        _undoDepth = 0
-    }
-    
+    func undo() { _undoManager.undo() }
+    func redo() { _undoManager.redo() }
+    func canUndo() -> Bool { return _undoManager.canUndo() }
+    func canRedo() -> Bool { return _undoManager.canRedo() }
+    func resetUndoHistory() { _undoManager.resetUndoHistory() }
     
     
     // MARK: - Utilities
     
     // index文字目のある場所を含む行のRangeを返す。改行は含まない。
     func lineRange(at index: Int) -> Range<Int>? {
-        //guard index >= 0 && index < _characters.count else { log("index out of range.",from:self); return nil }
         guard index >= 0 && index <= _characters.count else { log("index out of range.",from:self); return nil }
-        /*
-        var lower = index
-        while lower > 0 {
-            if _characters[lower - 1].isNewline {
-                break
-            }
-            lower -= 1
-        }
-
-        var upper = index
-        while upper < _characters.count {
-            if _characters[upper].isNewline {
-                break
-            }
-            upper += 1
-        }
-
-        return lower..<upper
-         */
+        
         
         var lower = index
         while lower > 0 {
@@ -519,7 +431,8 @@ final class KTextStorage: KTextStorageProtocol {
     }
     
     
-    
+    // 指定した範囲からattributed stringを返す。parserによる色指定を含む。
+    // withoutColors==trueで、parserによる色指定を無視してフォント・フォントサイズだけから高速に文字のoffset取得用attributed stringを返す。
     func attributedString(for range: Range<Int>,
                           tabWidth: Int? = nil,
                           withoutColors: Bool = false) -> NSAttributedString? {
