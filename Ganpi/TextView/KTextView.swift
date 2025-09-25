@@ -1865,6 +1865,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             caretIndex = newCharacterIndex
         }
         
+        scrollCaretToVisible()
+        
     }
     
     enum KCaretHorizontalMoveKind {
