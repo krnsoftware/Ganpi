@@ -51,15 +51,6 @@ extension KTextView {
     }
     
     
-    // MARK: - Yanks
-    
-    @IBAction func yankPop(_ sender: Any?) {
-        log("here!",from:self)
-    }
-    
-    @IBAction func yankPopReverse(_ sender: Any?) {
-        log("here!",from:self)
-    }
     
     
 }

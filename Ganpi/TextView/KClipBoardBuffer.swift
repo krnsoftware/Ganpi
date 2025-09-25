@@ -39,6 +39,8 @@ class KClipBoardBuffer {
         return _livePasteboard
     }
     
+    var isInCycle: Bool { _isInCycle }
+    
     var currentBuffer: String {
         if _cursor == 0 {
             return _currentPasteboard
@@ -66,8 +68,8 @@ class KClipBoardBuffer {
     }
     
     
-    func append(string: String) {
-        let newString = string.normalizedString
+    func append() {
+        let newString = currentBuffer
         if _buffer.element(at: 0) != newString {
             _buffer.append(newString)
         }

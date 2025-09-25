@@ -49,8 +49,12 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     private var _currentActionSelector: Selector? { // 今回受け取ったセレクタ。
         willSet { _lastActionSelector = _currentActionSelector }
     }
-    //private var _lastCaretIndex = 0 // 前回のキャレット位置。
-    private var _currentLineIndex: Int? = nil
+    // キャレット位置に於ける現在の行。
+    private var _currentLineIndex: Int?
+    
+    // yank関連
+    private var _yankSelection: Range<Int>?
+    private var _isApplyingYank: Bool = false
     
     // マウスによる領域選択に関するプロパティ
     private var _latestClickedCharacterIndex: Int?
@@ -103,6 +107,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             
             _selectionRange = newValue
             
+            endYankCycle()
+            
             //test
             //setCurrentLineIndex()
             _ = currentLineIndex
@@ -115,24 +121,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             needsDisplay = true
         }
     }
-    
-    // 一時的にここに置く。
-    /*
-    private func setCurrentLineIndex() {
-        
-        let lines = layoutManager.lines
-        
-        // 現在の行が存在しており、その左端・右端にキャレットがある場合、現在の行のインデックスはそのままにする。
-        if let currentLineIndex = _currentLineIndex,
-            currentLineIndex < lines.count,
-            let currentLine = lines[currentLineIndex],
-            (currentLine.range.upperBound == caretIndex || currentLine.range.lowerBound == caretIndex) {
-            return
-        }
-        // そうでなければ新規に計算する。
-        let newLineInfo = lines.lineInfo(at: caretIndex)
-        _currentLineIndex = newLineInfo.lineIndex < 0 ? 0 : newLineInfo.lineIndex
-    }*/
     
     private var currentLineIndex: Int {
         let lines = layoutManager.lines
@@ -243,6 +231,15 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         guard let sel = _lastActionSelector else { return false }
         return sel == #selector(moveLeftAndModifySelection(_:)) ||
         sel == #selector(moveRightAndModifySelection(_:))
+    }
+    
+    // 今回のセレクタがYankに属するものか返す。
+    private var isYankFamilySelector: Bool {
+        guard let sel = _currentActionSelector else { return false }
+        return sel == #selector(yank(_:)) ||
+        sel == #selector(yankPop(_:)) ||
+        sel == #selector(yankPopReverse(_:)) ||
+        sel == #selector(paste(_:))
     }
     
     override var acceptsFirstResponder: Bool { true }
@@ -384,6 +381,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     override func resignFirstResponder() -> Bool {
         //print("\(#function)")
         let ok = super.resignFirstResponder()
+        endYankCycle()
         _caretView.isHidden = true
         containerView?.setActiveEditor(false)
         needsDisplay = true
@@ -683,6 +681,12 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     // 前回のアクションのセレクタを保存するために実装
     override func doCommand(by selector: Selector) {
         _currentActionSelector = selector
+        
+        if !isYankFamilySelector {
+            KClipBoardBuffer.shared.endCycle()
+            _yankSelection = nil
+        }
+        
         super.doCommand(by: selector)
         //print(selector)
     }
@@ -691,6 +695,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
+        
+        endYankCycle()
         
         //キャレット移動のセレクタ記録に残すためのダミーセレクタ。
         doCommand(by: #selector(clearCaretContext(_:)))
@@ -823,6 +829,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     
     override func mouseDragged(with event: NSEvent) {
+        endYankCycle()
+        
         guard let layoutRects = _layoutManager.makeLayoutRects() else {
             print("\(#function): layoutRects is nil")
             return
@@ -1280,6 +1288,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     }
     
     func insertText(_ string: Any, replacementRange: NSRange) {
+        endYankCycle()
                 
         let rawString: String
         if let str = string as? String {
@@ -2402,6 +2411,34 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         paste(sender)
     }
     
+    @IBAction func yankPop(_ sender: Any?) {
+        let buffer = KClipBoardBuffer.shared
+        guard buffer.isInCycle, let selection = _yankSelection else { NSSound.beep(); return }
+        _isApplyingYank = true
+        defer { _isApplyingYank = false }
+        textStorage.undo()
+        buffer.pop()
+        _textStorageRef.replaceString(in: selection, with: buffer.currentBuffer)
+    }
+    
+    @IBAction func yankPopReverse(_ sender: Any?) {
+        let buffer = KClipBoardBuffer.shared
+        guard buffer.isInCycle, let selection = _yankSelection else { NSSound.beep(); return }
+        _isApplyingYank = true
+        defer { _isApplyingYank = false }
+        textStorage.undo()
+        buffer.popReverse()
+        _textStorageRef.replaceString(in: selection, with: buffer.currentBuffer)
+    }
+    
+    // Yankの動作を終了させるためのメソッド。一時的にここに置く。
+    private func endYankCycle() {
+        if !_isApplyingYank {
+            KClipBoardBuffer.shared.endCycle()
+            _yankSelection = nil
+        }
+    }
+    
     
     // MARK: - COPY and Paste (NSResponder method)
     
@@ -2416,19 +2453,35 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         guard !selectionRange.isEmpty else { return }
         guard let slicedCharacters = _textStorageRef[selectionRange] else { return }
         let selectedText = String(slicedCharacters)
+        
+        //test
+        let buffer = KClipBoardBuffer.shared
+        buffer.append()
+        //end
+        
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(selectedText, forType: .string)
     }
     
     @IBAction func paste(_ sender: Any?) {
+        
+        /*
         let pasteboard = NSPasteboard.general
         guard let rawString = pasteboard.string(forType: .string) else { return }
         
         let string = rawString.normalizedString
+         */
         
+        _isApplyingYank = true
+        defer { _isApplyingYank = false }
+        
+        let buffer = KClipBoardBuffer.shared
+        
+        _yankSelection = selectionRange
+        buffer.beginCycle()
+        let string = buffer.currentBuffer
         _textStorageRef.replaceCharacters(in: selectionRange, with: Array(string))
-        
         
     }
     
