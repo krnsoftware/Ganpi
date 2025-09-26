@@ -225,6 +225,7 @@ class Document: NSDocument {
         
         // 本文を TextStorage へ投入（全文置換）
         textStorage.replaceString(in: 0..<_textStorage.count, with: normalizedString)
+        textStorage.resetUndoHistory()
         
         
         // シンタックスタイプを推定
