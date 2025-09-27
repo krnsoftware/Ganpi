@@ -56,6 +56,9 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     private var _yankSelection: Range<Int>?
     private var _isApplyingYank: Bool = false
     
+    // Edit mode.
+    private var _editMode: KEditMode = .normal
+    
     // マウスによる領域選択に関するプロパティ
     private var _latestClickedCharacterIndex: Int?
     private var _mouseSelectionMode: KMouseSelectionMode = .character
@@ -154,6 +157,11 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     var layoutManager: KLayoutManager {
         return _layoutManager
+    }
+    
+    var editMode: KEditMode {
+        get { _editMode }
+        set { _editMode = newValue }
     }
     
     var wordWrap: Bool {
@@ -668,7 +676,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
         
         // キーアサインに適合するかチェック。適合しなければinputContextに投げて、そちらでも使われなければkeyDown()へ。
-        let status = KKeyAssign.shared.estimateKeyStroke(KKeyStroke(event: event), requester: self)
+        let status = KKeyAssign.shared.estimateKeyStroke(KKeyStroke(event: event), requester: self, mode: _editMode)
         if status == .passthrough {
             if inputContext?.handleEvent(event) == true { return }
             nextResponder?.keyDown(with: event)
@@ -2439,6 +2447,14 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
     }
     
+    // MARK: - Edit mode
+    @IBAction func setEditModeToNormal(_ sender: Any?) {
+        editMode = .normal
+    }
+    
+    @IBAction func setEditModeToEdit(_ sender: Any?) {
+        editMode = .edit
+    }
     
     // MARK: - COPY and Paste (NSResponder method)
     

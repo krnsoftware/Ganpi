@@ -31,6 +31,12 @@ struct KKeyStroke: Equatable, Hashable {
     }
     
     init(event: NSEvent) {
+        // ESCキーの場合、ctrl+'['に変換する。
+        if event.keyCode == 53 {
+            self.init("[", .control)
+            return
+        }
+        
         if let character = event.charactersIgnoringModifiers {
             self.init(character, event.modifierFlags)
             return

@@ -10,12 +10,19 @@
 
 import Cocoa
 
+enum KEditMode {
+    case normal
+    case edit
+}
+
+
 class KKeyAssign {
     
     enum KStatusCode {
         case passthrough
         case preserve
         case execute
+        case block
     }
     
     struct KShortCut {
@@ -23,32 +30,55 @@ class KKeyAssign {
         var actions: [String]
     }
     
+    static let shared: KKeyAssign = .init()
+    
+    private var _normalmodeShortcuts: [KShortCut] = defaultNormalModeKeyAssign
+    private var _editmodeShortCuts: [KShortCut] = defaultEditModeKeyAssign
+    
     private var _storedKeyStrokes: [KKeyStroke] = []
-    private var _shortcuts: [KShortCut] = []
+    private var _mode: KEditMode = .normal
+    
+    // owner.
     private weak var _pendingOwner: NSResponder? = nil
     private var _pendingOwnerID: ObjectIdentifier? = nil
     
-    var shortcuts: [KShortCut] {
-        set { _shortcuts = newValue }
-        get { _shortcuts }
+    private var mode: KEditMode {
+        get { _mode }
+        set {
+            if _mode != newValue { _storedKeyStrokes.removeAll() }
+            _mode = newValue
+        }
     }
     
-    static let shared: KKeyAssign = .init()
+    var shortcuts: [KShortCut] {
+        get { mode == .normal ? _normalmodeShortcuts : _editmodeShortCuts }
+    }
     
     var hasStoredKeyStrokes: Bool { _storedKeyStrokes.count > 0 }
     
-    init(_ shortcuts:[KShortCut] = defaultKeyAssign) {
-        _shortcuts = shortcuts
+    
+    
+    init() {
+        
+    }
+    
+    func setShortcuts(with shortcuts:[KShortCut], for mode:KEditMode = .normal) {
+        switch mode {
+        case .normal: _normalmodeShortcuts = shortcuts
+        case .edit: _editmodeShortCuts = shortcuts
+        }
     }
     
     func reset() { _storedKeyStrokes.removeAll(); _pendingOwner = nil }
     
-    func estimateKeyStroke(_ key: KKeyStroke, requester: NSResponder) -> KStatusCode {
+    func estimateKeyStroke(_ key: KKeyStroke, requester: NSResponder, mode: KEditMode = .normal) -> KStatusCode {
         if let owner = _pendingOwner, let oid = _pendingOwnerID, !(owner === requester && oid == ObjectIdentifier(requester)){
             resetPending()
         }
         _pendingOwner = requester
         _pendingOwnerID = ObjectIdentifier(requester)
+        
+        self.mode = mode
         
         _storedKeyStrokes.append(key)
         var executeShortcut: KShortCut? = nil
@@ -73,6 +103,9 @@ class KKeyAssign {
             return .execute
         } else if hasLongCandidate {
             return .preserve
+        } else if mode == .edit {
+            reset()
+            return .block
         } else {
             reset()
             return .passthrough
@@ -85,7 +118,7 @@ class KKeyAssign {
         reset()
     }
     
-    private static let defaultKeyAssign:[KShortCut] = [
+    private static let defaultNormalModeKeyAssign:[KShortCut] = [
         .init(keys:[KKeyStroke("A", [.control])], actions: ["moveToBeginningOfParagraph:"]),
         //.init(keys:[KKeyStroke("S", [.control])], actions: ["moveBackward:"]),
         .init(keys:[KKeyStroke("S", [.control])], actions: ["moveLeft:"]),
@@ -123,9 +156,19 @@ class KKeyAssign {
         .init(keys:[KKeyStroke("Q", [.control]), KKeyStroke("C", [.control])], actions: ["moveToEndOfDocument:"]),
         .init(keys:[KKeyStroke("Q", [.control]), KKeyStroke("1", [.control])], actions: ["removeSplit:"]),
         .init(keys:[KKeyStroke("Q", [.control]), KKeyStroke("2", [.control])], actions: ["splitHorizontally:"]),
-        .init(keys:[KKeyStroke("Q", [.control]), KKeyStroke("3", [.control])], actions: ["focusForwardTextView:"])
+        .init(keys:[KKeyStroke("Q", [.control]), KKeyStroke("3", [.control])], actions: ["focusForwardTextView:"]),
         
         
+        .init(keys:[KKeyStroke("[", [.control])], actions: ["setEditModeToEdit:"]),
+    ]
+    
+    private static let defaultEditModeKeyAssign:[KShortCut] = [
+        .init(keys:[KKeyStroke("H", [])], actions: ["moveLeft:"]),
+        .init(keys:[KKeyStroke("J", [])], actions: ["moveDown:"]),
+        .init(keys:[KKeyStroke("K", [])], actions: ["moveUp:"]),
+        .init(keys:[KKeyStroke("L", [])], actions: ["moveRight:"]),
+        
+        .init(keys:[KKeyStroke("i", [])], actions: ["setEditModeToNormal:"]),
     ]
 }
 
