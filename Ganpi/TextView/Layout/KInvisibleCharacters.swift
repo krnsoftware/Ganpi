@@ -23,7 +23,8 @@ final class KInvisibleCharacters {
     
     private static let _defaultAttributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: 10),
-            .foregroundColor: NSColor.secondaryLabelColor
+            //.foregroundColor: NSColor.secondaryLabelColor
+            .foregroundColor: NSColor.tertiaryLabelColor
         ]
 
     init(attributes: [NSAttributedString.Key: Any] = _defaultAttributes,
