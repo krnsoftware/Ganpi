@@ -54,7 +54,6 @@ protocol KTextStorageCommon: AnyObject {
 protocol KTextStorageReadable: KTextStorageCommon {
     var string: String { get }
     var skeletonString: KSkeletonStringInUTF8 { get }
-    //var parser: KSyntaxParserProtocol { get }
     var hardLineCount: Int { get } // if _character is empty, return 1. if end of chars is '\n', add 1.
     var invisibleCharacters: KInvisibleCharacters? { get }
     var spaceAdvance: CGFloat { get }
@@ -66,9 +65,6 @@ protocol KTextStorageReadable: KTextStorageCommon {
     func attributedString(for range: Range<Int>, tabWidth: Int?, withoutColors: Bool) -> NSAttributedString?
     func lineRange(at index: Int) -> Range<Int>?
     func lineAndColumNumber(at index:Int) -> (line:Int, column:Int) // index(0..), line(1..), column(1..)
-    //func advances(in range:Range<Int>) -> [CGFloat]
-    //func advance(for character:Character) -> CGFloat
-    //func countLines() -> Int
 }
 
 // 書き込み可能プロトコル（読み取り継承なし）
@@ -127,8 +123,6 @@ final class KTextStorage: KTextStorageProtocol {
     
     // propaties for appearances.
     private var _baseFont: NSFont = .monospacedSystemFont(ofSize: 12, weight: .regular)
-    //private var _lineNumberFont: NSFont = .monospacedDigitSystemFont(ofSize: 11 ,weight: .regular)
-    //private var _lineNumberFontEmph: NSFont = .monospacedDigitSystemFont(ofSize: 11 ,weight: .bold)
     private var _lineNumberFont: NSFont =
         NSFont(name: "Menlo-Regular", size: 11) ??
         .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
@@ -138,7 +132,6 @@ final class KTextStorage: KTextStorageProtocol {
     // caches.
     private var _spaceAdvanceCache: CGFloat?
     private var _hardLineCount: Int?
-    //private var _hardLineRanges: [Range<Int>]?
     private var _invisibleCharacters: KInvisibleCharacters?
     private var _lineNumberCharacterMaxWidth: CGFloat?
     
@@ -313,7 +306,6 @@ final class KTextStorage: KTextStorageProtocol {
         // undo. registering.
         _undoManager.register(range: range, oldString: String(_characters[range]), newString: String(newCharacters))
         
-        
         // 改行の数が旧テキストと新テキストで異なれば_hardLineCountが変化する。
         let oldReturnCount = _characters[range].filter { $0 == "\n" }.count
         let newReturnCount = newCharacters.filter { $0 == "\n" }.count
@@ -329,7 +321,7 @@ final class KTextStorage: KTextStorageProtocol {
         _parser.noteEdit(oldRange: range, newCount: newCharacters.count)
         
         // notification.
-        let timer = KTimeChecker(name:"observer")
+        //let timer = KTimeChecker(name:"observer")
         notifyObservers(.textChanged(
                 info: .init(
                     range: range,
@@ -339,11 +331,7 @@ final class KTextStorage: KTextStorageProtocol {
                 )
             )
         )
-        timer.stop()
-        
-        // undo. recovery.
-        //_undoManager.appendUndoAction(with: .none)
-        
+        //timer.stop()
         
         return true
     }

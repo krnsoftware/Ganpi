@@ -644,7 +644,7 @@ final class KLines: CustomStringConvertible {
             _lines.append(emptyLine)
         }
         
-        log("isValid: \(isValid)",from:self)
+        //log("isValid: \(isValid)",from:self)
 
         // mapも再構築
         _hardLineIndexMap.removeAll()
