@@ -1311,8 +1311,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         let string = rawString.normalizedString
         _textStorageRef.replaceCharacters(in: range, with: Array(string))
-        // 渡されたstringをCharacter.isControlでフィルターして制御文字を除去しておく。
-        //_textStorageRef.replaceCharacters(in: range, with: text.filter { !$0.isControl })
        
         _markedTextRange = nil
         _markedText = NSAttributedString()
@@ -2505,6 +2503,9 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         selectionRange = 0..<_textStorageRef.count
         
     }
+    
+    // MARK: - Others.
+    
     
 
     

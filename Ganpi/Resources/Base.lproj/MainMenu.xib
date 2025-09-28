@@ -279,6 +279,19 @@
                                                 <action selector="showFontSizePopoverFromMenu:" target="-1" id="zet-ls-M6r"/>
                                             </connections>
                                         </menuItem>
+                                        <menuItem title="Show Font Panel..." id="VuN-Ab-ImK">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="showFontPanel:" target="-1" id="F5v-r8-ShO"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem isSeparatorItem="YES" id="pYE-J5-mh9"/>
+                                        <menuItem title="Use Monospace System Font" id="Pw0-yu-gA2">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="setBaseFontToMonoSpaceSystemFont:" target="-1" id="30y-an-lVB"/>
+                                            </connections>
+                                        </menuItem>
                                     </items>
                                 </menu>
                             </menuItem>

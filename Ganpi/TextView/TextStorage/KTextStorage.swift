@@ -73,6 +73,7 @@ protocol KTextStorageReadable: KTextStorageCommon {
 // 書き込み可能プロトコル（読み取り継承なし）
 protocol KTextStorageWritable: KTextStorageCommon {
     var string: String { get set }
+    var baseFont: NSFont { get set }
 
     @discardableResult
     func replaceCharacters(in range: Range<Int>, with characters: [Character]) -> Bool

@@ -137,6 +137,37 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
     @IBAction func showCaretJumpPopoverFromMenu(_ sender: Any?) {
         _caretButton.performClick(nil)
     }
+    
+    @IBAction func showFontPanel(_ sender: Any?) {
+        let panel = NSFontPanel.shared
+        guard let font = document?.textStorage.baseFont else { log("document is nil.",from:self); return }
+        panel.setPanelFont(font, isMultiple: false)
+        panel.orderFront(self)
+    }
+    
+    @IBAction func changeFont(_ sender: Any?) {
+        guard let manager = sender as? NSFontManager else { log("Font manager is nil.", from:self); return }
+        guard let storage = document?.textStorage else { log("document is nil.", from:self); return }
+        let panelFont = manager.convert(storage.baseFont)
+        //log("font: \(panelFont.fontName)", from:self)
+        let isOption = NSApp.currentEvent?.modifierFlags.contains(.option) == true
+        if isOption {
+            guard let textView = activeTextView() else { log("activeTextView() is nil.", from:self); return }
+            let selection = textView.selectionRange
+            let string = "\(panelFont.fontName) \(panelFont.pointSize)"
+            storage.replaceString(in: selection, with: string)
+            textView.selectionRange = selection.lowerBound..<selection.lowerBound + string.count
+        } else {
+            storage.baseFont = panelFont
+            updateStatusBar()
+        }
+    }
+    
+    @IBAction func setBaseFontToMonoSpaceSystemFont(_ sender: Any?) {
+        guard let storage = document?.textStorage else { log("document is nil.", from:self); return }
+        
+        storage.baseFont = NSFont.monospacedSystemFont(ofSize: storage.fontSize, weight: .regular)
+    }
 
 
     // MARK: - UI validation
