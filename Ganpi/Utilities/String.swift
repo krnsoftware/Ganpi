@@ -578,6 +578,7 @@ extension String {
     }
 }
 
+/*
 //MARK: - NSColor Extension for String
 
 // Stringに関するNSColor extension
@@ -606,7 +607,7 @@ extension NSColor {
 
         return hexString
     }
-}
+}*/
 
 
 extension String.Encoding {
