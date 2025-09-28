@@ -41,6 +41,7 @@ protocol KTextStorageCommon: AnyObject {
     var characterSlice: ArraySlice<Character> { get }
     subscript(index: Int) -> Character? { get }
     subscript(range: Range<Int>) -> ArraySlice<Character>? { get }
+    subscript(string range: Range<Int>) -> String { get }
     
     func addObserver(_ owner: AnyObject, _ handler: @escaping (KStorageModified) -> Void)
     func removeObserver(_ owner: AnyObject)
@@ -380,6 +381,11 @@ final class KTextStorage: KTextStorageProtocol {
     subscript(range: Range<Int>) -> ArraySlice<Character>? {
         guard range.lowerBound >= 0 && range.upperBound <= _characters.count else { return nil }
         return _characters[range]
+    }
+    
+    subscript(string range: Range<Int>) -> String {
+        let clampedRange = range.clamped(to: 0..<_characters.count)
+        return String(_characters[clampedRange])
     }
     
     

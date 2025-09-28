@@ -199,6 +199,25 @@
                         </items>
                     </menu>
                 </menuItem>
+                <menuItem title="Text" id="nhI-OU-qvC">
+                    <modifierMask key="keyEquivalentModifierMask"/>
+                    <menu key="submenu" title="Text" id="pgI-qu-Ea7">
+                        <items>
+                            <menuItem title="show Color Panel" id="PHU-Wb-yqT">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <connections>
+                                    <action selector="showColorPanel:" target="-1" id="JKq-l8-UEO"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Item 2" id="i1L-aD-R1I">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                            </menuItem>
+                            <menuItem title="Item 3" id="aiM-IB-dEW">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                            </menuItem>
+                        </items>
+                    </menu>
+                </menuItem>
                 <menuItem title="Option" id="DZR-wt-FL4" userLabel="Option">
                     <modifierMask key="keyEquivalentModifierMask"/>
                     <menu key="submenu" title="Option" id="v9D-RY-AWl">
