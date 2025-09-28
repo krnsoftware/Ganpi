@@ -149,10 +149,27 @@ class KLine: CustomStringConvertible {
             for i in range.lowerBound..<range.upperBound {
                 guard let char = textStorageRef[i] else { log("textStorageRef[\(i)] is nil."); return }
                 
-                if let ctChar = textStorageRef.invisibleCharacters?.ctLine(for: char) {
-                    context.textPosition = CGPoint(x: point.x + _cachedOffsets[index], y: lineOriginY)
-                    CTLineDraw(ctChar, context)
+                if let ctLine = textStorageRef.invisibleCharacters?.ctLine(for: char) {
+                    // 1) その文字の実アドバンス幅（レイアウト済み値）を取得
+                    let x0 = _cachedOffsets[index]
+                    let x1: CGFloat = (index + 1 < _cachedOffsets.count) ? _cachedOffsets[index + 1] : x0
+                    let advance = max(x1 - x0, 0)
+                    
+                    // 2) 代替CTLineのタイポ幅を取得
+                    var ascent: CGFloat = 0, descent: CGFloat = 0, leading: CGFloat = 0
+                    let placeholderWidth = CGFloat(CTLineGetTypographicBounds(ctLine, &ascent, &descent, &leading))
+                    
+                    // 3) 箱の中央に置く（advance が小さい場合は左寄せにフォールバック）
+                    let dx = max((advance - placeholderWidth) * 0.5, 0)
+                    
+                    context.textPosition = CGPoint(x: point.x + x0 + dx, y: lineOriginY)
+                    CTLineDraw(ctLine, context)
                 }
+                /*
+                 if let ctChar = textStorageRef.invisibleCharacters?.ctLine(for: char) {
+                 context.textPosition = CGPoint(x: point.x + _cachedOffsets[index], y: lineOriginY)
+                 CTLineDraw(ctChar, context)
+                 }*/
                 index += 1
             }
             if range.upperBound < textStorageRef.count, textStorageRef[range.upperBound] == newlineChar {
