@@ -16,6 +16,7 @@ protocol KLayoutManagerReadable: AnyObject {
     var lineHeight: CGFloat { get }
     var lineSpacing: CGFloat { get }
     var maxLineWidth: CGFloat { get }
+    var fontHeight: CGFloat { get }
     
     func makeLayoutRects() -> KLayoutRects?
     func makeEmptyLine(index: Int, hardLineIndex: Int) -> KLine
@@ -71,6 +72,11 @@ final class KLayoutManager: KLayoutManagerReadable {
         //return font.ascender + abs(font.descender) + lineSpacing
         //return ceil(font.ascender - font.descender + font.leading + lineSpacing)
         return font.ascender - font.descender + font.leading + lineSpacing
+    }
+    
+    var fontHeight: CGFloat {
+        let font = _textStorageRef.baseFont
+        return font.ascender - font.descender
     }
     
     var lineCount: Int {
