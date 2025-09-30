@@ -457,7 +457,15 @@ final class KLines: CustomStringConvertible {
         if let lineA = textStorageRef.attributedString(for: range.lowerBound..<replacementRange.lowerBound, tabWidth: nil, withoutColors: false),
            let lineB = textStorageRef.attributedString(for: replacementRange.upperBound..<range.upperBound, tabWidth: nil, withoutColors: false){
             let muAttrString =  NSMutableAttributedString(attributedString: attrString)
-            muAttrString.addAttribute(.font, value: textStorageRef.baseFont, range: NSRange(location: 0, length: muAttrString.length))
+            
+            var attributes: [NSAttributedString.Key: Any] = [
+                .font: textStorageRef.baseFont
+            ]
+            // 挿入された文字列の直前(lineAの最後の文字)の.foregroundColorを挿入された文字全体に適用する。
+            if lineA.length > 0, let lastCharColor = lineA.attribute(.foregroundColor, at: lineA.length - 1, effectiveRange: nil) as? NSColor {
+                attributes[.foregroundColor] = lastCharColor
+            }
+            muAttrString.addAttributes(attributes, range: NSRange(location: 0, length: muAttrString.length))
             
             let fullLine = NSMutableAttributedString()
             fullLine.append(lineA)
