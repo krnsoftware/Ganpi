@@ -2,18 +2,23 @@
 //  KSyntaxParserRuby.swift
 //  Ganpi
 //
-//  Ruby用シンタックスパーサ
-//  コメント・文字列・正規表現・数値・キーワード・%系リテラルに対応
+//  Ruby用シンタックスパーサ（skeleton直読み・ゼロコピー版）
+//  - コメント: #, =begin/=end（行頭）
+//  - 文字列: '..."'
+//  - 正規表現: /.../（除算と文脈で判定）, %r..., %q/%Q/%w/%W/%s/%x/%i/%I
+//  - 数値（-付きも一括）
+//  - キーワード
+//  - 高速化: 特別文字FastPath, ゼロコピー, 最小割当
 //
 
 import AppKit
 
 final class KSyntaxParserRuby: KSyntaxParserProtocol {
 
-    // MARK: - 公開
+    // MARK: 公開
     let storage: KTextStorageReadable
 
-    // MARK: - 内部型
+    // MARK: 内部型
     private struct LineInfo {
         var endState: EndState = .neutral
         var spans: [AttributedSpan] = []
@@ -25,10 +30,10 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
         case inMultiComment
         case inStringSingle
         case inStringDouble
-        case inPercentLiteral(closing: UInt8) // %系や /…/ の継続
+        case inPercentLiteral(closing: UInt8) // %系や /…/ 継続（closing に '/' も使う）
     }
 
-    // MARK: - 内部状態
+    // MARK: 内部状態
     private var _lineStarts: [Int] = []
     private var _lines: [LineInfo] = []
     private var _needsRebuild = true
@@ -39,7 +44,7 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
     private let _colorKeyword = NSColor(hexString: "#070093") ?? .black   // キーワード
     private let _colorNumber  = NSColor(hexString: "#070093") ?? .black   // 数値
 
-    // キーワードセット（必要に応じて追加）
+    // キーワード
     private let _keywords: Set<String> = [
         "BEGIN","END","alias","and","begin","break","case","class","def","defined?",
         "do","else","elsif","end","ensure","false","for","if","in","module","next",
@@ -47,20 +52,24 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
         "true","undef","unless","until","when","while","yield"
     ]
 
-    // MARK: - 初期化
+    // 一時配列（再利用）
+    private var _tmpSpans: [AttributedSpan] = []
+
+    // MARK: 初期化
     init(storage: KTextStorageReadable) {
         self.storage = storage
     }
 
-    // MARK: - プロトコル準拠
+    // MARK: 更新通知
     func noteEdit(oldRange: Range<Int>, newCount: Int) {
         _needsRebuild = true
     }
 
+    // MARK: 同期
     func ensureUpToDate(for range: Range<Int>) {
         rebuildIfNeeded()
         let need = lineRangeCovering(range, pad: 2)
-        let anchor = anchorLine(before: need.lowerBound)   // neutral な既知行へ巻き戻し
+        let anchor = anchorLine(before: need.lowerBound)
         parseLines(in: anchor..<need.upperBound)
     }
 
@@ -71,6 +80,7 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
         parseLines(in: anchor..<need.upperBound)
     }
 
+    // MARK: 属性取得
     func attributes(in range: Range<Int>, tabWidth: Int) -> [AttributedSpan] {
         if range.isEmpty { return [] }
         ensureUpToDate(for: range)
@@ -78,8 +88,8 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
         if lineCount == 0 { return [] }
 
         let textCount = storage.count
-        let loOff = max(0, min(range.lowerBound, textCount == 0 ? 0 : textCount - 1))
-        let hiProbe = max(0, min(max(range.upperBound - 1, 0), textCount == 0 ? 0 : textCount - 1))
+        let loOff = max(0, min(range.lowerBound, max(0, textCount - 1)))
+        let hiProbe = max(0, min(max(range.upperBound - 1, 0), max(0, textCount - 1)))
 
         var li0 = lineIndex(at: loOff)
         var li1 = lineIndex(at: hiProbe)
@@ -88,6 +98,8 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
         if li0 > li1 { return [] }
 
         var result: [AttributedSpan] = []
+        result.reserveCapacity(32)
+
         let lo = range.lowerBound
         let hi = range.upperBound
 
@@ -106,10 +118,11 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
     }
 
     func wordRange(at index: Int) -> Range<Int>? {
-        storage.wordRange(at: index)
+        //storage.wordRange(at: index)
+        return nil
     }
 
-    // MARK: - 行管理
+    // MARK: 行管理
     private func rebuildIfNeeded() {
         guard _needsRebuild else { return }
         _needsRebuild = false
@@ -127,6 +140,7 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
         let n = max(0, _lineStarts.count - 1)
         _lines = Array(repeating: LineInfo(), count: n)
         for i in 0..<n { _lines[i].dirty = true }
+        _tmpSpans.reserveCapacity(16)
     }
 
     private func lineRangeCovering(_ charRange: Range<Int>, pad: Int) -> Range<Int> {
@@ -148,150 +162,184 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
         return lo
     }
 
-    // neutral な既知行（dirty でなく endState が .neutral）まで上へ巻き戻す
+    // neutral 既知行へ巻き戻し
     private func anchorLine(before line: Int) -> Int {
         guard !_lines.isEmpty else { return 0 }
         var i = max(0, min(line, _lines.count - 1))
         i = max(0, i - 1)
         while i > 0 {
+            // spansが空なら“安全アンカー”として採用
             if _lines[i].endState == .neutral && !_lines[i].dirty { return i }
+            if _lines[i].endState == .neutral && _lines[i].spans.isEmpty { return i }
             i -= 1
         }
         return 0
     }
 
-    // MARK: - 行解析
+    // MARK: 解析本体
     private func parseLines(in range: Range<Int>) {
         guard !_lines.isEmpty else { return }
-        var state: EndState = (range.lowerBound > 0) ? _lines[range.lowerBound - 1].endState : .neutral
         let skel = storage.skeletonString
-        for li in range {
-            if !_lines[li].dirty && _lines[li].endState == state {
-                state = _lines[li].endState
-                continue
+
+        var state: EndState = (range.lowerBound > 0) ? _lines[range.lowerBound - 1].endState : .neutral
+
+        // skeleton.bytes をゼロコピーで読む
+        skel.bytes.withUnsafeBufferPointer { whole in
+            let baseAll = whole.baseAddress!
+
+            for li in range {
+                if !_lines[li].dirty && _lines[li].endState == state {
+                    state = _lines[li].endState
+                    continue
+                }
+
+                let lo = _lineStarts[li]
+                let hi = _lineStarts[li + 1]
+                let count = hi - lo
+                let linePtr = baseAll + lo
+
+                let (newState, spans) = lexLine(base: linePtr, count: count, startOffset: lo, initial: state)
+                _lines[li].endState = newState
+                _lines[li].spans = spans
+                _lines[li].dirty = false
+                state = newState
             }
-            let lo = _lineStarts[li]
-            let hi = _lineStarts[li + 1]
-            let bytes = Array(skel.bytes(in: lo..<hi))
-            let (newState, spans) = lexLine(bytes: bytes, base: lo, initial: state)
-            _lines[li].endState = newState
-            _lines[li].spans = spans
-            _lines[li].dirty = false
-            state = newState
         }
     }
 
-    // MARK: - 字句解析
-    private func lexLine(bytes: [UInt8], base: Int, initial: EndState) -> (EndState, [AttributedSpan]) {
-        var spans: [AttributedSpan] = []
-        var state = initial
-        let n = bytes.count
-        var i = 0
+    // MARK: 字句解析（ゼロコピー）
+    private func lexLine(base: UnsafePointer<UInt8>, count: Int, startOffset: Int, initial: EndState) -> (EndState, [AttributedSpan]) {
+        _tmpSpans.removeAll(keepingCapacity: true)
 
-        // --- 継続状態の先頭処理 ---
+        var state = initial
+        var i = 0
+        let n = count
+
+        // --- 継続状態の処理 ---
         if state == .inMultiComment {
-            if matchLineHead(bytes, token: "=end") {
-                spans.append(span(base..<base+n, color: _colorComment))
-                return (.neutral, spans)
+            if matchLineHead(base, n, token: "=end") {
+                appendSpan(startOffset, 0, n, _colorComment)
+                return (.neutral, _tmpSpans)
             } else {
-                spans.append(span(base..<base+n, color: _colorComment))
-                return (.inMultiComment, spans)
+                appendSpan(startOffset, 0, n, _colorComment)
+                return (.inMultiComment, _tmpSpans)
             }
         }
 
         if state == .inStringSingle {
-            let (closed, end) = scanQuoted(bytes, from: 0, quote: FuncChar.singleQuote)
-            spans.append(span(base..<base+end, color: _colorString))
-            if closed { i = end; state = .neutral } else { return (.inStringSingle, spans) }
+            let (closed, end) = scanQuoted(base, n, from: 0, quote: FuncChar.singleQuote)
+            appendSpan(startOffset, 0, end, _colorString)
+            if closed { i = end; state = .neutral } else { return (.inStringSingle, _tmpSpans) }
         }
 
         if state == .inStringDouble {
-            let (closed, end) = scanQuoted(bytes, from: 0, quote: FuncChar.doubleQuote)
-            spans.append(span(base..<base+end, color: _colorString))
-            if closed { i = end; state = .neutral } else { return (.inStringDouble, spans) }
+            let (closed, end) = scanQuoted(base, n, from: 0, quote: FuncChar.doubleQuote)
+            appendSpan(startOffset, 0, end, _colorString)
+            if closed { i = end; state = .neutral } else { return (.inStringDouble, _tmpSpans) }
         }
 
         if case let .inPercentLiteral(closing) = state {
             if closing == FuncChar.slash {
-                let (closed, end) = scanSlashRegex(bytes, from: 0)
-                spans.append(span(base..<base+end, color: _colorString))
-                if closed { i = end; state = .neutral } else { return (.inPercentLiteral(closing: closing), spans) }
+                let (closed, end) = scanSlashRegex(base, n, from: 0)
+                appendSpan(startOffset, 0, end, _colorString)
+                if closed { i = end; state = .neutral } else { return (.inPercentLiteral(closing: closing), _tmpSpans) }
             } else {
-                let (closed, end) = scanUntil(bytes, from: 0, closing: closing)
-                spans.append(span(base..<base+end, color: _colorString))
-                if closed { i = end; state = .neutral } else { return (.inPercentLiteral(closing: closing), spans) }
+                let (closed, end) = scanUntil(base, n, from: 0, closing: closing)
+                appendSpan(startOffset, 0, end, _colorString)
+                if closed { i = end; state = .neutral } else { return (.inPercentLiteral(closing: closing), _tmpSpans) }
             }
         }
 
-        // 行頭の =begin
-        if matchLineHead(bytes, token: "=begin") {
-            spans.append(span(base..<base+n, color: _colorComment))
-            return (.inMultiComment, spans)
+        // =begin は行頭のみ
+        if matchLineHead(base, n, token: "=begin") {
+            appendSpan(startOffset, 0, n, _colorComment)
+            return (.inMultiComment, _tmpSpans)
+        }
+
+        // --- Fast Path ---
+        if state == .neutral && i == 0 && !hasSpecialToken(base, n) {
+            // 特別文字が無い行は解析不要
+            return (.neutral, _tmpSpans)
         }
 
         // --- 通常走査 ---
         while i < n {
-            let c = bytes[i]
+            let c = base[i]
 
             // 行コメント
             if c == FuncChar.numeric {
-                spans.append(span((base+i)..<base+n, color: _colorComment))
+                appendSpan(startOffset, i, n, _colorComment)
                 break
             }
 
-            // 文字列（' / "）
+            // 文字列
             if c == FuncChar.singleQuote {
-                let (closed, end) = scanQuoted(bytes, from: i, quote: FuncChar.singleQuote)
-                spans.append(span((base+i)..<base+end, color: _colorString))
-                if closed { i = end } else { return (.inStringSingle, spans) }
+                let (closed, end) = scanQuoted(base, n, from: i, quote: FuncChar.singleQuote)
+                appendSpan(startOffset, i, end, _colorString)
+                if closed { i = end } else { return (.inStringSingle, _tmpSpans) }
                 continue
             }
             if c == FuncChar.doubleQuote {
-                let (closed, end) = scanQuoted(bytes, from: i, quote: FuncChar.doubleQuote)
-                spans.append(span((base+i)..<base+end, color: _colorString))
-                if closed { i = end } else { return (.inStringDouble, spans) }
+                let (closed, end) = scanQuoted(base, n, from: i, quote: FuncChar.doubleQuote)
+                appendSpan(startOffset, i, end, _colorString)
+                if closed { i = end } else { return (.inStringDouble, _tmpSpans) }
                 continue
             }
 
-            // %系（%q/%Q/%w/%W/%s/%x/%i/%I/%r など）
+            // %系
             if c == FuncChar.percent, i + 1 < n {
-                let (closing, offset) = determinePercentLiteralClosing(bytes, from: i+1)
+                let (closing, offset) = determinePercentClosing(base, n, from: i + 1)
                 if closing == FuncChar.slash {
-                    // 単一区切りが / の場合（%r/ ... /）
-                    let (closed, end) = scanSlashRegex(bytes, from: offset - 1)
-                    spans.append(span((base+i)..<base+end, color: _colorString))
-                    if closed { i = end } else { return (.inPercentLiteral(closing: FuncChar.slash), spans) }
+                    let (closed, end) = scanSlashRegex(base, n, from: offset - 1)
+                    appendSpan(startOffset, i, end, _colorString)
+                    if closed { i = end } else { return (.inPercentLiteral(closing: FuncChar.slash), _tmpSpans) }
                     continue
                 } else {
-                    let (closed, end) = scanUntil(bytes, from: offset, closing: closing)
-                    spans.append(span((base+i)..<base+end, color: _colorString))
-                    if closed { i = end } else { return (.inPercentLiteral(closing: closing), spans) }
+                    let (closed, end) = scanUntil(base, n, from: offset, closing: closing)
+                    appendSpan(startOffset, i, end, _colorString)
+                    if closed { i = end } else { return (.inPercentLiteral(closing: closing), _tmpSpans) }
                     continue
                 }
             }
 
-            // 素の /…/ 正規表現
+            // /…/ 正規表現（除算誤判定の抑止）
             if c == FuncChar.slash {
-                let (closed, end) = scanSlashRegex(bytes, from: i)
-                spans.append(span((base+i)..<base+end, color: _colorString))
-                if closed { i = end } else { return (.inPercentLiteral(closing: FuncChar.slash), spans) }
+                if let p = previousNonSpace(base, i) {
+                    if looksLikeOperandTail(p) && !allowsRegexAfter(p) {
+                        // 除算とみなす：スキップして次へ
+                        i += 1
+                    } else {
+                        let (closed, end) = scanSlashRegex(base, n, from: i)
+                        appendSpan(startOffset, i, end, _colorString)
+                        if closed { i = end } else { return (.inPercentLiteral(closing: FuncChar.slash), _tmpSpans) }
+                    }
+                } else {
+                    // 行頭の '/'
+                    let (closed, end) = scanSlashRegex(base, n, from: i)
+                    appendSpan(startOffset, i, end, _colorString)
+                    if closed { i = end } else { return (.inPercentLiteral(closing: FuncChar.slash), _tmpSpans) }
+                }
                 continue
             }
 
-            // 数値（マイナス付き対応）
+            // 数値（マイナス付き）
             if c == FuncChar.minus || isDigit(c) {
-                let (end, _) = scanNumber(bytes, from: i)
-                spans.append(span((base+i)..<base+end, color: _colorNumber))
+                let end = scanNumber(base, n, from: i)
+                appendSpan(startOffset, i, end, _colorNumber)
                 i = end
                 continue
             }
 
             // キーワード / 識別子
             if isIdentStart(c) {
-                let (end, token) = scanIdent(bytes, from: i)
-                let text = String(decoding: token, as: UTF8.self)
+                let end = scanIdentEnd(base, n, from: i)
+                // バイト列→String化はここだけ（短い＆必要時のみ）
+                let text = String(bytesNoCopy: UnsafeMutableRawPointer(mutating: base + i),
+                                  length: end - i,
+                                  encoding: .utf8,
+                                  freeWhenDone: false) ?? ""
                 let color = _keywords.contains(text) ? _colorKeyword : .black
-                spans.append(span((base+i)..<base+end, color: color))
+                appendSpan(startOffset, i, end, color)
                 i = end
                 continue
             }
@@ -299,80 +347,45 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
             i += 1
         }
 
-        return (state, spans)
+        return (state, _tmpSpans)
     }
 
-    // MARK: - 補助
-    private func matchLineHead(_ bytes: [UInt8], token: String) -> Bool {
-        guard !bytes.isEmpty else { return false }
-        if bytes[0] == FuncChar.space || bytes[0] == FuncChar.tab { return false }
-        let t = Array(token.utf8)
-        if bytes.count < t.count { return false }
-        for i in 0..<t.count where bytes[i] != t[i] { return false }
+    // MARK: 補助（ゼロコピー版）
+
+    // 行頭の "=begin"/"=end" 判定（先頭空白不可）
+    private func matchLineHead(_ base: UnsafePointer<UInt8>, _ n: Int, token: String) -> Bool {
+        if n == 0 { return false }
+        let c0 = base[0]
+        if c0 == FuncChar.space || c0 == FuncChar.tab { return false }
+        let u = Array(token.utf8)
+        if n < u.count { return false }
+        for k in 0..<u.count where base[k] != u[k] { return false }
         return true
     }
 
-    private func scanQuoted(_ bytes: [UInt8], from: Int, quote: UInt8) -> (Bool, Int) {
+    private func scanQuoted(_ base: UnsafePointer<UInt8>, _ n: Int, from: Int, quote: UInt8) -> (Bool, Int) {
         var i = from + 1
-        let n = bytes.count
         while i < n {
-            if bytes[i] == quote {
+            if base[i] == quote {
                 var esc = 0, k = i - 1
-                while k >= 0, bytes[k] == FuncChar.backSlash { esc += 1; k -= 1 }
-                if esc % 2 == 0 { return (true, i+1) }
+                while k >= 0, base[k] == FuncChar.backSlash { esc += 1; k -= 1 }
+                if esc % 2 == 0 { return (true, i + 1) }
             }
             i += 1
         }
         return (false, n)
     }
 
-    private func scanUntil(_ bytes: [UInt8], from: Int, closing: UInt8) -> (Bool, Int) {
-        var i = from
-        let n = bytes.count
-        while i < n {
-            if bytes[i] == closing {
-                var esc = 0, k = i - 1
-                while k >= 0, bytes[k] == FuncChar.backSlash { esc += 1; k -= 1 }
-                if esc % 2 == 0 { return (true, i+1) }
-            }
-            i += 1
-        }
-        return (false, n)
-    }
-
-    private func determinePercentLiteralClosing(_ bytes: [UInt8], from: Int) -> (UInt8, Int) {
-        let n = bytes.count
-        var i = from
-        if i < n {
-            i += 1 // 種別文字を読み飛ばし
-            if i < n {
-                let opener = bytes[i]
-                switch opener {
-                case FuncChar.leftBrace:   return (FuncChar.rightBrace, i+1)
-                case FuncChar.leftBracket: return (FuncChar.rightBracket, i+1)
-                case FuncChar.leftParen:   return (FuncChar.rightParen, i+1)
-                case FuncChar.lt:          return (FuncChar.gt, i+1)
-                default:                   return (opener, i+1) // 単一記号
-                }
-            }
-        }
-        // フォールバック（異常系）
-        return (UInt8(ascii: "}"), from)
-    }
-
-    private func scanSlashRegex(_ bytes: [UInt8], from: Int) -> (Bool, Int) {
+    private func scanSlashRegex(_ base: UnsafePointer<UInt8>, _ n: Int, from: Int) -> (Bool, Int) {
         var i = from + 1
-        let n = bytes.count
         while i < n {
-            if bytes[i] == FuncChar.slash {
+            if base[i] == FuncChar.slash {
                 var esc = 0, k = i - 1
-                while k >= 0, bytes[k] == FuncChar.backSlash { esc += 1; k -= 1 }
+                while k >= 0, base[k] == FuncChar.backSlash { esc += 1; k -= 1 }
                 if esc % 2 == 0 {
                     i += 1
-                    // オプションフラグ（a〜z）
-                    while i < n, (bytes[i] >= 0x61 && bytes[i] <= 0x7A) {
-                        i += 1
-                    }
+                    // フラグ（a〜z）
+                    while i < n, (base[i] >= 0x61 && base[i] <= 0x7A) { i += 1 }
                     return (true, i)
                 }
             }
@@ -381,37 +394,75 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
         return (false, n)
     }
 
-    private func scanNumber(_ bytes: [UInt8], from: Int) -> (Int, [UInt8]) {
+    private func scanUntil(_ base: UnsafePointer<UInt8>, _ n: Int, from: Int, closing: UInt8) -> (Bool, Int) {
         var i = from
-        let n = bytes.count
-        if i < n, bytes[i] == FuncChar.minus {
-            i += 1
-        }
         while i < n {
-            let c = bytes[i]
-            if !isDigit(c) && c != FuncChar.period &&
-               !(c >= 0x61 && c <= 0x7A) && !(c >= 0x41 && c <= 0x5A) {
-                break
+            if base[i] == closing {
+                var esc = 0, k = i - 1
+                while k >= 0, base[k] == FuncChar.backSlash { esc += 1; k -= 1 }
+                if esc % 2 == 0 { return (true, i + 1) }
             }
             i += 1
         }
-        return (i, Array(bytes[from..<i]))
+        return (false, n)
     }
 
-    private func scanIdent(_ bytes: [UInt8], from: Int) -> (Int, [UInt8]) {
+    private func determinePercentClosing(_ base: UnsafePointer<UInt8>, _ n: Int, from: Int) -> (UInt8, Int) {
         var i = from
-        let n = bytes.count
-        while i < n {
-            let c = bytes[i]
-            if !isIdentPart(c) { break }
-            i += 1
+        if i < n {
+            i += 1 // 種別文字を読み飛ばし
+            if i < n {
+                let opener = base[i]
+                switch opener {
+                case FuncChar.leftBrace:   return (FuncChar.rightBrace, i + 1)
+                case FuncChar.leftBracket: return (FuncChar.rightBracket, i + 1)
+                case FuncChar.leftParen:   return (FuncChar.rightParen, i + 1)
+                case FuncChar.lt:          return (FuncChar.gt, i + 1)
+                default:                   return (opener, i + 1) // 単一記号
+                }
+            }
         }
-        return (i, Array(bytes[from..<i]))
+        return (UInt8(ascii: "}"), from)
     }
 
-    private func isDigit(_ c: UInt8) -> Bool {
-        c >= 0x30 && c <= 0x39
+    private func previousNonSpace(_ base: UnsafePointer<UInt8>, _ i: Int) -> UInt8? {
+        var k = i - 1
+        while k >= 0 {
+            let c = base[k]
+            if c != FuncChar.space && c != FuncChar.tab { return c }
+            k -= 1
+        }
+        return nil
     }
+
+    private func allowsRegexAfter(_ c: UInt8) -> Bool {
+        switch c {
+        case FuncChar.equals, FuncChar.plus, FuncChar.minus, FuncChar.asterisk, FuncChar.percent,
+             FuncChar.caret, FuncChar.pipe, FuncChar.ampersand, FuncChar.exclamation,
+             FuncChar.colon, FuncChar.semicolon, FuncChar.comma,
+             FuncChar.leftParen, FuncChar.leftBracket, FuncChar.leftBrace,
+             FuncChar.question, FuncChar.lt, FuncChar.gt:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func looksLikeOperandTail(_ c: UInt8) -> Bool {
+        if (c >= 0x30 && c <= 0x39) || (c >= 0x41 && c <= 0x5A) || (c >= 0x61 && c <= 0x7A) {
+            return true
+        }
+        switch c {
+        case FuncChar.underscore, FuncChar.singleQuote, FuncChar.doubleQuote,
+             FuncChar.rightParen, FuncChar.rightBracket, FuncChar.rightBrace,
+             FuncChar.period, FuncChar.dollar, FuncChar.at:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func isDigit(_ c: UInt8) -> Bool { c >= 0x30 && c <= 0x39 }
 
     private func isIdentStart(_ c: UInt8) -> Bool {
         (c >= 0x41 && c <= 0x5A) || (c >= 0x61 && c <= 0x7A) || c == FuncChar.underscore
@@ -421,7 +472,47 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
         isIdentStart(c) || isDigit(c) || c == FuncChar.question || c == FuncChar.exclamation
     }
 
-    private func span(_ range: Range<Int>, color: NSColor) -> AttributedSpan {
-        AttributedSpan(range: range, attributes: [.foregroundColor: color])
+    private func scanNumber(_ base: UnsafePointer<UInt8>, _ n: Int, from: Int) -> Int {
+        var i = from
+        if i < n, base[i] == FuncChar.minus { i += 1 }
+        while i < n {
+            let c = base[i]
+            if !isDigit(c) && c != FuncChar.period &&
+               !(c >= 0x61 && c <= 0x7A) && !(c >= 0x41 && c <= 0x5A) { break }
+            i += 1
+        }
+        return i
+    }
+
+    private func scanIdentEnd(_ base: UnsafePointer<UInt8>, _ n: Int, from: Int) -> Int {
+        var i = from
+        while i < n {
+            let c = base[i]
+            if !isIdentPart(c) { break }
+            i += 1
+        }
+        return i
+    }
+
+    private func hasSpecialToken(_ base: UnsafePointer<UInt8>, _ n: Int) -> Bool {
+        // ざっくり：コメント/引用/正規表現/%/=/=begin等で使い得るトリガ
+        var i = 0
+        while i < n {
+            switch base[i] {
+            case FuncChar.numeric, FuncChar.singleQuote, FuncChar.doubleQuote,
+                 FuncChar.percent, FuncChar.slash, FuncChar.equals:
+                return true
+            default:
+                i += 1
+            }
+        }
+        return false
+    }
+
+    private func appendSpan(_ baseOffset: Int, _ a: Int, _ b: Int, _ color: NSColor) {
+        if a < b {
+            _tmpSpans.append(AttributedSpan(range: (baseOffset + a)..<(baseOffset + b),
+                                            attributes: [.foregroundColor: color]))
+        }
     }
 }
