@@ -161,7 +161,10 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     var editMode: KEditMode {
         get { _editMode }
-        set { _editMode = newValue }
+        set {
+            _editMode = newValue
+            sendStatusBarUpdateAction()
+        }
     }
     
     var wordWrap: Bool {

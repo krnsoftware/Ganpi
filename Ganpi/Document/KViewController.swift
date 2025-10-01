@@ -20,6 +20,7 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
     private let _dividerHitWidth: CGFloat = 5.0
     private let _statusBarHeight: CGFloat = 20
     private let _statusBarFont: NSFont = .monospacedSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .regular)
+    private let _statusBarFontBold: NSFont = .monospacedSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .bold)
 
     // 行間の粗調整ステップ
     private let _lineSpacingStep: CGFloat = 1.0
@@ -32,6 +33,8 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
     private let _encButton    = NSButton(title: "", target: nil, action: nil)
     private let _eolButton    = NSButton(title: "", target: nil, action: nil)
     private let _syntaxButton = NSButton(title: "", target: nil, action: nil)
+    private let _funcMenuButton = NSButton(title: "func", target: nil, action: nil)
+    private let _editModeButton = NSButton(title: "", target: nil, action: nil)
     private let _caretButton  = NSButton(title: "", target: nil, action: nil)
     private let _fontSizeButton   = NSButton(title: "", target: nil, action: nil)   // "FS: <val>"
     private let _lineSpacingButton = NSButton(title: "", target: nil, action: nil)  // "LS: <val>"
@@ -322,7 +325,7 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
 
     private func buildStatusBarUI() {
         // ボタン外観
-        let buttons = [_encButton, _eolButton, _syntaxButton, _caretButton, _fontSizeButton, _lineSpacingButton]
+        let buttons = [_encButton, _eolButton, _syntaxButton, _caretButton, _fontSizeButton, _lineSpacingButton, _editModeButton, _funcMenuButton]
         buttons.forEach {
             $0.font = _statusBarFont
             $0.isBordered = false
@@ -332,27 +335,30 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
             $0.lineBreakMode = .byTruncatingTail
             $0.contentTintColor = .labelColor
         }
+        
 
         // 左：Encoding / EOL / Syntax（クリックでメニュー）
         _encButton.target = self;    _encButton.action = #selector(openEncodingMenuFromButton(_:))
         _eolButton.target = self;    _eolButton.action = #selector(openEOLMenuFromButton(_:))
         _syntaxButton.target = self; _syntaxButton.action = #selector(openSyntaxMenuFromButton(_:))
+        _funcMenuButton.target = self; _funcMenuButton.action = #selector(openFunctionMenuFromButton(_:))
+        _editModeButton.target = self; _editModeButton.action = #selector(toggleEditModeFromButton(_:))
 
         // 右：Caret（行ジャンプ）/ FS / LS（ポップオーバ）
         _caretButton.target = self;        _caretButton.action = #selector(showCaretPopover(_:))
         _fontSizeButton.target = self;     _fontSizeButton.action = #selector(showTypographyPopover_ForFontSize(_:))
         _lineSpacingButton.target = self;  _lineSpacingButton.action = #selector(showTypographyPopover_ForLineSpacing(_:))
 
-        let leftStack = NSStackView(views: [_encButton, _eolButton, _syntaxButton])
+        let leftStack = NSStackView(views: [_encButton, _eolButton, _syntaxButton, _funcMenuButton, _editModeButton])
         leftStack.orientation = .horizontal
         leftStack.alignment = .centerY
-        leftStack.spacing = 4//12
+        leftStack.spacing = 4
         leftStack.translatesAutoresizingMaskIntoConstraints = false
 
         let rightStack = NSStackView(views: [_caretButton, _fontSizeButton, _lineSpacingButton])
         rightStack.orientation = .horizontal
         rightStack.alignment = .centerY
-        rightStack.spacing = 4//12
+        rightStack.spacing = 4
         rightStack.translatesAutoresizingMaskIntoConstraints = false
 
         _statusBarView.addSubview(leftStack)
@@ -412,6 +418,17 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
             menu.addItem(item)
         }
         popUp(menu, from: sender)
+    }
+    
+    @objc private func openFunctionMenuFromButton(_ sender: NSButton) {
+        
+    }
+    
+    @objc private func toggleEditModeFromButton(_ sender: NSButton) {
+        guard let textView = activeTextView() else { log("activeTextView() is nil.", from: self); return }
+        let mode = textView.editMode
+        textView.editMode = mode == .normal ? .edit : .normal
+        updateStatusBar()
     }
 
     private func popUp(_ menu: NSMenu, from anchor: NSView) {
@@ -617,8 +634,12 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
             let currentLineNumber = m.line.formatted(.number.locale(.init(identifier: "en_US")))
             let currentLineColumn = m.column.formatted(.number.locale(.init(identifier: "en_US")))
             _caretButton.title = "Line: \(currentLineNumber):\(currentLineColumn)  [ch:\(totalCharacterCount) ln:\(totalLineCount)]"
+            
+            let editMode = textView.editMode
+            _editModeButton.title = editMode == .normal ? "'N'" : "'E'"
         } else {
             _caretButton.title = ""
+            _editModeButton.title = ""
         }
 
         if let fs = _document?.textStorage.fontSize {
