@@ -110,7 +110,158 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
         return result
     }
     
-    func wordRange(at index: Int) -> Range<Int>? { nil }
+    // 置換版 wordRange: "::" は演算子単体で選択、識別子は単体、:symbol は左右対称でコロン込み
+    func wordRange(at index: Int) -> Range<Int>? {
+        let n = storage.count
+        if n == 0 { return nil }
+
+        var i = max(0, min(index, n - 1))
+        let skel = storage.skeletonString
+
+        return skel.bytes.withUnsafeBufferPointer { whole -> Range<Int>? in
+            let base = whole.baseAddress!
+
+            @inline(__always) func at(_ p: Int) -> UInt8 { base[p] }
+            @inline(__always) func inBounds(_ p: Int) -> Bool { p >= 0 && p < n }
+
+            // 非単語上なら1文字左を試す（単語の末尾クリックを救う）
+            if !isWordish(at(i)) && i > 0 && isWordish(at(i - 1)) {
+                i -= 1
+            }
+            if !isWordish(at(i)) { return nil }
+
+            // ---- 1) "::"（スコープ演算子）は演算子だけを選択 ----
+            if at(i) == FuncChar.colon || (i > 0 && at(i - 1) == FuncChar.colon) {
+                // コロンの先頭位置（2個目の ':' 上を押しても先頭に寄せる）
+                let firstColon = (at(i) == FuncChar.colon && i > 0 && at(i - 1) == FuncChar.colon) ? (i - 1) : i
+                if firstColon + 1 < n, at(firstColon) == FuncChar.colon, at(firstColon + 1) == FuncChar.colon {
+                    return firstColon ..< (firstColon + 2) // "::" だけ
+                }
+                // ここから先は「:symbol」（シンボル）を扱う
+            }
+
+            // ユーティリティ: 識別子を前後に拡張（末尾 ? / ! を1個だけ許容）
+            func expandIdentifier(from pivot: Int) -> (lo: Int, hi: Int) {
+                var lo = pivot, hi = pivot
+                // pivot が識別子内部でなければ右へ寄せる
+                if !isIdentPart(at(pivot)) && inBounds(pivot + 1) && isIdentPart(at(pivot + 1)) {
+                    lo = pivot + 1; hi = lo
+                }
+                while inBounds(lo - 1), isIdentPart(at(lo - 1)) { lo -= 1 }
+                while inBounds(hi), isIdentPart(at(hi)) { hi += 1 }
+                if inBounds(hi), (at(hi) == FuncChar.question || at(hi) == FuncChar.exclamation) { hi += 1 }
+                return (lo, hi)
+            }
+
+            // ---- 2) $グローバル ----
+            if at(i) == FuncChar.dollar || (i > 0 && at(i - 1) == FuncChar.dollar) {
+                var lo = i
+                if at(i) != FuncChar.dollar { // 右側から入ったら $ を取り込む
+                    let id = expandIdentifier(from: i); lo = id.lo
+                    if lo > 0 && at(lo - 1) == FuncChar.dollar { lo -= 1 }
+                }
+                if at(lo) != FuncChar.dollar { return nil }
+                var hi = lo + 1
+                if hi < n {
+                    let d = at(hi)
+                    if d == FuncChar.minus {
+                        hi += (hi + 1 < n) ? 2 : 1
+                    } else if d >= 0x30 && d <= 0x39 {
+                        hi += 1
+                        while hi < n, (at(hi) >= 0x30 && at(hi) <= 0x39) { hi += 1 }
+                    } else if isIdentStart(d) {
+                        hi += 1
+                        while hi < n, isIdentPart(at(hi)) { hi += 1 }
+                    } else {
+                        hi += 1 // $~, $!, $? など
+                    }
+                }
+                return lo..<hi
+            }
+
+            // ---- 3) @ / @@ 変数 ----
+            if at(i) == FuncChar.at || (i > 0 && at(i - 1) == FuncChar.at) {
+                let id = expandIdentifier(from: i)
+                var lo = id.lo, hi = id.hi
+                if lo >= 2, at(lo - 2) == FuncChar.at, at(lo - 1) == FuncChar.at { lo -= 2 }
+                else if lo >= 1, at(lo - 1) == FuncChar.at { lo -= 1 }
+                else if at(i) == FuncChar.at { return nil } // 単独 @ は非単語
+                return lo..<hi
+            }
+
+            // ---- 4) :symbol（左右対称：内部をクリックしてもコロン込み）----
+            // 「::」は前段で返しているので、ここは単独コロンのみ
+            if at(i) == FuncChar.colon || (i > 0 && at(i - 1) != FuncChar.colon && at(i - 1) == FuncChar.colon) {
+                let colonPos = (at(i) == FuncChar.colon) ? i : (i - 1)
+                let lo = colonPos
+                var hi = colonPos + 1
+                if hi < n {
+                    let d = at(hi)
+                    if d == FuncChar.singleQuote || d == FuncChar.doubleQuote {
+                        let (closed, end) = scanQuotedNoInterp(base, n, from: hi, quote: d)
+                        return (closed ? (lo..<end) : (lo..<n))
+                    } else if isIdentStart(d) {
+                        hi += 1
+                        while hi < n, isIdentPart(at(hi)) { hi += 1 }
+                        return lo..<hi
+                    }
+                }
+                return nil
+            }
+
+            // ---- 5) 数値（- を必要に応じて取り込む）----
+            func expandNumber(from pivot: Int) -> (lo: Int, hi: Int)? {
+                var lo = pivot, hi = pivot
+                if !isDigit(at(pivot)) {
+                    if inBounds(pivot + 1), isDigit(at(pivot + 1)) {
+                        lo = pivot + 1; hi = lo
+                    } else if at(pivot) == FuncChar.minus, inBounds(pivot + 1), isDigit(at(pivot + 1)) {
+                        lo = pivot; hi = pivot + 1
+                    } else { return nil }
+                }
+                while inBounds(lo - 1), isDigit(at(lo - 1)) { lo -= 1 }
+                if inBounds(lo - 1),
+                   at(lo - 1) == FuncChar.minus,
+                   !(inBounds(lo - 2) && (isDigit(at(lo - 2)) || isIdentPart(at(lo - 2)))) {
+                    lo -= 1
+                }
+                while inBounds(hi) {
+                    let c = at(hi)
+                    if isDigit(c) || c == FuncChar.period ||
+                       (c >= 0x41 && c <= 0x5A) || (c >= 0x61 && c <= 0x7A) {
+                        hi += 1
+                    } else { break }
+                }
+                return (lo, hi)
+            }
+            if let nr = expandNumber(from: i) { return nr.lo..<nr.hi }
+
+            // ---- 6) 識別子（内部クリックでも単語全体）。:symbol対称性のため前置コロンを取り込む ----
+            if isIdentPart(at(i)) || isIdentStart(at(i)) {
+                var (lo, hi) = expandIdentifier(from: i)
+
+                // 前置 @ / @@ / $ は取り込む（: はここでは取り込まない）
+                if lo >= 2, at(lo - 2) == FuncChar.at, at(lo - 1) == FuncChar.at { lo -= 2 }
+                else if lo >= 1, at(lo - 1) == FuncChar.at { lo -= 1 }
+                else if lo >= 1, at(lo - 1) == FuncChar.dollar { lo -= 1 }
+
+                // :symbol の対称性：直前が単独コロンならコロンも含める（'::' は除外）
+                if lo >= 1, at(lo - 1) == FuncChar.colon,
+                   !(lo >= 2 && at(lo - 2) == FuncChar.colon) {
+                    lo -= 1
+                }
+                return lo..<hi
+            }
+
+            return nil
+        }
+    }
+
+    // 単語に“なり得る”先頭判定（wordRange用の緩い判定）
+    private func isWordish(_ c: UInt8) -> Bool {
+        return c == FuncChar.dollar || c == FuncChar.at || c == FuncChar.colon ||
+               c == FuncChar.minus || isIdentStart(c) || isDigit(c)
+    }
     
     // MARK: - 行テーブル構築
     
@@ -270,7 +421,7 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
 
             // ヒアドキュメント開始（<<[-~]? の直後の空白は許可／識別子orクォート以外は不採用）
             if c == FuncChar.lt, i + 1 < n, base[i + 1] == FuncChar.lt {
-                let (ok, nextI, term, allowIndent, interp) = parseHereDocHead(base, n, from: i)
+                let (ok, _, term, allowIndent, interp) = parseHereDocHead(base, n, from: i)
                 if ok {
                     // ヘッダ行も赤で塗る（検出が一目で分かる）
                     appendSpan(startOffset, i, n, _colorString)
