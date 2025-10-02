@@ -17,7 +17,7 @@ struct AttributedSpan {
     let attributes: [NSAttributedString.Key: Any]
 }
 
-enum KSyntaxType: String, CaseIterable {
+enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
     case plain = "public.plain-text"
     case ruby  = "public.ruby-script"
     case html  = "public.html"
@@ -59,6 +59,18 @@ enum KSyntaxType: String, CaseIterable {
             "html": .html,
             "htm": .html
         ]
+    
+    var string: String {
+        switch self {
+        case .plain: return "Plain"
+        case .ruby: return "Ruby"
+        case .html: return "HTML"
+        }
+    }
+    
+    var description: String {
+        return "KSyntaxType: \(self.string)"
+    }
 }
 
 typealias FC = FuncChar

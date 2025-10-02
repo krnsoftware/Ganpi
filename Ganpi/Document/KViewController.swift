@@ -422,10 +422,11 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         guard let doc = _document else { return }
         let menu = NSMenu()
         for ty in KSyntaxType.allCases {
-            let item = NSMenuItem(title: humanReadableSyntax(ty), action: #selector(didChooseSyntax(_:)), keyEquivalent: "")
+            //let item = NSMenuItem(title: humanReadableSyntax(ty), action: #selector(didChooseSyntax(_:)), keyEquivalent: "")
+            let item = NSMenuItem(title: ty.string, action: #selector(didChooseSyntax(_:)), keyEquivalent: "")
             item.target = self
             item.state = (ty == doc.syntaxType) ? .on : .off
-            item.representedObject = ty // そのまま
+            item.representedObject = ty
             menu.addItem(item)
         }
         popUp(menu, from: sender)
@@ -640,7 +641,8 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
             _encButton.title = doc.characterCode.string
             //_eolButton.title    = humanReadableEOL(doc.returnCode)
             _eolButton.title    = doc.returnCode.string
-            _syntaxButton.title = humanReadableSyntax(doc.syntaxType)
+            //_syntaxButton.title = humanReadableSyntax(doc.syntaxType)
+            _syntaxButton.title = doc.syntaxType.string
         } else {
             _encButton.title = ""; _eolButton.title = ""; _syntaxButton.title = ""
         }
@@ -711,6 +713,7 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         case .crlf: return "CRLF"
         }
     }*/
+    /*
     private func humanReadableSyntax(_ t: KSyntaxType) -> String {
         switch t {
         case .plain: return "Plain"
@@ -718,7 +721,7 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         case .html:  return "HTML"
         default:     return "\(t)"
         }
-    }
+    }*/
 }
 
 // MARK: - Popover ViewControllers
