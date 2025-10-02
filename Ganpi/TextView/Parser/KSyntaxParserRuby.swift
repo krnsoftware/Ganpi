@@ -7,12 +7,14 @@ import AppKit
 
 final class KSyntaxParserRuby: KSyntaxParserProtocol {
     
+    // 1行分の結果キャッシュ
     private struct LineInfo {
         var endState: EndState = .neutral
         var spans: [AttributedSpan] = []
         var dirty: Bool = true
     }
     
+    // 行末での継続状態
     private indirect enum EndState: Equatable {
         case neutral
         case inMultiComment
@@ -24,20 +26,22 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
         case inRegexSlash
     }
     
+    // #{...} の中身カラーリングは安定版では無効
     private let _enableStringInterpolationColoring = false
     
+    // 行先頭オフセット一覧（最後にテキスト末尾も入れる）
     private var _lineStarts: [Int] = []
     private var _lines: [LineInfo] = []
     private var _needsRebuild = true
     
-    // colors
+    // 配色（前回踏襲）＋変数用の茶色
     private let _colorString   = NSColor(hexString: "#860300") ?? .black
     private let _colorComment  = NSColor(hexString: "#0B5A00") ?? .black
     private let _colorKeyword  = NSColor(hexString: "#070093") ?? .black
     private let _colorNumber   = NSColor(hexString: "#070093") ?? .black
-    private let _colorVariable = NSColor(hexString: "#7A4E00") ?? .black  // 茶色
+    private let _colorVariable = NSColor(hexString: "#7A4E00") ?? .black
     
-    // keywords
+    // Rubyキーワード
     private let _keywords: Set<String> = [
         "BEGIN","END","alias","and","begin","break","case","class","def","defined?",
         "do","else","elsif","end","ensure","false","for","if","in","module","next",
@@ -50,8 +54,10 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
         "if","elsif","while","until","when","case","then","and","or","not","return"
     ]
     
+    // 作業用
     private var _tmpSpans: [AttributedSpan] = []
     
+    // ストレージ
     let storage: KTextStorageReadable
     init(storage: KTextStorageReadable) { self.storage = storage }
     
@@ -185,7 +191,8 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
             }
         }
     }
-    // MARK: - 字句解析
+    
+    // MARK: - 字句解析本体
 
     private func lexLine(base: UnsafePointer<UInt8>, count: Int, startOffset: Int, initial: EndState) -> (EndState, [AttributedSpan]) {
         _tmpSpans.removeAll(keepingCapacity: true)
@@ -194,7 +201,7 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
         var i = 0
         let n = count
 
-        // 継続状態の処理
+        // --- 継続状態の処理 ---
         if state == .inMultiComment {
             if matchLineHead(base, n, token: "=end") {
                 appendSpan(startOffset, 0, n, _colorComment); return (.neutral, _tmpSpans)
@@ -237,11 +244,11 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
             return (.inMultiComment, _tmpSpans)
         }
 
-        // 通常走査
+        // --- 通常走査 ---
         while i < n {
             let c = base[i]
 
-            // # 行コメント
+            // 行コメント #
             if c == FuncChar.numeric {
                 appendSpan(startOffset, i, n, _colorComment)
                 break
@@ -261,13 +268,17 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
                 continue
             }
 
-            // heredoc 開始（<<[-~]? の直後に空白は許可しない／演算子 << と衝突回避）
+            // ヒアドキュメント開始（<<[-~]? の直後の空白は許可／識別子orクォート以外は不採用）
             if c == FuncChar.lt, i + 1 < n, base[i + 1] == FuncChar.lt {
                 let (ok, nextI, term, allowIndent, interp) = parseHereDocHead(base, n, from: i)
-                if ok { i = nextI; return (.inHereDoc(term: term, allowIndent: allowIndent, interpolation: interp), _tmpSpans) }
+                if ok {
+                    // ヘッダ行も赤で塗る（検出が一目で分かる）
+                    appendSpan(startOffset, i, n, _colorString)
+                    return (.inHereDoc(term: term, allowIndent: allowIndent, interpolation: interp), _tmpSpans)
+                }
             }
 
-            // %r... regex
+            // %r デリミタ型 regex
             if c == FuncChar.percent, i + 2 < n, (base[i+1] == 0x72 || base[i+1] == 0x52) {
                 let delim = base[i+2]
                 let (open, close) = pairedDelims(for: delim)
@@ -288,7 +299,7 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
                 if r.closed { continue } else { return (.inRegexSlash, _tmpSpans) }
             }
 
-            // 変数（茶色）
+            // 変数系（茶色）
             if c == FuncChar.dollar {
                 let end = scanGlobalVar(base, n, from: i)
                 appendSpan(startOffset, i, end, _colorVariable)
@@ -299,7 +310,7 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
                 if end > i { appendSpan(startOffset, i, end, _colorVariable); i = end; continue }
             }
 
-            // "::" はスコープ演算子 → :symbol 誤検出を避けるためスキップ
+            // :: はスコープ演算子なのでスキップ（:symbol 誤認防止）
             if c == FuncChar.colon, i + 1 < n, base[i + 1] == FuncChar.colon {
                 i += 2; continue
             }
@@ -335,6 +346,7 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
 
     // MARK: - 補助関数
 
+    // スパン追加
     private func appendSpan(_ baseOff: Int, _ lo: Int, _ hi: Int, _ color: NSColor) {
         if lo < hi {
             _tmpSpans.append(AttributedSpan(range: baseOff + lo ..< baseOff + hi,
@@ -342,6 +354,7 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
         }
     }
 
+    // 行頭での "=begin" / "=end" 判定（完全一致）
     private func matchLineHead(_ base: UnsafePointer<UInt8>, _ n: Int, token: String) -> Bool {
         if n == 0 { return false }
         let u = Array(token.utf8)
@@ -350,8 +363,10 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
         return true
     }
 
+    // 任意デリミタまで（%r などの内部用）
     private enum ScanRI { case closed(Int), interp(Int), eof(Int) }
 
+    // 文字列（式展開なし）
     private func scanQuotedNoInterp(_ base: UnsafePointer<UInt8>, _ n: Int, from: Int, quote: UInt8) -> (Bool, Int) {
         var i = from + 1
         while i < n {
@@ -378,7 +393,9 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
         return .eof(n)
     }
 
-    // heredoc ヘッダ解析：<<[-~]? の直後に空白を許さない（演算子 << との衝突を避ける）
+    // --- heredoc ヘッダ解析 ---
+    // 仕様: <<[-~]? の直後の空白は許可。終端語は「クォート付き」か「[A-Z][A-Z0-9_]*」の場合のみ採用。
+    // 終端語の後は空白・タブ・';'・'#コメント' 以外が来たら不採用（演算子 << 判定）。
     private func parseHereDocHead(_ base: UnsafePointer<UInt8>, _ n: Int, from: Int)
     -> (Bool, Int, [UInt8], Bool, Bool) {
         var i = from
@@ -386,17 +403,27 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
             return (false, i, [], false, false)
         }
         i += 2
-        var allowIndent = false
-        if i < n, (base[i] == FuncChar.minus || base[i] == FuncChar.tilde) { allowIndent = true; i += 1 }
 
-        // 空白直後は NG（<< Link を誤検出しない）
+        // <<- / <<~ はインデント許可
+        var allowIndent = false
+        if i < n, (base[i] == FuncChar.minus || base[i] == FuncChar.tilde) {
+            allowIndent = true; i += 1
+        }
+
+        // 空白は許可しつつスキップ
+        while i < n, (base[i] == FuncChar.space || base[i] == FuncChar.tab) { i += 1 }
         if i >= n { return (false, from, [], false, false) }
-        if base[i] == FuncChar.space || base[i] == FuncChar.tab { return (false, from, [], false, false) }
+
+        // 終端語の抽出（識別子 or クォート）
+        let c0 = base[i]
+        let isQuoted = (c0 == FuncChar.singleQuote || c0 == FuncChar.doubleQuote)
+        let isIdent0 = (c0 >= 0x41 && c0 <= 0x5A) || (c0 >= 0x61 && c0 <= 0x7A) || c0 == FuncChar.underscore
+        if !(isIdent0 || isQuoted) { return (false, from, [], false, false) }
 
         var interpolation = true
         var term: [UInt8] = []
 
-        if base[i] == FuncChar.singleQuote || base[i] == FuncChar.doubleQuote {
+        if isQuoted {
             let q = base[i]; interpolation = (q == FuncChar.doubleQuote); i += 1
             let s = i
             while i < n, base[i] != q { i += 1 }
@@ -404,53 +431,100 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
             term = Array(UnsafeBufferPointer(start: base + s, count: i - s))
             i += 1
         } else {
+            // 裸の終端語を抽出
             let s = i
             while i < n {
                 let c = base[i]
-                let isAZ = (c >= 0x41 && c <= 0x5A) || (c >= 0x61 && c <= 0x7A) || c == FuncChar.underscore || (c >= 0x30 && c <= 0x39)
-                if !isAZ { break }
+                let isAZ09_ = (c >= 0x41 && c <= 0x5A) || (c >= 0x61 && c <= 0x7A) ||
+                              (c >= 0x30 && c <= 0x39) || c == FuncChar.underscore
+                if !isAZ09_ { break }
                 i += 1
             }
             if i == s { return (false, from, [], false, false) }
             term = Array(UnsafeBufferPointer(start: base + s, count: i - s))
+
+            // ★ 裸の終端語は大文字スネークのみ許容（実用ヒューリスティクス）
+            var hasUpper = false, allUpper = true
+            for b in term {
+                if b >= 0x41 && b <= 0x5A { hasUpper = true }
+                if !((b >= 0x41 && b <= 0x5A) || (b >= 0x30 && b <= 0x39) || b == FuncChar.underscore) {
+                    allUpper = false; break
+                }
+            }
+            if !(hasUpper && allUpper) {
+                return (false, from, [], false, false) // 例: "<< tag" や "<< link" を弾く
+            }
         }
-        return (true, i, term, allowIndent, interpolation)
+
+        // 終端語の後ろチェック：空白/タブをスキップ
+        var j = i
+        while j < n, (base[j] == FuncChar.space || base[j] == FuncChar.tab) { j += 1 }
+
+        // 実効行末（\n / \r\nを無視）ならOK
+        var e = n
+        if e > 0, base[e - 1] == FuncChar.lf { e -= 1 }
+        if e > 0, base[e - 1] == FuncChar.cr { e -= 1 }
+        if j >= e { return (true, i, term, allowIndent, interpolation) }
+
+        // コメント開始 or ';' ならOK（ヘッダ末尾に置ける）
+        if base[j] == FuncChar.numeric || base[j] == FuncChar.semicolon {
+            return (true, i, term, allowIndent, interpolation)
+        }
+
+        // それ以外が続く → これは演算子 << と見なす
+        return (false, from, [], false, false)
     }
 
+    // ヒアドキュメント終端判定（末尾の改行 \n / \r\n を無視。空白・;・#コメント許容）
     private func matchHereDocTerm(_ base: UnsafePointer<UInt8>, _ n: Int, term: [UInt8], allowIndent: Bool) -> Int {
+        // 実効行末（末尾の \n / \r\n を除外）
+        var e = n
+        if e > 0, base[e - 1] == FuncChar.lf { e -= 1 }
+        if e > 0, base[e - 1] == FuncChar.cr { e -= 1 }
+
         var i = 0
         if allowIndent {
-            while i < n, (base[i] == FuncChar.space || base[i] == FuncChar.tab) { i += 1 }
+            while i < e, (base[i] == FuncChar.space || base[i] == FuncChar.tab) { i += 1 }
         }
-        if i + term.count > n { return -1 }
+        if i + term.count > e { return -1 }
         for k in 0..<term.count { if base[i + k] != term[k] { return -1 } }
+
         var p = i + term.count
-        while p < n, (base[p] == FuncChar.space || base[p] == FuncChar.tab) { p += 1 }
-        if p == n { return n }
-        return -1
+        // 空白許容
+        while p < e, (base[p] == FuncChar.space || base[p] == FuncChar.tab) { p += 1 }
+        // コメント開始ならOK（#の後ろに何があっても終端扱い）
+        if p < e, base[p] == FuncChar.numeric { return e }
+        // セミコロンも許容
+        if p < e, base[p] == FuncChar.semicolon { return e }
+        // 何もなければ実効行末のみOK
+        return (p == e) ? e : -1
     }
 
+    // $グローバル等
     private func scanGlobalVar(_ base: UnsafePointer<UInt8>, _ n: Int, from: Int) -> Int {
         var i = from + 1
         if i >= n { return from + 1 }
         let c = base[i]
-        if c == FuncChar.minus {
+
+        if c == FuncChar.minus { // $-K
             if i + 1 < n { i += 2; return i }
             return i + 1
         }
-        if c >= 0x30 && c <= 0x39 {
+        if c >= 0x30 && c <= 0x39 { // $1, $10...
             i += 1
             while i < n, (base[i] >= 0x30 && base[i] <= 0x39) { i += 1 }
             return i
         }
-        if isIdentStart(c) {
+        if isIdentStart(c) { // $stdout, $KCODE...
             i += 1
             while i < n, isIdentPart(base[i]) { i += 1 }
             return i
         }
+        // 記号1文字の特殊 ($~, $!, $? など)
         return i + 1
     }
 
+    // @ / @@ 変数
     private func scanAtVar(_ base: UnsafePointer<UInt8>, _ n: Int, from: Int) -> Int {
         var i = from
         if i + 1 < n, base[i] == FuncChar.at, base[i + 1] == FuncChar.at {
@@ -471,6 +545,7 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
         return from
     }
 
+    // :symbol / :"..." / :'...'
     private func scanSymbolLiteral(_ base: UnsafePointer<UInt8>, _ n: Int, from: Int) -> Int {
         var i = from
         guard base[i] == FuncChar.colon else { return from }
@@ -479,15 +554,18 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
 
         let c = base[i]
         if c == FuncChar.singleQuote || c == FuncChar.doubleQuote {
-            let (closed, end) = scanQuotedNoInterp(base, n, from: i, quote: c)
+            let quote = c
+            let (closed, end) = scanQuotedNoInterp(base, n, from: i, quote: quote)
             return closed ? end : n
         } else if isIdentStart(c) {
-            var j = i + 1; while j < n, isIdentPart(base[j]) { j += 1 }
+            var j = i + 1
+            while j < n, isIdentPart(base[j]) { j += 1 }
             return j
         }
         return from
     }
 
+    // 文字クラス
     private func isDigit(_ c: UInt8) -> Bool { c >= 0x30 && c <= 0x39 }
 
     private func isIdentStart(_ c: UInt8) -> Bool {
@@ -498,6 +576,7 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
         isIdentStart(c) || isDigit(c) || c == FuncChar.question || c == FuncChar.exclamation
     }
 
+    // 数値（-や小数点もざっくり許容）
     private func scanNumber(_ base: UnsafePointer<UInt8>, _ n: Int, from: Int) -> Int {
         var i = from
         if i < n, base[i] == FuncChar.minus { i += 1 }
@@ -520,16 +599,14 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
         return i
     }
 
-    // --- /.../ regex ---
+    // --- /.../ regex サポート ---
 
     // 直前トークンから “ここは/でregexが来やすい文脈か” を推定
     private func isRegexLikelyAfterSlash(_ base: UnsafePointer<UInt8>, _ n: Int, at i: Int, startOfLine: Bool) -> Bool {
         var j = i - 1
-        // 空白・タブはスキップ
         while j >= 0, (base[j] == FuncChar.space || base[j] == FuncChar.tab) { j -= 1 }
         if j < 0 { return true } // 行頭なら regex の可能性が高い
 
-        // 直前が各種区切り・演算子なら regex の可能性が高い
         switch base[j] {
         case FuncChar.equals, FuncChar.plus, FuncChar.asterisk, FuncChar.percent,
              FuncChar.caret, FuncChar.pipe, FuncChar.ampersand, FuncChar.minus,
@@ -541,7 +618,7 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
             break
         }
 
-        // 直前が識別子 → 単語をさかのぼって取り出し、導入語なら regex
+        // 直前が識別子 → 単語を取り出して導入語なら regex
         if isIdentPart(base[j]) {
             var k = j
             while k >= 0, isIdentPart(base[k]) { k -= 1 }
@@ -563,7 +640,7 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
 
     private struct RegexScanResult { let closed: Bool; let closedTo: Int }
 
-    // /.../ 本体のスキャン（[] 内の / は終端にしない。エスケープ対応）
+    // /.../ の本体スキャン（[...] 内の / は終端にしない。エスケープ対応）
     private func scanRegexSlash(_ base: UnsafePointer<UInt8>, _ n: Int, from: Int) -> RegexScanResult {
         var i = from + 1
         var inClass = 0
@@ -586,7 +663,7 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
                 while k >= 0, base[k] == FuncChar.backSlash { esc += 1; k -= 1 }
                 if esc % 2 == 0 {
                     i += 1
-                    // フラグをざっくり許容
+                    // フラグ（i,m,x,o,n,e,u,s,d…）をざっくり許容
                     while i < n {
                         let f = base[i]
                         if (f >= 0x41 && f <= 0x5A) || (f >= 0x61 && f <= 0x7A) { i += 1 } else { break }
