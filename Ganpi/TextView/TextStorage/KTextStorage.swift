@@ -137,9 +137,6 @@ final class KTextStorage: KTextStorageProtocol {
     
     // for undo.
     private lazy var _undoManager: KUndoManager = .init(with: self)
-    
-    // constants.
-    private let _characterCacheLoadLimit: Int = 100_000
 
     // MARK: - Public API
 
@@ -150,7 +147,7 @@ final class KTextStorage: KTextStorageProtocol {
         set { characters = Array(newValue) }
     }
     
-    var characters: [Character] { // 将来的に内部データが[Character]でなくなる可能性あり。
+    var characters: [Character] {
         get { _characters }
         set {
             replaceCharacters(in: 0..<_characters.count, with: newValue)
@@ -499,12 +496,8 @@ final class KTextStorage: KTextStorageProtocol {
             if let r = nsRangeClipped(s.range) {
                 mas.addAttributes(s.attributes, range: r)
                 applied &+= 1
-                //log("apply attrs range=\(s.range.lowerBound)..<\(s.range.upperBound) -> NSRange\(r)", from: self)
-            } else {
-                //log("skip attrs (out of slice) \(s.range.lowerBound)..<\(s.range.upperBound)", from: self)
             }
         }
-        //log("applied spans: \(applied)/\(spans.count)", from: self)
 
         return mas
     }
