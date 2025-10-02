@@ -2236,6 +2236,13 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         selectionRange = lowerRange.lowerBound..<upperRange.upperBound
     }
     
+    @IBAction func selectRange(_ sender: Any?) {
+        
+        guard let item = sender as? NSMenuItem, let range = item.representedObject as? Range<Int> else { return }
+        selectionRange = range
+        centerSelectionInVisibleArea(self)
+    }
+    
     //MARK: - Delete.
     
     @IBAction override func deleteBackward(_ sender: Any?) {

@@ -340,15 +340,15 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         _encButton.target = self;    _encButton.action = #selector(openEncodingMenuFromButton(_:))
         _eolButton.target = self;    _eolButton.action = #selector(openEOLMenuFromButton(_:))
         _syntaxButton.target = self; _syntaxButton.action = #selector(openSyntaxMenuFromButton(_:))
-        _funcMenuButton.target = self; _funcMenuButton.action = #selector(openFunctionMenuFromButton(_:))
         _editModeButton.target = self; _editModeButton.action = #selector(toggleEditModeFromButton(_:))
+        _funcMenuButton.target = self; _funcMenuButton.action = #selector(openFunctionMenuFromButton(_:))
 
         // 右：Caret（行ジャンプ）/ FS / LS（ポップオーバ）
         _caretButton.target = self;        _caretButton.action = #selector(showCaretPopover(_:))
         _fontSizeButton.target = self;     _fontSizeButton.action = #selector(showTypographyPopover_ForFontSize(_:))
         _lineSpacingButton.target = self;  _lineSpacingButton.action = #selector(showTypographyPopover_ForLineSpacing(_:))
 
-        let leftStack = NSStackView(views: [_encButton, _eolButton, _syntaxButton, _funcMenuButton, _editModeButton])
+        let leftStack = NSStackView(views: [_encButton, _eolButton, _syntaxButton, _editModeButton, _funcMenuButton])
         leftStack.orientation = .horizontal
         leftStack.alignment = .centerY
         leftStack.spacing = 4
@@ -416,7 +416,17 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
     }
     
     @objc private func openFunctionMenuFromButton(_ sender: NSButton) {
-        
+        guard let doc = _document else { return }
+        let parser = doc.textStorage.parser
+        let outlineItems = parser.outline(in: nil)
+        let menu = NSMenu()
+        guard let textView = activeTextView() else { return }
+        for outlineItem in outlineItems {
+            let menuItem = NSMenuItem(title: outlineItem.name, action: #selector(textView.selectRange(_:)), keyEquivalent: "")
+            menuItem.representedObject = outlineItem.nameRange
+            menu.addItem(menuItem)
+        }
+        popUp(menu, from: sender)
     }
     
     @objc private func toggleEditModeFromButton(_ sender: NSButton) {

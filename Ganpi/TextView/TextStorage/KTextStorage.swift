@@ -274,7 +274,7 @@ final class KTextStorage: KTextStorageProtocol {
         return newCache
     }
     
-    private var parser: KSyntaxParserProtocol {
+    var parser: KSyntaxParserProtocol {
         get { _parser }
         set {
             _parser = newValue

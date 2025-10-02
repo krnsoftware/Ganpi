@@ -73,6 +73,24 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
     }
 }
 
+// MARK: - Outline API
+
+/// 言語アウトライン1項目
+struct OutlineItem {
+    enum Kind { case `class`, module, method }
+    let kind: Kind
+    let name: String                 // 表示名（例: "Foo::Bar", "#empty?", ".new"）
+    let containerPath: [String]      // 例: ["Foo","Bar"]
+    let nameRange: Range<Int>        // 名前シンボルのみ
+    let headerRange: Range<Int>      // "def foo ..."(行末まで)
+    let bodyRange: Range<Int>?       // 対応 end の直前まで（未確定なら nil）
+    let lineIndex: Int               // nameRange.lowerBound の行番号
+    let level: Int                   // ネスト深さ（UI用）
+    let isSingleton: Bool            // def self.foo / def Klass.bar
+}
+
+
+
 typealias FC = FuncChar
 
 
@@ -82,6 +100,9 @@ protocol KSyntaxParserProtocol: AnyObject {
     // TextStorage -> Parser
     func noteEdit(oldRange: Range<Int>, newCount: Int)
     func ensureUpToDate(for range: Range<Int>)
+    
+    func outline(in range: Range<Int>?) -> [OutlineItem]     // nilで全文
+    func currentContext(at index: Int) -> [OutlineItem]      // 外側→内側の順
     
     // Optional: full parse when needed
     func parse(range: Range<Int>)

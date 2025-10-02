@@ -6,6 +6,15 @@
 import AppKit
 
 final class KSyntaxParserRuby: KSyntaxParserProtocol {
+    // アウトライン用
+    private struct _OutlineSpan {
+        let start: Int
+        let end: Int?
+        let item: OutlineItem
+        let parentIndex: Int?   // 親の _spans インデックス
+    }
+
+    private var _outlineSpans: [_OutlineSpan] = []
     
     // 1行分の結果キャッシュ
     private struct LineInfo {
@@ -25,6 +34,8 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
         case inHereDoc(term: [UInt8], allowIndent: Bool, interpolation: Bool)
         case inRegexSlash
     }
+    
+    
     
     // #{...} の中身カラーリングは安定版では無効
     private let _enableStringInterpolationColoring = false
@@ -534,6 +545,56 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
         return (state, _tmpSpans)
     }
 
+    // MARK: - Outline (class/module/def)
+
+    func outline(in range: Range<Int>? = nil) -> [OutlineItem] {
+        rebuildIfNeeded()
+        // まず全文を走査（初版：毎回再構築。性能要望が出たら差分化）
+        _buildOutlineAll()
+
+        guard let r = range else {
+            return _outlineSpans.compactMap { $0.item }
+        }
+        var out: [OutlineItem] = []
+        out.reserveCapacity(_outlineSpans.count)
+        for sp in _outlineSpans {
+            let a = sp.item.nameRange.lowerBound
+            let b = sp.item.nameRange.upperBound
+            if b <= r.lowerBound || a >= r.upperBound { continue }
+            out.append(sp.item)
+        }
+        return out
+    }
+
+    func currentContext(at index: Int) -> [OutlineItem] {
+        rebuildIfNeeded()
+        _buildOutlineAll()
+
+        // 最も内側のブロック（start ≤ index < end）を探し、親を遡る
+        var bestIdx: Int? = nil
+        for (i, sp) in _outlineSpans.enumerated() {
+            guard let e = sp.end else { continue }
+            if sp.start <= index && index < e {
+                if let prev = bestIdx {
+                    let aLen = (_outlineSpans[prev].end ?? Int.max) - _outlineSpans[prev].start
+                    let bLen = (e) - sp.start
+                    if bLen <= aLen { bestIdx = i } // より内側（短い）を採用
+                } else {
+                    bestIdx = i
+                }
+            }
+        }
+        guard let leaf = bestIdx else { return [] }
+
+        var stack: [OutlineItem] = []
+        var cur: Int? = leaf
+        while let i = cur {
+            stack.append(_outlineSpans[i].item)
+            cur = _outlineSpans[i].parentIndex
+        }
+        return stack.reversed()
+    }
+    
     // MARK: - 補助関数
 
     // スパン追加
@@ -883,6 +944,323 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
             let ok = (b >= 0x41 && b <= 0x5A) || (b >= 0x61 && b <= 0x7A) ||
                      (b >= 0x30 && b <= 0x39) || b == FuncChar.underscore
             if !ok { return false }
+        }
+        return true
+    }
+    
+    // 全文スキャンで class/module/def ... end を抽出（簡易・高速版）
+    private func _buildOutlineAll() {
+        _outlineSpans.removeAll(keepingCapacity: true)
+
+        let nLines = max(0, _lineStarts.count - 1)
+        if nLines == 0 { return }
+
+        let skel = storage.skeletonString
+        skel.bytes.withUnsafeBufferPointer { whole in
+            let base = whole.baseAddress!
+
+            struct Frame {
+                let kind: OutlineItem.Kind
+                let name: String
+                let container: [String]
+                let startOffset: Int      // ヘッダ先頭
+                let nameRange: Range<Int>
+                let headerEnd: Int        // 行末
+                let lineIndex: Int
+                let isSingleton: Bool
+                let spanIndex: Int        // _outlineSpans での自分の位置
+            }
+
+            var containerPath: [String] = []
+            var stack: [Frame] = []
+
+            for li in 0..<nLines {
+                let lo = _lineStarts[li]
+                let hi = _lineStarts[li + 1]
+                let count = hi - lo
+                if count <= 0 { continue }
+
+                let line = base + lo
+                let lineEnd = hi
+
+                // 行頭の空白を飛ばす
+                var i = 0
+                while i < count, (line[i] == FuncChar.space || line[i] == FuncChar.tab) { i += 1 }
+                if i >= count { continue }
+
+                // 行コメントならスキップ
+                if line[i] == FuncChar.numeric { continue }
+
+                // "=begin"/"=end" の行はアウトライン対象外だが、end対応が崩れないように無視
+                if matchLineHead(line, count, token: "=begin") || matchLineHead(line, count, token: "=end") {
+                    continue
+                }
+
+                // ヒアドキュメントの開始行（<<...）はアウトライン無視。あくまで def/class 検出優先。
+                // ここでは何もしない（字句パーサ側で色分け済なので誤検出は起こりにくい）。
+
+                // --- class / module / def / end の簡易検出（行頭付近のみ） ---
+                if i + 5 <= count {
+                    // "class" or "module" or "def" or "end"
+                    let c0 = line[i]
+
+                    // end
+                    if c0 == 0x65 /*e*/, i + 3 <= count,
+                       line[i+1] == 0x6E, line[i+2] == 0x64,
+                       (i + 3 == count || isDelimiter(line[i+3])) {
+                        // pop
+                        if let top = stack.popLast() {
+                            // bodyRange を確定
+                            let endOff = lo + i // 'end' の先頭を end とする
+                            if top.spanIndex < _outlineSpans.count {
+                                let old = _outlineSpans[top.spanIndex]
+                                let item = OutlineItem(
+                                    kind: old.item.kind,
+                                    name: old.item.name,
+                                    containerPath: old.item.containerPath,
+                                    nameRange: old.item.nameRange,
+                                    headerRange: old.item.headerRange,
+                                    bodyRange: top.headerEnd ..< endOff,
+                                    lineIndex: old.item.lineIndex,
+                                    level: old.item.level,
+                                    isSingleton: old.item.isSingleton
+                                )
+                                _outlineSpans[top.spanIndex] = _OutlineSpan(start: old.start, end: endOff, item: item, parentIndex: old.parentIndex)
+                            }
+                            // class/module なら containerPath を戻す
+                            if top.kind == .class || top.kind == .module {
+                                if !containerPath.isEmpty { _ = containerPath.popLast() }
+                            }
+                        }
+                        continue
+                    }
+
+                    // class / module / def
+                    // 先頭トークンのみを拾う（識別子が続くか、区切りで終わるか）
+                    if c0 == 0x63 /*c*/ || c0 == 0x6D /*m*/ || c0 == 0x64 /*d*/ {
+                        // キーワード抽出
+                        let kwStart = i
+                        var j = i
+                        while j < count, isIdentPart(line[j]) { j += 1 }
+                        let kwLen = j - kwStart
+                        // 続きが区切りでなければキーワードとみなさない
+                        if j < count && !isDelimiter(line[j]) { /* 呼び出し等 */ }
+                        else if kwLen == 5 && memeq(line+kwStart, "class") {
+                            // class Foo::Bar
+                            var nameStart = j
+                            while nameStart < count, (line[nameStart] == FuncChar.space || line[nameStart] == FuncChar.tab) { nameStart += 1 }
+                            let (fullName, lastName, lastNameRange) = parseConstPath(line, count, from: nameStart, baseOffset: lo)
+                            let display = fullName
+                            let level = containerPath.count
+                            let item = OutlineItem(
+                                kind: .class,
+                                name: display,
+                                containerPath: containerPath,
+                                nameRange: lastNameRange,
+                                headerRange: lo + kwStart ..< lineEnd,
+                                bodyRange: nil,
+                                lineIndex: li,
+                                level: level,
+                                isSingleton: false
+                            )
+                            let idx = _outlineSpans.count
+                            _outlineSpans.append(_OutlineSpan(start: lo + kwStart, end: nil, item: item, parentIndex: stack.last.map { $0.spanIndex }))
+                            // containerPath へ push（Foo::Bar の最後の要素）
+                            let pushName = lastName.isEmpty ? display : lastName
+                            containerPath.append(pushName)
+                            stack.append(Frame(kind: .class, name: pushName, container: containerPath, startOffset: lo + kwStart, nameRange: lastNameRange, headerEnd: lineEnd, lineIndex: li, isSingleton: false, spanIndex: idx))
+                            continue
+                        }
+                        else if kwLen == 6 && memeq(line+kwStart, "module") {
+                            var nameStart = j
+                            while nameStart < count, (line[nameStart] == FuncChar.space || line[nameStart] == FuncChar.tab) { nameStart += 1 }
+                            let (fullName, lastName, lastNameRange) = parseConstPath(line, count, from: nameStart, baseOffset: lo)
+                            let display = fullName
+                            let level = containerPath.count
+                            let item = OutlineItem(
+                                kind: .module,
+                                name: display,
+                                containerPath: containerPath,
+                                nameRange: lastNameRange,
+                                headerRange: lo + kwStart ..< lineEnd,
+                                bodyRange: nil,
+                                lineIndex: li,
+                                level: level,
+                                isSingleton: false
+                            )
+                            let idx = _outlineSpans.count
+                            _outlineSpans.append(_OutlineSpan(start: lo + kwStart, end: nil, item: item, parentIndex: stack.last.map { $0.spanIndex }))
+                            let pushName = lastName.isEmpty ? display : lastName
+                            containerPath.append(pushName)
+                            stack.append(Frame(kind: .module, name: pushName, container: containerPath, startOffset: lo + kwStart, nameRange: lastNameRange, headerEnd: lineEnd, lineIndex: li, isSingleton: false, spanIndex: idx))
+                            continue
+                        }
+                        else if kwLen == 3 && memeq(line+kwStart, "def") {
+                            var nameStart = j
+                            while nameStart < count, (line[nameStart] == FuncChar.space || line[nameStart] == FuncChar.tab) { nameStart += 1 }
+                            let (disp, isSingleton, nameRange) = parseDefName(line, count, from: nameStart, baseOffset: lo)
+                            let level = containerPath.count
+                            let item = OutlineItem(
+                                kind: .method,
+                                name: disp,
+                                containerPath: containerPath,
+                                nameRange: nameRange,
+                                headerRange: lo + kwStart ..< lineEnd,
+                                bodyRange: nil,
+                                lineIndex: li,
+                                level: level,
+                                isSingleton: isSingleton
+                            )
+                            let idx = _outlineSpans.count
+                            _outlineSpans.append(_OutlineSpan(start: lo + kwStart, end: nil, item: item, parentIndex: stack.last.map { $0.spanIndex }))
+                            stack.append(Frame(kind: .method, name: disp, container: containerPath, startOffset: lo + kwStart, nameRange: nameRange, headerEnd: lineEnd, lineIndex: li, isSingleton: isSingleton, spanIndex: idx))
+                            continue
+                        }
+                    }
+                }
+            }
+
+            // ファイル末尾まで来て未閉鎖は end 未確定としてそのまま残す
+        }
+    }
+
+    // 行内の区切り（識別子が終わる境界）
+    private func isDelimiter(_ c: UInt8) -> Bool {
+        if c == FuncChar.space || c == FuncChar.tab { return true }
+        switch c {
+        case FuncChar.lf, FuncChar.cr, FuncChar.leftParen, FuncChar.rightParen,
+             FuncChar.leftBracket, FuncChar.rightBracket, FuncChar.leftBrace, FuncChar.rightBrace,
+             FuncChar.comma, FuncChar.period, FuncChar.colon, FuncChar.semicolon,
+             FuncChar.plus, FuncChar.minus, FuncChar.asterisk, FuncChar.slash,
+             FuncChar.equals, FuncChar.pipe, FuncChar.caret, FuncChar.ampersand,
+             FuncChar.exclamation, FuncChar.question, FuncChar.lt, FuncChar.gt:
+            return true
+        default:
+            return false
+        }
+    }
+
+    // "class Foo::Bar" の定数パスを抽出（表示名, 末尾名, 末尾名のRange）
+    private func parseConstPath(_ line: UnsafePointer<UInt8>, _ n: Int, from: Int, baseOffset: Int)
+    -> (String, String, Range<Int>) {
+        var i = from
+        var parts: [String] = []
+        var lastRange: Range<Int> = baseOffset+from ..< baseOffset+from
+
+        while i < n {
+            // A-Z で始まる識別子
+            if !(line[i] >= 0x41 && line[i] <= 0x5A) { break }
+            let s = i
+            i += 1
+            while i < n, isIdentPart(line[i]) { i += 1 }
+            let part = String(decoding: UnsafeBufferPointer(start: line + s, count: i - s), as: UTF8.self)
+            parts.append(part)
+            lastRange = baseOffset + s ..< baseOffset + i
+
+            // "::" なら続行
+            if i + 1 < n, line[i] == FuncChar.colon, line[i + 1] == FuncChar.colon {
+                i += 2
+                continue
+            }
+            break
+        }
+        let display = parts.joined(separator: "::")
+        let last = parts.last ?? ""
+        return (display, last, lastRange)
+    }
+
+    // def 名の抽出（表示名, isSingleton, nameRange）
+    private func parseDefName(_ line: UnsafePointer<UInt8>, _ n: Int, from: Int, baseOffset: Int)
+    -> (String, Bool, Range<Int>) {
+        var i = from
+        var isSingleton = false
+
+        // self. / Const::Path. の場合はクラスメソッド
+        if i + 4 < n, memeq(line+i, "self"), line[i+4] == FuncChar.period {
+            isSingleton = true
+            i += 5
+        } else {
+            // Const::Path. の検出（大文字始まり＋ "::" や "."）
+            let s = i
+            if s < n, (line[s] >= 0x41 && line[s] <= 0x5A) {
+                var j = s + 1
+                while j < n, isIdentPart(line[j]) { j += 1 }
+                // "::" のループ
+                while j + 1 < n, line[j] == FuncChar.colon, line[j+1] == FuncChar.colon {
+                    j += 2
+                    if j >= n || !(line[j] >= 0x41 && line[j] <= 0x5A) { break }
+                    j += 1
+                    while j < n, isIdentPart(line[j]) { j += 1 }
+                }
+                if j < n, line[j] == FuncChar.period {
+                    isSingleton = true
+                    i = j + 1
+                } else {
+                    i = from
+                }
+            }
+        }
+
+        // ここからメソッド名（演算子も含む）
+        let nameStart = i
+        var nameEnd = i
+
+        if nameStart < n {
+            let c = line[nameStart]
+            if isIdentStart(c) {
+                var j = nameStart + 1
+                while j < n, isIdentPart(line[j]) { j += 1 }
+                // 末尾 ? / ! / = を一個許容
+                if j < n, (line[j] == FuncChar.question || line[j] == FuncChar.exclamation || line[j] == FuncChar.equals) { j += 1 }
+                nameEnd = j
+            } else {
+                // 演算子名 ([], []=, +, -, *, /, ==, <=>, etc.)
+                // [] / []=
+                if c == FuncChar.leftBracket {
+                    var j = nameStart + 1
+                    if j < n, line[j] == FuncChar.rightBracket {
+                        j += 1
+                        if j < n, line[j] == FuncChar.equals { j += 1 }
+                        nameEnd = j
+                    }
+                } else {
+                    // +, -, *, /, %, &, |, ^, <, >, ==, ===, <=, >=, <=>
+                    var j = nameStart + 1
+                    while j < n, isOperatorChar(line[j]) { j += 1 }
+                    nameEnd = j
+                }
+            }
+        }
+
+        if nameEnd <= nameStart {
+            // 不明な場合は def の直後1文字だけ
+            nameEnd = min(n, nameStart + 1)
+        }
+
+        let range = baseOffset + nameStart ..< baseOffset + nameEnd
+        let display = isSingleton ? "." + String(decoding: UnsafeBufferPointer(start: line + nameStart, count: nameEnd - nameStart), as: UTF8.self)
+                                  : "#" + String(decoding: UnsafeBufferPointer(start: line + nameStart, count: nameEnd - nameStart), as: UTF8.self)
+        return (display, isSingleton, range)
+    }
+
+    private func isOperatorChar(_ c: UInt8) -> Bool {
+        switch c {
+        case FuncChar.plus, FuncChar.minus, FuncChar.asterisk, FuncChar.slash, FuncChar.percent,
+             FuncChar.ampersand, FuncChar.pipe, FuncChar.caret, FuncChar.lt, FuncChar.gt,
+             FuncChar.equals, FuncChar.exclamation, FuncChar.question, FuncChar.tilde:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func memeq(_ p: UnsafePointer<UInt8>, _ s: StaticString) -> Bool {
+        // s は英小文字の短いキーワード前提（"def","class","module"）
+        let len = s.utf8CodeUnitCount
+        let q = s.utf8Start
+
+        for i in 0..<len {
+            if p[i] != q[i] { return false }
         }
         return true
     }
