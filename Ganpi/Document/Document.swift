@@ -8,19 +8,22 @@
 import Cocoa
 import CryptoKit
 
+
 class Document: NSDocument {
     private static var lastCascadeTopLeft: NSPoint?
     private let _defaultWindowSize = NSSize(width: 600, height: 600)
     private let _windowMinimumSize = NSSize(width: 480, height: 320)
     
-    private var _characterCode: String.Encoding = .utf32
+    //private var _characterCode: String.Encoding = .utf32
+    private var _characterCode: KTextEncoding = .utf32
     private var _returnCode: String.ReturnCharacter = .lf
     private var _syntaxType: KSyntaxType = .plain
     
     
     private var _textStorage: KTextStorage = .init()
     
-    var characterCode: String.Encoding {
+    //var characterCode: String.Encoding {
+    var characterCode: KTextEncoding {
         get { _characterCode }
         set { _characterCode = newValue; notifyStatusBarNeedsUpdate()  }
     }
@@ -161,7 +164,8 @@ class Document: NSDocument {
             convertedString = string.replacingOccurrences(of: "\n", with: "\r\n")
         }
         
-        if let data = convertedString.data(using: characterCode, allowLossyConversion: false) {
+        //if let data = convertedString.data(using: characterCode, allowLossyConversion: false) {
+        if let data = convertedString.data(using: characterCode.stringEncoding(), allowLossyConversion: false) {
             try data.write(to:url, options: .atomic)
             return
         }
@@ -179,7 +183,8 @@ class Document: NSDocument {
         
         let res = alert.runModal()
         if res == .alertSecondButtonReturn {
-            guard let lossyData = convertedString.data(using: characterCode, allowLossyConversion: true) else {
+            //guard let lossyData = convertedString.data(using: characterCode, allowLossyConversion: true) else {
+            guard let lossyData = convertedString.data(using: characterCode.stringEncoding(), allowLossyConversion: true) else {
                 throw NSError(domain: NSCocoaErrorDomain, code: NSFileWriteInapplicableStringEncodingError, userInfo: [NSLocalizedDescriptionKey: "Failed to save with substitution."])
             }
             try lossyData.write(to:url, options: .atomic)
@@ -218,7 +223,13 @@ class Document: NSDocument {
         
         // 改行の正規化（内部は常に LF）、最初に見つかった外部改行を記録
         let normalizedInfo = decodedString.normalizeNewlinesAndDetect()
-        characterCode = encoding
+        //characterCode = encoding
+        /*if encoding == .utf16LittleEndian || encoding == .utf16BigEndian {
+            characterCode = .utf16
+        } else if encoding == .utf32LittleEndian || encoding == .utf32BigEndian {
+            characterCode = .utf32
+        }*/
+        characterCode = KTextEncoding.normalized(from: encoding) ?? .utf8
         returnCode = normalizedInfo.detected ?? .lf   // 改行が無い場合は LF を既定
         
         let normalizedString = normalizedInfo.normalized

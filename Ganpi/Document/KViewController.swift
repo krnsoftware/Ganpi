@@ -377,18 +377,21 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
 
     // MARK: - Encoding / EOL / Syntax（NSMenuをボタンから）
 
-    private let _encodingCandidates: [String.Encoding] = [
+    /*private let _encodingCandidates: [String.Encoding] = [
         .utf8, .utf16, .utf32, .shiftJIS, .japaneseEUC, .iso2022JP
-    ]
-
+    ]*/
+    
     @objc private func openEncodingMenuFromButton(_ sender: NSButton) {
         guard let doc = _document else { return }
         let menu = NSMenu()
-        for enc in _encodingCandidates {
-            let item = NSMenuItem(title: humanReadableEncoding(enc), action: #selector(didChooseEncoding(_:)), keyEquivalent: "")
+        //for enc in _encodingCandidates {
+        for enc in KTextEncoding.allCases {
+            //let item = NSMenuItem(title: humanReadableEncoding(enc), action: #selector(didChooseEncoding(_:)), keyEquivalent: "")
+            let item = NSMenuItem(title: enc.string, action: #selector(didChooseEncoding(_:)), keyEquivalent: "")
             item.target = self
             item.state = (enc == doc.characterCode) ? .on : .off
-            item.representedObject = enc.rawValue // あなたの方式に合わせる
+            //item.representedObject = enc.rawValue // あなたの方式に合わせる
+            item.representedObject = enc
             menu.addItem(item)
         }
         popUp(menu, from: sender)
@@ -437,13 +440,21 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
     }
 
     @objc private func didChooseEncoding(_ item: NSMenuItem) {
-        guard let raw = item.representedObject as? UInt, let doc = _document else { return }
+        /*guard let raw = item.representedObject as? UInt, let doc = _document else { return }
         let enc = String.Encoding(rawValue: raw)
-        if doc.characterCode != enc {
-            doc.characterCode = enc
+         if doc.characterCode != enc {
+             doc.characterCode = enc
+             updateStatusBar()
+             doc.updateChangeCount(.changeDone)
+         }*/
+        
+        guard let enc = item.representedObject as? KTextEncoding else { return }
+        if document?.characterCode != enc {
+            document?.characterCode = enc
             updateStatusBar()
-            doc.updateChangeCount(.changeDone)
+            document?.updateChangeCount(.changeDone)
         }
+        
     }
 
     @objc private func didChooseEOL(_ item: NSMenuItem) {
@@ -617,7 +628,8 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
 
     func updateStatusBar() {
         if let doc = _document {
-            _encButton.title    = humanReadableEncoding(doc.characterCode)
+            //_encButton.title    = humanReadableEncoding(doc.characterCode)
+            _encButton.title = doc.characterCode.string
             _eolButton.title    = humanReadableEOL(doc.returnCode)
             _syntaxButton.title = humanReadableSyntax(doc.syntaxType)
         } else {
@@ -664,17 +676,24 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         return _panes.first?.textView
     }
 
-    private func humanReadableEncoding(_ enc: String.Encoding) -> String {
+    /*
+    //private func humanReadableEncoding(_ enc: String.Encoding) -> String {
+    private func humanReadableEncoding(_ enc: KTextEncoding) -> String {
         switch enc {
         case .utf8: return "UTF-8"
-        case .utf16, .utf16BigEndian, .utf16LittleEndian: return "UTF-16"
+        case .utf16: return "UTF-16"
+        case .utf32: return "UTF-32"
+        case .jis: return "JIS"
+        case .sjis: return "SJIS"
+        case .euc: return "EUC"
+        /*case .utf16, .utf16BigEndian, .utf16LittleEndian: return "UTF-16"
         case .utf32, .utf32BigEndian, .utf32LittleEndian: return "UTF-32"
         case .shiftJIS: return "SJIS"
         case .japaneseEUC: return "EUC"
         case .iso2022JP: return "JIS"
-        default: return enc.description
+        default: return enc.description*/
         }
-    }
+    }*/
     private func humanReadableEOL(_ rc: String.ReturnCharacter) -> String {
         switch rc {
         case .lf: return "LF"
