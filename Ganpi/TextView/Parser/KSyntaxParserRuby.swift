@@ -278,16 +278,55 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
                 }
             }
 
-            // %r デリミタ型 regex
-            if c == FuncChar.percent, i + 2 < n, (base[i+1] == 0x72 || base[i+1] == 0x52) {
-                let delim = base[i+2]
-                let (open, close) = pairedDelims(for: delim)
-                let closing: UInt8 = (open == 0 && close == 0) ? delim : close
-                let r = scanUntilOrInterp(base, n, from: i+3, closing: closing)
-                switch r {
-                case .closed(let end): appendSpan(startOffset, i, end, _colorString); i = end; continue
-                case .eof(let end):    appendSpan(startOffset, i, end, _colorString); return (.inPercentLiteral(closing: closing), _tmpSpans)
-                case .interp:          return (.inPercentLiteral(closing: closing), _tmpSpans)
+            // %系リテラル（%r は正規表現、その他は文字列系として同色）
+            if c == FuncChar.percent, i + 2 < n {
+                let t = base[i + 1]                      // 種別文字
+                let tl = (t >= 0x41 && t <= 0x5A) ? t + 0x20 : t  // 小文字化
+                let delim = base[i + 2]
+
+                // 許可される %種別
+                let isRegex = (tl == 0x72) // 'r'
+                let isStringLike =
+                    (tl == 0x71 /*q*/ || tl == 0x77 /*w*/ || tl == 0x69 /*i*/ ||
+                     tl == 0x73 /*s*/ || tl == 0x78 /*x*/ || tl == 0x71 /*q*/ )
+
+                // 上の isStringLike は 'Q','W','I','S','X' も含む（tl化で対応）
+                if isRegex || isStringLike {
+                    let (_, close) = pairedDelims(for: delim)
+                    // 括弧類は対になる終端、その他は同一文字で閉じる
+                    let closing: UInt8 = (close == 0) ? delim : close
+                    let start = i + 3
+
+                    if isRegex {
+                        // %r は既存と同様に「文字列色」で強調
+                        let r = scanUntilOrInterp(base, n, from: start, closing: closing)
+                        switch r {
+                        case .closed(let end):
+                            appendSpan(startOffset, i, end, _colorString)
+                            i = end
+                            continue
+                        case .eof(let end):
+                            appendSpan(startOffset, i, end, _colorString)
+                            return (.inPercentLiteral(closing: closing), _tmpSpans)
+                        case .interp:
+                            return (.inPercentLiteral(closing: closing), _tmpSpans)
+                        }
+                    } else {
+                        // %q/%Q/%w/%W/%i/%I/%s/%S/%x/%X は「文字列系」として同色にする
+                        let r = scanUntilOrInterp(base, n, from: start, closing: closing)
+                        switch r {
+                        case .closed(let end):
+                            appendSpan(startOffset, i, end, _colorString)
+                            i = end
+                            continue
+                        case .eof(let end):
+                            appendSpan(startOffset, i, end, _colorString)
+                            return (.inPercentLiteral(closing: closing), _tmpSpans)
+                        case .interp:
+                            // 現行は補間の中身カラー復帰は無効化しているため、そのまま継続状態へ
+                            return (.inPercentLiteral(closing: closing), _tmpSpans)
+                        }
+                    }
                 }
             }
 
@@ -394,8 +433,10 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
     }
 
     // --- heredoc ヘッダ解析 ---
-    // 仕様: <<[-~]? の直後の空白は許可。終端語は「クォート付き」か「[A-Z][A-Z0-9_]*」の場合のみ採用。
-    // 終端語の後は空白・タブ・';'・'#コメント' 以外が来たら不採用（演算子 << 判定）。
+    // 仕様: <<[-~]? の直後の空白は許可。
+    //   ・クォート付き: 内容が [A-Za-z_][A-Za-z0-9_]* のときだけ採用
+    //   ・裸の終端語:   ^[A-Z][A-Z0-9_]*$ のときだけ採用
+    // 終端語の後は 空白/タブ/';'/ '#…' のみ許容（それ以外が来たら演算子 <<）
     private func parseHereDocHead(_ base: UnsafePointer<UInt8>, _ n: Int, from: Int)
     -> (Bool, Int, [UInt8], Bool, Bool) {
         var i = from
@@ -404,17 +445,14 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
         }
         i += 2
 
-        // <<- / <<~ はインデント許可
         var allowIndent = false
         if i < n, (base[i] == FuncChar.minus || base[i] == FuncChar.tilde) {
             allowIndent = true; i += 1
         }
 
-        // 空白は許可しつつスキップ
         while i < n, (base[i] == FuncChar.space || base[i] == FuncChar.tab) { i += 1 }
         if i >= n { return (false, from, [], false, false) }
 
-        // 終端語の抽出（識別子 or クォート）
         let c0 = base[i]
         let isQuoted = (c0 == FuncChar.singleQuote || c0 == FuncChar.doubleQuote)
         let isIdent0 = (c0 >= 0x41 && c0 <= 0x5A) || (c0 >= 0x61 && c0 <= 0x7A) || c0 == FuncChar.underscore
@@ -430,8 +468,10 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
             if i >= n { return (false, from, [], false, false) }
             term = Array(UnsafeBufferPointer(start: base + s, count: i - s))
             i += 1
+
+            // ★ クォート付きは識別子っぽい単語だけ許可（"<li>" 等を排除）
+            if !isIdentWord(term) { return (false, from, [], false, false) }
         } else {
-            // 裸の終端語を抽出
             let s = i
             while i < n {
                 let c = base[i]
@@ -443,7 +483,7 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
             if i == s { return (false, from, [], false, false) }
             term = Array(UnsafeBufferPointer(start: base + s, count: i - s))
 
-            // ★ 裸の終端語は大文字スネークのみ許容（実用ヒューリスティクス）
+            // ★ 裸は ALL UPPER のスネークのみ採用
             var hasUpper = false, allUpper = true
             for b in term {
                 if b >= 0x41 && b <= 0x5A { hasUpper = true }
@@ -451,27 +491,22 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
                     allUpper = false; break
                 }
             }
-            if !(hasUpper && allUpper) {
-                return (false, from, [], false, false) // 例: "<< tag" や "<< link" を弾く
-            }
+            if !(hasUpper && allUpper) { return (false, from, [], false, false) }
         }
 
-        // 終端語の後ろチェック：空白/タブをスキップ
+        // 終端語の後ろチェック
         var j = i
         while j < n, (base[j] == FuncChar.space || base[j] == FuncChar.tab) { j += 1 }
 
-        // 実効行末（\n / \r\nを無視）ならOK
         var e = n
         if e > 0, base[e - 1] == FuncChar.lf { e -= 1 }
         if e > 0, base[e - 1] == FuncChar.cr { e -= 1 }
         if j >= e { return (true, i, term, allowIndent, interpolation) }
 
-        // コメント開始 or ';' ならOK（ヘッダ末尾に置ける）
         if base[j] == FuncChar.numeric || base[j] == FuncChar.semicolon {
             return (true, i, term, allowIndent, interpolation)
         }
 
-        // それ以外が続く → これは演算子 << と見なす
         return (false, from, [], false, false)
     }
 
@@ -685,5 +720,19 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
         case FuncChar.lt:          return (FuncChar.lt,          FuncChar.gt)
         default: return (0, 0) // 同一文字で閉じる（%r! ... ! など）
         }
+    }
+    
+    // 補助関数（private関数群のところへ追加）
+    // クォート付き終端語の中身が [A-Za-z_][A-Za-z0-9_]* かどうか
+    private func isIdentWord(_ bs: [UInt8]) -> Bool {
+        guard let f = bs.first else { return false }
+        let isHead = (f >= 0x41 && f <= 0x5A) || (f >= 0x61 && f <= 0x7A) || f == FuncChar.underscore
+        if !isHead { return false }
+        for b in bs.dropFirst() {
+            let ok = (b >= 0x41 && b <= 0x5A) || (b >= 0x61 && b <= 0x7A) ||
+                     (b >= 0x30 && b <= 0x39) || b == FuncChar.underscore
+            if !ok { return false }
+        }
+        return true
     }
 }
