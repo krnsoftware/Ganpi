@@ -38,6 +38,7 @@ enum KTextEncoding: CaseIterable, CustomStringConvertible {
         case .euc: return .japaneseEUC
         }
     }
+
     
     var description: String {
         return "KTextEncoding: \(self.string)"
@@ -54,4 +55,24 @@ enum KTextEncoding: CaseIterable, CustomStringConvertible {
         }
     }
     
+}
+
+extension String {
+    enum ReturnCharacter : String, CaseIterable, CustomStringConvertible {
+        case lf = "\n"
+        case cr = "\r"
+        case crlf = "\r\n"
+        
+        var description: String {
+            return "KNewlineCharacter: \(self.string)"
+        }
+        
+        var string: String {
+            switch self {
+            case .lf: return "LF"
+            case .cr: return "CR"
+            case .crlf: return "CRLF"
+            }
+        }
+    }
 }

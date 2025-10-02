@@ -400,11 +400,19 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
     @objc private func openEOLMenuFromButton(_ sender: NSButton) {
         guard let doc = _document else { return }
         let menu = NSMenu()
+        /*
         for eol in [String.ReturnCharacter.lf, .crlf, .cr] {
             let item = NSMenuItem(title: humanReadableEOL(eol), action: #selector(didChooseEOL(_:)), keyEquivalent: "")
             item.target = self
             item.state = (eol == doc.returnCode) ? .on : .off
             item.representedObject = eol.rawValue // あなたの方式に合わせる（String）
+            menu.addItem(item)
+        }*/
+        for eol in String.ReturnCharacter.allCases {
+            let item = NSMenuItem(title: eol.string, action: #selector(didChooseEOL(_:)), keyEquivalent: "")
+            item.target = self
+            item.state = (eol == doc.returnCode) ? .on : .off
+            item.representedObject = eol
             menu.addItem(item)
         }
         popUp(menu, from: sender)
@@ -448,9 +456,9 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
              doc.updateChangeCount(.changeDone)
          }*/
         
-        guard let enc = item.representedObject as? KTextEncoding else { return }
-        if document?.characterCode != enc {
-            document?.characterCode = enc
+        guard let enc = item.representedObject as? KTextEncoding, let doc = _document else { return }
+        if doc.characterCode != enc {
+            doc.characterCode = enc
             updateStatusBar()
             document?.updateChangeCount(.changeDone)
         }
@@ -458,8 +466,8 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
     }
 
     @objc private func didChooseEOL(_ item: NSMenuItem) {
-        guard let raw = item.representedObject as? String,
-              let eol = String.ReturnCharacter(rawValue: raw),
+        //guard let raw = item.representedObject as? String,
+        guard let eol = item.representedObject as? String.ReturnCharacter,
               let doc = _document else { return }
         if doc.returnCode != eol {
             doc.returnCode = eol
@@ -630,7 +638,8 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         if let doc = _document {
             //_encButton.title    = humanReadableEncoding(doc.characterCode)
             _encButton.title = doc.characterCode.string
-            _eolButton.title    = humanReadableEOL(doc.returnCode)
+            //_eolButton.title    = humanReadableEOL(doc.returnCode)
+            _eolButton.title    = doc.returnCode.string
             _syntaxButton.title = humanReadableSyntax(doc.syntaxType)
         } else {
             _encButton.title = ""; _eolButton.title = ""; _syntaxButton.title = ""
@@ -694,13 +703,14 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         default: return enc.description*/
         }
     }*/
+    /*
     private func humanReadableEOL(_ rc: String.ReturnCharacter) -> String {
         switch rc {
         case .lf: return "LF"
         case .cr: return "CR"
         case .crlf: return "CRLF"
         }
-    }
+    }*/
     private func humanReadableSyntax(_ t: KSyntaxType) -> String {
         switch t {
         case .plain: return "Plain"

@@ -16,12 +16,7 @@ extension String {
     
     
     
-    //enum ReturnCharacter : Character, CaseIterable {
-    enum ReturnCharacter : String, CaseIterable {
-        case lf = "\n"
-        case cr = "\r"
-        case crlf = "\r\n"
-    }
+    
     
     /*
     enum FuncChar : Int {
