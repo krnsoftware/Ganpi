@@ -14,7 +14,6 @@ class Document: NSDocument {
     private let _defaultWindowSize = NSSize(width: 600, height: 600)
     private let _windowMinimumSize = NSSize(width: 480, height: 320)
     
-    //private var _characterCode: String.Encoding = .utf32
     private var _characterCode: KTextEncoding = .utf32
     private var _returnCode: String.ReturnCharacter = .lf
     private var _syntaxType: KSyntaxType = .plain
@@ -22,7 +21,6 @@ class Document: NSDocument {
     
     private var _textStorage: KTextStorage = .init()
     
-    //var characterCode: String.Encoding {
     var characterCode: KTextEncoding {
         get { _characterCode }
         set { _characterCode = newValue; notifyStatusBarNeedsUpdate()  }
@@ -122,34 +120,6 @@ class Document: NSDocument {
         Document.lastCascadeTopLeft = topLeft
     }
     
-    /*
-     override func makeWindowControllers() {
-     let windowController = NSWindowController(windowNibName: "Document")
-     addWindowController(windowController)
-     
-     _ = windowController.window                                // NIB をここでロード
-     windowController.contentViewController = KViewController() // 中身はここで決定
-     
-     // ① フレームの自動保存名（次回からはこのサイズで開く）
-     windowController.windowFrameAutosaveName = "KEditDocumentWindow"
-     
-     // ② 初回だけのデフォルトサイズ（自動保存がまだ無い場合）
-     if UserDefaults.standard.string(forKey: "NSWindow Frame KEditDocumentWindow") == nil {
-     windowController.window?.setContentSize(NSSize(width: 720, height: 520))
-     windowController.window?.center()
-     }
-     
-     // ③ これ以下に縮まない下限（“豆粒ウインドウ”防止）
-     windowController.window?.contentMinSize = NSSize(width: 480, height: 320)
-     
-     windowController.window?.isRestorable = false             // 復元は引き続き無効
-     
-     if let viewController = windowController.contentViewController as? KViewController {
-     viewController.document = self
-     }
-     }
-     */
-    
     
     override func write(to url:URL, ofType typeName: String) throws {
         let string = textStorage.string
@@ -164,7 +134,6 @@ class Document: NSDocument {
             convertedString = string.replacingOccurrences(of: "\n", with: "\r\n")
         }
         
-        //if let data = convertedString.data(using: characterCode, allowLossyConversion: false) {
         if let data = convertedString.data(using: characterCode.stringEncoding(), allowLossyConversion: false) {
             try data.write(to:url, options: .atomic)
             return
@@ -183,7 +152,6 @@ class Document: NSDocument {
         
         let res = alert.runModal()
         if res == .alertSecondButtonReturn {
-            //guard let lossyData = convertedString.data(using: characterCode, allowLossyConversion: true) else {
             guard let lossyData = convertedString.data(using: characterCode.stringEncoding(), allowLossyConversion: true) else {
                 throw NSError(domain: NSCocoaErrorDomain, code: NSFileWriteInapplicableStringEncodingError, userInfo: [NSLocalizedDescriptionKey: "Failed to save with substitution."])
             }
@@ -206,31 +174,15 @@ class Document: NSDocument {
                           userInfo: [NSLocalizedDescriptionKey: "Unsupported text encoding"])
         }
         
-        // test
-        /*
-         for (i, scalar) in decodedString.unicodeScalars.enumerated() {
-         if scalar.value < 0x20 || scalar.value == 0xFEFF {
-         log("index \(i): U+\(String(format: "%04X", scalar.value))",from:self)
-         }
-         if i > 100 { break }
-         }*/
-        
         // 先頭にBOM(FEFF)がある場合は先頭一文字を落とす。
         if decodedString.unicodeScalars.first == "\u{FEFF}" {
             decodedString.removeFirst()
-            //log("BOM!",from:self)
         }
         
         // 改行の正規化（内部は常に LF）、最初に見つかった外部改行を記録
         let normalizedInfo = decodedString.normalizeNewlinesAndDetect()
-        //characterCode = encoding
-        /*if encoding == .utf16LittleEndian || encoding == .utf16BigEndian {
-            characterCode = .utf16
-        } else if encoding == .utf32LittleEndian || encoding == .utf32BigEndian {
-            characterCode = .utf32
-        }*/
         characterCode = KTextEncoding.normalized(from: encoding) ?? .utf8
-        returnCode = normalizedInfo.detected ?? .lf   // 改行が無い場合は LF を既定
+        returnCode = normalizedInfo.detected ?? .lf
         
         let normalizedString = normalizedInfo.normalized
         
@@ -256,10 +208,10 @@ class Document: NSDocument {
         return super.validateUserInterfaceItem(item)
     }
     
-    
-    
 }
 
+
+// MARK: - Document extension and others.
 extension Document {
     /// 自分のウインドウ群だけ確実に更新（レスポンダチェーンに頼らない）
     func notifyStatusBarNeedsUpdate() {

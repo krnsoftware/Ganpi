@@ -152,7 +152,6 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         guard let manager = sender as? NSFontManager else { log("Font manager is nil.", from:self); return }
         guard let storage = document?.textStorage else { log("document is nil.", from:self); return }
         let panelFont = manager.convert(storage.baseFont)
-        //log("font: \(panelFont.fontName)", from:self)
         let isOption = NSApp.currentEvent?.modifierFlags.contains(.option) == true
         if isOption {
             guard let textView = activeTextView() else { log("activeTextView() is nil.", from:self); return }
@@ -376,21 +375,14 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
  
 
     // MARK: - Encoding / EOL / Syntax（NSMenuをボタンから）
-
-    /*private let _encodingCandidates: [String.Encoding] = [
-        .utf8, .utf16, .utf32, .shiftJIS, .japaneseEUC, .iso2022JP
-    ]*/
     
     @objc private func openEncodingMenuFromButton(_ sender: NSButton) {
         guard let doc = _document else { return }
         let menu = NSMenu()
-        //for enc in _encodingCandidates {
         for enc in KTextEncoding.allCases {
-            //let item = NSMenuItem(title: humanReadableEncoding(enc), action: #selector(didChooseEncoding(_:)), keyEquivalent: "")
             let item = NSMenuItem(title: enc.string, action: #selector(didChooseEncoding(_:)), keyEquivalent: "")
             item.target = self
             item.state = (enc == doc.characterCode) ? .on : .off
-            //item.representedObject = enc.rawValue // あなたの方式に合わせる
             item.representedObject = enc
             menu.addItem(item)
         }
@@ -400,14 +392,6 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
     @objc private func openEOLMenuFromButton(_ sender: NSButton) {
         guard let doc = _document else { return }
         let menu = NSMenu()
-        /*
-        for eol in [String.ReturnCharacter.lf, .crlf, .cr] {
-            let item = NSMenuItem(title: humanReadableEOL(eol), action: #selector(didChooseEOL(_:)), keyEquivalent: "")
-            item.target = self
-            item.state = (eol == doc.returnCode) ? .on : .off
-            item.representedObject = eol.rawValue // あなたの方式に合わせる（String）
-            menu.addItem(item)
-        }*/
         for eol in String.ReturnCharacter.allCases {
             let item = NSMenuItem(title: eol.string, action: #selector(didChooseEOL(_:)), keyEquivalent: "")
             item.target = self
@@ -422,7 +406,6 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         guard let doc = _document else { return }
         let menu = NSMenu()
         for ty in KSyntaxType.allCases {
-            //let item = NSMenuItem(title: humanReadableSyntax(ty), action: #selector(didChooseSyntax(_:)), keyEquivalent: "")
             let item = NSMenuItem(title: ty.string, action: #selector(didChooseSyntax(_:)), keyEquivalent: "")
             item.target = self
             item.state = (ty == doc.syntaxType) ? .on : .off
@@ -449,14 +432,6 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
     }
 
     @objc private func didChooseEncoding(_ item: NSMenuItem) {
-        /*guard let raw = item.representedObject as? UInt, let doc = _document else { return }
-        let enc = String.Encoding(rawValue: raw)
-         if doc.characterCode != enc {
-             doc.characterCode = enc
-             updateStatusBar()
-             doc.updateChangeCount(.changeDone)
-         }*/
-        
         guard let enc = item.representedObject as? KTextEncoding, let doc = _document else { return }
         if doc.characterCode != enc {
             doc.characterCode = enc
@@ -503,10 +478,7 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
                 }
 
                 // 選択を反映（NSRange に変換）
-                // let nsRange = NSRange(location: selection.lowerBound, length: selection.count)
-                //activeTextView.setSelectedRange(nsRange)// KTextView が NSTextView 互換ならこれでOK
                 activeTextView.selectionRange = selection
-                //activeTextView.scrollSelectionToVisible()
                 activeTextView.centerSelectionInVisibleArea(nil)
 
                 // ステータス更新 & フォーカス復帰
@@ -548,8 +520,6 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
                 self.updateStatusBar()
             case .fontSize:
                 self.updateStatusBar()
-                //self.setFontSize(value)
-                //guard let storage = _document?.textStorage else { return }
                 if let storage = _document?.textStorage {
                     storage.fontSize = max(5, value)
                     updateStatusBar()
@@ -637,11 +607,8 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
 
     func updateStatusBar() {
         if let doc = _document {
-            //_encButton.title    = humanReadableEncoding(doc.characterCode)
             _encButton.title = doc.characterCode.string
-            //_eolButton.title    = humanReadableEOL(doc.returnCode)
             _eolButton.title    = doc.returnCode.string
-            //_syntaxButton.title = humanReadableSyntax(doc.syntaxType)
             _syntaxButton.title = doc.syntaxType.string
         } else {
             _encButton.title = ""; _eolButton.title = ""; _syntaxButton.title = ""
@@ -687,41 +654,6 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         return _panes.first?.textView
     }
 
-    /*
-    //private func humanReadableEncoding(_ enc: String.Encoding) -> String {
-    private func humanReadableEncoding(_ enc: KTextEncoding) -> String {
-        switch enc {
-        case .utf8: return "UTF-8"
-        case .utf16: return "UTF-16"
-        case .utf32: return "UTF-32"
-        case .jis: return "JIS"
-        case .sjis: return "SJIS"
-        case .euc: return "EUC"
-        /*case .utf16, .utf16BigEndian, .utf16LittleEndian: return "UTF-16"
-        case .utf32, .utf32BigEndian, .utf32LittleEndian: return "UTF-32"
-        case .shiftJIS: return "SJIS"
-        case .japaneseEUC: return "EUC"
-        case .iso2022JP: return "JIS"
-        default: return enc.description*/
-        }
-    }*/
-    /*
-    private func humanReadableEOL(_ rc: String.ReturnCharacter) -> String {
-        switch rc {
-        case .lf: return "LF"
-        case .cr: return "CR"
-        case .crlf: return "CRLF"
-        }
-    }*/
-    /*
-    private func humanReadableSyntax(_ t: KSyntaxType) -> String {
-        switch t {
-        case .plain: return "Plain"
-        case .ruby:  return "Ruby"
-        case .html:  return "HTML"
-        default:     return "\(t)"
-        }
-    }*/
 }
 
 // MARK: - Popover ViewControllers
