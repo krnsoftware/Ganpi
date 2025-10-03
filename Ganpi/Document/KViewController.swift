@@ -442,7 +442,35 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         guard let textView = activeTextView() else { return }
         for outlineItem in outlineItems {
             let menuItem = NSMenuItem(title: outlineItem.name, action: #selector(textView.selectRange(_:)), keyEquivalent: "")
+            //let font = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+            //let font = NSFont.monospacedSystemFont(ofSize: 12.0, weight: .regular)
+            let attrs: [NSAttributedString.Key: Any] = [
+                //.font: font,
+                .foregroundColor: NSColor.labelColor
+            ]
+            let color:NSColor
+            let char:String
+            switch outlineItem.kind {
+            case .class:
+                color = NSColor.systemPurple
+                char = "C"
+            case .module:
+                color = NSColor.systemOrange
+                char = "M"
+            case .method:
+                if outlineItem.isSingleton {
+                    color = NSColor.init(hexString: "#22B023") ?? NSColor.systemGreen
+                    char = "S"
+                } else {
+                    color = NSColor.systemBlue
+                    char = "F"
+                }
+            }
+            if outlineItem.kind != .class { menuItem.indentationLevel = 1 }
+            let img = KOutlineBadgeFactory.shared.badge(letter: char,color: color, size: 16.0 )
+            menuItem.attributedTitle = NSAttributedString(string: outlineItem.name, attributes: attrs)
             menuItem.representedObject = outlineItem.nameRange
+            menuItem.image = img
             menu.addItem(menuItem)
         }
         popUp(menu, from: sender)
