@@ -344,6 +344,8 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         _funcMenuButton.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         _funcMenuButton.setContentHuggingPriority(.defaultLow, for: .horizontal)
         
+        _funcMenuButton.contentTintColor = .secondaryLabelColor
+        
 
         // 左：Encoding / EOL / Syntax（クリックでメニュー）
         _encButton.target = self;    _encButton.action = #selector(openEncodingMenuFromButton(_:))
@@ -654,6 +656,12 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
             
             let editMode = textView.editMode
             _editModeButton.title = editMode == .normal ? "'N'" : "'E'"
+            
+            let parser = textView.textStorage.parser
+            let ctx = parser.currentContext(at: caret)
+            let (display, tooltip) = makeStatusTitle(from: ctx)
+            _funcMenuButton.title = display
+            _funcMenuButton.toolTip = tooltip
         } else {
             _caretButton.title = ""
             _editModeButton.title = ""
@@ -679,6 +687,66 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
             if window.firstResponder === view { return view }
         }
         return _panes.first?.textView
+    }
+    
+    /// ステータスバー左側の関数名表示とツールチップ用文字列を生成
+    /// - Parameters:
+    ///   - context: parser.currentContext(at:) の結果（外→内）
+    ///   - containerTailCount: コンテナ（Class/Module）の末尾セグメントをいくつ付けるか（0=メソッド名のみ）
+    /// - Returns: (display, tooltip) 文字列タプル
+    private func makeStatusTitle(from context: [OutlineItem],
+                                 containerTailCount: Int = 1) -> (display: String, tooltip: String)
+    {
+        // 最内側の method / class/module を拾う
+        let method = context.last(where: { $0.kind == .method })
+        let containerChain = context.filter { $0.kind == .class || $0.kind == .module }
+
+        // フルパス（ツールチップ用）
+        let fullContainerPath: String = {
+            if containerChain.isEmpty { return "" }
+            // containerPath は親たち、各 OutlineItem.name は自分の表示名（"Foo::Bar" もあり得る）
+            // ツールチップは読みやすさ優先で chain の name を "Foo::Bar" 連結
+            return containerChain.map { $0.name }.joined(separator: "::")
+        }()
+
+        // 行番号（1-origin）
+        let lineForTooltip: Int? = {
+            if let m = method { return m.lineIndex + 1 }
+            if let lastC = containerChain.last { return lastC.lineIndex + 1 }
+            return nil
+        }()
+
+        // --- 表示（短い方） ---
+        let methodLabel: String = {
+            if let m = method { return m.name }          // 例: "#parse" / ".build" / "#[]="
+            if let lastC = containerChain.last { return lastC.name } // メソッドが無い場合はコンテナ名
+            return "(top)"
+        }()
+
+        let containerTail: String = {
+            guard containerTailCount > 0, !containerChain.isEmpty else { return "" }
+            // 末尾から指定個数だけ取り出して "Outer::Inner" 形式に
+            let names = containerChain.map { $0.name }
+            let tail = names.suffix(containerTailCount)
+            return tail.joined(separator: "::")
+        }()
+
+        let display: String = {
+            if containerTail.isEmpty {
+                return methodLabel                         // 例: "#parse"
+            } else {
+                return "'\(containerTail)·\(methodLabel)'" // 例: "Parser · #parse"
+            }
+        }()
+
+        // --- ツールチップ（フル情報） ---
+        var tooltipParts: [String] = []
+        if !fullContainerPath.isEmpty { tooltipParts.append(fullContainerPath) }
+        tooltipParts.append(methodLabel)
+        if let ln = lineForTooltip { tooltipParts.append("(L\(ln))") }
+        let tooltip = tooltipParts.joined(separator: " ")
+
+        return (display, tooltip)
     }
 
 }

@@ -101,8 +101,8 @@ protocol KSyntaxParserProtocol: AnyObject {
     func noteEdit(oldRange: Range<Int>, newCount: Int)
     func ensureUpToDate(for range: Range<Int>)
     
-    func outline(in range: Range<Int>?) -> [OutlineItem]     // nilで全文
-    func currentContext(at index: Int) -> [OutlineItem]      // 外側→内側の順
+    func outline(in range: Range<Int>?) -> [OutlineItem]     // if nil, in whole text.
+    func currentContext(at index: Int) -> [OutlineItem]      // outer -> inner.
     
     // Optional: full parse when needed
     func parse(range: Range<Int>)

@@ -39,6 +39,7 @@ protocol KTextStorageCommon: AnyObject {
     var count: Int { get }
     var baseFont: NSFont { get }
     var characterSlice: ArraySlice<Character> { get }
+    var parser: KSyntaxParserProtocol { get }
     subscript(index: Int) -> Character? { get }
     subscript(range: Range<Int>) -> ArraySlice<Character>? { get }
     subscript(string range: Range<Int>) -> String { get }

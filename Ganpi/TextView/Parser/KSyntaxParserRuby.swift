@@ -566,19 +566,22 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
         return out
     }
 
+    // 置換：未クローズ span（end == nil）も候補に入れる
     func currentContext(at index: Int) -> [OutlineItem] {
         rebuildIfNeeded()
         _buildOutlineAll()
 
-        // 最も内側のブロック（start ≤ index < end）を探し、親を遡る
+        // 最も内側のブロック（start ≤ index < end*）を選ぶ
         var bestIdx: Int? = nil
         for (i, sp) in _outlineSpans.enumerated() {
-            guard let e = sp.end else { continue }
+            let e = sp.end ?? Int.max            // ★ 未クローズは「開いたまま」
             if sp.start <= index && index < e {
-                if let prev = bestIdx {
-                    let aLen = (_outlineSpans[prev].end ?? Int.max) - _outlineSpans[prev].start
-                    let bLen = (e) - sp.start
-                    if bLen <= aLen { bestIdx = i } // より内側（短い）を採用
+                if let b = bestIdx {
+                    let bS = _outlineSpans[b].start
+                    let bE = _outlineSpans[b].end ?? Int.max
+                    // より内側＝開始が大きく、終了が小さい方を優先
+                    let thisIsDeeper = (sp.start >= bS) && (e <= bE)
+                    if thisIsDeeper { bestIdx = i }
                 } else {
                     bestIdx = i
                 }
@@ -586,13 +589,14 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
         }
         guard let leaf = bestIdx else { return [] }
 
-        var stack: [OutlineItem] = []
+        // 親を遡って外→内順に返す
+        var chain: [OutlineItem] = []
         var cur: Int? = leaf
         while let i = cur {
-            stack.append(_outlineSpans[i].item)
+            chain.append(_outlineSpans[i].item)
             cur = _outlineSpans[i].parentIndex
         }
-        return stack.reversed()
+        return chain.reversed()
     }
     
     // MARK: - 補助関数
