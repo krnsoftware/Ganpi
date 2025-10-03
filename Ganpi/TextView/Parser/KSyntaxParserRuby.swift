@@ -1174,76 +1174,110 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
     }
 
     // def 名の抽出（表示名, isSingleton, nameRange）
+    // - def self.foo         → isSingleton = true,  ".foo"
+    // - def Klass.foo        → isSingleton = true,  ".foo"
+    // - def Klass::foo       → isSingleton = true,  ".foo"
+    // - def foo / def []=    → isSingleton = false, "#foo" / "#[]="
     private func parseDefName(_ line: UnsafePointer<UInt8>, _ n: Int, from: Int, baseOffset: Int)
     -> (String, Bool, Range<Int>) {
         var i = from
         var isSingleton = false
 
-        // self. / Const::Path. の場合はクラスメソッド
-        if i + 4 < n, memeq(line+i, "self"), line[i+4] == FuncChar.period {
-            isSingleton = true
-            i += 5
+        // ユーティリティ
+        @inline(__always)
+        func skipSpaces(_ p: UnsafePointer<UInt8>, _ n: Int, _ i0: inout Int) {
+            while i0 < n, (p[i0] == FuncChar.space || p[i0] == FuncChar.tab) { i0 += 1 }
+        }
+
+        skipSpaces(line, n, &i)
+
+        // 1) def self.
+        if i + 4 < n, memeq(line + i, "self") {
+            var j = i + 4; skipSpaces(line, n, &j)
+            if j < n, line[j] == FuncChar.period {
+                isSingleton = true
+                i = j + 1
+            }
         } else {
-            // Const::Path. の検出（大文字始まり＋ "::" や "."）
-            let s = i
-            if s < n, (line[s] >= 0x41 && line[s] <= 0x5A) {
-                var j = s + 1
+            // 2) def ConstPath (Const(::Const)*) .|:: method
+            var j = i
+            var sawConstPath = false
+
+            // 先頭は大文字の定数名
+            if j < n, line[j] >= 0x41, line[j] <= 0x5A {
+                sawConstPath = true
+                j += 1
                 while j < n, isIdentPart(line[j]) { j += 1 }
-                // "::" のループ
-                while j + 1 < n, line[j] == FuncChar.colon, line[j+1] == FuncChar.colon {
+                // "::Const" を辿る
+                while true {
+                    let jj = j
+                    skipSpaces(line, n, &j)
+                    guard j + 1 < n, line[j] == FuncChar.colon, line[j + 1] == FuncChar.colon else { break }
                     j += 2
-                    if j >= n || !(line[j] >= 0x41 && line[j] <= 0x5A) { break }
+                    skipSpaces(line, n, &j)
+                    // 次も定数名（大文字始まり）なら継続
+                    guard j < n, line[j] >= 0x41, line[j] <= 0x5A else { j = jj; break }
                     j += 1
                     while j < n, isIdentPart(line[j]) { j += 1 }
                 }
-                if j < n, line[j] == FuncChar.period {
+            }
+
+            // 直後の区切りが '.' または '::' ならクラスメソッド扱い
+            if sawConstPath {
+                var k = j
+                skipSpaces(line, n, &k)
+                if k < n, line[k] == FuncChar.period {
                     isSingleton = true
-                    i = j + 1
-                } else {
-                    i = from
+                    i = k + 1
+                } else if k + 1 < n, line[k] == FuncChar.colon, line[k + 1] == FuncChar.colon {
+                    isSingleton = true
+                    i = k + 2
                 }
             }
         }
 
-        // ここからメソッド名（演算子も含む）
+        skipSpaces(line, n, &i)
+
+        // 3) メソッド名（識別子 / [] / []= / 演算子）
         let nameStart = i
         var nameEnd = i
 
         if nameStart < n {
             let c = line[nameStart]
             if isIdentStart(c) {
-                var j = nameStart + 1
-                while j < n, isIdentPart(line[j]) { j += 1 }
-                // 末尾 ? / ! / = を一個許容
-                if j < n, (line[j] == FuncChar.question || line[j] == FuncChar.exclamation || line[j] == FuncChar.equals) { j += 1 }
-                nameEnd = j
-            } else {
-                // 演算子名 ([], []=, +, -, *, /, ==, <=>, etc.)
-                // [] / []=
-                if c == FuncChar.leftBracket {
-                    var j = nameStart + 1
-                    if j < n, line[j] == FuncChar.rightBracket {
-                        j += 1
-                        if j < n, line[j] == FuncChar.equals { j += 1 }
-                        nameEnd = j
-                    }
-                } else {
-                    // +, -, *, /, %, &, |, ^, <, >, ==, ===, <=, >=, <=>
-                    var j = nameStart + 1
-                    while j < n, isOperatorChar(line[j]) { j += 1 }
-                    nameEnd = j
+                var k = nameStart + 1
+                while k < n, isIdentPart(line[k]) { k += 1 }
+                // 末尾の ?, !, = を 1 文字だけ許容
+                if k < n, (line[k] == FuncChar.question || line[k] == FuncChar.exclamation || line[k] == FuncChar.equals) {
+                    k += 1
                 }
+                nameEnd = k
+            } else if c == FuncChar.leftBracket {
+                // [] / []=
+                var k = nameStart + 1
+                if k < n, line[k] == FuncChar.rightBracket {
+                    k += 1
+                    if k < n, line[k] == FuncChar.equals { k += 1 }
+                    nameEnd = k
+                }
+            } else {
+                // 演算子名（+, -, *, /, %, &, |, ^, <, >, ==, ===, <=, >=, <=> など）
+                var k = nameStart + 1
+                while k < n, isOperatorChar(line[k]) { k += 1 }
+                if k > nameStart { nameEnd = k }
             }
         }
 
         if nameEnd <= nameStart {
-            // 不明な場合は def の直後1文字だけ
+            // 不明時は 1 文字だけ（フォールバック）
             nameEnd = min(n, nameStart + 1)
         }
 
         let range = baseOffset + nameStart ..< baseOffset + nameEnd
-        let display = isSingleton ? "." + String(decoding: UnsafeBufferPointer(start: line + nameStart, count: nameEnd - nameStart), as: UTF8.self)
-                                  : "#" + String(decoding: UnsafeBufferPointer(start: line + nameStart, count: nameEnd - nameStart), as: UTF8.self)
+        let raw = String(decoding: UnsafeBufferPointer(start: line + nameStart,
+                                                       count: nameEnd - nameStart),
+                         as: UTF8.self)
+        let display = (isSingleton ? "." : "#") + raw
         return (display, isSingleton, range)
     }
 
