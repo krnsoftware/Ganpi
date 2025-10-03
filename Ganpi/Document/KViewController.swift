@@ -25,7 +25,7 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
     // 行間の粗調整ステップ
     private let _lineSpacingStep: CGFloat = 1.0
 
-    // コンテナはコードで用意（XIBなし前提）
+    // コンテナ
     private let _contentContainer = NSView()
     private let _statusBarView    = NSView()
 
@@ -335,6 +335,15 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
             $0.contentTintColor = .labelColor
         }
         
+        // 潰れないように。
+        [_encButton, _eolButton, _syntaxButton, _editModeButton].forEach {
+            $0.setContentCompressionResistancePriority(.required, for: .horizontal)
+            $0.setContentHuggingPriority(.required, for: .horizontal)
+        }
+        // よく縮むように。
+        _funcMenuButton.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        _funcMenuButton.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        
 
         // 左：Encoding / EOL / Syntax（クリックでメニュー）
         _encButton.target = self;    _encButton.action = #selector(openEncodingMenuFromButton(_:))
@@ -362,6 +371,12 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
 
         _statusBarView.addSubview(leftStack)
         _statusBarView.addSubview(rightStack)
+        
+        // ---- レイアウト優先度（右を死守・左が縮む）----
+        rightStack.setContentCompressionResistancePriority(.required, for: .horizontal)
+        rightStack.setContentHuggingPriority(.required, for: .horizontal)
+        leftStack.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        leftStack.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
         NSLayoutConstraint.activate([
             leftStack.leadingAnchor.constraint(equalTo: _statusBarView.leadingAnchor, constant: 8),
@@ -369,6 +384,8 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
 
             rightStack.trailingAnchor.constraint(equalTo: _statusBarView.trailingAnchor, constant: -8),
             rightStack.centerYAnchor.constraint(equalTo: _statusBarView.centerYAnchor),
+            
+            leftStack.trailingAnchor.constraint(lessThanOrEqualTo: rightStack.leadingAnchor, constant: -8),
         ])
     }
 
