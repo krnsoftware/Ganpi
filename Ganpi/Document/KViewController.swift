@@ -444,6 +444,7 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
             let menuItem = NSMenuItem(title: outlineItem.name, action: #selector(textView.selectRange(_:)), keyEquivalent: "")
             //let font = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
             //let font = NSFont.monospacedSystemFont(ofSize: 12.0, weight: .regular)
+            /*
             let attrs: [NSAttributedString.Key: Any] = [
                 //.font: font,
                 .foregroundColor: NSColor.labelColor
@@ -469,8 +470,16 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
             if outlineItem.kind != .class { menuItem.indentationLevel = 1 }
             let img = KOutlineBadgeFactory.shared.badge(letter: char,color: color, size: 16.0 )
             menuItem.attributedTitle = NSAttributedString(string: outlineItem.name, attributes: attrs)
+            */
+            switch outlineItem.kind {
+            case .class: menuItem.image = KOutlineBadgeFactory.shared.classBadge()
+            case .module: menuItem.image = KOutlineBadgeFactory.shared.moduleBadge()
+            case .method:
+                menuItem.image = KOutlineBadgeFactory.shared.methodBadge(isSingleton: outlineItem.isSingleton)
+                menuItem.indentationLevel = 1
+            }
             menuItem.representedObject = outlineItem.nameRange
-            menuItem.image = img
+            //menuItem.image = img
             menu.addItem(menuItem)
         }
         popUp(menu, from: sender)
