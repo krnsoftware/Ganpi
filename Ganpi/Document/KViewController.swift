@@ -33,7 +33,7 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
     private let _encButton    = NSButton(title: "", target: nil, action: nil)
     private let _eolButton    = NSButton(title: "", target: nil, action: nil)
     private let _syntaxButton = NSButton(title: "", target: nil, action: nil)
-    private let _funcMenuButton = NSButton(title: "func", target: nil, action: nil)
+    private let _funcMenuButton = NSButton(title: "", target: nil, action: nil)
     private let _editModeButton = NSButton(title: "", target: nil, action: nil)
     private let _caretButton  = NSButton(title: "", target: nil, action: nil)
     private let _fontSizeButton   = NSButton(title: "", target: nil, action: nil)   // "FS: <val>"
@@ -731,7 +731,7 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
     ///   - context: parser.currentContext(at:) の結果（外→内）
     ///   - containerTailCount: コンテナ（Class/Module）の末尾セグメントをいくつ付けるか（0=メソッド名のみ）
     /// - Returns: (display, tooltip) 文字列タプル
-    private func makeStatusTitle(from context: [OutlineItem],
+    private func makeStatusTitle(from context: [KOutlineItem],
                                  containerTailCount: Int = 1) -> (display: String, tooltip: String)
     {
         // 最内側の method / class/module を拾う

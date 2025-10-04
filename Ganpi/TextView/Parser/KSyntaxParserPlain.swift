@@ -16,11 +16,13 @@ final class KSyntaxParserPlain: KSyntaxParserProtocol {
     func noteEdit(oldRange: Range<Int>, newCount: Int) { /* no-op */ }
     func ensureUpToDate(for range: Range<Int>) { /* no-op */ }
     func parse(range: Range<Int>) { /* no-op */ }
-    func outline(in range: Range<Int>?) -> [OutlineItem] { return [] }
-    func currentContext(at index: Int) -> [OutlineItem]  { return [] }
+    func outline(in range: Range<Int>?) -> [KOutlineItem] { return [] }
+    func currentContext(at index: Int) -> [KOutlineItem]  { return [] }
+    func rebuildCompletionsIfNeeded(dirtyRange: Range<Int>?) { /* no-op */ }
+    func completionEntries(prefix: String,around index: Int,limit: Int, policy: KCompletionPolicy) -> [KCompletionEntry]{ return [] }
 
     // ハイライトなし
-    func attributes(in range: Range<Int>, tabWidth: Int) -> [AttributedSpan] { [] }
+    func attributes(in range: Range<Int>, tabWidth: Int) -> [KAttributedSpan] { [] }
     
     // 欧文のみ（日本語は storage.wordRange が先に処理）
     func wordRange(at index: Int) -> Range<Int>? { return nil }

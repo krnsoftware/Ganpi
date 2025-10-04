@@ -12,7 +12,7 @@ import AppKit
 
 
 
-struct AttributedSpan {
+struct KAttributedSpan {
     let range: Range<Int>
     let attributes: [NSAttributedString.Key: Any]
 }
@@ -22,6 +22,14 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
     case ruby  = "public.ruby-script"
     case html  = "public.html"
     
+    // 拡張子 → SyntaxType マップ
+    private static let _extMap: [String: KSyntaxType] = [
+            /* plain */ "txt": .plain, "text": .plain, "md": .plain,
+            /* ruby */  "rb": .ruby, "rake": .ruby, "ru": .ruby, "erb": .ruby,
+            /* html */  "html": .html, "htm": .html
+        ]
+    
+    // KSyntaxType.plain.makeParser(storage:self)...といった形で生成する。
     func makeParser(storage:KTextStorageReadable) -> KSyntaxParserProtocol {
         switch self {
         case .plain: return KSyntaxParserPlain(storage: storage)
@@ -32,13 +40,13 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
     
     static func detect(fromTypeName typeName: String?, orExtension ext: String?) -> KSyntaxType {
         // 1) typeName が UTI として一致するか
-        if let t = typeName, let known = KSyntaxType(rawValue: t) {
-            return known
+        if let type = typeName, let knownType = KSyntaxType(rawValue: type) {
+            return knownType
         }
         
         // 2) 拡張子から推定
-        if let e = ext?.lowercased() {
-            if let mapped = _extMap[e] {
+        if let fileExtionsion = ext?.lowercased() {
+            if let mapped = _extMap[fileExtionsion] {
                 return mapped
             }
         }
@@ -46,19 +54,6 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         // 3) デフォルトはプレーンテキスト
         return .plain
     }
-
-        /// 拡張子 → SyntaxType マップ
-    private static let _extMap: [String: KSyntaxType] = [
-            "txt": .plain,
-            "text": .plain,
-            "md": .plain,
-            "rb": .ruby,
-            "rake": .ruby,
-            "ru": .ruby,
-            "erb": .ruby,
-            "html": .html,
-            "htm": .html
-        ]
     
     var string: String {
         switch self {
@@ -76,7 +71,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
 // MARK: - Outline API
 
 /// 言語アウトライン1項目
-struct OutlineItem {
+struct KOutlineItem {
     enum Kind { case `class`, module, method }
     let kind: Kind
     let name: String                 // 表示名（例: "Foo::Bar", "#empty?", ".new"）
@@ -89,6 +84,45 @@ struct OutlineItem {
     let isSingleton: Bool            // def self.foo / def Klass.bar
 }
 
+// MARK: - Completion Common Types
+
+/// 候補の種類（共通）
+enum KCompletionKind {
+    case keyword
+    case typeClass
+    case typeModule
+    case methodInstance
+    case methodClass
+    case constant
+    case variableLocal
+    case variableInstance
+    case variableClass
+    case variableGlobal
+    case symbol
+}
+
+/// 1件の候補
+struct KCompletionEntry {
+    let text: String          // 挿入文字列（例: "to_i"）
+    let kind: KCompletionKind
+    let detail: String?       // 表示用ラベル（例: "String · #to_i"）
+    let score: Int            // 並べ替え用（ポリシーがアルファベットなら 0 のままでOK）
+}
+
+/// 並べ替えポリシー（拡張用）。現段階では .alphabetical のみ使用
+enum KCompletionPolicy {
+    case alphabetical
+    case heuristic(KCompletionWeights) // 今回は未使用（将来用）
+}
+
+/// 重み（将来のヒューリスティック用）
+struct KCompletionWeights {
+    var baseByKind: [KCompletionKind: Int] = [:]
+    var nearBoostMax: Int = 0
+    var scopeBoost: Int = 0
+    var freqUnit: Int = 0
+    var recentHit: Int = 0
+}
 
 
 typealias FC = FuncChar
@@ -97,23 +131,34 @@ typealias FC = FuncChar
 // MARK: - Parser protocol
 
 protocol KSyntaxParserProtocol: AnyObject {
-    // TextStorage -> Parser
+    // 対象とするKTextStorageの参照。
+    var storage: KTextStorageReadable { get }
+    
+    // パース用メソッド TextStorageから呼び出す。
     func noteEdit(oldRange: Range<Int>, newCount: Int)
     func ensureUpToDate(for range: Range<Int>)
     
-    func outline(in range: Range<Int>?) -> [OutlineItem]     // if nil, in whole text.
-    func currentContext(at index: Int) -> [OutlineItem]      // outer -> inner.
-    
-    // Optional: full parse when needed
+    // Optional: 必要時に全体パース
     func parse(range: Range<Int>)
     
+    // 現在のテキストの範囲rangeについてattributesを取り出す。
     // Painter hook: attribute spans (font is applied by TextStorage)
-    func attributes(in range: Range<Int>, tabWidth: Int) -> [AttributedSpan]
+    func attributes(in range: Range<Int>, tabWidth: Int) -> [KAttributedSpan]
     
-    var storage: KTextStorageReadable { get }
+    // caretのindex:iに於いてそれに属すると思われる単語の領域。
     func wordRange(at index: Int) -> Range<Int>?
     
-    //static func makeParser(for type:KSyntaxType) -> KSyntaxParserProtocol?
+    // 文書の構造をパースする。
+    func outline(in range: Range<Int>?) -> [KOutlineItem]     // if nil, in whole text.
+    func currentContext(at index: Int) -> [KOutlineItem]      // outer -> inner.
+    
+    // Word Completionに関するメソッド。
+    func rebuildCompletionsIfNeeded(dirtyRange: Range<Int>?)
+    func completionEntries(prefix: String,
+                           around index: Int,
+                           limit: Int,
+                           policy: KCompletionPolicy) -> [KCompletionEntry]
+    
     
 }
 

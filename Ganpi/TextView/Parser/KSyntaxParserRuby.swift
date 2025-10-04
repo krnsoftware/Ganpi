@@ -10,7 +10,7 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
     private struct _OutlineSpan {
         let start: Int
         let end: Int?
-        let item: OutlineItem
+        let item: KOutlineItem
         let parentIndex: Int?   // 親の _spans インデックス
     }
 
@@ -19,7 +19,7 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
     // 1行分の結果キャッシュ
     private struct LineInfo {
         var endState: EndState = .neutral
-        var spans: [AttributedSpan] = []
+        var spans: [KAttributedSpan] = []
         var dirty: Bool = true
     }
     
@@ -66,7 +66,7 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
     ]
     
     // 作業用
-    private var _tmpSpans: [AttributedSpan] = []
+    private var _tmpSpans: [KAttributedSpan] = []
     
     // ストレージ
     let storage: KTextStorageReadable
@@ -88,7 +88,7 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
         parseLines(in: anchor..<need.upperBound)
     }
     
-    func attributes(in range: Range<Int>, tabWidth: Int) -> [AttributedSpan] {
+    func attributes(in range: Range<Int>, tabWidth: Int) -> [KAttributedSpan] {
         if range.isEmpty { return [] }
         ensureUpToDate(for: range)
         let lineCount = max(0, _lineStarts.count - 1)
@@ -104,7 +104,7 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
         li1 = max(0, min(li1, lineCount - 1))
         if li0 > li1 { return [] }
         
-        var result: [AttributedSpan] = []
+        var result: [KAttributedSpan] = []
         result.reserveCapacity(32)
         
         for li in li0...li1 {
@@ -114,7 +114,7 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
                 let a = max(span.range.lowerBound, range.lowerBound)
                 let b = min(span.range.upperBound, range.upperBound)
                 if a < b {
-                    result.append(AttributedSpan(range: a..<b, attributes: span.attributes))
+                    result.append(KAttributedSpan(range: a..<b, attributes: span.attributes))
                 }
             }
         }
@@ -356,7 +356,7 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
     
     // MARK: - 字句解析本体
 
-    private func lexLine(base: UnsafePointer<UInt8>, count: Int, startOffset: Int, initial: EndState) -> (EndState, [AttributedSpan]) {
+    private func lexLine(base: UnsafePointer<UInt8>, count: Int, startOffset: Int, initial: EndState) -> (EndState, [KAttributedSpan]) {
         _tmpSpans.removeAll(keepingCapacity: true)
 
         var state = initial
@@ -547,7 +547,7 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
 
     // MARK: - Outline (class/module/def)
 
-    func outline(in range: Range<Int>? = nil) -> [OutlineItem] {
+    func outline(in range: Range<Int>? = nil) -> [KOutlineItem] {
         rebuildIfNeeded()
         // まず全文を走査（初版：毎回再構築。性能要望が出たら差分化）
         _buildOutlineAll()
@@ -555,7 +555,7 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
         guard let r = range else {
             return _outlineSpans.compactMap { $0.item }
         }
-        var out: [OutlineItem] = []
+        var out: [KOutlineItem] = []
         out.reserveCapacity(_outlineSpans.count)
         for sp in _outlineSpans {
             let a = sp.item.nameRange.lowerBound
@@ -567,7 +567,7 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
     }
 
     // 置換：未クローズ span（end == nil）も候補に入れる
-    func currentContext(at index: Int) -> [OutlineItem] {
+    func currentContext(at index: Int) -> [KOutlineItem] {
         rebuildIfNeeded()
         _buildOutlineAll()
 
@@ -590,7 +590,7 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
         guard let leaf = bestIdx else { return [] }
 
         // 親を遡って外→内順に返す
-        var chain: [OutlineItem] = []
+        var chain: [KOutlineItem] = []
         var cur: Int? = leaf
         while let i = cur {
             chain.append(_outlineSpans[i].item)
@@ -599,12 +599,226 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
         return chain.reversed()
     }
     
+    // MARK: - Completion (Ruby)
+
+    /// 動的語彙の内部情報（辞書はパーサ内に閉じ込める）
+    private struct DynamicTokenInfo {
+        var kind: KCompletionKind
+        var firstPos: Int
+        var lastPos: Int
+        var freq: Int
+        var containerPath: [String] // 表示用に使うことがある
+    }
+
+    // 内部辞書（動的）
+    private var _dynamicMap: [String: DynamicTokenInfo] = [:]
+    // 最終更新のテキスト長（簡易な変化検知に使う）
+    private var _lastScannedLength: Int = -1
+
+    func rebuildCompletionsIfNeeded(dirtyRange: Range<Int>?) {
+        // 1) アウトライン由来を反映（class/module/method）
+        _ingestOutlineToDynamicMap()
+
+        // 2) 本文から識別子・変数っぽいものを軽く拾う（全走査でも高速）
+        //    必要なら dirtyRange ±数行に限定する最適化を後で入れる。
+        _scanDocumentForDynamicTokens()
+
+        // 3) 更新記録
+        _lastScannedLength = storage.count//textLength // textLength は既存の全文長プロパティ想定
+    }
+
+    func completionEntries(prefix: String,
+                           around index: Int,
+                           limit: Int,
+                           policy: KCompletionPolicy) -> [KCompletionEntry]
+    {
+        // 0) 前処理
+        let normalizedPrefix = prefix.lowercased()
+
+        // 1) 固定語彙（prefix一致）
+        var entries: [KCompletionEntry] = []
+        if normalizedPrefix.isEmpty {
+            // 空prefixなら固定語彙は出し過ぎない。必要なら後段で追加。
+        } else {
+            for kw in _keywords {
+                if kw.hasPrefix(normalizedPrefix) {
+                    entries.append(KCompletionEntry(text: kw, kind: .keyword, detail: nil, score: 0))
+                }
+            }
+        }
+
+        // 2) 動的語彙（prefix一致）
+        for (text, info) in _dynamicMap {
+            if normalizedPrefix.isEmpty || text.lowercased().hasPrefix(normalizedPrefix) {
+                // 表示 detail：可能なら containerPath と #/. を組み立て
+                var detail: String? = nil
+                switch info.kind {
+                case .methodInstance:
+                    if let last = info.containerPath.last { detail = "\(last) · #\(text)" }
+                    else { detail = "#\(text)" }
+                case .methodClass:
+                    if let last = info.containerPath.last { detail = "\(last) · .\(text)" }
+                    else { detail = ".\(text)" }
+                case .typeClass, .typeModule:
+                    detail = text
+                case .constant:
+                    detail = text
+                case .variableLocal, .variableInstance, .variableClass, .variableGlobal, .symbol:
+                    detail = text
+                case .keyword:
+                    detail = text
+                }
+
+                entries.append(KCompletionEntry(text: text, kind: info.kind, detail: detail, score: 0))
+            }
+        }
+
+        // 3) 並べ替え
+        switch policy {
+        case .alphabetical:
+            entries.sort {
+                // textのローカライズ比較。textが同じならkindで安定化。
+                let lhs = $0.text
+                let rhs = $1.text
+                let c = lhs.localizedStandardCompare(rhs)
+                if c == .orderedSame {
+                    return String(describing: $0.kind) < String(describing: $1.kind)
+                }
+                return c == .orderedAscending
+            }
+
+        case .heuristic(let weights):
+            // まだ使わない。将来ここに score 合成を入れる。
+            entries.sort {
+                if $0.score == $1.score {
+                    return $0.text.localizedStandardCompare($1.text) == .orderedAscending
+                }
+                return $0.score > $1.score
+            }
+        }
+
+        // 4) 重複除去（text単位でユニーク化）
+        var seen = Set<String>()
+        var unique: [KCompletionEntry] = []
+        unique.reserveCapacity(min(entries.count, limit))
+        for e in entries {
+            if !seen.contains(e.text) {
+                unique.append(e); seen.insert(e.text)
+                if unique.count >= limit { break }
+            }
+        }
+        return unique
+    }
+
+    // MARK: - 動的語彙の取り込み
+
+    private func _ingestOutlineToDynamicMap() {
+        // 既存アウトライン（class/module/method）から流用
+        // outline はあなたの実装にある前提。全件（または画面周辺）を取り、Mapに入れる。
+        let items = outline(in: nil)
+        for it in items {
+            switch it.kind {
+            case .class:
+                _dynamicInsert(text: it.name, kind: .typeClass, pos: it.lineIndex, containerPath: it.containerPath)
+            case .module:
+                _dynamicInsert(text: it.name, kind: .typeModule, pos: it.lineIndex, containerPath: it.containerPath)
+            case .method:
+                // 表示名 ".foo" / "#foo" を返している想定なので、textは記号を外す
+                let raw = it.name.hasPrefix(".") || it.name.hasPrefix("#") ? String(it.name.dropFirst()) : it.name
+                let kind: KCompletionKind = it.isSingleton ? .methodClass : .methodInstance
+                _dynamicInsert(text: raw, kind: kind, pos: it.lineIndex, containerPath: it.containerPath)
+            }
+        }
+    }
+
+    private func _dynamicInsert(text: String, kind: KCompletionKind, pos: Int, containerPath: [String]) {
+        guard !text.isEmpty else { return }
+        if var v = _dynamicMap[text] {
+            v.freq += 1
+            v.lastPos = max(v.lastPos, pos)
+            if v.containerPath.isEmpty { v.containerPath = containerPath }
+            _dynamicMap[text] = v
+        } else {
+            _dynamicMap[text] = DynamicTokenInfo(kind: kind, firstPos: pos, lastPos: pos, freq: 1, containerPath: containerPath)
+        }
+    }
+
+    /// ざっくり本文スキャン：識別子/変数/定数/シンボルを拾う（軽い・安全）
+    private func _scanDocumentForDynamicTokens() {
+        // すでに同長ならスキップ（ざっくり検知）
+        if _lastScannedLength == storage.count { return }
+
+        let bytes = storage.skeletonString.bytes   // 1:1のUInt8配列（あなたの設計どおり）
+        let n = bytes.count
+        var i = 0
+        while i < n {
+            let c = bytes[i]
+
+            // コメント行の # 〜 改行 を飛ばす（超簡易）
+            if c == FuncChar.numeric { // #
+                i += 1
+                while i < n, bytes[i] != FuncChar.lf { i += 1 }
+                continue
+            }
+
+            // @ivar / @@cvar / $gvar
+            if c == FuncChar.at {
+                let start = i
+                var j = i + 1
+                if j < n, bytes[j] == FuncChar.at { j += 1 } // @@
+                if j < n, isIdentStart(bytes[j]) {
+                    j += 1
+                    while j < n, isIdentPart(bytes[j]) { j += 1 }
+                    let name = String(decoding: bytes[start..<j], as: UTF8.self)
+                    let kind: KCompletionKind = (name.hasPrefix("@@") ? .variableClass : .variableInstance)
+                    _dynamicInsert(text: name, kind: kind, pos: start, containerPath: [])
+                    i = j; continue
+                }
+            } else if c == FuncChar.dollar {
+                let start = i
+                var j = i + 1
+                if j < n, isIdentStart(bytes[j]) {
+                    j += 1
+                    while j < n, isIdentPart(bytes[j]) { j += 1 }
+                    let name = String(decoding: bytes[start..<j], as: UTF8.self)
+                    _dynamicInsert(text: name, kind: .variableGlobal, pos: start, containerPath: [])
+                    i = j; continue
+                }
+            } else if c == FuncChar.colon {
+                // :symbol
+                let start = i
+                var j = i + 1
+                if j < n, isIdentStart(bytes[j]) {
+                    j += 1
+                    while j < n, isIdentPart(bytes[j]) { j += 1 }
+                    let sym = String(decoding: bytes[start..<j], as: UTF8.self)
+                    _dynamicInsert(text: sym, kind: .symbol, pos: start, containerPath: [])
+                    i = j; continue
+                }
+            } else if isIdentStart(c) {
+                // 識別子（ローカル or 定数）
+                let start = i
+                i += 1
+                while i < n, isIdentPart(bytes[i]) { i += 1 }
+                let name = String(decoding: bytes[start..<i], as: UTF8.self)
+                if let first = name.utf8.first, first >= 0x41 && first <= 0x5A {
+                    _dynamicInsert(text: name, kind: .constant, pos: start, containerPath: [])
+                } else {
+                    _dynamicInsert(text: name, kind: .variableLocal, pos: start, containerPath: [])
+                }
+                continue
+            }
+
+            i += 1
+        }
+    }
+    
     // MARK: - 補助関数
 
     // スパン追加
     private func appendSpan(_ baseOff: Int, _ lo: Int, _ hi: Int, _ color: NSColor) {
         if lo < hi {
-            _tmpSpans.append(AttributedSpan(range: baseOff + lo ..< baseOff + hi,
+            _tmpSpans.append(KAttributedSpan(range: baseOff + lo ..< baseOff + hi,
                                             attributes: [.foregroundColor: color]))
         }
     }
@@ -964,7 +1178,7 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
             let base = whole.baseAddress!
 
             struct Frame {
-                let kind: OutlineItem.Kind
+                let kind: KOutlineItem.Kind
                 let name: String
                 let container: [String]
                 let startOffset: Int      // ヘッダ先頭
@@ -1018,7 +1232,7 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
                             let endOff = lo + i // 'end' の先頭を end とする
                             if top.spanIndex < _outlineSpans.count {
                                 let old = _outlineSpans[top.spanIndex]
-                                let item = OutlineItem(
+                                let item = KOutlineItem(
                                     kind: old.item.kind,
                                     name: old.item.name,
                                     containerPath: old.item.containerPath,
@@ -1056,7 +1270,7 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
                             let (fullName, lastName, lastNameRange) = parseConstPath(line, count, from: nameStart, baseOffset: lo)
                             let display = fullName
                             let level = containerPath.count
-                            let item = OutlineItem(
+                            let item = KOutlineItem(
                                 kind: .class,
                                 name: display,
                                 containerPath: containerPath,
@@ -1081,7 +1295,7 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
                             let (fullName, lastName, lastNameRange) = parseConstPath(line, count, from: nameStart, baseOffset: lo)
                             let display = fullName
                             let level = containerPath.count
-                            let item = OutlineItem(
+                            let item = KOutlineItem(
                                 kind: .module,
                                 name: display,
                                 containerPath: containerPath,
@@ -1104,7 +1318,7 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
                             while nameStart < count, (line[nameStart] == FuncChar.space || line[nameStart] == FuncChar.tab) { nameStart += 1 }
                             let (disp, isSingleton, nameRange) = parseDefName(line, count, from: nameStart, baseOffset: lo)
                             let level = containerPath.count
-                            let item = OutlineItem(
+                            let item = KOutlineItem(
                                 kind: .method,
                                 name: disp,
                                 containerPath: containerPath,
