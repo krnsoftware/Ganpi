@@ -27,7 +27,13 @@ final class KCompletionController {
             if !isInCompletion {
                 reset()
             }
+            sendStatusBarUpdateAction()
         }
+    }
+    
+    private func sendStatusBarUpdateAction() {
+        NSApp.sendAction(#selector(KStatusBarUpdateAction.statusBarNeedsUpdate(_:)),
+                                         to: nil, from: self)
     }
     
     private func reset() {

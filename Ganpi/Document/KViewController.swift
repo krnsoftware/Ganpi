@@ -488,6 +488,7 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
     @objc private func toggleEditModeFromButton(_ sender: NSButton) {
         guard let textView = activeTextView() else { log("activeTextView() is nil.", from: self); return }
         let mode = textView.editMode
+        if textView.completion.isInCompletion { textView.completion.isInCompletion = false }
         textView.editMode = mode == .normal ? .edit : .normal
         updateStatusBar()
     }
@@ -691,8 +692,21 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
             let currentLineColumn = m.column.formatted(.number.locale(.init(identifier: "en_US")))
             _caretButton.title = "Line: \(currentLineNumber):\(currentLineColumn)  [ch:\(totalCharacterCount) ln:\(totalLineCount)]"
             
+            /*
             let editMode = textView.editMode
             _editModeButton.title = editMode == .normal ? "'N'" : "'E'"
+             */
+            _editModeButton.wantsLayer = true
+            _editModeButton.isBordered = false
+            _editModeButton.layer?.masksToBounds = true
+            let bgGray = NSColor.windowBackgroundColor.blended(withFraction: 0.5, of: .black) ?? .darkGray
+            //let bgGray = NSColor.darkGray
+            _editModeButton.layer?.backgroundColor = bgGray.cgColor
+            updateEditModeButton(textView)
+            _editModeButton.sizeToFit()
+            _editModeButton.layoutSubtreeIfNeeded()
+            let height = max(_editModeButton.bounds.height, 14)
+            _editModeButton.layer?.cornerRadius = height / 4
             
             let parser = textView.textStorage.parser
             let ctx = parser.currentContext(at: caret)
@@ -716,6 +730,32 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         } else {
             _lineSpacingButton.title = "LS:—"
         }
+    }
+    
+    private func updateEditModeButton(_ textView: KTextView) {
+        log("here",from:self)
+        let font = NSFont.monospacedSystemFont(ofSize: 12, weight: .bold)
+        //let accent = NSColor.controlAccentColor
+        let textColor:NSColor
+        let char: String
+        if textView.completion.isInCompletion {
+            char = "C"
+            textColor = NSColor(hexString: "#FFC786") ?? NSColor.orange
+        } else if textView.editMode == .normal {
+            char = "N"
+            textColor = NSColor.white
+        } else  {
+            char = "E"
+            textColor = NSColor(hexString: "#FFB7BB") ?? NSColor.red
+        }
+        //
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: textColor
+        ]
+        _editModeButton.attributedTitle = NSAttributedString(string: char, attributes: attrs)
+        _editModeButton.attributedAlternateTitle = _editModeButton.attributedTitle
+        
     }
 
     private func activeTextView() -> KTextView? {

@@ -59,6 +59,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     // Edit mode.
     private var _editMode: KEditMode = .normal
     
+    // completion.
     private lazy var _completion: KCompletionController = .init(textView: self)
     
     // マウスによる領域選択に関するプロパティ
@@ -169,6 +170,10 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             _editMode = newValue
             sendStatusBarUpdateAction()
         }
+    }
+    
+    var completion: KCompletionController {
+        _completion
     }
     
     var wordWrap: Bool {
