@@ -59,6 +59,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     // Edit mode.
     private var _editMode: KEditMode = .normal
     
+    private lazy var _completion: KCompletionController = .init(textView: self)
+    
     // マウスによる領域選択に関するプロパティ
     private var _latestClickedCharacterIndex: Int?
     private var _mouseSelectionMode: KMouseSelectionMode = .character
@@ -113,11 +115,13 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             endYankCycle()
             
             //test
-            //setCurrentLineIndex()
+            if _completion.isInCompletion {
+                _completion.update()
+            }
+            
             _ = currentLineIndex
 
             _caretView.isHidden = !selectionRange.isEmpty
-            //_caretIndex = selectionRange.upperBound
             updateCaretPosition()
             sendStatusBarUpdateAction()
             
@@ -567,6 +571,11 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         if hasMarkedText(), let repRange = _replacementRange{
             lines.addFakeLine(replacementRange: repRange, attrString: _markedText)
         }
+        
+        //test
+        if _completion.isInCompletion, let attrString = _completion.currentWordTail {
+            lines.addFakeLine(replacementRange: caretIndex..<caretIndex, attrString: attrString)
+        }
 
         for i in 0..<lines.count {
             let y = CGFloat(i) * lineHeight + layoutRects.textEdgeInsets.top
@@ -675,12 +684,20 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         // Application専用キーアサインを使用する場合
         // IM変換中はそちらを優先
         if hasMarkedText() {
+            _completion.isInCompletion = false
             _ = inputContext?.handleEvent(event)
             return
         }
         
+        // 補完機能に渡してキーが消費されるか確認。
+        if _completion.estimate(event: event) {
+            needsDisplay = true
+            return
+        }
+        
         // キーアサインに適合するかチェック。適合しなければinputContextに投げて、そちらでも使われなければkeyDown()へ。
-        let status = KKeyAssign.shared.estimateKeyStroke(KKeyStroke(event: event), requester: self, mode: _editMode)
+        let keyStroke = KKeyStroke(event: event)
+        let status = KKeyAssign.shared.estimateKeyStroke(keyStroke, requester: self, mode: _editMode)
         if status == .passthrough {
             if inputContext?.handleEvent(event) == true { return }
             nextResponder?.keyDown(with: event)
@@ -2463,6 +2480,19 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     @IBAction func setEditModeToEdit(_ sender: Any?) {
         editMode = .edit
+    }
+    
+    // MARK: - Completion
+    @IBAction func setCompletionModeOn(_ sender: Any?) {
+        _completion.isInCompletion = true
+    }
+    
+    @IBAction func setCompletionModeOff(_ sender: Any?) {
+        _completion.isInCompletion = false
+    }
+    
+    @IBAction func toggleCompletionMode(_ sender: Any?) {
+        _completion.isInCompletion = !_completion.isInCompletion
     }
     
     // MARK: - COPY and Paste (NSResponder method)

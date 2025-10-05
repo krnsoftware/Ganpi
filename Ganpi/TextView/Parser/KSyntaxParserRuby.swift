@@ -45,6 +45,9 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
     private var _lines: [LineInfo] = []
     private var _needsRebuild = true
     
+    // 文書から抽出した語彙のスナップショット（ソート済み, 重複なし, UTF-8 Data）
+    private var _completionLexicon: [Data] = []
+    
     // 配色（前回踏襲）＋変数用の茶色
     private let _colorString   = NSColor(hexString: "#860300") ?? .black
     private let _colorComment  = NSColor(hexString: "#0B5A00") ?? .black
@@ -609,11 +612,77 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
         var freq: Int
         var containerPath: [String] // 表示用に使うことがある
     }
+    
+    /// 文書全体から「今この瞬間に存在する確定語」だけを収集し、ソート済み配列として保持する。
+    /// - 仕様: 大小は常に区別。コメント/文字列はスキップ。ヒアドキュメント等の高度な構文は対象外（最小実装）。
+    func rebuildCompletionsIfNeeded(dirtyRange: Range<Int>?) {
+        // TextStorage からスナップショット（UTF-8バイト列）を取得
+        // 例: let bytes = textStorage.skeletonString.bytes
+        let bytes: [UInt8] = storage.skeletonString.bytes
+
+        // 文書から語彙（UTF-8 Data）を抽出（コメント/文字列は除外）
+        let unique = _scanRubyIdentifiers(from: bytes)
+
+        // 辞書順（UTF-8バイト列の昇順）に並べる
+        let sorted = unique.sorted { $0.lexicographicallyPrecedes($1) }
+
+        // スナップショット差し替え
+        _completionLexicon = sorted
+    }
+    
+    /// 収集済みスナップショットから前方一致で候補を返す。大小は常に区別。アルファベット順。
+    func completionEntries(prefix: String,
+                           around index: Int,
+                           limit: Int,
+                           policy: KCompletionPolicy) -> [KCompletionEntry] {
+        // policy は現状未使用（仕様により無視）
+        _ = policy
+
+        // 空prefixは返さない
+        guard !prefix.isEmpty else { return [] }
+
+        // prefix を UTF-8 Data に変換（大小区別, 正規化なし）
+        guard let prefixData = prefix.data(using: .utf8), !prefixData.isEmpty else { return [] }
+
+        // ソート済み _completionLexicon から前方一致範囲を二分探索で抽出
+        let lower = _lowerBound(in: _completionLexicon, forPrefix: prefixData)
+        if lower == _completionLexicon.count { return [] }
+
+        let upper = _upperBound(in: _completionLexicon, forPrefix: prefixData)
+        if upper <= lower { return [] }
+
+        var results: [KCompletionEntry] = []
+        results.reserveCapacity(min(limit, upper - lower))
+
+        // 返却時に prefix と完全一致は除外（自己エコー防止）
+        let maxCount = min(limit, upper - lower)
+        var emitted = 0
+
+        var i = lower
+        while i < upper && emitted < maxCount {
+            let d = _completionLexicon[i]
+            if d != prefixData, let s = String(data: d, encoding: .utf8) {
+                // kind / detail / score に既定値を与えて生成
+                let entry = KCompletionEntry(
+                    text: s,
+                    kind: .keyword,     // 通常の語彙を表す識別子として扱う
+                    detail: nil,           // 詳細情報なし
+                    score: 0               // ソート済みなのでスコアリング不要
+                )
+                results.append(entry)
+                emitted += 1
+            }
+            i += 1
+        }
+
+        return results
+    }
 
     // 内部辞書（動的）
     private var _dynamicMap: [String: DynamicTokenInfo] = [:]
     // 最終更新のテキスト長（簡易な変化検知に使う）
     private var _lastScannedLength: Int = -1
+    /*
 
     func rebuildCompletionsIfNeeded(dirtyRange: Range<Int>?) {
         // 1) アウトライン由来を反映（class/module/method）
@@ -707,8 +776,9 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
                 if unique.count >= limit { break }
             }
         }
-        return unique
-    }
+        //return unique
+        return unique.filter { $0.text != prefix }
+    }*/
 
     // MARK: - 動的語彙の取り込み
 
@@ -1515,5 +1585,178 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
             if p[i] != q[i] { return false }
         }
         return true
+    }
+    
+    // MARK: - Completion helpers
+
+    /// 文書（UTF-8 bytes）から Ruby の「識別子っぽい語」を抽出する（大小区別, コメント/文字列はスキップ）
+    /// 最小実装: # 行コメント, =begin/=end ブロック, '...' / "..." 文字列のみ対応（エスケープ考慮）
+    /// ヒアドキュメントや %Q/%q, 正規表現等は対象外（必要なら将来拡張）
+    private func _scanRubyIdentifiers(from bytes: [UInt8]) -> Set<Data> {
+        var out = Set<Data>()
+
+        enum Mode {
+            case code
+            case lineComment
+            case blockComment   // =begin ... =end
+            case singleQuoted   // '...'
+            case doubleQuoted   // "..."
+        }
+
+        var mode: Mode = .code
+        let n = bytes.count
+        var i = 0
+
+        // ユーティリティ
+        @inline(__always) func isIdentHead(_ b: UInt8) -> Bool {
+            // @ / $ / _ / A-Z / a-z
+            return b == 0x40 || b == 0x24 || b == 0x5F || (b >= 0x41 && b <= 0x5A) || (b >= 0x61 && b <= 0x7A)
+        }
+        @inline(__always) func isIdentBody(_ b: UInt8) -> Bool {
+            // 0-9 / _ / A-Z / a-z
+            return (b >= 0x30 && b <= 0x39) || b == 0x5F || (b >= 0x41 && b <= 0x5A) || (b >= 0x61 && b <= 0x7A)
+        }
+
+        // =begin / =end のシグネチャ
+        @inline(__always) func hasPrefix(_ s: StaticString, at pos: Int) -> Bool {
+            let cnt = s.utf8CodeUnitCount
+            if pos + cnt > n { return false }
+            return s.withUTF8Buffer { sig in
+                for j in 0..<cnt {
+                    if bytes[pos + j] != sig[j] { return false }
+                }
+                return true
+            }
+        }
+
+        while i < n {
+            let b = bytes[i]
+
+            switch mode {
+            case .code:
+                // 行コメント開始: '#'
+                if b == 0x23 { mode = .lineComment; i += 1; continue }
+
+                // ブロックコメント開始: "=begin"（行頭/空白後限定の厳密性は省略）
+                if b == 0x3D, hasPrefix("=begin", at: i) {
+                    mode = .blockComment
+                    i += 6
+                    continue
+                }
+
+                // 文字列開始
+                if b == 0x27 { mode = .singleQuoted; i += 1; continue } // '
+                if b == 0x22 { mode = .doubleQuoted; i += 1; continue } // "
+
+                // 識別子抽出
+                if isIdentHead(b) {
+                    let start = i
+                    i += 1
+                    while i < n, isIdentBody(bytes[i]) { i += 1 }
+                    // 語尾の ! / ? は Ruby で許容されるため、1 文字だけ認可
+                    if i < n, (bytes[i] == 0x21 || bytes[i] == 0x3F) { i += 1 }
+
+                    // ここまでが 1 単語。Data で取り出して Set 化（大小区別のまま）
+                    let len = i - start
+                    if len > 0 {
+                        let d = Data(bytes[start..<i])
+                        out.insert(d)
+                    }
+                    continue
+                }
+
+                i += 1
+
+            case .lineComment:
+                // 改行で終了
+                if b == 0x0A { mode = .code }
+                i += 1
+
+            case .blockComment:
+                if b == 0x3D, hasPrefix("=end", at: i) {
+                    mode = .code
+                    i += 4
+                } else {
+                    i += 1
+                }
+
+            case .singleQuoted:
+                if b == 0x5C { // backslash
+                    i = min(i + 2, n) // エスケープをスキップ
+                } else if b == 0x27 { // '
+                    mode = .code
+                    i += 1
+                } else {
+                    i += 1
+                }
+
+            case .doubleQuoted:
+                if b == 0x5C { // backslash
+                    i = min(i + 2, n)
+                } else if b == 0x22 { // "
+                    mode = .code
+                    i += 1
+                } else {
+                    i += 1
+                }
+            }
+        }
+
+        return out
+    }
+
+    /// 辞書順ソート済み配列に対し、prefix を持つ最初の位置（lower bound）を返す
+    private func _lowerBound(in haystack: [Data], forPrefix prefix: Data) -> Int {
+        var lo = 0
+        var hi = haystack.count
+        while lo < hi {
+            let mid = (lo + hi) >> 1
+            let d = haystack[mid]
+            if d.count < prefix.count {
+                // 短すぎる場合、先頭 prefix.count バイトがそもそも無い → d < prefix として扱う
+                // ただし辞書順としては d < prefix 判定に相当
+                if d.lexicographicallyPrecedes(prefix) {
+                    lo = mid + 1
+                } else {
+                    hi = mid
+                }
+            } else {
+                // 比較は prefix 長だけ
+                let cmp = d.prefix(prefix.count).lexicographicallyPrecedes(prefix)
+                if cmp || d.prefix(prefix.count) == prefix && d.count < prefix.count {
+                    // d[0..<prefix] < prefix と判定
+                    lo = mid + 1
+                } else {
+                    hi = mid
+                }
+            }
+        }
+        return lo
+    }
+
+    /// 辞書順ソート済み配列に対し、prefix をもつ最後の位置の次（upper bound）を返す
+    private func _upperBound(in haystack: [Data], forPrefix prefix: Data) -> Int {
+        var lo = 0
+        var hi = haystack.count
+        while lo < hi {
+            let mid = (lo + hi) >> 1
+            let d = haystack[mid]
+            if d.count < prefix.count {
+                // 短い単語は必ず prefix より前なので、右へ
+                if d.lexicographicallyPrecedes(prefix) {
+                    lo = mid + 1
+                } else {
+                    hi = mid
+                }
+            } else {
+                let head = d.prefix(prefix.count)
+                if head.lexicographicallyPrecedes(prefix) || head == prefix {
+                    lo = mid + 1
+                } else {
+                    hi = mid
+                }
+            }
+        }
+        return lo
     }
 }

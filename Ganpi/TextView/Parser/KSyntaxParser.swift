@@ -125,7 +125,6 @@ struct KCompletionWeights {
 }
 
 
-typealias FC = FuncChar
 
 
 // MARK: - Parser protocol

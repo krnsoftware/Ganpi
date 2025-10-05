@@ -8,8 +8,8 @@
 
 import Foundation
 
-// FuncChar.swift
-// FuncChar.swift
+typealias FC = FuncChar
+
 struct FuncChar {
     // 制御
     static let lf: UInt8          = 0x0A  // \n
@@ -58,6 +58,8 @@ struct FuncChar {
     static let pipe:       UInt8 = 0x7C  // |
     static let at:         UInt8 = 0x40  // @
     static let underscore: UInt8 = 0x5F  // _
+    
+    
 }
 
 /*
