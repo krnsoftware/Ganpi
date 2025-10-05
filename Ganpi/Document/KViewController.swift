@@ -488,7 +488,7 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
     @objc private func toggleEditModeFromButton(_ sender: NSButton) {
         guard let textView = activeTextView() else { log("activeTextView() is nil.", from: self); return }
         let mode = textView.editMode
-        if textView.completion.isInCompletion { textView.completion.isInCompletion = false }
+        if textView.completion.isInCompletionMode { textView.completion.isInCompletionMode = false }
         textView.editMode = mode == .normal ? .edit : .normal
         updateStatusBar()
     }
@@ -737,7 +737,7 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         //let accent = NSColor.controlAccentColor
         let textColor:NSColor
         let char: String
-        if textView.completion.isInCompletion {
+        if textView.completion.isInCompletionMode {
             char = "C"
             textColor = NSColor(hexString: "#FFC786") ?? NSColor.orange
         } else if textView.editMode == .normal {

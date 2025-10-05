@@ -22,13 +22,17 @@ final class KCompletionController {
     
     var currentWordTail: NSAttributedString?
     
-    var isInCompletion:Bool = false {
+    var isInCompletionMode:Bool = false {
         didSet {
-            if !isInCompletion {
+            if !isInCompletionMode {
                 reset()
             }
             sendStatusBarUpdateAction()
         }
+    }
+    
+    var nowCompleting:Bool {
+        currentWordTail != nil
     }
     
     private func sendStatusBarUpdateAction() {
@@ -45,13 +49,19 @@ final class KCompletionController {
     }
     
     private func setCurrentWordTail() {
-        if _entries.count == 0 { log("count == 0",from:self); return }
-        guard _entryIndex >= 0, _entryIndex < _entries.count else {log("_entryIndex: out of range. \(_entryIndex)",from:self); return }
+        if _entries.count == 0 { /*log("count == 0",from:self);*/ return }
+        guard _entryIndex >= 0, _entryIndex < _entries.count else {
+            log("_entryIndex: out of range. \(_entryIndex)",from:self)
+            return
+        }
         let word = _entries[_entryIndex].text
 
-        // risky.
+        
         let wordArray = Array(word)
-        //log("array:\(String(wordArray[_currentPrefix.count..<wordArray.count]))")
+        guard _currentPrefix.count < wordArray.count else {
+            log("_currentPrefix.count is out of range.",from:self)
+            return
+        }
         currentWordTail = NSAttributedString(string: String(wordArray[_currentPrefix.count..<wordArray.count]))
         
     }
@@ -62,6 +72,7 @@ final class KCompletionController {
         _characterLimit = characterLimit
     }
     
+    // 選択範囲が変更された際に呼び出す。
     func update() {
         reset()
         guard let textView = _textView else { log("textView is nil.",from:self); return }
@@ -83,16 +94,21 @@ final class KCompletionController {
         
     }
     
+    // 現在選択されている候補より上(前)の候補を選択する。
+    // 呼び出し後にKTextView上でneedsDisplay=trueが必要。
     func selectPrevious() {
         if _entryIndex > 0 { _entryIndex -= 1 }
         setCurrentWordTail()
     }
     
+    // 現在選択されている候補より下(後)の候補を選択する。
+    // 呼び出し後にKTextView上でneedsDisplay=trueが必要。
     func selectNext() {
         if _entryIndex < _entries.count - 1 { _entryIndex += 1 }
         setCurrentWordTail()
     }
     
+    // 選択されている候補を挿入した後reset()する。
     func fix() {
         guard let textView = _textView else { log("textView is nil.",from:self); return }
         guard let tail = currentWordTail else { log("tail is nil.",from:self); return }
@@ -103,17 +119,17 @@ final class KCompletionController {
         reset()
     }
     
+    // KTextView.keyDown()で呼び出す。
     // キーイベントが内部で消費されればtrue, 放流する場合はfalse。
     func estimate(event:NSEvent) -> Bool {
-        
         let code = event.keyCode
         let flags = event.modifierFlags.intersection([.shift, .control, .option, .command])
         let noflag = flags == []
         
-        if !isInCompletion {
+        if !isInCompletionMode {
             // F5キーまたはopt+escの場合はcompletion開始
             if code == KC.f5 || (code == KC.escape && flags == [.option]) {
-                isInCompletion = true
+                isInCompletionMode = true
                 return true
             }
             return false
@@ -121,16 +137,20 @@ final class KCompletionController {
         
         // これ以降はisInCompletion == trueの場合。
         
-        // escapeキーが押下された場合はcompletionモードから抜ける。
+        // escapeキーが押下された場合、currentWordTailがあればreset(), なければcompletionモードから抜ける。
         if code == KC.escape && noflag {
-            isInCompletion = false
+            if nowCompleting {
+                reset()
+            } else {
+                isInCompletionMode = false
+            }
             return true
         }
         
         // 改行キーが押された際、補完候補があれば中断する。なければ改行する。
         if code == KC.returnKey && noflag {
-            if currentWordTail != nil {
-                reset()
+            if nowCompleting {
+                fix()
                 return true
             }
             return false

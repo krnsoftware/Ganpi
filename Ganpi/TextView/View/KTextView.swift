@@ -115,9 +115,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             
             endYankCycle()
             
-            //test
-            if _completion.isInCompletion {
-                _completion.update()
+            if completion.isInCompletionMode {
+                completion.update()
             }
             
             _ = currentLineIndex
@@ -578,7 +577,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             lines.addFakeLine(replacementRange: repRange, attrString: _markedText, kind: .im)
         
         // 単語補完中であれば、それをKLinesにFakeLineとして追加する。
-        } else if _completion.isInCompletion, let attrString = _completion.currentWordTail {
+        } else if completion.isInCompletionMode, let attrString = completion.currentWordTail {
             lines.addFakeLine(replacementRange: caretIndex..<caretIndex, attrString: attrString, kind: .completion)
         }
 
@@ -687,13 +686,13 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         // Application専用キーアサインを使用する場合
         // IM変換中はそちらを優先
         if hasMarkedText() {
-            _completion.isInCompletion = false
+            completion.isInCompletionMode = false
             _ = inputContext?.handleEvent(event)
             return
         }
         
         // 補完機能に渡してキーが消費されるか確認。
-        if _completion.estimate(event: event) {
+        if completion.estimate(event: event) {
             needsDisplay = true
             return
         }
@@ -2110,7 +2109,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     // MARK: - Vertical Movement
     
     @IBAction override func moveUp(_ sender: Any?) {
-        if completion.isInCompletion, completion.currentWordTail != nil {
+        if completion.isInCompletionMode, completion.nowCompleting {
             completion.selectPrevious()
             needsDisplay = true
             return
@@ -2119,7 +2118,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     }
     
     @IBAction override func moveDown(_ sender: Any?) {
-        if completion.isInCompletion, completion.currentWordTail != nil {
+        if completion.isInCompletionMode, completion.nowCompleting {
             completion.selectNext()
             needsDisplay = true
             return
@@ -2497,15 +2496,15 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     // MARK: - Completion
     @IBAction func setCompletionModeOn(_ sender: Any?) {
-        _completion.isInCompletion = true
+        completion.isInCompletionMode = true
     }
     
     @IBAction func setCompletionModeOff(_ sender: Any?) {
-        _completion.isInCompletion = false
+        completion.isInCompletionMode = false
     }
     
     @IBAction func toggleCompletionMode(_ sender: Any?) {
-        _completion.isInCompletion = !_completion.isInCompletion
+        completion.isInCompletionMode = !completion.isInCompletionMode
     }
     
     // MARK: - COPY and Paste (NSResponder method)
