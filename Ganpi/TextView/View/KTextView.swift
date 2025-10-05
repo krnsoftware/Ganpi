@@ -185,6 +185,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             _layoutManager.rebuildLayout()
             updateFrameSizeToFitContent()
             updateCaretPosition()
+            centerSelectionInVisibleArea(self)
             needsDisplay = true
         }
     }
