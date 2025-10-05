@@ -733,7 +733,6 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
     }
     
     private func updateEditModeButton(_ textView: KTextView) {
-        log("here",from:self)
         let font = NSFont.monospacedSystemFont(ofSize: 12, weight: .bold)
         //let accent = NSColor.controlAccentColor
         let textColor:NSColor

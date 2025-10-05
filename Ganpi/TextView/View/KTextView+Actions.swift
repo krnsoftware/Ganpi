@@ -13,11 +13,11 @@ extension KTextView {
     
     @IBAction func setSearchStringWithSelectedString(_ sender: Any?) {
         if selectionRange.isEmpty { NSSound.beep(); return }
-        
         KSearchPanel.shared.searchString = String( textStorage[selectionRange] ?? [])
     }
     
     @IBAction func searchNextAction(_ sender: Any?) {
+        KSearchPanel.shared.close()
         search(for: .forward)
     }
     
