@@ -434,11 +434,15 @@ final class KLines: CustomStringConvertible {
         
     }
     
-    
+    enum KFakeLineKind {
+        case im
+        case completion
+        case temporary // currently no use.
+    }
     
     // 外部から特定の行について別のAttributedStringを挿入することができる。
     // hardLineIndex行のinsertionオフセットの部分にattrStringを挿入する形になる。
-    func addFakeLine(replacementRange: Range<Int>, attrString: NSAttributedString) {
+    func addFakeLine(replacementRange: Range<Int>, attrString: NSAttributedString, kind: KFakeLineKind = .im) {
                 
         _fakeLines = []
         guard let textStorageRef = _textStorageRef else { print("\(#function) - textStorageRef is nil"); return }
@@ -461,9 +465,17 @@ final class KLines: CustomStringConvertible {
             var attributes: [NSAttributedString.Key: Any] = [
                 .font: textStorageRef.baseFont
             ]
-            // 挿入された文字列の直前(lineAの最後の文字)の.foregroundColorを挿入された文字全体に適用する。
-            if lineA.length > 0, let lastCharColor = lineA.attribute(.foregroundColor, at: lineA.length - 1, effectiveRange: nil) as? NSColor {
-                attributes[.foregroundColor] = lastCharColor
+            switch kind {
+            case .im:
+                // 挿入された文字列の直前(lineAの最後の文字)の.foregroundColorを挿入された文字全体に適用する。
+                if lineA.length > 0, let lastCharColor = lineA.attribute(.foregroundColor, at: lineA.length - 1, effectiveRange: nil) as? NSColor {
+                    attributes[.foregroundColor] = lastCharColor
+                }
+            case .completion:
+                // 挿入された文字列をグレーにする。
+                attributes[.foregroundColor] = NSColor.secondaryLabelColor
+            default:
+                log("currently no implementation.",from:self)
             }
             muAttrString.addAttributes(attributes, range: NSRange(location: 0, length: muAttrString.length))
             

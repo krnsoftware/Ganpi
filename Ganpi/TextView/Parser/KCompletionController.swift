@@ -72,26 +72,18 @@ final class KCompletionController {
                                                                  limit: 100, policy: .alphabetical))
             _currentPrefix = prefix
             setCurrentWordTail()
-            
-            for (i, ent) in _entries.enumerated() {
-                log("\(i)- ent:\(ent.text)",from:self)
-            }
         }
         
         
     }
     
     func selectPrevious() {
-        log("pre",from:self)
         if _entryIndex > 0 { _entryIndex -= 1 }
-        log("post",from:self)
         setCurrentWordTail()
     }
     
     func selectNext() {
-        log("pre",from:self)
         if _entryIndex < _entries.count - 1 { _entryIndex += 1 }
-        log("post",from:self)
         setCurrentWordTail()
     }
     
@@ -102,41 +94,56 @@ final class KCompletionController {
         let storage = textView.textStorage as! KTextStorage
         
         storage.replaceString(in: caretIndex..<caretIndex, with: tail.string)
-        log("caretIndex:\(caretIndex), tail:\(tail.string)", from:self)
         reset()
     }
     
     // キーイベントが内部で消費されればtrue, 放流する場合はfalse。
     func estimate(event:NSEvent) -> Bool {
-        if !isInCompletion { return false }
         
         let code = event.keyCode
-
-        //log("code: \(code)",from:self)
-
-        if code == KC.f5 {
-            isInCompletion = true
-            return true
+        let flags = event.modifierFlags.intersection([.shift, .control, .option, .command])
+        let noflag = flags == []
+        
+        if !isInCompletion {
+            // F5キーまたはopt+escの場合はcompletion開始
+            if code == KC.f5 || (code == KC.escape && flags == [.option]) {
+                isInCompletion = true
+                return true
+            }
+            return false
         }
         
-        if code == KC.escape {
+        // これ以降はisInCompletion == trueの場合。
+        
+        // escapeキーが押下された場合はcompletionモードから抜ける。
+        if code == KC.escape && noflag {
             isInCompletion = false
             return true
         }
         
-        if code == KC.tab || code == KC.returnKey {
+        // 改行キーが押された際、補完候補があれば中断する。なければ改行する。
+        if code == KC.returnKey && noflag {
+            if currentWordTail != nil {
+                reset()
+                return true
+            }
+            return false
+        }
+        
+        // tabキーが押されたら確定する。
+        if code == KC.tab && noflag {
             fix()
             return true
         }
         
-        if code == KC.arrowUp {
-            log("code: \(code)",from:self)
+        // 上矢印で補完候補を上へ。
+        if code == KC.arrowUp && noflag {
             selectPrevious()
             return true
         }
         
-        if code == KC.arrowDown {
-            log("code: \(code)",from:self)
+        // 下矢印で補完候補を下へ。
+        if code == KC.arrowDown && noflag {
             selectNext()
             return true
         }

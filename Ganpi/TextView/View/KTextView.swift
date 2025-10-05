@@ -567,19 +567,17 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
         
         // テキストを描画
-        
+        // IMの変換中文字列あれば、それをKLinesにFakeLineとして追加する。
         if hasMarkedText(), let repRange = _replacementRange{
-            lines.addFakeLine(replacementRange: repRange, attrString: _markedText)
-        }
+            lines.addFakeLine(replacementRange: repRange, attrString: _markedText, kind: .im)
         
-        //test
-        if _completion.isInCompletion, let attrString = _completion.currentWordTail {
-            lines.addFakeLine(replacementRange: caretIndex..<caretIndex, attrString: attrString)
+        // 単語補完中であれば、それをKLinesにFakeLineとして追加する。
+        } else if _completion.isInCompletion, let attrString = _completion.currentWordTail {
+            lines.addFakeLine(replacementRange: caretIndex..<caretIndex, attrString: attrString, kind: .completion)
         }
 
         for i in 0..<lines.count {
             let y = CGFloat(i) * lineHeight + layoutRects.textEdgeInsets.top
-            //let y = ceil(CGFloat(i) * lineHeight + layoutRects.textEdgeInsets.top)
             
             let textPoint = CGPoint(x: textRect.origin.x + layoutRects.horizontalInsets ,
                                     y: textRect.origin.y + y)
@@ -598,7 +596,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         
         // 行番号部分を描画。
-        
         if _showLineNumbers, let lnRect = layoutRects.lineNumberRegion?.rect {
             NSColor.white.setFill()
             lnRect.fill()
