@@ -2110,10 +2110,20 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     // MARK: - Vertical Movement
     
     @IBAction override func moveUp(_ sender: Any?) {
+        if completion.isInCompletion, completion.currentWordTail != nil {
+            completion.selectPrevious()
+            needsDisplay = true
+            return
+        }
         moveCaretVertically(to: .backward, extendSelection: false)
     }
     
     @IBAction override func moveDown(_ sender: Any?) {
+        if completion.isInCompletion, completion.currentWordTail != nil {
+            completion.selectNext()
+            needsDisplay = true
+            return
+        }
         moveCaretVertically(to: .forward, extendSelection: false)
     }
     
