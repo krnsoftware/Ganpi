@@ -1490,6 +1490,17 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         layoutManager.lineSpacing = textView.layoutManager.lineSpacing
     }
     
+    // 現在選択されている文字列を扱う。
+    var selectedString: String {
+        get { textStorage.string(in: selectionRange) }
+        set {
+            let selection = selectionRange
+            let repString = newValue
+            textStorage.replaceString(in: selection, with: repString)
+            selectionRange = selection.lowerBound..<selection.lowerBound + repString.count
+        }
+    }
+    
     // 現在のところinternalとしているが、将来的に公開レベルを変更する可能性あり。
     func updateFrameSizeToFitContent() {
         

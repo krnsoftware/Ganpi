@@ -57,7 +57,8 @@ extension KTextView {
     @IBAction func showColorPanel(_ sender: Any?) {
         let panel = NSColorPanel.shared
         let selection = selectionRange
-        let string = textStorage[string: selection]
+        //let string = textStorage[string: selection]
+        let string = textStorage.string(in: selection)
         let isOption = NSApp.currentEvent?.modifierFlags.contains(.option) == true
         panel.showsAlpha = isOption ? true : false
         
@@ -80,4 +81,78 @@ extension KTextView {
         selectionRange = selection.lowerBound..<selection.lowerBound + string.count
     }
     
+    // MARK: - Unicode Normalization.
+    
+    @IBAction func doNFC(_ sender: Any?) {
+        selectedString = selectedString.precomposedStringWithCanonicalMapping
+    }
+    
+    @IBAction func doNFKC(_ sender: Any?) {
+        selectedString = selectedString.precomposedStringWithCompatibilityMapping
+    }
+    
+    // MARK: - Surround Selection.
+    
+    @IBAction func surroundSelectionWithDoubleQuote(_ sender: Any?) {
+        surroundSelection(left: "\"", right: "\"")
+    }
+    
+    @IBAction func surroundSelectionWithSingleQuote(_ sender: Any?) {
+        surroundSelection(left: "'", right: "'")
+    }
+    
+    @IBAction func surroundSelectionWithParen(_ sender: Any?) {
+        surroundSelection(left:"(", right:")")
+    }
+    
+    @IBAction func surroundSelectionWithBlacket(_ sender: Any?) {
+        surroundSelection(left:"[", right:"]")
+    }
+    
+    @IBAction func surroundSelectionWithBrace(_ sender: Any?) {
+        surroundSelection(left:"{", right:"}")
+    }
+    
+    private func surroundSelection(left:String, right:String) {
+        selectedString = left + selectedString + right
+    }
+    
+    // MARK: - URL Encode/Decode
+    
+    @IBAction func urlEncode(_ sender: Any?) {
+        if let encoded = selectedString.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
+            selectedString = encoded
+            return
+        }
+        NSSound.beep()
+    }
+    
+    @IBAction func urlDecode(_ sender: Any?) {
+        if let encoded = selectedString.removingPercentEncoding {
+            selectedString = encoded
+            return
+        }
+        NSSound.beep()
+    }
+    
+    // MARK: Base64 Encode/Decode
+    
+    @IBAction func base64Encode(_ sender: Any?) {
+        if let data = selectedString.data(using: .utf8) {
+            selectedString = data.base64EncodedString()
+            return
+        }
+        NSSound.beep()
+    }
+    
+    @IBAction func base64Decode(_ sender: Any?) {
+        if let data = Data(base64Encoded: selectedString),
+           let decoded = String(data: data, encoding: .utf8) {
+            selectedString = decoded
+            return
+        }
+        NSSound.beep()
+    }
+    
+     
 }

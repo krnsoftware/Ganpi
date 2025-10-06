@@ -42,7 +42,7 @@ protocol KTextStorageCommon: AnyObject {
     var parser: KSyntaxParserProtocol { get }
     subscript(index: Int) -> Character? { get }
     subscript(range: Range<Int>) -> ArraySlice<Character>? { get }
-    subscript(string range: Range<Int>) -> String { get }
+    //subscript(string range: Range<Int>) -> String { get }
     
     func addObserver(_ owner: AnyObject, _ handler: @escaping (KStorageModified) -> Void)
     func removeObserver(_ owner: AnyObject)
@@ -62,6 +62,7 @@ protocol KTextStorageReadable: KTextStorageCommon {
     var lineNumberFont: NSFont { get }
     var lineNumberFontEmph: NSFont { get }
     
+    func string(in range:Range<Int>) -> String
     func wordRange(at index: Int) -> Range<Int>?
     func attributedString(for range: Range<Int>, tabWidth: Int?, withoutColors: Bool) -> NSAttributedString?
     func lineRange(at index: Int) -> Range<Int>?
@@ -370,6 +371,11 @@ final class KTextStorage: KTextStorageProtocol {
     }
     
     subscript(string range: Range<Int>) -> String {
+        let clampedRange = range.clamped(to: 0..<_characters.count)
+        return String(_characters[clampedRange])
+    }
+    
+    func string(in range:Range<Int>) -> String {
         let clampedRange = range.clamped(to: 0..<_characters.count)
         return String(_characters[clampedRange])
     }

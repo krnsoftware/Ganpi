@@ -82,7 +82,8 @@ final class KCompletionController {
         
         // キャレットの位置が単語の最後である場合のみ動作する。
         if let range = parser.wordRange(at: _caretIndex), range.upperBound == _caretIndex {
-            let prefix = storage[string: range]
+            //let prefix = storage[string: range]
+            let prefix = storage.string(in: range)
             
             parser.rebuildCompletionsIfNeeded(dirtyRange:nil)
             _entries.append(contentsOf: parser.completionEntries(prefix: prefix, around: _caretIndex,

@@ -141,6 +141,25 @@
                                     <action selector="paste:" target="-1" id="UvS-8e-Qdg"/>
                                 </connections>
                             </menuItem>
+                            <menuItem title="Paste Pop" id="Exo-Zq-5YN">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <menu key="submenu" id="nxk-18-9VD">
+                                    <items>
+                                        <menuItem title="Paste Pop" id="QFR-4d-MM4">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="yankPop:" target="-1" id="iEN-uE-gHP"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Paste Pop Reverse" id="A02-5t-7yl">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="yankPopReverse:" target="-1" id="R6l-ku-irI"/>
+                                            </connections>
+                                        </menuItem>
+                                    </items>
+                                </menu>
+                            </menuItem>
                             <menuItem title="Select All" keyEquivalent="a" id="Ruw-6m-B2m">
                                 <connections>
                                     <action selector="selectAll:" target="-1" id="VNm-Mi-diN"/>
@@ -203,17 +222,140 @@
                     <modifierMask key="keyEquivalentModifierMask"/>
                     <menu key="submenu" title="Text" id="pgI-qu-Ea7">
                         <items>
-                            <menuItem title="show Color Panel" id="PHU-Wb-yqT">
+                            <menuItem title="Conversion" id="IRA-6g-Vdc">
                                 <modifierMask key="keyEquivalentModifierMask"/>
-                                <connections>
-                                    <action selector="showColorPanel:" target="-1" id="JKq-l8-UEO"/>
-                                </connections>
+                                <menu key="submenu" id="7ZX-Nw-i1m">
+                                    <items>
+                                        <menuItem title="Transpose" id="aQF-jt-Tri">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="transpose:" target="-1" id="rsZ-EU-j8P"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Capitalize" id="jfl-sq-lhN">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="capitalizeWord:" target="-1" id="hd4-4s-SzA"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="To Lower Case" keyEquivalent="l" id="xxe-RG-WfK">
+                                            <connections>
+                                                <action selector="lowercaseWord:" target="-1" id="jqu-63-3jw"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="To Upper Case" keyEquivalent="u" id="xVv-do-yPC">
+                                            <connections>
+                                                <action selector="uppercaseWord:" target="-1" id="bYh-Js-hNb"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Unicode Normalize" id="i1L-aD-R1I">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <menu key="submenu" title="Unicode Normalize" id="nNe-bo-DhC">
+                                                <items>
+                                                    <menuItem title="NFC" id="Q8s-ze-LdV">
+                                                        <modifierMask key="keyEquivalentModifierMask"/>
+                                                        <connections>
+                                                            <action selector="doNFC:" target="-1" id="6dF-xO-HoY"/>
+                                                        </connections>
+                                                    </menuItem>
+                                                    <menuItem title="NFKC" id="UzY-l1-2cX">
+                                                        <modifierMask key="keyEquivalentModifierMask"/>
+                                                        <connections>
+                                                            <action selector="doNFKC:" target="-1" id="TiN-ci-eB1"/>
+                                                        </connections>
+                                                    </menuItem>
+                                                </items>
+                                            </menu>
+                                        </menuItem>
+                                        <menuItem title="URL" id="Lug-E5-4b3">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <menu key="submenu" title="URL" id="tx3-hY-1fc">
+                                                <items>
+                                                    <menuItem title="URL Encode" id="KjJ-16-9kV">
+                                                        <modifierMask key="keyEquivalentModifierMask"/>
+                                                        <connections>
+                                                            <action selector="urlEncode:" target="-1" id="yra-Uy-nAg"/>
+                                                        </connections>
+                                                    </menuItem>
+                                                    <menuItem title="URL Decode" id="XBb-HE-fDa">
+                                                        <modifierMask key="keyEquivalentModifierMask"/>
+                                                        <connections>
+                                                            <action selector="urlDecode:" target="-1" id="9NW-iw-g2O"/>
+                                                        </connections>
+                                                    </menuItem>
+                                                </items>
+                                            </menu>
+                                        </menuItem>
+                                        <menuItem title="Base64" id="Rpw-uh-LEQ">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <menu key="submenu" id="aDX-0V-0Jy">
+                                                <items>
+                                                    <menuItem title="Base64 Encode" id="2BH-nv-yiM">
+                                                        <modifierMask key="keyEquivalentModifierMask"/>
+                                                        <connections>
+                                                            <action selector="base64Encode:" target="-1" id="PEq-VQ-diQ"/>
+                                                        </connections>
+                                                    </menuItem>
+                                                    <menuItem title="Base64 Decode" id="Izk-4i-5xr">
+                                                        <modifierMask key="keyEquivalentModifierMask"/>
+                                                        <connections>
+                                                            <action selector="base64Decode:" target="-1" id="tkW-hD-acb"/>
+                                                        </connections>
+                                                    </menuItem>
+                                                </items>
+                                            </menu>
+                                        </menuItem>
+                                    </items>
+                                </menu>
                             </menuItem>
-                            <menuItem title="Item 2" id="i1L-aD-R1I">
+                            <menuItem title="Surround" id="HLy-En-TnM">
                                 <modifierMask key="keyEquivalentModifierMask"/>
+                                <menu key="submenu" title="Surround" id="VWo-C0-jYu">
+                                    <items>
+                                        <menuItem title="Surround With &quot;...&quot;" keyEquivalent="&quot;" id="RYf-FS-hDk">
+                                            <modifierMask key="keyEquivalentModifierMask" shift="YES" command="YES"/>
+                                            <connections>
+                                                <action selector="surroundSelectionWithDoubleQuote:" target="-1" id="DCg-n4-lYR"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Surround With '...'" keyEquivalent="'" id="Kai-ym-wkA">
+                                            <connections>
+                                                <action selector="surroundSelectionWithSingleQuote:" target="-1" id="DXf-Cn-h4L"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Surround With (...)" keyEquivalent="(" id="P6u-Wt-p0b">
+                                            <modifierMask key="keyEquivalentModifierMask" shift="YES" command="YES"/>
+                                            <connections>
+                                                <action selector="surroundSelectionWithParen:" target="-1" id="Mdd-Ws-nZ6"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Surround With {...}" id="2dB-Yi-nvW">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="surroundSelectionWithBrace:" target="-1" id="GVC-mU-v5Q"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Surround With [...]" id="a2C-aZ-ESi">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="surroundSelectionWithBlacket:" target="-1" id="X6k-aE-IVD"/>
+                                            </connections>
+                                        </menuItem>
+                                    </items>
+                                </menu>
                             </menuItem>
-                            <menuItem title="Item 3" id="aiM-IB-dEW">
+                            <menuItem title="Color" id="aiM-IB-dEW">
                                 <modifierMask key="keyEquivalentModifierMask"/>
+                                <menu key="submenu" title="Color" id="5VZ-Iv-yDJ">
+                                    <items>
+                                        <menuItem title="Show Color Panel" id="PHU-Wb-yqT">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="showColorPanel:" target="-1" id="JKq-l8-UEO"/>
+                                            </connections>
+                                        </menuItem>
+                                    </items>
+                                </menu>
                             </menuItem>
                         </items>
                     </menu>
