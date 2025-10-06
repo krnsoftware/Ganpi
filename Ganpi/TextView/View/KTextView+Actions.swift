@@ -73,9 +73,10 @@ extension KTextView {
     @IBAction func changeColor(_ sender: Any?) {
         guard let panel = sender as? NSColorPanel else { log("sender is not NSColorPanel.", from:self); return }
         guard let string = panel.color.toHexString(includeAlpha: panel.showsAlpha) else { log("string is nil.", from:self); return }
-        guard let storage = textStorage as? KTextStorageProtocol else { log("textstorage is not writable.", from:self); return }
+        //guard let storage = textStorage as? KTextStorageProtocol else { log("textstorage is not writable.", from:self); return }
+
         let selection = selectionRange
-        storage.replaceString(in: selection, with: string)
+        textStorage.replaceString(in: selection, with: string)
         selectionRange = selection.lowerBound..<selection.lowerBound + string.count
     }
     

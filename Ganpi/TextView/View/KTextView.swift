@@ -155,7 +155,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     
     // 読み取り専用として公開
-    var textStorage: KTextStorageReadable {
+    var textStorage: KTextStorageProtocol {//KTextStorageReadable {
         return _textStorageRef
     }
     

@@ -113,7 +113,7 @@ final class KCompletionController {
         guard let textView = _textView else { log("textView is nil.",from:self); return }
         guard let tail = currentWordTail else { log("tail is nil.",from:self); return }
         let caretIndex = textView.caretIndex
-        let storage = textView.textStorage as! KTextStorage
+        let storage = textView.textStorage // as! KTextStorage
         
         storage.replaceString(in: caretIndex..<caretIndex, with: tail.string)
         reset()
