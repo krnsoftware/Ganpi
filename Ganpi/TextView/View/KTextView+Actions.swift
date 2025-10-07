@@ -135,7 +135,7 @@ extension KTextView {
         NSSound.beep()
     }
     
-    // MARK: Base64 Encode/Decode
+    // MARK: - Base64 Encode/Decode
     
     @IBAction func base64Encode(_ sender: Any?) {
         if let data = selectedString.data(using: .utf8) {
@@ -153,6 +153,56 @@ extension KTextView {
         }
         NSSound.beep()
     }
+    
+    // MARK: - Hiragana <-> Katakana
+    
+    @IBAction func hiraganaToKatakana(_ sender: Any?) {
+        if let string = selectedString.applyingTransform(.hiraganaToKatakana, reverse: false) {
+            selectedString = string
+            return
+        }
+        NSSound.beep()
+    }
+    
+    @IBAction func katakanaToHiragana(_ sender: Any?) {
+        if let string = selectedString.applyingTransform(.hiraganaToKatakana, reverse: true) {
+            selectedString = string
+            return
+        }
+        NSSound.beep()
+    }
+    
+    @IBAction func fullWidthToHalfWidth(_ sender: Any?) {
+        if let string = selectedString.applyingTransform(.fullwidthToHalfwidth, reverse: false) {
+            selectedString = string
+            return
+        }
+        NSSound.beep()
+    }
+    
+    @IBAction func halfWidthToFullWidth(_ sender: Any?) {
+        if let string = selectedString.applyingTransform(.fullwidthToHalfwidth, reverse: true) {
+            selectedString = string
+            return
+        }
+        NSSound.beep()
+    }
+    
+    //MARK: - Encrypt.
+    
+    @IBAction func rot13(_ sender: Any?) {
+        let text = selectedString
+        let transform: (Character) -> Character = {
+            guard let ascii = $0.asciiValue else { return $0 }
+            switch ascii {
+            case 65...90:  return Character(UnicodeScalar(65 + (ascii - 65 + 13) % 26))
+            case 97...122: return Character(UnicodeScalar(97 + (ascii - 97 + 13) % 26))
+            default:       return $0
+            }
+        }
+        selectedString = String(text.map(transform))
+    }
+    
     
      
 }
