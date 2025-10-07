@@ -66,6 +66,7 @@ protocol KTextStorageReadable: KTextStorageCommon {
     func wordRange(at index: Int) -> Range<Int>?
     func attributedString(for range: Range<Int>, tabWidth: Int?, withoutColors: Bool) -> NSAttributedString?
     func lineRange(at index: Int) -> Range<Int>?
+    func lineRange(in range: Range<Int>) -> Range<Int>?
     func lineAndColumNumber(at index:Int) -> (line:Int, column:Int) // index(0..), line(1..), column(1..)
 }
 
@@ -410,6 +411,23 @@ final class KTextStorage: KTextStorageProtocol {
         }
         return lower..<upper
     }
+    
+    // rangeを内包する最初の行の行頭から最後の行の行末までの範囲を返す。最後の改行は含まない。
+    func lineRange(in range:Range<Int>) -> Range<Int>? {
+        guard range.lowerBound >= 0 && range.upperBound <= count else { log("range is out of range.",from:self); return nil }
+        
+        var lower = range.lowerBound
+        while lower > 0 {
+            if skeletonString.bytes[lower - 1] == FuncChar.lf { break }
+            lower -= 1
+        }
+        var upper = range.upperBound
+        while upper < count {
+            if skeletonString.bytes[upper] == FuncChar.lf { break }
+            upper += 1
+        }
+        return lower..<upper
+    }
 
     
     // attributeの変更についてはテキストの変更時に自動ではなくattributeの変更の際に手動で送信する。
@@ -420,7 +438,7 @@ final class KTextStorage: KTextStorageProtocol {
 
     
     // TextStorageのindexを含む単語を返す。
-    // 現在の実装では一般的な英単語に準じた単語判定だが、将来的には開発言語毎に調整した方がよいと思われる。
+    // scape/tabの連続、日本語文字のクラスタ、パーサ毎の単語抽出、ASCII文字列境界の順に検証される。
     func wordRange(at index: Int) -> Range<Int>? {
         if let spaceTabRange = spaceOrTabRunRange(at: index) { return spaceTabRange }
         if let japaneseRange = japaneseClusterRange(at: index) { return japaneseRange }

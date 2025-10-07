@@ -243,7 +243,8 @@
                                                 <action selector="lowercaseWord:" target="-1" id="jqu-63-3jw"/>
                                             </connections>
                                         </menuItem>
-                                        <menuItem title="To Upper Case" keyEquivalent="u" id="xVv-do-yPC">
+                                        <menuItem title="To Upper Case" keyEquivalent="L" id="xVv-do-yPC">
+                                            <modifierMask key="keyEquivalentModifierMask" shift="YES" command="YES"/>
                                             <connections>
                                                 <action selector="uppercaseWord:" target="-1" id="bYh-Js-hNb"/>
                                             </connections>
@@ -332,6 +333,23 @@
                                             <modifierMask key="keyEquivalentModifierMask"/>
                                             <connections>
                                                 <action selector="surroundSelectionWithBlacket:" target="-1" id="X6k-aE-IVD"/>
+                                            </connections>
+                                        </menuItem>
+                                    </items>
+                                </menu>
+                            </menuItem>
+                            <menuItem title="Line" id="ZZm-eE-Wkd">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <menu key="submenu" id="ijU-wn-apn">
+                                    <items>
+                                        <menuItem title="shift Left" keyEquivalent="[" id="xf8-eU-1uw">
+                                            <connections>
+                                                <action selector="shiftLeft:" target="-1" id="tq1-X9-rhL"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="shift Right" keyEquivalent="]" id="MjN-TF-A3f">
+                                            <connections>
+                                                <action selector="shiftRight:" target="-1" id="rbM-Pp-dtJ"/>
                                             </connections>
                                         </menuItem>
                                     </items>

@@ -51,6 +51,78 @@ extension KTextView {
         textStorage.redo()
     }
     
+    
+    // MARK: - Indext Shift.
+    
+    @IBAction func shiftLeft(_ sender: Any?) {
+        shiftIndentedString(direction: .backward)
+    }
+    
+    @IBAction func shiftRight(_ sender: Any?) {
+        shiftIndentedString(direction: .forward)
+    }
+    
+    // 行頭インデントを左/右シフト（tabはtabWidth換算でspace化）
+    // - 空白だけの行でも二重インデントにならないよう、本文の開始位置を headChars で切る
+    // - 改行の結合にはドキュメントの改行コードを使用
+    private func shiftIndentedString(direction: KDirection) {
+        guard let range = textStorage.lineRange(in: selectionRange) else { log("out of range.", from: self); return }
+        if range.isEmpty { return }
+
+        let skeleton = textStorage.skeletonString
+        let tabWidth = layoutManager.tabWidth
+
+        var headSpaces = 0         // 見た目幅（tabはtabWidth換算）
+        var headChars  = 0         // 実際に行頭で消費した“文字数”
+        var lineStart  = range.lowerBound
+        var inHead     = true
+        var repArray: [String] = []
+
+        for i in range {
+            let ch = skeleton[i]
+
+            if inHead, ch == FuncChar.tab {
+                headSpaces += tabWidth
+                headChars  += 1
+                continue
+            } else if inHead, ch == FuncChar.space {
+                headSpaces += 1
+                headChars  += 1
+                continue
+            } else if ch == FuncChar.lf {
+                // 本文は“行頭インデントの文字数”をスキップして切り出す
+                let contentStart = lineStart + headChars
+                let newWidth = max(headSpaces + tabWidth * direction.rawValue, 0)
+                let header = String(repeating: " ", count: newWidth)
+                repArray.append(header + textStorage.string(in: contentStart..<i))
+
+                // 次の行の初期化
+                lineStart  = i + 1
+                headSpaces = 0
+                headChars  = 0
+                inHead     = true
+                continue
+            }
+
+            if inHead {
+                // はじめて非インデント文字に到達
+                inHead = false
+            }
+        }
+
+        // 最終行（改行で終わらない行）
+        let contentStart = lineStart + headChars
+        let newWidth = max(headSpaces + tabWidth * direction.rawValue, 0)
+        let header = String(repeating: " ", count: newWidth)
+        repArray.append(header + textStorage.string(in: contentStart..<range.upperBound))
+
+        // ドキュメントの改行コードで結合（LF固定にしない）
+        let res = repArray.joined(separator: "\n")
+
+        textStorage.replaceString(in: range, with: res)
+        selectionRange = range.lowerBound ..< (range.lowerBound + res.count)
+    }
+    
     // MARK: - Color treatment
     
     // Show Color Panel.

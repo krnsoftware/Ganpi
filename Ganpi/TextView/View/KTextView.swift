@@ -10,10 +10,11 @@ import Cocoa
 final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     // MARK: - Struct and Enum
+    /*
     private enum KTextEditDirection : Int {
         case forward = 1
         case backward = -1
-    }
+    }*/
     
     private enum KMouseSelectionMode {
         case character
@@ -1852,7 +1853,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         //updateCaretPosition()
     }*/
     
-    private func moveCaretVertically(to direction: KTextEditDirection, extendSelection: Bool) {
+    private func moveCaretVertically(to direction: KDirection, extendSelection: Bool) {
         /*
          private var isVerticalAction: 今回のセレクタが垂直方向にキャレット・選択範囲を動かすか否か。
          private var wasVerticalAction: 前回のセレクタが垂直方向にキャレット・選択範囲を動かしたか否か。
@@ -1929,7 +1930,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     // キーアサイン用のキャレット移動をサポートする関数
     // 水平方向の移動をサポート
     @discardableResult
-    private func moveSelectionHorizontally(for kind: KCaretHorizontalMoveKind, to direction: KTextEditDirection, extendSelection: Bool, remove: Bool = false) -> Bool {
+    private func moveSelectionHorizontally(for kind: KCaretHorizontalMoveKind, to direction: KDirection, extendSelection: Bool, remove: Bool = false) -> Bool {
         
         let selection = selectionRange
         let count = textStorage.count
@@ -2049,7 +2050,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         case line
     }
     
-    private func moveSelectionVertically(for kind:KPageVerticalMoveKind, to direction:KTextEditDirection, caretMovement:Bool, extendSelection: Bool) {
+    private func moveSelectionVertically(for kind:KPageVerticalMoveKind, to direction:KDirection, caretMovement:Bool, extendSelection: Bool) {
         
         guard let scrollView = enclosingScrollView else { log("enclosingScrollView is nil",from: self); return }
         let clipView = scrollView.contentView
@@ -2083,7 +2084,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     }
     
     // ページスクロール専用のメソッド。キャレット移動なし。
-    private func scrollVertically(for kind:KPageVerticalMoveKind, to direction:KTextEditDirection) {
+    private func scrollVertically(for kind:KPageVerticalMoveKind, to direction:KDirection) {
         guard let scrollView = enclosingScrollView else { log("enclosingScrollView is nil",from: self); return }
         guard let documentBounds = scrollView.documentView?.bounds else { log("documentView is nil",from: self); return }
         let clipView = scrollView.contentView
