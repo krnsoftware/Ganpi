@@ -284,7 +284,7 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
         _needsRebuild = false
         
         let skel = storage.skeletonString
-        let lf = skel.newlineIndices()
+        let lf = skel.newlineIndices
         
         _lineStarts.removeAll(keepingCapacity: true)
         _lineStarts.append(0)

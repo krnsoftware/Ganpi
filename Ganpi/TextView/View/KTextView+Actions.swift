@@ -52,7 +52,7 @@ extension KTextView {
     }
     
     
-    // MARK: - Indext Shift.
+    // MARK: - Indent Shift.
     
     @IBAction func shiftLeft(_ sender: Any?) {
         shiftIndentedString(direction: .backward)
@@ -63,8 +63,6 @@ extension KTextView {
     }
     
     // 行頭インデントを左/右シフト（tabはtabWidth換算でspace化）
-    // - 空白だけの行でも二重インデントにならないよう、本文の開始位置を headChars で切る
-    // - 改行の結合にはドキュメントの改行コードを使用
     private func shiftIndentedString(direction: KDirection) {
         guard let range = textStorage.lineRange(in: selectionRange) else { log("out of range.", from: self); return }
         if range.isEmpty { return }
@@ -121,6 +119,37 @@ extension KTextView {
 
         textStorage.replaceString(in: range, with: res)
         selectionRange = range.lowerBound ..< (range.lowerBound + res.count)
+    }
+    
+    // MARK: - Move Line Up / Down
+    
+    @IBAction func moveLineUp(_ sender: Any?) {
+        moveLineVertically(direction: .backward)
+    }
+    
+    @IBAction func moveLineDown(_ sender: Any?) {
+        moveLineVertically(direction: .forward)
+    }
+    
+    private func moveLineVertically(direction: KDirection) {
+        guard let range = textStorage.lineRange(in: selectionRange) else { log("out of range.", from: self); return }
+        if range.isEmpty { return }
+        if direction == .backward && range.lowerBound == 0 { return }
+        if direction == .forward && range.upperBound == textStorage.count { return }
+
+        let skeleton = textStorage.skeletonString
+        var lineRange:Range<Int>
+        var blockRange:Range<Int>
+        var newString:String
+        switch direction {
+        case .backward:
+            guard let lineRange = textStorage.lineRange(at: range.lowerBound - 1) else { return }
+            //blockRange = lineRange.lowerBound..<
+        case .forward:
+            
+        }
+        
+        
     }
     
     // MARK: - Color treatment

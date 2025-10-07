@@ -1622,7 +1622,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         guard !query.isEmpty else { return nil }
 
         let skeleton = textStorage.skeletonString
-        let newlineIndices = skeleton.newlineIndices()
+        let newlineIndices = skeleton.newlineIndices
         let docLen = textStorage.count
 
         func startOfLine(_ oneBased: Int) -> Int? {

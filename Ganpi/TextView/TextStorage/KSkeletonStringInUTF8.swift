@@ -172,16 +172,29 @@ final class KSkeletonStringInUTF8 {
     }
     
     
-    // 改行コード("\n")のoffsetを全て返す。
-    func newlineIndices() -> [Int] {
+    // 改行コード("\n")のoffsetを全て返す。昇順。
+    var newlineIndices: [Int] {
         if let cache = _newlineCache { return cache }
         
         let res = Self.indicesOfCharacter(in: _bytes, range: 0..<_bytes.count, target: FuncChar.lf)
         _newlineCache = res
         return res
     }
+    /*
+    func newlineIndices() -> [Int] {
+        if let cache = _newlineCache { return cache }
+        
+        let res = Self.indicesOfCharacter(in: _bytes, range: 0..<_bytes.count, target: FuncChar.lf)
+        _newlineCache = res
+        return res
+    }*/
     
-    // rangeの範囲内に於いて\nで区切られた行の範囲を返す。\nは含まない。
+    // 行頭のインデックスを全て返す。昇順。
+    var lineStartIndices: [Int] {
+        [0] + newlineIndices.map { $0 + 1 }
+    }
+    
+    
     // --- 二分探索ヘルパ（昇順配列 a 前提） ---
     @inline(__always)
     private func firstIndexGE(_ a: [Int], _ x: Int) -> Int {
@@ -218,7 +231,7 @@ final class KSkeletonStringInUTF8 {
     // range を含む行すべて（\n除外で各行Range配列）
     func lineRangeExpanded(range: Range<Int>) -> [Range<Int>] {
         guard !range.isEmpty else { return [] }
-        let lf = newlineIndices()
+        let lf = newlineIndices
 
         let lowerIdx = lastIndexLT(lf, range.lowerBound)
         let lower = lowerIdx.map { lf[$0] + 1 } ?? 0
@@ -232,7 +245,7 @@ final class KSkeletonStringInUTF8 {
     // range を行単位に拡張して単一Range（末尾は \n を含む）
     func expandToFullLines(range: Range<Int>) -> Range<Int> {
         guard !range.isEmpty else { return range }
-        let lf = newlineIndices()
+        let lf = newlineIndices
 
         let lowerIdx = lastIndexLT(lf, range.lowerBound)
         let lower = lowerIdx.map { lf[$0] + 1 } ?? 0
