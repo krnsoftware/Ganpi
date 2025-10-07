@@ -222,9 +222,9 @@
                     <modifierMask key="keyEquivalentModifierMask"/>
                     <menu key="submenu" title="Text" id="pgI-qu-Ea7">
                         <items>
-                            <menuItem title="Conversion" id="IRA-6g-Vdc">
+                            <menuItem title="Transform" id="IRA-6g-Vdc">
                                 <modifierMask key="keyEquivalentModifierMask"/>
-                                <menu key="submenu" id="7ZX-Nw-i1m">
+                                <menu key="submenu" title="Transform" id="7ZX-Nw-i1m">
                                     <items>
                                         <menuItem title="Transpose" id="aQF-jt-Tri">
                                             <modifierMask key="keyEquivalentModifierMask"/>
@@ -248,6 +248,37 @@
                                                 <action selector="uppercaseWord:" target="-1" id="bYh-Js-hNb"/>
                                             </connections>
                                         </menuItem>
+                                        <menuItem title="Kana" id="QBd-Vk-e8a">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <menu key="submenu" id="7Nt-CM-D8I">
+                                                <items>
+                                                    <menuItem title="Hiragana -&gt; Katakana" id="Xh1-5H-eJe">
+                                                        <modifierMask key="keyEquivalentModifierMask"/>
+                                                        <connections>
+                                                            <action selector="hiraganaToKatakana:" target="-1" id="W82-3b-kGB"/>
+                                                        </connections>
+                                                    </menuItem>
+                                                    <menuItem title="Katakana -&gt; Hiragana" id="0xq-k5-arV">
+                                                        <modifierMask key="keyEquivalentModifierMask"/>
+                                                        <connections>
+                                                            <action selector="katakanaToHiragana:" target="-1" id="U5w-0S-GOw"/>
+                                                        </connections>
+                                                    </menuItem>
+                                                    <menuItem title="Convert Kana to Halfwidth" id="9hh-io-yC8">
+                                                        <modifierMask key="keyEquivalentModifierMask"/>
+                                                        <connections>
+                                                            <action selector="fullWidthToHalfWidth:" target="-1" id="yef-ZP-lW5"/>
+                                                        </connections>
+                                                    </menuItem>
+                                                    <menuItem title="Convert Kana to Fullwidth" id="5nD-Bj-dnB">
+                                                        <modifierMask key="keyEquivalentModifierMask"/>
+                                                        <connections>
+                                                            <action selector="halfWidthToFullWidth:" target="-1" id="x1Y-9B-HK9"/>
+                                                        </connections>
+                                                    </menuItem>
+                                                </items>
+                                            </menu>
+                                        </menuItem>
                                         <menuItem title="Unicode Normalize" id="i1L-aD-R1I">
                                             <modifierMask key="keyEquivalentModifierMask"/>
                                             <menu key="submenu" title="Unicode Normalize" id="nNe-bo-DhC">
@@ -262,44 +293,6 @@
                                                         <modifierMask key="keyEquivalentModifierMask"/>
                                                         <connections>
                                                             <action selector="doNFKC:" target="-1" id="TiN-ci-eB1"/>
-                                                        </connections>
-                                                    </menuItem>
-                                                </items>
-                                            </menu>
-                                        </menuItem>
-                                        <menuItem title="URL" id="Lug-E5-4b3">
-                                            <modifierMask key="keyEquivalentModifierMask"/>
-                                            <menu key="submenu" title="URL" id="tx3-hY-1fc">
-                                                <items>
-                                                    <menuItem title="URL Encode" id="KjJ-16-9kV">
-                                                        <modifierMask key="keyEquivalentModifierMask"/>
-                                                        <connections>
-                                                            <action selector="urlEncode:" target="-1" id="yra-Uy-nAg"/>
-                                                        </connections>
-                                                    </menuItem>
-                                                    <menuItem title="URL Decode" id="XBb-HE-fDa">
-                                                        <modifierMask key="keyEquivalentModifierMask"/>
-                                                        <connections>
-                                                            <action selector="urlDecode:" target="-1" id="9NW-iw-g2O"/>
-                                                        </connections>
-                                                    </menuItem>
-                                                </items>
-                                            </menu>
-                                        </menuItem>
-                                        <menuItem title="Base64" id="Rpw-uh-LEQ">
-                                            <modifierMask key="keyEquivalentModifierMask"/>
-                                            <menu key="submenu" id="aDX-0V-0Jy">
-                                                <items>
-                                                    <menuItem title="Base64 Encode" id="2BH-nv-yiM">
-                                                        <modifierMask key="keyEquivalentModifierMask"/>
-                                                        <connections>
-                                                            <action selector="base64Encode:" target="-1" id="PEq-VQ-diQ"/>
-                                                        </connections>
-                                                    </menuItem>
-                                                    <menuItem title="Base64 Decode" id="Izk-4i-5xr">
-                                                        <modifierMask key="keyEquivalentModifierMask"/>
-                                                        <connections>
-                                                            <action selector="base64Decode:" target="-1" id="tkW-hD-acb"/>
                                                         </connections>
                                                     </menuItem>
                                                 </items>
@@ -340,6 +333,82 @@
                                             <connections>
                                                 <action selector="surroundSelectionWithBlacket:" target="-1" id="X6k-aE-IVD"/>
                                             </connections>
+                                        </menuItem>
+                                    </items>
+                                </menu>
+                            </menuItem>
+                            <menuItem title="Encrypt" id="wGp-nf-ZNI">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <menu key="submenu" title="Encrypt" id="tAZ-72-vJg">
+                                    <items>
+                                        <menuItem title="Base64" id="Rpw-uh-LEQ">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <menu key="submenu" id="aDX-0V-0Jy">
+                                                <items>
+                                                    <menuItem title="Base64 Encode" id="2BH-nv-yiM">
+                                                        <modifierMask key="keyEquivalentModifierMask"/>
+                                                        <connections>
+                                                            <action selector="base64Encode:" target="-1" id="PEq-VQ-diQ"/>
+                                                        </connections>
+                                                    </menuItem>
+                                                    <menuItem title="Base64 Decode" id="Izk-4i-5xr">
+                                                        <modifierMask key="keyEquivalentModifierMask"/>
+                                                        <connections>
+                                                            <action selector="base64Decode:" target="-1" id="tkW-hD-acb"/>
+                                                        </connections>
+                                                    </menuItem>
+                                                </items>
+                                            </menu>
+                                        </menuItem>
+                                        <menuItem title="URL" id="Lug-E5-4b3">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <menu key="submenu" title="URL" id="tx3-hY-1fc">
+                                                <items>
+                                                    <menuItem title="URL Encode" id="KjJ-16-9kV">
+                                                        <modifierMask key="keyEquivalentModifierMask"/>
+                                                        <connections>
+                                                            <action selector="urlEncode:" target="-1" id="yra-Uy-nAg"/>
+                                                        </connections>
+                                                    </menuItem>
+                                                    <menuItem title="URL Decode" id="XBb-HE-fDa">
+                                                        <modifierMask key="keyEquivalentModifierMask"/>
+                                                        <connections>
+                                                            <action selector="urlDecode:" target="-1" id="9NW-iw-g2O"/>
+                                                        </connections>
+                                                    </menuItem>
+                                                </items>
+                                            </menu>
+                                        </menuItem>
+                                        <menuItem title="Hash" id="JvZ-MP-QMg">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <menu key="submenu" id="ht1-CT-ftn">
+                                                <items>
+                                                    <menuItem title="ROT13" id="K4d-W2-yTX">
+                                                        <modifierMask key="keyEquivalentModifierMask"/>
+                                                        <connections>
+                                                            <action selector="rot13:" target="-1" id="MyO-ci-J90"/>
+                                                        </connections>
+                                                    </menuItem>
+                                                    <menuItem title="SHA-256" id="zn6-Zm-PRt">
+                                                        <modifierMask key="keyEquivalentModifierMask"/>
+                                                        <connections>
+                                                            <action selector="sha256:" target="-1" id="6Zh-fJ-d4C"/>
+                                                        </connections>
+                                                    </menuItem>
+                                                    <menuItem title="MD5 (Hex)" id="dmC-As-35M">
+                                                        <modifierMask key="keyEquivalentModifierMask"/>
+                                                        <connections>
+                                                            <action selector="md5Hex:" target="-1" id="EXb-Sn-rMS"/>
+                                                        </connections>
+                                                    </menuItem>
+                                                    <menuItem title="MD5 (Base64)" id="XaI-e7-bNl">
+                                                        <modifierMask key="keyEquivalentModifierMask"/>
+                                                        <connections>
+                                                            <action selector="md5Base64:" target="-1" id="hQB-Jw-kfk"/>
+                                                        </connections>
+                                                    </menuItem>
+                                                </items>
+                                            </menu>
                                         </menuItem>
                                     </items>
                                 </menu>

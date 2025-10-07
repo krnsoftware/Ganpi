@@ -6,6 +6,7 @@
 //
 
 import AppKit
+import CryptoKit
 
 extension KTextView {
     
@@ -202,6 +203,30 @@ extension KTextView {
         }
         selectedString = String(text.map(transform))
     }
+    
+    
+    @IBAction func sha256(_ sender: Any?) {
+        let text = selectedString
+        guard let data = text.data(using: .utf8) else { log("data is nil.", from:self); return }
+        
+        let digest = SHA256.hash(data: data)
+        selectedString = digest.compactMap { String(format: "%02x", $0)}.joined()
+    }
+    
+    // 文字列の MD5(UTF-8) を 16進小文字で返す
+    @IBAction func md5Hex(_ sender: Any?) {
+        let data = Data(selectedString.utf8)
+        let digest = Insecure.MD5.hash(data: data)
+        selectedString = digest.map { String(format: "%02x", $0) }.joined()
+    }
+    
+    // 文字列の MD5(UTF-8) を Base64 で返す
+    @IBAction func md5Base64(_ sender: Any?) {
+        let data = Data(selectedString.utf8)
+        let digest = Insecure.MD5.hash(data: data)
+        selectedString = Data(digest).base64EncodedString()
+    }
+    
     
     
      
