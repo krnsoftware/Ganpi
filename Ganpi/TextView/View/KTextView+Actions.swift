@@ -167,7 +167,8 @@ extension KTextView {
     private func sortSelectedLines(caseInsensitive: Bool, numeric: Bool, descending: Bool) {
         let snapshot = textStorage.snapshot
         let selection = selectionRange
-        guard let paraRange = snapshot.paragraphRange(containing: selection) else {
+        guard let paraRange = snapshot.paragraphRange(containing: selection),
+              !paraRange.isEmpty else {
             log("paragraphRange: out of range.", from: self)
             return
         }

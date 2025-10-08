@@ -54,13 +54,18 @@ class KTextSnapShot {
     }
     
     func paragraphIndex(containing index: Int) -> Int? {
+        // 許容範囲：0...count（countは文末直後を指す）
         guard index >= 0, index <= _storage.count else { return nil }
+        if paragraphs.isEmpty { return nil }
+
+        // 文末（index == count）は「最後の段落」を返す
+        if index == _storage.count { return paragraphs.count - 1 }
 
         var lo = 0
         var hi = paragraphs.count - 1
         while lo <= hi {
             let mid = (lo + hi) >> 1
-            let r = paragraphs[mid].range
+            let r = paragraphs[mid].range   // [lower, upper) …… upperは排他的
             if index >= r.lowerBound && index < r.upperBound {
                 return mid
             } else if index < r.lowerBound {
@@ -69,29 +74,21 @@ class KTextSnapShot {
                 lo = mid + 1
             }
         }
-        // 末尾LFありの“空段落”対応：index がその lowerBound なら最後を返す
-        if let last = paragraphs.last, index == last.range.lowerBound {
-            return paragraphs.count - 1
-        }
+
+        // ここには来ない想定（段落は全文を被覆している）
         return nil
     }
     
     func paragraphRange(containing range: Range<Int>) -> Range<Int>? {
         if range.isEmpty {
-            if let idx = paragraphIndex(containing: range.lowerBound) {
-                return idx..<idx + 1
-            }
-            return nil
+            guard let idx = paragraphIndex(containing: range.lowerBound) else { return nil }
+            return idx..<(idx + 1)
         }
-        // 下端の段落
+
         guard let lo = paragraphIndex(containing: range.lowerBound) else { return nil }
-        
-        // 上端は排他的なので、最後に“含まれる”位置を使う
+        // upperBound は排他的。実際に含まれる末位置 = min(upper-1, count-1)
         let lastIncluded = max(0, min(range.upperBound - 1, _storage.count - 1))
-        
         guard let hi = paragraphIndex(containing: lastIncluded) else { return nil }
-        
-        // hiの段落も含めるので、上端は hi + 1
-        return lo ..< (hi + 1)
+        return lo..<(hi + 1)   // hi も含めるので +1
     }
 }
