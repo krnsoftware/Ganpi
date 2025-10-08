@@ -137,17 +137,25 @@ extension KTextView {
         if direction == .backward && range.lowerBound == 0 { return }
         if direction == .forward && range.upperBound == textStorage.count { return }
 
-        let skeleton = textStorage.skeletonString
-        var lineRange:Range<Int>
-        var blockRange:Range<Int>
-        var newString:String
+        var rangeA:Range<Int>
+        var rangeB:Range<Int>
+        var newSelectionRange:Range<Int>
         switch direction {
         case .backward:
             guard let lineRange = textStorage.lineRange(at: range.lowerBound - 1) else { return }
-            //blockRange = lineRange.lowerBound..<
+            rangeA = lineRange
+            rangeB = range
+            newSelectionRange = rangeA.lowerBound..<rangeA.lowerBound + range.count
         case .forward:
-            
+            guard let lineRange = textStorage.lineRange(at: range.upperBound + 1) else { return }
+            rangeA = range
+            rangeB = lineRange
+            newSelectionRange = rangeA.lowerBound + rangeB.count + 1..<rangeB.upperBound
         }
+        let newString = textStorage.string(in:rangeB) + "\n" + textStorage.string(in: rangeA)
+        log("A:\(textStorage.string(in:rangeA)), B:\(textStorage.string(in:rangeB))",from:self)
+        textStorage.replaceString(in: rangeA.lowerBound..<rangeB.upperBound, with: newString)
+        selectionRange = newSelectionRange
         
         
     }
