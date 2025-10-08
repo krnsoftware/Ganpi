@@ -364,6 +364,12 @@
                                                 <action selector="moveLineDown:" target="-1" id="RKq-CG-i0w"/>
                                             </connections>
                                         </menuItem>
+                                        <menuItem title="Sort Lines" id="vWS-Zf-2r1">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="sortLines:" target="-1" id="01H-on-Cpt"/>
+                                            </connections>
+                                        </menuItem>
                                     </items>
                                 </menu>
                             </menuItem>

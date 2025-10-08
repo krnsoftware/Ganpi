@@ -54,20 +54,22 @@ class KTextSnapShot {
     }
     
     func paragraphIndex(containing index: Int) -> Int? {
-        guard index >= 0, index <= _storage.count else { log("index: out of range.", from: self); return nil }
+        guard index >= 0, index <= _storage.count else { return nil }
+
         var lo = 0
-        var hi = paragraphs.count
-        while lo < hi {
+        var hi = paragraphs.count - 1
+        while lo <= hi {
             let mid = (lo + hi) >> 1
-            let range = paragraphs[mid].range
-            if index >= range.lowerBound, index <= range.upperBound { return mid }
-            if index < range.lowerBound {
+            let r = paragraphs[mid].range
+            if index >= r.lowerBound && index < r.upperBound {
+                return mid
+            } else if index < r.lowerBound {
                 hi = mid - 1
             } else {
                 lo = mid + 1
             }
         }
-        // 末尾LF直後（空段落）のケース
+        // 末尾LFありの“空段落”対応：index がその lowerBound なら最後を返す
         if let last = paragraphs.last, index == last.range.lowerBound {
             return paragraphs.count - 1
         }

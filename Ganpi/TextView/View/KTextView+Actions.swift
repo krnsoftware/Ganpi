@@ -161,9 +161,54 @@ extension KTextView {
     // MARK: - Sort Lines
     
     @IBAction func sortLines(_ sender: Any?) {
-        if let paragraphRange = textStorage.snapshot.paragraphRange(containing: selectionRange) {
-            log("paragraphRange: \(paragraphRange)",from:self)
+            sortSelectedLines(caseInsensitive: false, numeric: false, descending: false)
         }
+
+    private func sortSelectedLines(caseInsensitive: Bool, numeric: Bool, descending: Bool) {
+        let snapshot = textStorage.snapshot
+        let selection = selectionRange
+        guard let paraRange = snapshot.paragraphRange(containing: selection) else {
+            log("paragraphRange: out of range.", from: self)
+            return
+        }
+        
+        // 対象段落のテキスト抽出
+        var lines: [String] = []
+        lines.reserveCapacity(paraRange.count)
+        for i in paraRange {
+            lines.append(snapshot.paragraphs[i].string)
+        }
+        
+        // 並べ替え（安定ソート）
+        let locale = Locale.current
+        lines.sort {
+            let result = $0.compare(
+                $1,
+                options: buildCompareOptions(caseInsensitive: caseInsensitive, numeric: numeric),
+                range: nil,
+                locale: locale
+            )
+            return descending ? (result == .orderedDescending) : (result == .orderedAscending)
+        }
+        
+        // 結合して置換（LF固定）
+        let newBlock = lines.joined(separator: "\n")
+        
+        // 段落範囲を文字範囲に変換
+        let lower = snapshot.paragraphs[paraRange.lowerBound].range.lowerBound
+        let upper = snapshot.paragraphs[paraRange.upperBound - 1].range.upperBound
+        let replaceRange = lower..<upper
+        
+        textStorage.replaceString(in: replaceRange, with: newBlock)
+        selectionRange = replaceRange.lowerBound ..< (replaceRange.lowerBound + newBlock.count)
+    }
+
+        // 比較オプション生成
+    private func buildCompareOptions(caseInsensitive: Bool, numeric: Bool) -> String.CompareOptions {
+        var options: String.CompareOptions = [.widthInsensitive]
+        if caseInsensitive { options.insert(.caseInsensitive) }
+        if numeric { options.insert(.numeric) }
+        return options
     }
     
     // MARK: - Color treatment
