@@ -153,11 +153,17 @@ extension KTextView {
             newSelectionRange = rangeA.lowerBound + rangeB.count + 1..<rangeB.upperBound
         }
         let newString = textStorage.string(in:rangeB) + "\n" + textStorage.string(in: rangeA)
-        log("A:\(textStorage.string(in:rangeA)), B:\(textStorage.string(in:rangeB))",from:self)
         textStorage.replaceString(in: rangeA.lowerBound..<rangeB.upperBound, with: newString)
         selectionRange = newSelectionRange
-        
-        
+    }
+    
+    
+    // MARK: - Sort Lines
+    
+    @IBAction func sortLines(_ sender: Any?) {
+        if let paragraphRange = textStorage.snapshot.paragraphRange(containing: selectionRange) {
+            log("paragraphRange: \(paragraphRange)",from:self)
+        }
     }
     
     // MARK: - Color treatment
