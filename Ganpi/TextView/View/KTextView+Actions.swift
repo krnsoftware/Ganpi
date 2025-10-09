@@ -396,7 +396,7 @@ extension KTextView {
     }
     
     
-    // MARK: - Collapse Empty Lines
+    // MARK: - Collapse Empty Lines / Remove Empty Lines
     
     @IBAction func collapseEmptyLines(_ sender: Any?) {
         let snapshot = textStorage.snapshot
@@ -428,6 +428,37 @@ extension KTextView {
 
         textStorage.replaceString(in: total, with: newBlock)
         selectionRange = total.lowerBound ..< (total.lowerBound + newBlock.count)
+    }
+    
+    @IBAction func removeEmptyLines(_ sender: Any?) {
+        let snapshot = textStorage.snapshot
+        guard let indexRange = snapshot.paragraphIndexRange(containing: selectionRange),
+              !indexRange.isEmpty else {
+            log("1", from: self)
+            return
+        }
+
+        var result: [String] = []
+        result.reserveCapacity(indexRange.count)
+
+        for i in indexRange {
+            let paragraph = snapshot.paragraphs[i]
+            // 空行でなければ残す（Collapseの逆）
+            if !paragraph.range.isEmpty {
+                result.append(paragraph.string)
+            }
+        }
+
+        let totalRange = snapshot.paragraphRange(indexRange: indexRange)
+        var newBlock = result.joined(separator: "\n")
+
+        // 文末まで選択されている場合は、末尾LFを調整（必要なら付ける）
+        if indexRange.upperBound == snapshot.paragraphs.count {
+            newBlock.append("\n")
+        }
+
+        textStorage.replaceString(in: totalRange, with: newBlock)
+        selectionRange = totalRange.lowerBound ..< (totalRange.lowerBound + newBlock.count)
     }
     
     // MARK: - Color treatment

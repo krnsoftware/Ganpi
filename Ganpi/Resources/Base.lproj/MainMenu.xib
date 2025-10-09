@@ -222,6 +222,13 @@
                     <modifierMask key="keyEquivalentModifierMask"/>
                     <menu key="submenu" title="Text" id="pgI-qu-Ea7">
                         <items>
+                            <menuItem title="Sort Lines" id="h7N-6G-MPJ">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <connections>
+                                    <action selector="sortLines:" target="-1" id="eOR-Fo-HUd"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem isSeparatorItem="YES" id="qQa-6f-lE3"/>
                             <menuItem title="Transform" id="IRA-6g-Vdc">
                                 <modifierMask key="keyEquivalentModifierMask"/>
                                 <menu key="submenu" title="Transform" id="7ZX-Nw-i1m">
@@ -249,6 +256,7 @@
                                                 <action selector="uppercaseWord:" target="-1" id="bYh-Js-hNb"/>
                                             </connections>
                                         </menuItem>
+                                        <menuItem isSeparatorItem="YES" id="YOe-ej-ChR"/>
                                         <menuItem title="Kana" id="QBd-Vk-e8a">
                                             <modifierMask key="keyEquivalentModifierMask"/>
                                             <menu key="submenu" id="7Nt-CM-D8I">
@@ -298,165 +306,6 @@
                                                     </menuItem>
                                                 </items>
                                             </menu>
-                                        </menuItem>
-                                    </items>
-                                </menu>
-                            </menuItem>
-                            <menuItem title="Surround" id="HLy-En-TnM">
-                                <modifierMask key="keyEquivalentModifierMask"/>
-                                <menu key="submenu" title="Surround" id="VWo-C0-jYu">
-                                    <items>
-                                        <menuItem title="Surround With &quot;...&quot;" keyEquivalent="&quot;" id="RYf-FS-hDk">
-                                            <modifierMask key="keyEquivalentModifierMask" shift="YES" command="YES"/>
-                                            <connections>
-                                                <action selector="surroundSelectionWithDoubleQuote:" target="-1" id="DCg-n4-lYR"/>
-                                            </connections>
-                                        </menuItem>
-                                        <menuItem title="Surround With '...'" keyEquivalent="'" id="Kai-ym-wkA">
-                                            <connections>
-                                                <action selector="surroundSelectionWithSingleQuote:" target="-1" id="DXf-Cn-h4L"/>
-                                            </connections>
-                                        </menuItem>
-                                        <menuItem title="Surround With (...)" keyEquivalent="(" id="P6u-Wt-p0b">
-                                            <modifierMask key="keyEquivalentModifierMask" shift="YES" command="YES"/>
-                                            <connections>
-                                                <action selector="surroundSelectionWithParen:" target="-1" id="Mdd-Ws-nZ6"/>
-                                            </connections>
-                                        </menuItem>
-                                        <menuItem title="Surround With {...}" id="2dB-Yi-nvW">
-                                            <modifierMask key="keyEquivalentModifierMask"/>
-                                            <connections>
-                                                <action selector="surroundSelectionWithBrace:" target="-1" id="GVC-mU-v5Q"/>
-                                            </connections>
-                                        </menuItem>
-                                        <menuItem title="Surround With [...]" id="a2C-aZ-ESi">
-                                            <modifierMask key="keyEquivalentModifierMask"/>
-                                            <connections>
-                                                <action selector="surroundSelectionWithBlacket:" target="-1" id="X6k-aE-IVD"/>
-                                            </connections>
-                                        </menuItem>
-                                    </items>
-                                </menu>
-                            </menuItem>
-                            <menuItem title="Lines" id="ZZm-eE-Wkd">
-                                <modifierMask key="keyEquivalentModifierMask"/>
-                                <menu key="submenu" title="Lines" id="ijU-wn-apn">
-                                    <items>
-                                        <menuItem title="Shift Left" keyEquivalent="[" id="xf8-eU-1uw">
-                                            <connections>
-                                                <action selector="shiftLeft:" target="-1" id="tq1-X9-rhL"/>
-                                            </connections>
-                                        </menuItem>
-                                        <menuItem title="Shift Right" keyEquivalent="]" id="MjN-TF-A3f">
-                                            <connections>
-                                                <action selector="shiftRight:" target="-1" id="rbM-Pp-dtJ"/>
-                                            </connections>
-                                        </menuItem>
-                                        <menuItem title="Move Line Up" keyEquivalent="[" id="4UJ-AD-5N9">
-                                            <modifierMask key="keyEquivalentModifierMask" option="YES" command="YES"/>
-                                            <connections>
-                                                <action selector="moveLineUp:" target="-1" id="01v-mp-kZf"/>
-                                            </connections>
-                                        </menuItem>
-                                        <menuItem title="Move Line Down" keyEquivalent="]" id="MLs-r4-aig">
-                                            <modifierMask key="keyEquivalentModifierMask" option="YES" command="YES"/>
-                                            <connections>
-                                                <action selector="moveLineDown:" target="-1" id="RKq-CG-i0w"/>
-                                            </connections>
-                                        </menuItem>
-                                        <menuItem isSeparatorItem="YES" id="dGo-AE-liP"/>
-                                        <menuItem title="Unique (Keep First)" id="HVl-2Z-U8s">
-                                            <modifierMask key="keyEquivalentModifierMask"/>
-                                            <connections>
-                                                <action selector="uniqueLinesKeepFirst:" target="-1" id="9bN-sg-vty"/>
-                                            </connections>
-                                        </menuItem>
-                                        <menuItem title="Unique (Keep Last)" id="GYD-Mu-Pl1">
-                                            <modifierMask key="keyEquivalentModifierMask"/>
-                                            <connections>
-                                                <action selector="uniqueLinesKeepLast:" target="-1" id="eNT-gH-6g6"/>
-                                            </connections>
-                                        </menuItem>
-                                        <menuItem title="Join Lines" id="KG2-Lg-vZa">
-                                            <modifierMask key="keyEquivalentModifierMask"/>
-                                            <connections>
-                                                <action selector="joinLines:" target="-1" id="fbS-tf-mew"/>
-                                            </connections>
-                                        </menuItem>
-                                        <menuItem title="Trim Trailing Spaces" id="W3y-2u-1iz">
-                                            <modifierMask key="keyEquivalentModifierMask"/>
-                                            <connections>
-                                                <action selector="trimTrailingSpaces:" target="-1" id="qTD-ud-naW"/>
-                                            </connections>
-                                        </menuItem>
-                                        <menuItem title="Collapse Empty Lines" id="bXN-QK-OUJ">
-                                            <modifierMask key="keyEquivalentModifierMask"/>
-                                            <connections>
-                                                <action selector="collapseEmptyLines:" target="-1" id="ZQw-ol-hRm"/>
-                                            </connections>
-                                        </menuItem>
-                                        <menuItem isSeparatorItem="YES" id="Icb-Jy-B8c"/>
-                                        <menuItem title="Sort Lines" id="vWS-Zf-2r1">
-                                            <modifierMask key="keyEquivalentModifierMask"/>
-                                            <connections>
-                                                <action selector="sortLines:" target="-1" id="01H-on-Cpt"/>
-                                            </connections>
-                                        </menuItem>
-                                        <menuItem title="Sort  Asc:Y  CaseIns:Y  Num:Y" indentationLevel="1" id="z7c-a8-z3R">
-                                            <attributedString key="attributedTitle"/>
-                                            <modifierMask key="keyEquivalentModifierMask"/>
-                                            <connections>
-                                                <action selector="sortSelectedLines_AscT_CaseT_NumT:" target="-1" id="7rD-1l-Twc"/>
-                                            </connections>
-                                        </menuItem>
-                                        <menuItem title="Sort  Asc:Y  CaseIns:Y  Num:N" indentationLevel="1" id="EbB-MN-qLK">
-                                            <attributedString key="attributedTitle"/>
-                                            <modifierMask key="keyEquivalentModifierMask"/>
-                                            <connections>
-                                                <action selector="sortSelectedLines_AscT_CaseT_NumN:" target="-1" id="TJW-Ic-na9"/>
-                                            </connections>
-                                        </menuItem>
-                                        <menuItem title="Sort  Asc:Y  CaseIns:N  Num:Y" indentationLevel="1" id="Ueb-0c-D2B">
-                                            <attributedString key="attributedTitle"/>
-                                            <modifierMask key="keyEquivalentModifierMask"/>
-                                            <connections>
-                                                <action selector="sortSelectedLines_AscT_CaseN_NumT:" target="-1" id="Shx-gU-ECs"/>
-                                            </connections>
-                                        </menuItem>
-                                        <menuItem title="Sort  Asc:Y  CaseIns:N  Num:N" indentationLevel="1" id="VIT-pc-Z36">
-                                            <attributedString key="attributedTitle"/>
-                                            <modifierMask key="keyEquivalentModifierMask"/>
-                                            <connections>
-                                                <action selector="sortSelectedLines_AscT_CaseN_NumN:" target="-1" id="JDi-lN-u7j"/>
-                                            </connections>
-                                        </menuItem>
-                                        <menuItem title="Sort  Asc:N  CaseIns:Y  Num:Y" indentationLevel="1" id="r6y-2v-0zZ">
-                                            <attributedString key="attributedTitle"/>
-                                            <modifierMask key="keyEquivalentModifierMask"/>
-                                            <connections>
-                                                <action selector="sortSelectedLines_AscN_CaseT_NumT:" target="-1" id="Dnd-ki-THy"/>
-                                            </connections>
-                                        </menuItem>
-                                        <menuItem title="Sort  Asc:N  CaseIns:Y  Num:N" indentationLevel="1" id="8tU-1N-35k">
-                                            <attributedString key="attributedTitle"/>
-                                            <modifierMask key="keyEquivalentModifierMask"/>
-                                            <connections>
-                                                <action selector="sortSelectedLines_AscN_CaseT_NumN:" target="-1" id="1qF-Jo-zDc"/>
-                                            </connections>
-                                        </menuItem>
-                                        <menuItem title="Sort  Asc:N  CaseIns:N  Num:Y" indentationLevel="1" id="wk9-WJ-pmv">
-                                            <attributedString key="attributedTitle"/>
-                                            <modifierMask key="keyEquivalentModifierMask"/>
-                                            <connections>
-                                                <action selector="sortSelectedLines_AscN_CaseN_NumT:" target="-1" id="YbI-ya-FeV"/>
-                                            </connections>
-                                        </menuItem>
-                                        <menuItem title="Sort  Asc:N  CaseIns:N  Num:N" indentationLevel="1" id="Plf-hp-CmM">
-                                            <attributedString key="attributedTitle"/>
-                                            <modifierMask key="keyEquivalentModifierMask"/>
-                                            <connections>
-                                                <action selector="sortSelectedLines_AscN_CaseN_NumN:" target="-1" id="xYA-Rk-TXK"/>
-                                            </connections>
                                         </menuItem>
                                     </items>
                                 </menu>
@@ -537,6 +386,189 @@
                                     </items>
                                 </menu>
                             </menuItem>
+                            <menuItem title="Surround" id="HLy-En-TnM">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <menu key="submenu" title="Surround" id="VWo-C0-jYu">
+                                    <items>
+                                        <menuItem title="Surround With &quot;...&quot;" keyEquivalent="&quot;" id="RYf-FS-hDk">
+                                            <modifierMask key="keyEquivalentModifierMask" shift="YES" command="YES"/>
+                                            <connections>
+                                                <action selector="surroundSelectionWithDoubleQuote:" target="-1" id="DCg-n4-lYR"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Surround With '...'" keyEquivalent="'" id="Kai-ym-wkA">
+                                            <connections>
+                                                <action selector="surroundSelectionWithSingleQuote:" target="-1" id="DXf-Cn-h4L"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Surround With (...)" keyEquivalent="(" id="P6u-Wt-p0b">
+                                            <modifierMask key="keyEquivalentModifierMask" shift="YES" command="YES"/>
+                                            <connections>
+                                                <action selector="surroundSelectionWithParen:" target="-1" id="Mdd-Ws-nZ6"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Surround With {...}" id="2dB-Yi-nvW">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="surroundSelectionWithBrace:" target="-1" id="GVC-mU-v5Q"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Surround With [...]" id="a2C-aZ-ESi">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="surroundSelectionWithBlacket:" target="-1" id="X6k-aE-IVD"/>
+                                            </connections>
+                                        </menuItem>
+                                    </items>
+                                </menu>
+                            </menuItem>
+                            <menuItem isSeparatorItem="YES" id="VaE-pr-yAa"/>
+                            <menuItem title="Lines - Move" id="ZZm-eE-Wkd">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <menu key="submenu" title="Lines - Move" id="ijU-wn-apn">
+                                    <items>
+                                        <menuItem title="Shift Left" keyEquivalent="[" id="xf8-eU-1uw">
+                                            <connections>
+                                                <action selector="shiftLeft:" target="-1" id="tq1-X9-rhL"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Shift Right" keyEquivalent="]" id="MjN-TF-A3f">
+                                            <connections>
+                                                <action selector="shiftRight:" target="-1" id="rbM-Pp-dtJ"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem isSeparatorItem="YES" id="dGo-AE-liP"/>
+                                        <menuItem title="Move Line Up" keyEquivalent="[" id="4UJ-AD-5N9">
+                                            <modifierMask key="keyEquivalentModifierMask" option="YES" command="YES"/>
+                                            <connections>
+                                                <action selector="moveLineUp:" target="-1" id="01v-mp-kZf"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Move Line Down" keyEquivalent="]" id="MLs-r4-aig">
+                                            <modifierMask key="keyEquivalentModifierMask" option="YES" command="YES"/>
+                                            <connections>
+                                                <action selector="moveLineDown:" target="-1" id="RKq-CG-i0w"/>
+                                            </connections>
+                                        </menuItem>
+                                    </items>
+                                </menu>
+                            </menuItem>
+                            <menuItem title="Lines - Modify" id="DRK-yg-pgE">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <menu key="submenu" id="Glo-lu-b1r">
+                                    <items>
+                                        <menuItem title="Unique (Keep First)" id="JfS-QD-MDw">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="uniqueLinesKeepFirst:" target="-1" id="D0v-QY-9wf"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Unique (Keep Last)" id="S08-3y-Lqa">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="uniqueLinesKeepLast:" target="-1" id="hnq-9D-KOJ"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem isSeparatorItem="YES" id="qDb-TX-71W"/>
+                                        <menuItem title="Trim Trailing Spaces" id="fnf-Dn-Rcw">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="trimTrailingSpaces:" target="-1" id="qyA-0v-gwL"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Join Lines" id="hlu-t3-YmD">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="joinLines:" target="-1" id="498-He-fLA"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem isSeparatorItem="YES" id="uKj-fd-z7S"/>
+                                        <menuItem title="Collapse Empty Lines" id="E2h-8a-OuK">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="collapseEmptyLines:" target="-1" id="TQf-6m-gaG"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Remove Empty Lines" id="Rmk-Yx-gMD">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="removeEmptyLines:" target="-1" id="giL-uJ-5bt"/>
+                                            </connections>
+                                        </menuItem>
+                                    </items>
+                                </menu>
+                            </menuItem>
+                            <menuItem title="Lines - Sort" id="UxS-Pu-sPd">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <menu key="submenu" id="wSw-cm-Ph1">
+                                    <items>
+                                        <menuItem title="Sort Lines" id="0cC-jH-XYX">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="sortLines:" target="-1" id="zJ1-kU-mCE"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem isSeparatorItem="YES" id="FUl-27-qOp"/>
+                                        <menuItem title="Sort  Asc:Y  CaseIns:Y  Num:Y" id="8vV-nv-kRv">
+                                            <attributedString key="attributedTitle"/>
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="sortSelectedLines_AscT_CaseT_NumT:" target="-1" id="WTh-De-cov"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Sort  Asc:Y  CaseIns:Y  Num:N" id="rMG-kQ-rMs">
+                                            <attributedString key="attributedTitle"/>
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="sortSelectedLines_AscT_CaseT_NumN:" target="-1" id="Arj-oc-y4y"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Sort  Asc:Y  CaseIns:N  Num:Y" id="nGh-4b-1i4">
+                                            <attributedString key="attributedTitle"/>
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="sortSelectedLines_AscT_CaseN_NumT:" target="-1" id="DHX-mM-sgN"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Sort  Asc:Y  CaseIns:N  Num:N" id="rix-jJ-RIb">
+                                            <attributedString key="attributedTitle"/>
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="sortSelectedLines_AscT_CaseN_NumN:" target="-1" id="yUs-Zp-2TR"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Sort  Asc:N  CaseIns:Y  Num:Y" id="JQK-xo-yXS">
+                                            <attributedString key="attributedTitle"/>
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="sortSelectedLines_AscN_CaseT_NumT:" target="-1" id="GtX-0o-3W3"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Sort  Asc:N  CaseIns:Y  Num:N" id="d9p-rZ-b5W">
+                                            <attributedString key="attributedTitle"/>
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="sortSelectedLines_AscN_CaseT_NumN:" target="-1" id="pA1-YJ-DtH"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Sort  Asc:N  CaseIns:N  Num:Y" id="Czy-kY-gfr">
+                                            <attributedString key="attributedTitle"/>
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="sortSelectedLines_AscN_CaseN_NumT:" target="-1" id="kbk-e2-8Zm"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Sort  Asc:N  CaseIns:N  Num:N" id="iyx-hs-3oK">
+                                            <attributedString key="attributedTitle"/>
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="sortSelectedLines_AscN_CaseN_NumN:" target="-1" id="EBr-Gu-4JN"/>
+                                            </connections>
+                                        </menuItem>
+                                    </items>
+                                </menu>
+                            </menuItem>
+                            <menuItem isSeparatorItem="YES" id="sOB-A2-Bqx"/>
                             <menuItem title="Color" id="aiM-IB-dEW">
                                 <modifierMask key="keyEquivalentModifierMask"/>
                                 <menu key="submenu" title="Color" id="5VZ-Iv-yDJ">
