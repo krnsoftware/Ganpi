@@ -489,6 +489,18 @@
                                                 <action selector="joinLines:" target="-1" id="498-He-fLA"/>
                                             </connections>
                                         </menuItem>
+                                        <menuItem title="Duplicate Lines" id="SpR-D7-4iH">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="duplicateLines:" target="-1" id="ezb-wc-hNP"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Delete Lines" keyEquivalent="K" id="QmS-ie-jYS">
+                                            <modifierMask key="keyEquivalentModifierMask" shift="YES" command="YES"/>
+                                            <connections>
+                                                <action selector="deleteLines:" target="-1" id="9LI-xn-B2A"/>
+                                            </connections>
+                                        </menuItem>
                                         <menuItem isSeparatorItem="YES" id="uKj-fd-z7S"/>
                                         <menuItem title="Collapse Empty Lines" id="E2h-8a-OuK">
                                             <modifierMask key="keyEquivalentModifierMask"/>

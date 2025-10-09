@@ -158,6 +158,50 @@ extension KTextView {
     }
     
     
+    // MARK: - Delete Lines / Duplicate Lines
+    
+    @IBAction func deleteLines(_ sender: Any?) {
+        let snapshot = textStorage.snapshot
+        guard let indexRange = snapshot.paragraphIndexRange(containing: selectionRange),
+              !indexRange.isEmpty else { log("1", from: self); return }
+
+        // 段落本体の文字範囲（[lower, upper)）
+        var deleteRange = snapshot.paragraphRange(indexRange: indexRange)
+
+        // 最終段落を含まない場合は、後続の改行（1文字）も一緒に削除して繰り上げる
+        if indexRange.upperBound < snapshot.paragraphs.count {
+            if deleteRange.upperBound < textStorage.count {
+                deleteRange = deleteRange.lowerBound ..< (deleteRange.upperBound + 1)
+            }
+        }
+
+        textStorage.replaceString(in: deleteRange, with: "")
+        // 削除開始位置にキャレットを置く
+        selectionRange = deleteRange.lowerBound ..< deleteRange.lowerBound
+    }
+    
+    @IBAction func duplicateLines(_ sender: Any?) {
+        let snapshot = textStorage.snapshot
+        guard let indexRange = snapshot.paragraphIndexRange(containing: selectionRange),
+              !indexRange.isEmpty else { log("1", from: self); return }
+
+        // 対象段落の文字範囲と内容（段落はLFを含まない仕様）
+        let totalRange = snapshot.paragraphRange(indexRange: indexRange)
+        let block = textStorage.string(in: totalRange)
+
+        // 直下に複製する：挿入位置は対象ブロックの末尾
+        let insertPosition = totalRange.upperBound
+        let insertString = "\n" + block
+
+        textStorage.replaceString(in: insertPosition..<insertPosition, with: insertString)
+
+        // 複製された行群（先頭の改行は除外）を新たに選択
+        let newStart = insertPosition + 1
+        let newEnd = newStart + block.count
+        selectionRange = newStart..<newEnd
+    }
+    
+    
     // MARK: - Sort Lines
     
     
