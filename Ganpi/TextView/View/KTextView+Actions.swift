@@ -195,7 +195,7 @@ extension KTextView {
         let snapshot = textStorage.snapshot
         let sel = selectionRange
 
-        guard var paraRange = snapshot.paragraphRange(containing: sel),
+        guard var paraRange = snapshot.paragraphIndexRange(containing: sel),
               !paraRange.isEmpty else { return }
 
         // 全文選択で末尾LFがあるなら、空段落を含める
@@ -258,18 +258,18 @@ extension KTextView {
     
     // MARK: - Unique Lines
     
-    /// 先勝ち：最初の出現を残して重複行を削除
-        @IBAction func uniqueLinesKeepFirst(_ sender: Any?) {
-            uniqueSelectedLines(keepLast: false)
-        }
+    // 先勝ち：最初の出現を残して重複行を削除
+    @IBAction func uniqueLinesKeepFirst(_ sender: Any?) {
+        uniqueSelectedLines(keepLast: false)
+    }
 
-        /// 後勝ち：最後の出現を残して重複行を削除
-        @IBAction func uniqueLinesKeepLast(_ sender: Any?) {
-            uniqueSelectedLines(keepLast: true)
-        }
+    // 後勝ち：最後の出現を残して重複行を削除
+    @IBAction func uniqueLinesKeepLast(_ sender: Any?) {
+        uniqueSelectedLines(keepLast: true)
+    }
 
-        /// 選択範囲にかかる段落の重複を削除する（順序は維持）
-        /// - Parameter keepLast: true で最後の出現を残す（後勝ち）、false で最初（先勝ち）
+    // 選択範囲にかかる段落の重複を削除する（順序は維持）
+    // - Parameter keepLast: true で最後の出現を残す（後勝ち）、false で最初（先勝ち）
     func uniqueSelectedLines(keepLast: Bool) {
         let snapshot = textStorage.snapshot
         let sel = selectionRange
@@ -279,7 +279,7 @@ extension KTextView {
         if sel.isEmpty {
             paraRange = 0 ..< snapshot.paragraphs.count
         } else {
-            guard let r = snapshot.paragraphRange(containing: sel), !r.isEmpty else { return }
+            guard let r = snapshot.paragraphIndexRange(containing: sel), !r.isEmpty else { return }
             paraRange = r
         }
         
@@ -314,7 +314,6 @@ extension KTextView {
         let replaceRange = lower ..< upper
         
         // 最後にだけ文字列化（コピーはここ1回）
-        // paragraph.string は末尾LFを含まない想定なので "\n" で結合
         var parts: [String] = []
         parts.reserveCapacity(keptRanges.count)
         for r in keptRanges {
@@ -324,6 +323,36 @@ extension KTextView {
         
         textStorage.replaceString(in: replaceRange, with: newBlock)
         selectionRange = replaceRange.lowerBound ..< (replaceRange.lowerBound + newBlock.count)
+    }
+    
+    
+    // MARK: - Join Lines
+    
+    @IBAction func joinLines(_ sender: Any?) {
+        let snapshot = textStorage.snapshot
+        let idxRange: Range<Int>
+
+        if selectionRange.isEmpty {
+            idxRange = 0..<snapshot.paragraphs.count
+        } else {
+            guard let r = snapshot.paragraphIndexRange(containing: selectionRange),
+                  !r.isEmpty else { return }
+            idxRange = r
+        }
+        if idxRange.count <= 1 { return }
+
+        let totalRange = snapshot.paragraphRange(indexRange: idxRange)
+
+        var parts: [String] = []
+        parts.reserveCapacity(idxRange.count)
+        for i in idxRange {
+            parts.append(snapshot.paragraphs[i].string)
+        }
+        let joined = parts.joined()
+
+        textStorage.replaceString(in: totalRange, with: joined)
+        selectionRange = totalRange.lowerBound ..< (totalRange.lowerBound + joined.count)
+        
     }
     
     

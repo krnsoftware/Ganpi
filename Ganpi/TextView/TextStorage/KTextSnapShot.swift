@@ -75,20 +75,25 @@ class KTextSnapShot {
             }
         }
 
-        // ここには来ない想定（段落は全文を被覆している）
         return nil
     }
     
-    func paragraphRange(containing range: Range<Int>) -> Range<Int>? {
+    // rangeを含むparagraphのindexの範囲を返す。
+    func paragraphIndexRange(containing range: Range<Int>) -> Range<Int>? {
         if range.isEmpty {
             guard let idx = paragraphIndex(containing: range.lowerBound) else { return nil }
             return idx..<(idx + 1)
+        } else {
+            guard let lo = paragraphIndex(containing: range.lowerBound),
+                  let hi = paragraphIndex(containing: range.upperBound - 1) else { return nil }
+            return lo..<(hi + 1)
         }
-
-        guard let lo = paragraphIndex(containing: range.lowerBound) else { return nil }
-        // upperBound は排他的。実際に含まれる末位置 = min(upper-1, count-1)
-        let lastIncluded = max(0, min(range.upperBound - 1, _storage.count - 1))
-        guard let hi = paragraphIndex(containing: lastIncluded) else { return nil }
-        return lo..<(hi + 1)   // hi も含めるので +1
+    }
+    
+    func paragraphRange(indexRange: Range<Int>) -> Range<Int> {
+        precondition(!indexRange.isEmpty)
+        let lower = paragraphs[indexRange.lowerBound].range.lowerBound
+        let upper = paragraphs[indexRange.upperBound - 1].range.upperBound
+        return lower..<upper
     }
 }
