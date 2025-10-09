@@ -383,8 +383,11 @@
                                                 <action selector="joinLines:" target="-1" id="fbS-tf-mew"/>
                                             </connections>
                                         </menuItem>
-                                        <menuItem title="Item" id="W3y-2u-1iz">
+                                        <menuItem title="Trim" id="W3y-2u-1iz">
                                             <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="trimTrailingSpaces:" target="-1" id="qTD-ud-naW"/>
+                                            </connections>
                                         </menuItem>
                                         <menuItem isSeparatorItem="YES" id="Icb-Jy-B8c"/>
                                         <menuItem title="Sort Lines" id="vWS-Zf-2r1">

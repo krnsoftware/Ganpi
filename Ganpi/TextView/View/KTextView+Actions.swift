@@ -356,6 +356,48 @@ extension KTextView {
     }
     
     
+    // MARK: - Trim Lines
+    
+    @IBAction func trimTrailingSpaces(_ sender: Any?) {
+        let snapshot = textStorage.snapshot
+        let sel = selectionRange
+
+        // 対象段落を決定
+        let idxRange: Range<Int>
+        if sel.isEmpty {
+            idxRange = 0..<snapshot.paragraphs.count
+        } else {
+            guard let r = snapshot.paragraphIndexRange(containing: sel),
+                  !r.isEmpty else { return }
+            idxRange = r
+        }
+
+        // 各段落を末尾トリム
+        var resultLines: [String] = []
+        resultLines.reserveCapacity(idxRange.count)
+
+        for i in idxRange {
+            let para = snapshot.paragraphs[i]
+            if para.range.isEmpty {
+                // 空行はそのまま
+                resultLines.append("")
+                continue
+            }
+
+            // 末尾の空白とタブを削除
+            let s = para.string
+            let trimmed = s.replacingOccurrences(of: #"[ \t]+$"#, with: "", options: .regularExpression)
+            resultLines.append(trimmed)
+        }
+
+        // 置換範囲を確定
+        let totalRange = snapshot.paragraphRange(indexRange: idxRange)
+        let newBlock = resultLines.joined(separator: "\n")
+
+        textStorage.replaceString(in: totalRange, with: newBlock)
+        selectionRange = totalRange.lowerBound ..< (totalRange.lowerBound + newBlock.count)
+    }
+    
     // MARK: - Color treatment
     
     // Show Color Panel.
