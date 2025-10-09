@@ -29,6 +29,37 @@ enum KDirection: Int {
     case backward = -1
 }
 
+/// ストレージ上の範囲をゼロコピーで等価判定するためのキー。
+// KTextRangeRef.swift
+struct TextRangeRef: Hashable {
+    unowned let storage: KTextStorageReadable
+    let range: Range<Int>
+    private let _cachedHash: Int
+
+    init(storage: KTextStorageReadable, range: Range<Int>) {
+        self.storage = storage
+        self.range = range
+        self._cachedHash = storage.hash(of: range)   // ゼロコピーで事前計算
+    }
+
+    // Set/Dict 用：キャッシュしたハッシュだけで十分
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(_cachedHash)
+        // （任意）hasher.combine(range.count) を混ぜてもOK
+    }
+
+    static func == (lhs: TextRangeRef, rhs: TextRangeRef) -> Bool {
+        // 本番はコストをかけない。DEBUG だけ検知。
+        #if DEBUG
+        precondition(lhs.storage === rhs.storage, "TextRangeRef compared across different storages.")
+        #endif
+        // 早期棄却
+        if lhs._cachedHash != rhs._cachedHash { return false }
+        // ゼロコピー等価判定（最終確認）
+        return lhs.storage.equals(lhs.range, rhs.range)
+    }
+}
+
 
 // MARK: - KTextStorageProtocol
 // read-onlyとして利用する場合にはKTextStorageReadableを使用。
@@ -36,17 +67,21 @@ enum KDirection: Int {
 
 // 共通プロパティ（読み書き両方が依存する基本インターフェース）
 protocol KTextStorageCommon: AnyObject {
+    // basic.
     var count: Int { get }
-    var baseFont: NSFont { get }
     var characterSlice: ArraySlice<Character> { get }
-    var parser: KSyntaxParserProtocol { get }
     subscript(index: Int) -> Character? { get }
     subscript(range: Range<Int>) -> ArraySlice<Character>? { get }
-    //subscript(string range: Range<Int>) -> String { get }
     
+    // propaties.
+    var baseFont: NSFont { get }
+    var parser: KSyntaxParserProtocol { get }
+
+    // observers.
     func addObserver(_ owner: AnyObject, _ handler: @escaping (KStorageModified) -> Void)
     func removeObserver(_ owner: AnyObject)
     
+    // undo.
     func undo()
     func redo()
 }
@@ -69,6 +104,10 @@ protocol KTextStorageReadable: KTextStorageCommon {
     func lineRange(at index: Int) -> Range<Int>?
     func lineRange(in range: Range<Int>) -> Range<Int>?
     func lineAndColumNumber(at index:Int) -> (line:Int, column:Int) // index(0..), line(1..), column(1..)
+    
+    // comparing characters using ranges.
+    func equals(_ rangeA: Range<Int>, _ rangeB: Range<Int>) -> Bool
+    func hash(of range: Range<Int>) -> Int
 }
 
 // 書き込み可能プロトコル（読み取り継承なし）
@@ -154,9 +193,7 @@ final class KTextStorage: KTextStorageProtocol {
     
     var characters: [Character] {
         get { _characters }
-        set {
-            replaceCharacters(in: 0..<_characters.count, with: newValue)
-        }
+        set { replaceCharacters(in: 0..<_characters.count, with: newValue) }
     }
     
     var skeletonString: KSkeletonStringInUTF8 {
@@ -574,6 +611,58 @@ final class KTextStorage: KTextStorageProtocol {
     
     func replaceParser(for type: KSyntaxType) {
         parser = type.makeParser(storage: self)
+    }
+    
+    // MARK: - Range Comparison
+
+    /// 指定された2つの範囲の内容が完全に等しいかを判定する。
+    /// [Character]の直接比較で、String生成を行わない。
+    func equals(_ rangeA: Range<Int>, _ rangeB: Range<Int>) -> Bool {
+        // 範囲の長さが異なる場合は即不一致
+        if rangeA.count != rangeB.count {
+            return false
+        }
+
+        // 空範囲は一致とみなす
+        if rangeA.isEmpty {
+            return true
+        }
+
+        // 範囲外アクセス防止
+        if rangeA.lowerBound < 0 || rangeB.lowerBound < 0 ||
+           rangeA.upperBound > characters.count || rangeB.upperBound > characters.count {
+            log("equals: out of range.", from: self)
+            return false
+        }
+
+        // [Character]を直接比較
+        let len = rangeA.count
+        for i in 0..<len {
+            if characters[rangeA.lowerBound + i] != characters[rangeB.lowerBound + i] {
+                return false
+            }
+        }
+
+        return true
+    }
+    
+    
+    func hash(of range: Range<Int>) -> Int {
+        // 範囲チェック
+        if range.lowerBound < 0 || range.upperBound > characters.count {
+            log("hash(of:): out of range.", from: self)
+            return 0
+        }
+        if range.isEmpty { return 0 }  // 空行は一定値
+
+        var hasher = Hasher()
+        var i = range.lowerBound
+        // Character は Hashable。コピーせずに combine できる
+        while i < range.upperBound {
+            hasher.combine(characters[i])
+            i += 1
+        }
+        return hasher.finalize()
     }
     
     

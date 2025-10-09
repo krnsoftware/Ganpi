@@ -258,8 +258,72 @@ extension KTextView {
     
     // MARK: - Unique Lines
     
-    @IBAction func uniqueSelectedLines(_ sender: Any?) {
+    /// 先勝ち：最初の出現を残して重複行を削除
+        @IBAction func uniqueLinesKeepFirst(_ sender: Any?) {
+            uniqueSelectedLines(keepLast: false)
+        }
+
+        /// 後勝ち：最後の出現を残して重複行を削除
+        @IBAction func uniqueLinesKeepLast(_ sender: Any?) {
+            uniqueSelectedLines(keepLast: true)
+        }
+
+        /// 選択範囲にかかる段落の重複を削除する（順序は維持）
+        /// - Parameter keepLast: true で最後の出現を残す（後勝ち）、false で最初（先勝ち）
+    func uniqueSelectedLines(keepLast: Bool) {
+        let snapshot = textStorage.snapshot
+        let sel = selectionRange
         
+        // 空選択は全文対象／それ以外は選択にかかる段落範囲
+        let paraRange: Range<Int>
+        if sel.isEmpty {
+            paraRange = 0 ..< snapshot.paragraphs.count
+        } else {
+            guard let r = snapshot.paragraphRange(containing: sel), !r.isEmpty else { return }
+            paraRange = r
+        }
+        
+        // 範囲キー（ゼロコピー）でユニーク化
+        var seen = Set<TextRangeRef>()
+        var keptRanges: [Range<Int>] = []
+        keptRanges.reserveCapacity(paraRange.count)
+        
+        if keepLast {
+            // 後勝ち：逆順に走査して新規だけを前詰め
+            for idx in paraRange.reversed() {
+                let pr = snapshot.paragraphs[idx].range
+                let key = TextRangeRef(storage: textStorage, range: pr)
+                if seen.insert(key).inserted {
+                    keptRanges.insert(pr, at: 0)
+                }
+            }
+        } else {
+            // 先勝ち：通常順に走査して新規だけを追加
+            for idx in paraRange {
+                let pr = snapshot.paragraphs[idx].range
+                let key = TextRangeRef(storage: textStorage, range: pr)
+                if seen.insert(key).inserted {
+                    keptRanges.append(pr)
+                }
+            }
+        }
+        
+        // 置換範囲（文字範囲）を構成
+        let lower = snapshot.paragraphs[paraRange.lowerBound].range.lowerBound
+        let upper = snapshot.paragraphs[paraRange.upperBound - 1].range.upperBound
+        let replaceRange = lower ..< upper
+        
+        // 最後にだけ文字列化（コピーはここ1回）
+        // paragraph.string は末尾LFを含まない想定なので "\n" で結合
+        var parts: [String] = []
+        parts.reserveCapacity(keptRanges.count)
+        for r in keptRanges {
+            parts.append(textStorage.string(in: r))
+        }
+        let newBlock = parts.joined(separator: "\n")
+        
+        textStorage.replaceString(in: replaceRange, with: newBlock)
+        selectionRange = replaceRange.lowerBound ..< (replaceRange.lowerBound + newBlock.count)
     }
     
     
