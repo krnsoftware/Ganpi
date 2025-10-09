@@ -363,14 +363,11 @@ extension KTextView {
         let sel = selectionRange
 
         // 対象段落を決定
-        let idxRange: Range<Int>
-        if sel.isEmpty {
-            idxRange = 0..<snapshot.paragraphs.count
-        } else {
-            guard let r = snapshot.paragraphIndexRange(containing: sel),
-                  !r.isEmpty else { return }
-            idxRange = r
+        guard let idxRange = snapshot.paragraphIndexRange(containing: sel) else {
+            log("idx nil",from:self)
+            return
         }
+           
 
         // 各段落を末尾トリム
         var resultLines: [String] = []
@@ -396,6 +393,41 @@ extension KTextView {
 
         textStorage.replaceString(in: totalRange, with: newBlock)
         selectionRange = totalRange.lowerBound ..< (totalRange.lowerBound + newBlock.count)
+    }
+    
+    
+    // MARK: - Collapse Empty Lines
+    
+    @IBAction func collapseEmptyLines(_ sender: Any?) {
+        let snapshot = textStorage.snapshot
+        guard let idxRange = snapshot.paragraphIndexRange(containing: selectionRange),
+              !idxRange.isEmpty else { return }
+
+        var result: [String] = []
+        result.reserveCapacity(idxRange.count)
+        var prevEmpty = false
+
+        for i in idxRange {
+            let p = snapshot.paragraphs[i]
+            if p.range.isEmpty {
+                if !prevEmpty { result.append("") }   // 連続空行を1行に圧縮
+                prevEmpty = true
+            } else {
+                result.append(p.string)
+                prevEmpty = false
+            }
+        }
+
+        let total = snapshot.paragraphRange(indexRange: idxRange)
+        var newBlock = result.joined(separator: "\n")
+
+        // 末尾まで選択が届いており、最後が空行なら LF を1つ保持
+        if idxRange.upperBound == snapshot.paragraphs.count, result.last == "" {
+            newBlock.append("\n")
+        }
+
+        textStorage.replaceString(in: total, with: newBlock)
+        selectionRange = total.lowerBound ..< (total.lowerBound + newBlock.count)
     }
     
     // MARK: - Color treatment

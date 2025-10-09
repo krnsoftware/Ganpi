@@ -338,9 +338,9 @@
                                     </items>
                                 </menu>
                             </menuItem>
-                            <menuItem title="Line" id="ZZm-eE-Wkd">
+                            <menuItem title="Lines" id="ZZm-eE-Wkd">
                                 <modifierMask key="keyEquivalentModifierMask"/>
-                                <menu key="submenu" id="ijU-wn-apn">
+                                <menu key="submenu" title="Lines" id="ijU-wn-apn">
                                     <items>
                                         <menuItem title="Shift Left" keyEquivalent="[" id="xf8-eU-1uw">
                                             <connections>
@@ -377,16 +377,22 @@
                                                 <action selector="uniqueLinesKeepLast:" target="-1" id="eNT-gH-6g6"/>
                                             </connections>
                                         </menuItem>
-                                        <menuItem title="Join" id="KG2-Lg-vZa">
+                                        <menuItem title="Join Lines" id="KG2-Lg-vZa">
                                             <modifierMask key="keyEquivalentModifierMask"/>
                                             <connections>
                                                 <action selector="joinLines:" target="-1" id="fbS-tf-mew"/>
                                             </connections>
                                         </menuItem>
-                                        <menuItem title="Trim" id="W3y-2u-1iz">
+                                        <menuItem title="Trim Trailing Spaces" id="W3y-2u-1iz">
                                             <modifierMask key="keyEquivalentModifierMask"/>
                                             <connections>
                                                 <action selector="trimTrailingSpaces:" target="-1" id="qTD-ud-naW"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Collapse Empty Lines" id="bXN-QK-OUJ">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="collapseEmptyLines:" target="-1" id="ZQw-ol-hRm"/>
                                             </connections>
                                         </menuItem>
                                         <menuItem isSeparatorItem="YES" id="Icb-Jy-B8c"/>

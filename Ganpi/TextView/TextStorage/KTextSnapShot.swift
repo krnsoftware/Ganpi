@@ -54,28 +54,28 @@ class KTextSnapShot {
     }
     
     func paragraphIndex(containing index: Int) -> Int? {
-        // 許容範囲：0...count（countは文末直後を指す）
-        guard index >= 0, index <= _storage.count else { return nil }
-        if paragraphs.isEmpty { return nil }
+        // 許容範囲：0...count（count は文末直後）
+        guard index >= 0, index <= _storage.count else { log("out of range.", from: self); return nil }
+        if paragraphs.isEmpty { log("empty.", from: self); return nil }
 
-        // 文末（index == count）は「最後の段落」を返す
+        // 文末（index == count）は最後の段落
         if index == _storage.count { return paragraphs.count - 1 }
 
         var lo = 0
-        var hi = paragraphs.count - 1
-        while lo <= hi {
+        var hi = paragraphs.count  // 半開区間
+        while lo < hi {
             let mid = (lo + hi) >> 1
-            let r = paragraphs[mid].range   // [lower, upper) …… upperは排他的
-            if index >= r.lowerBound && index < r.upperBound {
-                return mid
-            } else if index < r.lowerBound {
-                hi = mid - 1
-            } else {
+            let range = paragraphs[mid].range // [lower, upper)
+            if index < range.lowerBound {
+                hi = mid
+            } else if index >= range.upperBound {
                 lo = mid + 1
+            } else {
+                return mid // lower <= index < upper
             }
         }
-
-        return nil
+        // ここに来るのは “境界ジャスト（= upperBound）”
+        return lo > 0 ? (lo - 1) : 0
     }
     
     // rangeを含むparagraphのindexの範囲を返す。
@@ -84,12 +84,21 @@ class KTextSnapShot {
             guard let idx = paragraphIndex(containing: range.lowerBound) else { return nil }
             return idx..<(idx + 1)
         } else {
-            guard let lo = paragraphIndex(containing: range.lowerBound),
-                  let hi = paragraphIndex(containing: range.upperBound - 1) else { return nil }
-            return lo..<(hi + 1)
+            guard let lo = paragraphIndex(containing: range.lowerBound) else { return nil }
+
+            let hi: Int
+            if range.upperBound == _storage.count {
+                // 文末まで選択されている場合：最終段落を含める（末尾が空段落でも漏らさない）
+                hi = paragraphs.count - 1
+            } else {
+                guard let hiIndex = paragraphIndex(containing: range.upperBound - 1) else { return nil }
+                hi = hiIndex
+            }
+            return lo..<(hi + 1) // 半開区間に揃える
         }
     }
     
+    // indexの範囲で表されるパラグラフの範囲を返す。最後の行の行末の改行は含まない。
     func paragraphRange(indexRange: Range<Int>) -> Range<Int> {
         precondition(!indexRange.isEmpty)
         let lower = paragraphs[indexRange.lowerBound].range.lowerBound
