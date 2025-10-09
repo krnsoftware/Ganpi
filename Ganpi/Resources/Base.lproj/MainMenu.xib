@@ -470,6 +470,13 @@
                                             </connections>
                                         </menuItem>
                                         <menuItem isSeparatorItem="YES" id="qDb-TX-71W"/>
+                                        <menuItem title="Toggle Line Comment" id="F0a-Sf-TI4">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="toggleLineComment:" target="-1" id="pq1-z3-VIQ"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem isSeparatorItem="YES" id="nMF-KV-TI0"/>
                                         <menuItem title="Trim Trailing Spaces" id="fnf-Dn-Rcw">
                                             <modifierMask key="keyEquivalentModifierMask"/>
                                             <connections>

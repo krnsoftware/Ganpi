@@ -461,6 +461,70 @@ extension KTextView {
         selectionRange = totalRange.lowerBound ..< (totalRange.lowerBound + newBlock.count)
     }
     
+    // MARK: - Comment
+    
+    @IBAction func toggleLineComment(_ sender: Any?) {
+        let snapshot = textStorage.snapshot
+        guard let indexRange = snapshot.paragraphIndexRange(containing: selectionRange),
+              !indexRange.isEmpty else { log("1", from: self); return }
+        guard let head = textStorage.parser.lineCommentPrefix, !head.isEmpty else { log("2", from: self); return }
+
+        // 対象段落を取得
+        var lines: [String] = []
+        lines.reserveCapacity(indexRange.count)
+        for i in indexRange {
+            lines.append(snapshot.paragraphs[i].string)
+        }
+
+        // 非空行がすべてコメント済みなら「解除」、そうでなければ「付与」
+        let headWithSpace = head + " "
+        let isCommentedLine: (String) -> Bool = { line in
+            guard !line.isEmpty else { return false }
+            return line.hasPrefix(headWithSpace) || line.hasPrefix(head)
+        }
+        let nonEmpty = lines.filter { !$0.isEmpty }
+        let allCommented = !nonEmpty.isEmpty && nonEmpty.allSatisfy(isCommentedLine)
+
+        var result: [String] = []
+        result.reserveCapacity(lines.count)
+
+        if allCommented {
+            // 解除：行頭の head を外し、続く 1 スペースがあれば外す
+            for line in lines {
+                guard !line.isEmpty else { result.append(""); continue }
+                if line.hasPrefix(headWithSpace) {
+                    let start = headWithSpace.count
+                    result.append(String(line.dropFirst(start)))
+                } else if line.hasPrefix(head) {
+                    let afterHead = line.index(line.startIndex, offsetBy: head.count)
+                    // 直後のスペースは 1 つだけ落とす
+                    if afterHead < line.endIndex, line[afterHead] == " " {
+                        result.append(String(line.dropFirst(head.count + 1)))
+                    } else {
+                        result.append(String(line.dropFirst(head.count)))
+                    }
+                } else {
+                    result.append(line)
+                }
+            }
+        } else {
+            // 付与：非空行の行頭に head+" " を追加（空行はそのまま）
+            for line in lines {
+                if line.isEmpty {
+                    result.append("")
+                } else {
+                    result.append(headWithSpace + line)
+                }
+            }
+        }
+
+        // 一括置換（Undo 1 回）
+        let replaceRange = snapshot.paragraphRange(indexRange: indexRange)
+        let newBlock = result.joined(separator: "\n")
+        textStorage.replaceString(in: replaceRange, with: newBlock)
+        selectionRange = replaceRange.lowerBound ..< (replaceRange.lowerBound + newBlock.count)
+    }
+    
     // MARK: - Color treatment
     
     // Show Color Panel.

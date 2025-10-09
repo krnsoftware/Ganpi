@@ -20,6 +20,7 @@ final class KSyntaxParserPlain: KSyntaxParserProtocol {
     func currentContext(at index: Int) -> [KOutlineItem]  { return [] }
     func rebuildCompletionsIfNeeded(dirtyRange: Range<Int>?) { /* no-op */ }
     func completionEntries(prefix: String,around index: Int,limit: Int, policy: KCompletionPolicy) -> [KCompletionEntry]{ return [] }
+    var lineCommentPrefix: String? { nil }
 
     // ハイライトなし
     func attributes(in range: Range<Int>, tabWidth: Int) -> [KAttributedSpan] { [] }

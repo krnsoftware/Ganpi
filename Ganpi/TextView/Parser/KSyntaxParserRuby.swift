@@ -71,6 +71,10 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
     // 作業用
     private var _tmpSpans: [KAttributedSpan] = []
     
+    // コメント用
+    var lineCommentPrefix: String? { "#" }
+    
+    
     // ストレージ
     let storage: KTextStorageReadable
     init(storage: KTextStorageReadable) { self.storage = storage }

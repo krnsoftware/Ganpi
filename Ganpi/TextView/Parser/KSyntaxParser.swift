@@ -158,6 +158,8 @@ protocol KSyntaxParserProtocol: AnyObject {
                            limit: Int,
                            policy: KCompletionPolicy) -> [KCompletionEntry]
     
+    // コメント用のプロパティ
+    var lineCommentPrefix: String? { get }
     
 }
 
