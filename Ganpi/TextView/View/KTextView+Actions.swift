@@ -160,57 +160,108 @@ extension KTextView {
     
     // MARK: - Sort Lines
     
+    
     @IBAction func sortLines(_ sender: Any?) {
-            sortSelectedLines(caseInsensitive: false, numeric: false, descending: false)
+        //sortSelectedLines(caseInsensitive: false, numeric: false, descending: false)
+        sortSelectedLines()
+    }
+    
+    @IBAction func sortSelectedLines_AscT_CaseT_NumT(_ sender: Any?) {
+        sortSelectedLines(options: [.caseInsensitive, .numeric], ascending: true)
+    }
+    @IBAction func sortSelectedLines_AscT_CaseT_NumN(_ sender: Any?) {
+        sortSelectedLines(options: [.caseInsensitive], ascending: true)
+    }
+    @IBAction func sortSelectedLines_AscT_CaseN_NumT(_ sender: Any?) {
+        sortSelectedLines(options: [.numeric], ascending: true)
+    }
+    @IBAction func sortSelectedLines_AscT_CaseN_NumN(_ sender: Any?) {
+        sortSelectedLines(options: [], ascending: true)
+    }
+    @IBAction func sortSelectedLines_AscN_CaseT_NumT(_ sender: Any?) {
+        sortSelectedLines(options: [.caseInsensitive, .numeric], ascending: false)
+    }
+    @IBAction func sortSelectedLines_AscN_CaseT_NumN(_ sender: Any?) {
+        sortSelectedLines(options: [.caseInsensitive], ascending: false)
+    }
+    @IBAction func sortSelectedLines_AscN_CaseN_NumT(_ sender: Any?) {
+        sortSelectedLines(options: [.numeric], ascending: false)
+    }
+    @IBAction func sortSelectedLines_AscN_CaseN_NumN(_ sender: Any?) {
+        sortSelectedLines(options: [], ascending: false)
+    }
+    
+    func sortSelectedLines(options: String.CompareOptions = [], ascending: Bool = true) {
+        let snapshot = textStorage.snapshot
+        let sel = selectionRange
+
+        guard var paraRange = snapshot.paragraphRange(containing: sel),
+              !paraRange.isEmpty else { return }
+
+        // 全文選択で末尾LFがあるなら、空段落を含める
+        if sel.lowerBound == 0, sel.upperBound == textStorage.count,
+           let last = snapshot.paragraphs.last, last.range.isEmpty {
+            paraRange = paraRange.lowerBound ..< (paraRange.upperBound + 1)
         }
 
-    private func sortSelectedLines(caseInsensitive: Bool, numeric: Bool, descending: Bool) {
+        var lines: [String] = []
+        lines.reserveCapacity(paraRange.count)
+        for i in paraRange { lines.append(snapshot.paragraphs[i].string) }
+
+        let locale = Locale.current
+        lines.sort {
+            let cmp = $0.compare($1, options: options, range: nil, locale: locale)
+            return ascending ? (cmp == .orderedAscending) : (cmp == .orderedDescending)
+        }
+
+        let lower = snapshot.paragraphs[paraRange.lowerBound].range.lowerBound
+        let upper = snapshot.paragraphs[paraRange.upperBound - 1].range.upperBound
+        let replaceRange = lower..<upper
+
+        let newBlock = lines.joined(separator: "\n")
+        textStorage.replaceString(in: replaceRange, with: newBlock)
+        selectionRange = replaceRange.lowerBound ..< (replaceRange.lowerBound + newBlock.count)
+    }
+    
+    /*
+    func sortSelectedLines(options: String.CompareOptions = [], ascending: Bool = true) {
         let snapshot = textStorage.snapshot
         let selection = selectionRange
         guard let paraRange = snapshot.paragraphRange(containing: selection),
-              !paraRange.isEmpty else {
-            log("paragraphRange: out of range.", from: self)
-            return
-        }
-        
-        // 対象段落のテキスト抽出
+              !paraRange.isEmpty else { return }
+
         var lines: [String] = []
-        lines.reserveCapacity(paraRange.count)
         for i in paraRange {
             lines.append(snapshot.paragraphs[i].string)
         }
         
-        // 並べ替え（安定ソート）
         let locale = Locale.current
         lines.sort {
-            let result = $0.compare(
-                $1,
-                options: buildCompareOptions(caseInsensitive: caseInsensitive, numeric: numeric),
-                range: nil,
-                locale: locale
-            )
-            return descending ? (result == .orderedDescending) : (result == .orderedAscending)
+            let cmp = $0.compare($1,
+                                 options: options,
+                                 range: nil,
+                                 locale: locale)
+            return ascending
+                ? (cmp == .orderedAscending)
+                : (cmp == .orderedDescending)
         }
-        
-        // 結合して置換（LF固定）
-        let newBlock = lines.joined(separator: "\n")
-        
-        // 段落範囲を文字範囲に変換
+
         let lower = snapshot.paragraphs[paraRange.lowerBound].range.lowerBound
         let upper = snapshot.paragraphs[paraRange.upperBound - 1].range.upperBound
         let replaceRange = lower..<upper
-        
+
+        let newBlock = lines.joined(separator: "\n")
         textStorage.replaceString(in: replaceRange, with: newBlock)
         selectionRange = replaceRange.lowerBound ..< (replaceRange.lowerBound + newBlock.count)
+    }*/
+    
+    
+    // MARK: - Unique Lines
+    
+    @IBAction func uniqueSelectedLines(_ sender: Any?) {
+        
     }
-
-        // 比較オプション生成
-    private func buildCompareOptions(caseInsensitive: Bool, numeric: Bool) -> String.CompareOptions {
-        var options: String.CompareOptions = [.widthInsensitive]
-        if caseInsensitive { options.insert(.caseInsensitive) }
-        if numeric { options.insert(.numeric) }
-        return options
-    }
+    
     
     // MARK: - Color treatment
     

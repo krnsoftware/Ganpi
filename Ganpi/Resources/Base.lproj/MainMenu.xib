@@ -364,10 +364,60 @@
                                                 <action selector="moveLineDown:" target="-1" id="RKq-CG-i0w"/>
                                             </connections>
                                         </menuItem>
+                                        <menuItem isSeparatorItem="YES" id="dGo-AE-liP"/>
                                         <menuItem title="Sort Lines" id="vWS-Zf-2r1">
                                             <modifierMask key="keyEquivalentModifierMask"/>
                                             <connections>
                                                 <action selector="sortLines:" target="-1" id="01H-on-Cpt"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem isSeparatorItem="YES" id="Icb-Jy-B8c"/>
+                                        <menuItem title="Sort  Asc:Y  CaseIns:Y  Num:Y" id="z7c-a8-z3R">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="sortSelectedLines_AscT_CaseT_NumT:" target="-1" id="7rD-1l-Twc"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Sort  Asc:Y  CaseIns:Y  Num:N" id="EbB-MN-qLK">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="sortSelectedLines_AscT_CaseT_NumN:" target="-1" id="TJW-Ic-na9"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Sort  Asc:Y  CaseIns:N  Num:Y" id="Ueb-0c-D2B">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="sortSelectedLines_AscT_CaseN_NumT:" target="-1" id="Shx-gU-ECs"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Sort  Asc:Y  CaseIns:N  Num:N" id="VIT-pc-Z36">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="sortSelectedLines_AscT_CaseN_NumN:" target="-1" id="JDi-lN-u7j"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Sort  Asc:N  CaseIns:Y  Num:Y" id="r6y-2v-0zZ">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="sortSelectedLines_AscN_CaseT_NumT:" target="-1" id="Dnd-ki-THy"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Sort  Asc:N  CaseIns:Y  Num:N" id="8tU-1N-35k">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="sortSelectedLines_AscN_CaseT_NumN:" target="-1" id="1qF-Jo-zDc"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Sort  Asc:N  CaseIns:N  Num:Y" id="wk9-WJ-pmv">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="sortSelectedLines_AscN_CaseN_NumT:" target="-1" id="YbI-ya-FeV"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Sort  Asc:N  CaseIns:N  Num:N" id="Plf-hp-CmM">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="sortSelectedLines_AscN_CaseN_NumN:" target="-1" id="xYA-Rk-TXK"/>
                                             </connections>
                                         </menuItem>
                                     </items>
