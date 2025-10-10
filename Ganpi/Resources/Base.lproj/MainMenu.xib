@@ -423,9 +423,9 @@
                                 </menu>
                             </menuItem>
                             <menuItem isSeparatorItem="YES" id="VaE-pr-yAa"/>
-                            <menuItem title="Lines - Move" id="ZZm-eE-Wkd">
+                            <menuItem title="Move Lines" id="ZZm-eE-Wkd">
                                 <modifierMask key="keyEquivalentModifierMask"/>
-                                <menu key="submenu" title="Lines - Move" id="ijU-wn-apn">
+                                <menu key="submenu" title="Move Lines" id="ijU-wn-apn">
                                     <items>
                                         <menuItem title="Shift Left" keyEquivalent="[" id="xf8-eU-1uw">
                                             <connections>
@@ -453,9 +453,9 @@
                                     </items>
                                 </menu>
                             </menuItem>
-                            <menuItem title="Lines - Modify" id="DRK-yg-pgE">
+                            <menuItem title="Modify Lines" id="DRK-yg-pgE">
                                 <modifierMask key="keyEquivalentModifierMask"/>
-                                <menu key="submenu" id="Glo-lu-b1r">
+                                <menu key="submenu" title="Modify Lines" id="Glo-lu-b1r">
                                     <items>
                                         <menuItem title="Unique (Keep First)" id="JfS-QD-MDw">
                                             <modifierMask key="keyEquivalentModifierMask"/>
@@ -477,12 +477,6 @@
                                             </connections>
                                         </menuItem>
                                         <menuItem isSeparatorItem="YES" id="nMF-KV-TI0"/>
-                                        <menuItem title="Trim Trailing Spaces" id="fnf-Dn-Rcw">
-                                            <modifierMask key="keyEquivalentModifierMask"/>
-                                            <connections>
-                                                <action selector="trimTrailingSpaces:" target="-1" id="qyA-0v-gwL"/>
-                                            </connections>
-                                        </menuItem>
                                         <menuItem title="Join Lines" id="hlu-t3-YmD">
                                             <modifierMask key="keyEquivalentModifierMask"/>
                                             <connections>
@@ -495,10 +489,35 @@
                                                 <action selector="duplicateLines:" target="-1" id="ezb-wc-hNP"/>
                                             </connections>
                                         </menuItem>
+                                        <menuItem title="Trim Trailing Spaces" id="fnf-Dn-Rcw">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="trimTrailingSpaces:" target="-1" id="qyA-0v-gwL"/>
+                                            </connections>
+                                        </menuItem>
                                         <menuItem title="Delete Lines" keyEquivalent="K" id="QmS-ie-jYS">
                                             <modifierMask key="keyEquivalentModifierMask" shift="YES" command="YES"/>
                                             <connections>
                                                 <action selector="deleteLines:" target="-1" id="9LI-xn-B2A"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem isSeparatorItem="YES" id="GR7-3o-LvB"/>
+                                        <menuItem title="Reflow Paragraph [72]" id="jMT-qO-SOF">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="reflowParagraph72:" target="-1" id="0aZ-bi-WdX"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Reflow Paragraph [80]" id="VYf-zj-p8u">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="reflowParagraph80:" target="-1" id="DFL-Bb-cNM"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Reflow Paragraph [100]" id="bd5-cK-snZ">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="reflowParagraph100:" target="-1" id="EQz-rW-UPG"/>
                                             </connections>
                                         </menuItem>
                                         <menuItem isSeparatorItem="YES" id="uKj-fd-z7S"/>
@@ -517,9 +536,9 @@
                                     </items>
                                 </menu>
                             </menuItem>
-                            <menuItem title="Lines - Sort" id="UxS-Pu-sPd">
+                            <menuItem title="Sort Lines" id="UxS-Pu-sPd">
                                 <modifierMask key="keyEquivalentModifierMask"/>
-                                <menu key="submenu" id="wSw-cm-Ph1">
+                                <menu key="submenu" title="Sort Lines" id="wSw-cm-Ph1">
                                     <items>
                                         <menuItem title="Sort Lines" id="0cC-jH-XYX">
                                             <modifierMask key="keyEquivalentModifierMask"/>

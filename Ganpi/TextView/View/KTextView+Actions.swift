@@ -569,6 +569,196 @@ extension KTextView {
         selectionRange = replaceRange.lowerBound ..< (replaceRange.lowerBound + newBlock.count)
     }
     
+    
+    // MARK: - Reflow Paragraph (column wrap by display width)
+
+    @IBAction func reflowParagraph72(_ sender: Any?) { reflowSelectedParagraphs(columnLimit: 72) }
+    @IBAction func reflowParagraph80(_ sender: Any?) { reflowSelectedParagraphs(columnLimit: 80) }
+    @IBAction func reflowParagraph100(_ sender: Any?) { reflowSelectedParagraphs(columnLimit: 100) }
+
+    /// 選択中の段落ブロックを Reflow（幅指定で折り直し）
+    /// - columnLimit: 列の上限（72/80/100 など）
+    /// - tabWidth: タブ幅（Ganpi 既定に合わせる）
+    private func reflowSelectedParagraphs(columnLimit: Int, tabWidth: Int = 8) {
+        let snapshot = textStorage.snapshot
+        guard let indexRange = snapshot.paragraphIndexRange(containing: selectionRange),
+              !indexRange.isEmpty else { log("1", from: self); return }
+        
+        // 段落ブロック全体の置換範囲（[lower, upper)）
+        let replaceRange = snapshot.paragraphRange(indexRange: indexRange)
+        
+        // 「空行で段落を区切る」：非空行の塊ごとに reflow し、空行はそのまま出力
+        var outLines: [String] = []
+        outLines.reserveCapacity(indexRange.count)
+        
+        var buffer = "" // 非空行の塊を 1 行（英語: 空白1で連結 / 日本語: そのまま連結）に畳む
+        for i in indexRange {
+            let para = snapshot.paragraphs[i]
+            if para.range.isEmpty {
+                // 空行に遭遇：直前の塊をフラッシュして空行を出力
+                if !buffer.isEmpty {
+                    outLines.append(contentsOf: wrapToColumns(buffer, limit: columnLimit, tabWidth: tabWidth))
+                    buffer.removeAll(keepingCapacity: true)
+                }
+                outLines.append("")
+            } else {
+                let s = para.string
+                if buffer.isEmpty {
+                    buffer = normalizeWhitespaces(s)
+                } else {
+                    // 英語は空白 1 で接続、日本語は normalizeWhitespaces 内で空白が潰れるため結果は自然
+                    buffer += " " + normalizeWhitespaces(s)
+                }
+            }
+        }
+        // 末尾に塊が残っていればフラッシュ
+        if !buffer.isEmpty {
+            outLines.append(contentsOf: wrapToColumns(buffer, limit: columnLimit, tabWidth: tabWidth))
+        }
+        
+        let newBlock = outLines.joined(separator: "\n")
+        textStorage.replaceString(in: replaceRange, with: newBlock)
+        selectionRange = replaceRange.lowerBound ..< (replaceRange.lowerBound + newBlock.count)
+    }
+
+
+    /// 与えられたテキストを列幅で折り直す。
+    /// CJK（ひらがな/カタカナ/漢字）を含む場合は CJK モード＝文字幅のみで改行（空白挿入なし）
+    private func wrapToColumns(_ text: String, limit: Int, tabWidth: Int) -> [String] {
+        let containsCJK = text.contains { $0._jpScript != nil }
+        if containsCJK {
+            return wrapCJKToColumns(text, limit: limit)
+        } else {
+            return wrapLatinToColumns(text, limit: limit, tabWidth: tabWidth)
+        }
+    }
+
+    /// 英語（空白区切り）用：トークン単位で折り返し。トークン間には半角スペース 1 を入れる。
+    /// 長大トークン（URLなど）は行頭にそのまま置いてはみ出し許容。
+    private func wrapLatinToColumns(_ text: String, limit: Int, tabWidth: Int) -> [String] {
+        var lines: [String] = []
+        lines.reserveCapacity(max(1, text.count / max(1, limit)))
+        
+        var line = ""
+        var col = 0
+        
+        var i = text.startIndex
+        while i < text.endIndex {
+            // 先頭空白（space/tab）は正規化済みだが念のため読み飛ばし
+            while i < text.endIndex, text[i] == " " || text[i] == "\t" {
+                i = text.index(after: i)
+            }
+            if i >= text.endIndex { break }
+            
+            // 非空白トークン抽出
+            let start = i
+            while i < text.endIndex, text[i] != " " && text[i] != "\t" {
+                i = text.index(after: i)
+            }
+            let token = text[start..<i]
+            let tokenCols = token.displayColumns(startColumn: 0, tabWidth: tabWidth)
+            
+            if line.isEmpty {
+                // 行頭：そのまま置く（はみ出し許容）
+                line = String(token)
+                col = tokenCols
+            } else if col + 1 + tokenCols <= limit {
+                line.append(" ")
+                line.append(contentsOf: token)
+                col += 1 + tokenCols
+            } else {
+                lines.append(line)
+                line = String(token)
+                col = tokenCols
+            }
+        }
+        
+        if !line.isEmpty { lines.append(line) }
+        return lines
+    }
+
+    /// 日本語（CJK）用：文字幅の合計で折り返し。結合記号は幅 0。空白は挿入しない。
+    // ASCII の「語っぽい」文字（英数と一部記号）だけを true にする
+    private func isAsciiWordChar(_ ch: Character) -> Bool {
+        guard ch.isAllASCII else { return false }
+        switch ch {
+        case "A"..."Z", "a"..."z", "0"..."9", "_", "-", ".", "/", ":":
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// 日本語（CJK）用：文字幅の合計で折り返しつつ、ASCII の語連続は1トークンとして扱う
+    private func wrapCJKToColumns(_ text: String, limit: Int) -> [String] {
+        var lines: [String] = []
+        var line = ""
+        var col = 0
+
+        var i = text.startIndex
+        while i < text.endIndex {
+            let ch = text[i]
+
+            // 1) ASCII の語連続をまとめて1トークンにする
+            if isAsciiWordChar(ch) {
+                let start = i
+                var j = text.index(after: i)
+                while j < text.endIndex, isAsciiWordChar(text[j]) {
+                    j = text.index(after: j)
+                }
+                let token = text[start..<j]
+                let w = token.displayColumns(startColumn: 0, tabWidth: 8) // タブは来ない想定だが念のため
+
+                if col + w > limit, !line.isEmpty {
+                    lines.append(line)
+                    line.removeAll(keepingCapacity: true)
+                    col = 0
+                }
+                line.append(contentsOf: token)
+                col += w
+                i = j
+                continue
+            }
+
+            // 2) それ以外は1文字ずつ扱う（CJK/絵文字/句読点など）
+            if ch == "\n" { // 念のため無視（段落単位で来る想定）
+                i = text.index(after: i)
+                continue
+            }
+            let w = ch.displayWidth
+            if col + w > limit, !line.isEmpty {
+                lines.append(line)
+                line.removeAll(keepingCapacity: true)
+                col = 0
+            }
+            line.append(ch)
+            col += w
+            i = text.index(after: i)
+        }
+
+        if !line.isEmpty { lines.append(line) }
+        return lines
+    }
+
+    /// 連続空白（space/tab）を単一スペースに正規化（LF は Ganpi 仕様で来ない前提）
+    private func normalizeWhitespaces(_ s: String) -> String {
+        var out = String()
+        out.reserveCapacity(s.count)
+        var wasSpace = false
+        for ch in s {
+            if ch == " " || ch == "\t" {
+                if !wasSpace {
+                    out.append(" ")
+                    wasSpace = true
+                }
+            } else {
+                out.append(ch)
+                wasSpace = false
+            }
+        }
+        return out
+    }
+    
     // MARK: - Color treatment
     
     // Show Color Panel.

@@ -9,21 +9,45 @@ import Cocoa
 
 extension Character {
     
-    // 文字種により全角・半角を判別する。
-    // proportional fontでは意味がないが、将来完全な等幅フォントを使用する場合に利用する予定。
     var displayWidth: Int {
+        // 制御系は 0（既存の isControl でもOK）
+        if self == "\n" || self == "\r" { return 0 }
+        
+        // まず絵文字をざっくり 2 桁扱い
+        // （厳密化は将来でOK）
+        if unicodeScalars.contains(where: { $0.properties.isEmoji || $0.properties.isEmojiPresentation }) {
+            return 2
+        }
+        
+        // 結合記号・フォーマットは 0 幅にする
+        // （結合濁点/ZWJ/バリアント選択子など）
+        let contributesWidth = unicodeScalars.contains { s in
+            // ZWJ / Variation Selector
+            if s.value == 0x200D { return false }
+            if (0xFE00...0xFE0F).contains(s.value) { return false }
+            if (0xE0100...0xE01EF).contains(s.value) { return false }
+            
+            // Category による 0 幅
+            switch s.properties.generalCategory {
+            case .nonspacingMark, .enclosingMark, .format:
+                return false
+            default:
+                return true
+            }
+        }
+        if !contributesWidth { return 0 }
+        
+        // ここからは既存の全角/半角ざっくり判定（維持）
         guard let scalar = unicodeScalars.first else { return 1 }
-        let value = scalar.value
-
-        // 簡易全角・半角判定
-        switch value {
+        let v = scalar.value
+        switch v {
         case 0x1100...0x11FF,       // Hangul Jamo
-             0x2E80...0x9FFF,       // CJK系（部首/漢字など）
-             0xAC00...0xD7A3,       // Hangul Syllables
-             0xF900...0xFAFF,       // CJK互換漢字
-             0xFE10...0xFE1F,       // 縦書き用句読点
-             0xFF01...0xFF60,       // 全角記号/英数
-             0xFFE0...0xFFE6:       // 全角記号
+            0x2E80...0x9FFF,       // CJK系（部首/漢字など）
+            0xAC00...0xD7A3,       // Hangul Syllables
+            0xF900...0xFAFF,       // CJK互換漢字
+            0xFE10...0xFE1F,       // 縦書き用句読点
+            0xFF01...0xFF60,       // 全角記号/英数
+            0xFFE0...0xFFE6:       // 全角記号
             return 2
         default:
             return 1
@@ -101,3 +125,6 @@ extension Character {
         return nil
     }
 }
+
+
+

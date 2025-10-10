@@ -900,7 +900,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 image.unlockFocus()
                 
                 draggingItem.setDraggingFrame(NSRect(origin: imageOrigin, size: image.size), contents: image)
-                log("DRAGGING.", from:self)
+                //log("DRAGGING.", from:self)
                 beginDraggingSession(with: [draggingItem], event: event, source: self)
                 _singleClickPending = false
             }
@@ -960,7 +960,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             // textRegionより上なら文頭まで、下なら文末まで選択する。
             let textRect = layoutRects.textRegion.rect
             
-            log(".outside", from:self)
+            //log(".outside", from:self)
             
             if location.y < textRect.minY {
                 //selectionRange = 0..<(_horizontalSelectionBase ?? caretIndex)
