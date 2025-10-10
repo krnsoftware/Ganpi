@@ -42,8 +42,67 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @IBAction func showLogPanel(_ sender: Any?) {
         KLogPanel.shared.show()
     }
-
     
+    @IBOutlet private  var _dockMenuFromNib: NSMenu!  // nib 接続（保持は nib 側）
+    
+    // ActiveでもInactiveでも、開く直前に必ず呼ばれる
+    func menuWillOpen(_ menu: NSMenu) {
+        guard menu === _dockMenuFromNib else { return }
+        rebuildDockMenu()
+    }
+    
+    // Active時だけ OS が呼ぶ（呼ばれたら一応詰め替えて同じインスタンスを返す）
+    @objc(applicationDockMenu:)
+    func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
+        log("dock!")
+        rebuildDockMenu()
+        return _dockMenuFromNib
+    }
+    
+    private func rebuildDockMenu() {
+        guard let menu = _dockMenuFromNib else { return }
+        menu.removeAllItems()
+        var added = 0
+        for w in NSApp.windows {
+            if w.level != .normal { continue }
+            if w.isExcludedFromWindowsMenu { continue }
+            if w is NSPanel { continue }
+            if w.isSheet { continue }
+            let item = NSMenuItem(
+                title: dockTitle(for: w),
+                action: #selector(selectWindowFromDockMenu(_:)),
+                keyEquivalent: ""
+            )
+            item.target = self
+            item.representedObject = w
+            if w.isMiniaturized { item.toolTip = "Minimized" }
+            menu.addItem(item)
+            added += 1
+        }
+        if added == 0 {
+            let info = NSMenuItem(title: "No document windows", action: nil, keyEquivalent: "")
+            info.isEnabled = false
+            menu.addItem(info)
+        }
+    }
+    
+    @objc private func selectWindowFromDockMenu(_ sender: NSMenuItem) {
+        guard let w = sender.representedObject as? NSWindow else { return }
+        NSApp.activate(ignoringOtherApps: false)
+        if w.isMiniaturized { w.deminiaturize(nil) }
+        w.makeKeyAndOrderFront(nil)
+    }
+    
+    private func dockTitle(for w: NSWindow) -> String {
+        var s: String = {
+            if let d = w.windowController?.document as? NSDocument { return d.displayName }
+            let t = w.title.trimmingCharacters(in: .whitespacesAndNewlines)
+            return t.isEmpty ? "Untitled" : t
+        }()
+        if w.isDocumentEdited { s = "● " + s }
+        if w.isMiniaturized { s += " (Minimized)" }
+        return s
+    }
     
 }
 
