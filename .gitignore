@@ -12,6 +12,11 @@ xcuserdata/
 *.xcuserstate
 *.xcscmblueprint
 
+# Xcode schemes (never version)
+*.xcscheme
+*.xcodeproj/xcshareddata/xcschemes/
+*.xcworkspace/xcshareddata/xcschemes/
+
 # SwiftPM
 .swiftpm/
 .build/
