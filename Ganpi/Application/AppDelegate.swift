@@ -54,7 +54,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // Active時だけ OS が呼ぶ（呼ばれたら一応詰め替えて同じインスタンスを返す）
     @objc(applicationDockMenu:)
     func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
-        log("dock!")
         rebuildDockMenu()
         return _dockMenuFromNib
     }
@@ -99,7 +98,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let t = w.title.trimmingCharacters(in: .whitespacesAndNewlines)
             return t.isEmpty ? "Untitled" : t
         }()
-        if w.isDocumentEdited { s = "● " + s }
+        //if w.isDocumentEdited { s = "● " + s }
         if w.isMiniaturized { s += " (Minimized)" }
         return s
     }
