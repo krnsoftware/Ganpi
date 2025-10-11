@@ -521,6 +521,19 @@
                                             </connections>
                                         </menuItem>
                                         <menuItem isSeparatorItem="YES" id="uKj-fd-z7S"/>
+                                        <menuItem title="Align Assignment [=]" id="pCQ-hM-Gw0">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="alignAssignmentEquals:" target="-1" id="Q1B-c6-8zd"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Align Assignment [:]" id="20Z-aj-lVZ">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="alignAssignmentColons:" target="-1" id="WF5-PG-hrx"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem isSeparatorItem="YES" id="LGn-d6-GyV"/>
                                         <menuItem title="Collapse Empty Lines" id="E2h-8a-OuK">
                                             <modifierMask key="keyEquivalentModifierMask"/>
                                             <connections>

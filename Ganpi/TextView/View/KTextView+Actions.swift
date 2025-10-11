@@ -759,6 +759,104 @@ extension KTextView {
         return out
     }
     
+    
+    // MARK: - Align Assignment (=, :)
+    
+    @IBAction func alignAssignmentEquals(_ sender: Any?) { alignOperator("=") }
+    @IBAction func alignAssignmentColons(_ sender: Any?) { alignOperator(":") }
+
+    private func alignOperator(_ symbol: Character) {
+        let snapshot = textStorage.snapshot
+        guard let indexRange = snapshot.paragraphIndexRange(containing: selectionRange),
+              !indexRange.isEmpty else { log("1", from: self); return }
+        
+        let tabWidth = layoutManager.tabWidth
+        
+        // 1) 左側の見かけカラムの最大値を測る
+        var leftWidths: [Int?] = Array(repeating: nil, count: indexRange.count)
+        var maxLeft = 0
+        
+        for (offset, i) in indexRange.enumerated() {
+            let line = snapshot.paragraphs[i].string
+            guard let opIdx = line.firstIndex(of: symbol) else { continue }
+            
+            let leftRaw = line[..<opIdx]
+            let leftTrimmed = trimTrailingSpacesTabs(leftRaw)     // ← ここが変更点
+            let w = leftTrimmed.displayColumns(startColumn: 0, tabWidth: tabWidth)
+            leftWidths[offset] = w
+            if w > maxLeft { maxLeft = w }
+        }
+        
+        if !leftWidths.contains(where: { $0 != nil }) { return }
+        
+        // 2) 行を再構成
+        var out: [String] = []
+        out.reserveCapacity(indexRange.count)
+        
+        for (offset, i) in indexRange.enumerated() {
+            let line = snapshot.paragraphs[i].string
+
+            // 記号なし行 or 計測対象外はそのまま
+            if line.firstIndex(of: symbol) == nil || leftWidths[offset] == nil {
+                out.append(line)
+                continue
+            }
+
+            // ここから整形
+            let opIdx = line.firstIndex(of: symbol)!        // 上で nil を弾いているので安全
+            let leftRaw  = line[..<opIdx]
+            let rightRaw = line[line.index(after: opIdx)...]
+
+            let leftTrimmed  = trimTrailingSpacesTabs(leftRaw)
+            let rightTrimmed = trimLeadingSpacesTabs(rightRaw)
+
+            let currentLeftCols = leftTrimmed.displayColumns(startColumn: 0, tabWidth: layoutManager.tabWidth)
+
+            // “演算子の前に最低1スペース” を確保して整列
+            let minLeftGap = 1
+            let targetOpCol = maxLeft + minLeftGap
+            let padSpaces = max(0, targetOpCol - currentLeftCols)
+
+            var newLine = String(leftTrimmed)
+            if padSpaces > 0 { newLine += String(repeating: " ", count: padSpaces) }
+            newLine.append(symbol)
+            newLine.append(" ")
+            newLine.append(contentsOf: rightTrimmed)
+
+            out.append(newLine)
+        }
+        
+        // 3) 一括置換
+        let replaceRange = snapshot.paragraphRange(indexRange: indexRange)
+        let newBlock = out.joined(separator: "\n")
+        textStorage.replaceString(in: replaceRange, with: newBlock)
+        selectionRange = replaceRange.lowerBound ..< (replaceRange.lowerBound + newBlock.count)
+    }
+
+        // MARK: - 小さなトリム関数（Substringを返す）
+
+    private func trimTrailingSpacesTabs(_ s: Substring) -> Substring {
+        var end = s.endIndex
+        while end > s.startIndex {
+            let p = s.index(before: end)
+            let ch = s[p]
+            if ch == " " || ch == "\t" {
+                end = p
+            } else {
+                break
+            }
+        }
+        return s[..<end]
+    }
+
+    private func trimLeadingSpacesTabs(_ s: Substring) -> Substring {
+        var i = s.startIndex
+        while i < s.endIndex, (s[i] == " " || s[i] == "\t") {
+            i = s.index(after: i)
+        }
+        return s[i...]
+    }
+    
     // MARK: - Color treatment
     
     // Show Color Panel.
@@ -766,7 +864,6 @@ extension KTextView {
     @IBAction func showColorPanel(_ sender: Any?) {
         let panel = NSColorPanel.shared
         let selection = selectionRange
-        //let string = textStorage[string: selection]
         let string = textStorage.string(in: selection)
         let isOption = NSApp.currentEvent?.modifierFlags.contains(.option) == true
         panel.showsAlpha = isOption ? true : false
