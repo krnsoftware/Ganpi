@@ -43,64 +43,54 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         KLogPanel.shared.show()
     }
     
-    @IBOutlet private  var _dockMenuFromNib: NSMenu!  // nib 接続（保持は nib 側）
-    
-    // ActiveでもInactiveでも、開く直前に必ず呼ばれる
-    func menuWillOpen(_ menu: NSMenu) {
-        guard menu === _dockMenuFromNib else { return }
-        rebuildDockMenu()
-    }
-    
-    // Active時だけ OS が呼ぶ（呼ばれたら一応詰め替えて同じインスタンスを返す）
+    // MARK: - Dock menu
+
     @objc(applicationDockMenu:)
     func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
-        rebuildDockMenu()
-        return _dockMenuFromNib
-    }
-    
-    private func rebuildDockMenu() {
-        guard let menu = _dockMenuFromNib else { return }
-        menu.removeAllItems()
-        var added = 0
-        for w in NSApp.windows {
-            if w.level != .normal { continue }
-            if w.isExcludedFromWindowsMenu { continue }
-            if w is NSPanel { continue }
-            if w.isSheet { continue }
-            let item = NSMenuItem(
-                title: dockTitle(for: w),
-                action: #selector(selectWindowFromDockMenu(_:)),
-                keyEquivalent: ""
-            )
-            item.target = self
-            item.representedObject = w
-            if w.isMiniaturized { item.toolTip = "Minimized" }
-            menu.addItem(item)
-            added += 1
+        let menu = NSMenu(title: "DockMenu")
+
+        // 最近使ったドキュメント（開いているファイルは除外）
+        let openDocURLs = Set(NSDocumentController.shared.documents.compactMap { $0.fileURL })
+        let recents = NSDocumentController.shared.recentDocumentURLs
+            .filter { !openDocURLs.contains($0) }
+
+        if !recents.isEmpty {
+            for url in recents.prefix(10) {
+                let item = NSMenuItem(
+                    title: url.lastPathComponent,
+                    action: #selector(openRecentDocumentFromDock(_:)),
+                    keyEquivalent: ""
+                )
+                let icon = NSWorkspace.shared.icon(forFile: url.path)
+                icon.size = NSSize(width: 16, height: 16)
+                icon.isTemplate = false
+                item.image = icon //
+                item.representedObject = url
+                item.target = self
+                menu.addItem(item)
+            }
+            menu.addItem(.separator())
         }
-        if added == 0 {
-            let info = NSMenuItem(title: "No document windows", action: nil, keyEquivalent: "")
-            info.isEnabled = false
-            menu.addItem(info)
-        }
+
+        // 新規ドキュメント
+        let newItem = NSMenuItem(
+            title: "New Document",
+            action: #selector(createNewDocumentFromDock(_:)),
+            keyEquivalent: ""
+        )
+        newItem.target = self
+        menu.addItem(newItem)
+
+        return menu
     }
-    
-    @objc private func selectWindowFromDockMenu(_ sender: NSMenuItem) {
-        guard let w = sender.representedObject as? NSWindow else { return }
-        NSApp.activate(ignoringOtherApps: false)
-        if w.isMiniaturized { w.deminiaturize(nil) }
-        w.makeKeyAndOrderFront(nil)
+
+    @objc private func openRecentDocumentFromDock(_ sender: NSMenuItem) {
+        guard let url = sender.representedObject as? URL else { return }
+        NSDocumentController.shared.openDocument(withContentsOf: url, display: true) { _, _, _ in }
     }
-    
-    private func dockTitle(for w: NSWindow) -> String {
-        var s: String = {
-            if let d = w.windowController?.document as? NSDocument { return d.displayName }
-            let t = w.title.trimmingCharacters(in: .whitespacesAndNewlines)
-            return t.isEmpty ? "Untitled" : t
-        }()
-        //if w.isDocumentEdited { s = "● " + s }
-        if w.isMiniaturized { s += " (Minimized)" }
-        return s
+
+    @objc private func createNewDocumentFromDock(_ sender: NSMenuItem) {
+        NSDocumentController.shared.newDocument(nil)
     }
     
 }
