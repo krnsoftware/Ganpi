@@ -25,6 +25,8 @@ final class KSyntaxParserPlain: KSyntaxParserProtocol {
     // ハイライトなし
     func attributes(in range: Range<Int>, tabWidth: Int) -> [KAttributedSpan] { [] }
     
+    var baseTextColor: NSColor { get { return NSColor.black }}
+    
     // 欧文のみ（日本語は storage.wordRange が先に処理）
     func wordRange(at index: Int) -> Range<Int>? { return nil }
 }

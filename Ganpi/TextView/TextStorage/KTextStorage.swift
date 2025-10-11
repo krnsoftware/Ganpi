@@ -532,7 +532,8 @@ final class KTextStorage: KTextStorageProtocol {
         // 3) Base attributes (font + default color + optional paragraph style)
         var baseAttrs: [NSAttributedString.Key: Any] = [
             .font: baseFont,
-            .foregroundColor: NSColor.black
+            //.foregroundColor: NSColor.black
+            .foregroundColor: _parser.baseTextColor
         ]
         if let tabWidth = tabWidth {
             let ps = NSMutableParagraphStyle()

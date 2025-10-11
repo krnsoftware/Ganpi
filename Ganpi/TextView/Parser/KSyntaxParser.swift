@@ -21,12 +21,15 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
     case plain = "public.plain-text"
     case ruby  = "public.ruby-script"
     case html  = "public.html"
+    case ini = "public.ini-text"
     
     // 拡張子 → SyntaxType マップ
     private static let _extMap: [String: KSyntaxType] = [
             /* plain */ "txt": .plain, "text": .plain, "md": .plain,
             /* ruby */  "rb": .ruby, "rake": .ruby, "ru": .ruby, "erb": .ruby,
-            /* html */  "html": .html, "htm": .html
+            /* html */  "html": .html, "htm": .html,
+                        /* ini */   "ini": .ini, "conf": .html, "cfg": .ini,
+                        
         ]
     
     // KSyntaxType.plain.makeParser(storage:self)...といった形で生成する。
@@ -34,6 +37,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         switch self {
         case .plain: return KSyntaxParserPlain(storage: storage)
         case .ruby: return KSyntaxParserRuby(storage: storage)
+        case .ini: return KSyntaxParserIni(storage: storage)
         default: return KSyntaxParserPlain(storage: storage) // 暫定。
         }
     }
@@ -60,6 +64,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         case .plain: return "Plain"
         case .ruby: return "Ruby"
         case .html: return "HTML"
+        case .ini: return "INI"
         }
     }
     
@@ -143,6 +148,9 @@ protocol KSyntaxParserProtocol: AnyObject {
     // 現在のテキストの範囲rangeについてattributesを取り出す。
     // Painter hook: attribute spans (font is applied by TextStorage)
     func attributes(in range: Range<Int>, tabWidth: Int) -> [KAttributedSpan]
+    
+    // 基本となる文字列の色を返す。ベースカラー。
+    var baseTextColor: NSColor { get }
     
     // caretのindex:iに於いてそれに属すると思われる単語の領域。
     func wordRange(at index: Int) -> Range<Int>?

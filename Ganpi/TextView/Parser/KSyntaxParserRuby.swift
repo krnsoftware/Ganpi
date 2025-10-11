@@ -49,6 +49,7 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
     private var _completionLexicon: [Data] = []
     
     // 配色（前回踏襲）＋変数用の茶色
+    private let _colorBase     = NSColor.black
     private let _colorString   = NSColor(hexString: "#860300") ?? .black
     private let _colorComment  = NSColor(hexString: "#0B5A00") ?? .black
     private let _colorKeyword  = NSColor(hexString: "#070093") ?? .black
@@ -73,6 +74,10 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
     
     // コメント用
     var lineCommentPrefix: String? { "#" }
+    
+    var baseTextColor: NSColor {
+        get { _colorBase }
+    }
     
     
     // ストレージ
@@ -541,8 +546,11 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
                 let end = scanIdentEnd(base, n, from: i)
                 let buf = UnsafeBufferPointer(start: base + i, count: end - i)
                 let text = String(decoding: buf, as: UTF8.self)
-                let color = _keywords.contains(text) ? _colorKeyword : .black
-                appendSpan(startOffset, i, end, color)
+                //let color = _keywords.contains(text) ? _colorKeyword : .black
+                //appendSpan(startOffset, i, end, color)
+                if _keywords.contains(text) {
+                    appendSpan(startOffset, i, end, _colorKeyword)
+                }
                 i = end; continue
             }
 
