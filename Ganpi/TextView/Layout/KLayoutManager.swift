@@ -27,11 +27,11 @@ protocol KLayoutManagerReadable: AnyObject {
 // MARK: - Struct and Enum.
 
 // 行の折り返しの際、折り返された2行目以降の行のオフセットをどうするかの種別。
-enum KWrapLineOffsetType {
-    case none // オフセットなし
-    case same // 最初の行と同じオフセット
-    case tab1 // 最初の行の更に1tab分右にオフセット
-    case tab2 // 最初の行の更に2tab分右にオフセット
+enum KWrapLineOffsetType : Int {
+    case none = 0 // オフセットなし
+    case same = 1 // 最初の行と同じオフセット
+    case tab1 = 2 // 最初の行の更に1tab分右にオフセット
+    case tab2 = 3 // 最初の行の更に2tab分右にオフセット
 }
 
 
@@ -96,7 +96,12 @@ final class KLayoutManager: KLayoutManagerReadable {
     }
     
     var wrapLineOffsetType: KWrapLineOffsetType {
-        return _wrapLineOffsetType
+        get { _wrapLineOffsetType }
+        set {
+            _wrapLineOffsetType = newValue
+            rebuildLayout()
+            textView?.updateFrameSizeToFitContent()
+        }
     }
     
     // KLinesが持つ最も幅の大きな行の幅を返します。表示マージンなし。

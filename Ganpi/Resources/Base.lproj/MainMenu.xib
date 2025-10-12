@@ -786,6 +786,37 @@ CQ
                                     </items>
                                 </menu>
                             </menuItem>
+                            <menuItem title="Line Wrap Alignment" id="lAY-7Y-zcD">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <menu key="submenu" id="dKh-6o-sEw">
+                                    <items>
+                                        <menuItem title="Left Edge" id="gA0-k9-SjV">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="lineWrapAlignment:" target="-1" id="kTA-Br-1hD"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Match Indent" tag="1" id="Ad3-Cj-8Ba">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="lineWrapAlignment:" target="-1" id="onn-up-UYw"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Indent +1 Tab" tag="2" id="Qtz-eV-1Rc">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="lineWrapAlignment:" target="-1" id="z8z-KF-bbJ"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Indent +2 Tab" tag="3" id="fpv-3B-6Be">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="lineWrapAlignment:" target="-1" id="5dk-GL-WI4"/>
+                                            </connections>
+                                        </menuItem>
+                                    </items>
+                                </menu>
+                            </menuItem>
                             <menuItem isSeparatorItem="YES" id="6Su-uP-LnA"/>
                             <menuItem title="Show Log Window" keyEquivalent="i" id="Y9W-W2-80V">
                                 <connections>

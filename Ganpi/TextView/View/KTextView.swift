@@ -217,6 +217,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
     }
     
+    
     var containerView: KTextViewContainerView? {
         get { _containerView }
         set { _containerView = newValue}

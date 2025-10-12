@@ -79,6 +79,15 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
 
     @IBAction func toggleSyncOptions(_ sender: Any?) { syncOptions.toggle() }
     
+    @IBAction func lineWrapAlignment(_ sender: Any?) {
+        guard let activeTextView = activeTextView() else { log("activeTextView is nil.",from:self); return }
+        guard let menuItem = sender as? NSMenuItem else { log("1"); return }
+        guard let menuTag  = KWrapLineOffsetType(rawValue: menuItem.tag) else { log("2"); return }
+        activeTextView.layoutManager.wrapLineOffsetType = menuTag
+        if !syncOptions { return }
+        textViews.forEach { if $0 !== activeTextView { $0.layoutManager.wrapLineOffsetType = menuTag } }
+    }
+    
     // 現在アクティブなTextViewの次(右または下)のTextViewをフォーカスする。
     @IBAction func focusForwardTextView(_ sender: Any?) {
         focusAdjoiningTextView(for: .forward)
@@ -192,6 +201,11 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
             return true
         case #selector(toggleSyncOptions(_:)):
             (item as? NSMenuItem)?.state = syncOptions ? .on : .off
+            return true
+        case #selector(lineWrapAlignment(_:)):
+            guard let menuItem = item as? NSMenuItem else { log("#1"); return true }
+            guard let menuTag = KWrapLineOffsetType(rawValue: menuItem.tag) else { log("#2"); return true }
+            menuItem.state = menuTag == textView.layoutManager.wrapLineOffsetType ? .on : .off
             return true
 
         case #selector(splitVertically), #selector(splitHorizontally):
