@@ -39,6 +39,30 @@ class KTextParagraph {
         return range.lowerBound..<range.lowerBound + spaces + tabs
     }
     
+    // spaceの幅に換算した行頭の連続するtab|spaceの幅を返す。
+    func leadingWhitespaceWidth(tabWidth: Int) -> Int {
+        
+        let skeleton = _storage.skeletonString
+        var width = 0
+        var isInLeadingTabs = true
+        for i in range {
+            if skeleton[i] == FuncChar.tab {
+                if isInLeadingTabs {
+                    width += tabWidth
+                } else {
+                    width += 1
+                }
+                continue
+            } else if skeleton[i] == FuncChar.space {
+                width += 1
+                isInLeadingTabs = false
+                continue
+            }
+            break
+        }
+        return width
+    }
+    
     // 行頭の連続するtab|spaceの個数を返す。
     func leadingSpacesAndTabs() -> (spaces:Int, tabs:Int) {
         let skeleton = _storage.skeletonString
@@ -55,6 +79,7 @@ class KTextParagraph {
         }
         return (spaces:spaces, tabs:tabs)
     }
+    
     
     
     /// インデント内（右端は「外側」扱い）で、次/前のタブストップまでの差分を返す。
