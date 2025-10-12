@@ -2427,6 +2427,10 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         textStorage.replaceString(in: selection, with: String(repeating: " ", count: max(1, width)))
     }
     
+    @IBAction func insertLiteralTabCharacter(_ sender: Any?) {
+        textStorage.replaceString(in: selectionRange, with: "\t")
+    }
+    
     @IBAction override func insertBacktab(_ sender: Any?) {
         log("do nothing.",from:self)
     }

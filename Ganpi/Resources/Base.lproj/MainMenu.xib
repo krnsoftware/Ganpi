@@ -619,6 +619,23 @@
                                     </items>
                                 </menu>
                             </menuItem>
+                            <menuItem isSeparatorItem="YES" id="X1s-rF-Tg3"/>
+                            <menuItem title="Insert" id="9dH-eX-3zq">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <menu key="submenu" title="Insert" id="zaS-7Y-2Fv">
+                                    <items>
+                                        <menuItem title="tab" id="CXl-mK-Kck">
+                                            <string key="keyEquivalent" base64-UTF8="YES">
+CQ
+</string>
+                                            <modifierMask key="keyEquivalentModifierMask" control="YES"/>
+                                            <connections>
+                                                <action selector="insertLiteralTabCharacter:" target="-1" id="riY-TQ-iDO"/>
+                                            </connections>
+                                        </menuItem>
+                                    </items>
+                                </menu>
+                            </menuItem>
                             <menuItem isSeparatorItem="YES" id="sOB-A2-Bqx"/>
                             <menuItem title="Color" id="aiM-IB-dEW">
                                 <modifierMask key="keyEquivalentModifierMask"/>
