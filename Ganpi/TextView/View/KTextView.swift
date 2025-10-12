@@ -2400,7 +2400,31 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     }
     
     @IBAction override func insertTab(_ sender: Any?) {
+        /*
         _textStorageRef.replaceString(in: selectionRange, with: "\t")
+         */
+        
+        let snapshot = textStorage.snapshot
+        
+        if let indexRange = snapshot.paragraphIndexRange(containing: selectionRange),
+                indexRange.count > 1 {
+            shiftRight(self)
+            return
+        }
+        
+        var selection = selectionRange
+        
+        if !selection.isEmpty {
+            textStorage.deleteCharacters(in: selection)
+            selectionRange = selection.lowerBound..<selection.lowerBound
+            selection = selectionRange
+        }
+        
+        let tabWidth = layoutManager.tabWidth
+        
+        guard let pIndex = snapshot.paragraphIndex(containing: selection.lowerBound) else { log("0"); return }
+        let width = snapshot.paragraphs[pIndex].tabStopDeltaInIndent(at: selection.lowerBound, tabWidth: tabWidth, direction: .forward)
+        textStorage.replaceString(in: selection, with: String(repeating: " ", count: max(1, width)))
     }
     
     @IBAction override func insertBacktab(_ sender: Any?) {
