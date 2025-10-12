@@ -705,11 +705,9 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
             let currentLineNumber = m.line.formatted(.number.locale(.init(identifier: "en_US")))
             let currentLineColumn = m.column.formatted(.number.locale(.init(identifier: "en_US")))
             _caretButton.title = "Line: \(currentLineNumber):\(currentLineColumn)  [ch:\(totalCharacterCount) ln:\(totalLineCount)]"
+ 
             
-            /*
-            let editMode = textView.editMode
-            _editModeButton.title = editMode == .normal ? "'N'" : "'E'"
-             */
+            
             _editModeButton.wantsLayer = true
             _editModeButton.isBordered = false
             _editModeButton.layer?.masksToBounds = true

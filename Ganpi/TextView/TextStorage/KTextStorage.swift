@@ -338,6 +338,7 @@ final class KTextStorage: KTextStorageProtocol {
     init() {
         
         _invisibleCharacters = KInvisibleCharacters()
+        
                 
     }
 
@@ -369,7 +370,7 @@ final class KTextStorage: KTextStorageProtocol {
         _parser.noteEdit(oldRange: range, newCount: newCharacters.count)
         
         // notification.
-        //let timer = KTimeChecker(name:"observer")
+        let timer = KTimeChecker(name:"observer")
         notifyObservers(.textChanged(
                 info: .init(
                     range: range,
@@ -379,7 +380,7 @@ final class KTextStorage: KTextStorageProtocol {
                 )
             )
         )
-        //timer.stop()
+        timer.stop()
         
         return true
     }

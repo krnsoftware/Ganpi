@@ -114,6 +114,10 @@ final class KSkeletonStringInUTF8 {
     
     }
     
+    init() {
+        
+    }
+    
     //MARK: - Internal functions. (for the limited use)
     
     // KTextStorage.replaceCharacters()内に於いてreplaceSubrange()の後に呼ばれる。

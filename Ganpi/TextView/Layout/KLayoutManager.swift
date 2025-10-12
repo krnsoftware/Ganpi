@@ -64,7 +64,7 @@ final class KLayoutManager: KLayoutManagerReadable {
     
     private var _lineSpacing: CGFloat = 2.0
     
-    private var _wrapLineOffsetType: KWrapLineOffsetType = .tab1
+    private var _wrapLineOffsetType: KWrapLineOffsetType = .same
     
     // 表示される行をまとめるKLinesクラスインスタンス。
     private lazy var _lines: KLines = {
@@ -100,7 +100,9 @@ final class KLayoutManager: KLayoutManagerReadable {
         set {
             _wrapLineOffsetType = newValue
             rebuildLayout()
-            textView?.updateFrameSizeToFitContent()
+            //textView?.updateFrameSizeToFitContent()
+            //textView?.updateCaretPosition()
+            textView?.textStorageDidModify(.colorChanged(range: 0..<_textStorageRef.count))
         }
     }
     
@@ -398,6 +400,8 @@ final class KLayoutManager: KLayoutManagerReadable {
     
     // ソフトウェア行の2行目以降の右オフセットの量を返す。
     private func leadingWhitespaceOffset(at index:Int) -> CGFloat {
+        if wrapLineOffsetType == .none { return 0.0 }
+        
         let snapshot = _textStorageRef.snapshot
         guard let paragIndex = snapshot.paragraphIndex(containing: index) else { log("1"); return 0.0 }
         let parag = snapshot.paragraphs[paragIndex]
