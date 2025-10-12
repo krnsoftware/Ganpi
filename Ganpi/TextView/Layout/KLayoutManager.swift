@@ -281,27 +281,13 @@ final class KLayoutManager: KLayoutManagerReadable {
         }
 
         guard let textWidth = width, wordWrap == true else {
-            
             return [hardLine]
         }
         
-        let snapshot = _textStorageRef.snapshot
-        guard let paragIndex = snapshot.paragraphIndex(containing: range.lowerBound) else { log("1"); return nil }
-        let parag = snapshot.paragraphs[paragIndex]
-        let tabSpaceCount = parag.leadingWhitespaceWidth(tabWidth: tabWidth)
-        
-        let leadingLineOffset:CGFloat
-        switch wrapLineOffsetType {
-        case .none: leadingLineOffset = 0
-        case .same: leadingLineOffset = CGFloat(tabSpaceCount) * _textStorageRef.spaceAdvance
-        case .tab1: leadingLineOffset = CGFloat(tabSpaceCount + 1 * tabWidth) * _textStorageRef.spaceAdvance
-        case .tab2: leadingLineOffset = CGFloat(tabSpaceCount + 2 * tabWidth) * _textStorageRef.spaceAdvance
-        }
-        
+        let leadingLineOffset = leadingWhitespaceOffset(at: range.lowerBound)
         let trailingLineWidth = textWidth - leadingLineOffset
         
         // オフセットリストを取得
-        //let offsets = hardLine.characterOffsets()
         let offsets = hardLine.characterOffsets
 
         if offsets.count == 0 {
@@ -355,37 +341,72 @@ final class KLayoutManager: KLayoutManagerReadable {
     func makeFakeLines(from attributedString: NSAttributedString,hardLineIndex: Int,
                        width: CGFloat?) -> [KFakeLine] {
         guard attributedString.length > 0 else { return [] }
-        guard let width = width else {
+        guard let textWidth = width else {
             return [KFakeLine(attributedString: attributedString, hardLineIndex: hardLineIndex, softLineIndex: 0, wordWrapOffset: 0.0, layoutManager: self, textStorageRef: _textStorageRef)]
         }
         
-        var lines: [KFakeLine] = []
+        var fakeLines: [KFakeLine] = []
         
         let fullLine = CTLineCreateWithAttributedString(attributedString)
+        
+        //test
+        guard let hardLineRange = lines.hardLineRange(hardLineIndex: hardLineIndex) else { log("0"); return [] }
+        let leadingLineOffset = leadingWhitespaceOffset(at: hardLineRange.lowerBound)
+        var isFirstLine = true
+        let trailingLineWidth = textWidth - leadingLineOffset
         
         var baseOffset: CGFloat = 0
         var baseIndex: Int = 0
         var softLineIndex: Int = 0
         for i in 0..<attributedString.length {
             let offset = CTLineGetOffsetForStringIndex(fullLine, i, nil)
+            let currentTextWidth = isFirstLine ? textWidth : trailingLineWidth
             
-            if offset - baseOffset >= width {
+            if offset - baseOffset >= currentTextWidth {
                 
                 let subAttr = attributedString.attributedSubstring(from: NSRange(location: baseIndex, length: i - baseIndex))
-                let fakeLine = KFakeLine(attributedString: subAttr, hardLineIndex: hardLineIndex, softLineIndex: softLineIndex, wordWrapOffset:0.0, layoutManager: self, textStorageRef: _textStorageRef)
-                lines.append(fakeLine)
+                let fakeLine = KFakeLine(attributedString: subAttr,
+                                         hardLineIndex: hardLineIndex,
+                                         softLineIndex: softLineIndex,
+                                         wordWrapOffset:isFirstLine ? 0.0 : leadingLineOffset,//0.0,
+                                         layoutManager: self,
+                                         textStorageRef: _textStorageRef)
+                fakeLines.append(fakeLine)
                 baseIndex = i
                 baseOffset = offset
                 softLineIndex += 1
+                isFirstLine = false
             }
         }
         let subAttr = attributedString.attributedSubstring(from: NSRange(location: baseIndex, length: attributedString.length - baseIndex))
         
-        lines.append(KFakeLine(attributedString: subAttr, hardLineIndex: hardLineIndex, softLineIndex: softLineIndex, wordWrapOffset: 0.0, layoutManager: self, textStorageRef: _textStorageRef))
+        fakeLines.append(KFakeLine(attributedString: subAttr,
+                                   hardLineIndex: hardLineIndex,
+                                   softLineIndex: softLineIndex,
+                                   wordWrapOffset: isFirstLine ? 0.0 : leadingLineOffset,//0.0,
+                                   layoutManager: self,
+                                   textStorageRef: _textStorageRef))
         
-        return lines
+        return fakeLines
     }
     
+    
+    // ソフトウェア行の2行目以降の右オフセットの量を返す。
+    private func leadingWhitespaceOffset(at index:Int) -> CGFloat {
+        let snapshot = _textStorageRef.snapshot
+        guard let paragIndex = snapshot.paragraphIndex(containing: index) else { log("1"); return 0.0 }
+        let parag = snapshot.paragraphs[paragIndex]
+        let tabSpaceCount = parag.leadingWhitespaceWidth(tabWidth: tabWidth)
+        
+        let leadingLineOffset:CGFloat
+        switch wrapLineOffsetType {
+        case .none: leadingLineOffset = 0
+        case .same: leadingLineOffset = CGFloat(tabSpaceCount) * _textStorageRef.spaceAdvance
+        case .tab1: leadingLineOffset = CGFloat(tabSpaceCount + 1 * tabWidth) * _textStorageRef.spaceAdvance
+        case .tab2: leadingLineOffset = CGFloat(tabSpaceCount + 2 * tabWidth) * _textStorageRef.spaceAdvance
+        }
+        return leadingLineOffset
+    }
     
 }
 
