@@ -624,13 +624,25 @@
                                 <modifierMask key="keyEquivalentModifierMask"/>
                                 <menu key="submenu" title="Insert" id="zaS-7Y-2Fv">
                                     <items>
-                                        <menuItem title="tab" id="CXl-mK-Kck">
+                                        <menuItem title="Tab" id="CXl-mK-Kck">
                                             <string key="keyEquivalent" base64-UTF8="YES">
 CQ
 </string>
                                             <modifierMask key="keyEquivalentModifierMask" control="YES"/>
                                             <connections>
                                                 <action selector="insertLiteralTabCharacter:" target="-1" id="riY-TQ-iDO"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Current Date / Time" id="Kpy-wx-eOO">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="insertCurrentDateTime:" target="-1" id="BkH-ec-4f8"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="UUID" id="LsD-qO-of3">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="insertUUID:" target="-1" id="Epm-42-tUy"/>
                                             </connections>
                                         </menuItem>
                                     </items>

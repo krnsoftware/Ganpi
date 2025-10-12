@@ -66,19 +66,19 @@ extension KTextView {
     private func shiftIndentedString(direction: KDirection) {
         guard let range = textStorage.lineRange(in: selectionRange) else { log("out of range.", from: self); return }
         if range.isEmpty { return }
-
+        
         let skeleton = textStorage.skeletonString
         let tabWidth = layoutManager.tabWidth
-
+        
         var headSpaces = 0         // 見た目幅（tabはtabWidth換算）
         var headChars  = 0         // 実際に行頭で消費した“文字数”
         var lineStart  = range.lowerBound
         var inHead     = true
         var repArray: [String] = []
-
+        
         for i in range {
             let ch = skeleton[i]
-
+            
             if inHead, ch == FuncChar.tab {
                 headSpaces += tabWidth
                 headChars  += 1
@@ -93,7 +93,7 @@ extension KTextView {
                 let newWidth = max(headSpaces + tabWidth * direction.rawValue, 0)
                 let header = String(repeating: " ", count: newWidth)
                 repArray.append(header + textStorage.string(in: contentStart..<i))
-
+                
                 // 次の行の初期化
                 lineStart  = i + 1
                 headSpaces = 0
@@ -101,22 +101,22 @@ extension KTextView {
                 inHead     = true
                 continue
             }
-
+            
             if inHead {
                 // はじめて非インデント文字に到達
                 inHead = false
             }
         }
-
+        
         // 最終行（改行で終わらない行）
         let contentStart = lineStart + headChars
         let newWidth = max(headSpaces + tabWidth * direction.rawValue, 0)
         let header = String(repeating: " ", count: newWidth)
         repArray.append(header + textStorage.string(in: contentStart..<range.upperBound))
-
+        
         // ドキュメントの改行コードで結合（LF固定にしない）
         let res = repArray.joined(separator: "\n")
-
+        
         textStorage.replaceString(in: range, with: res)
         selectionRange = range.lowerBound ..< (range.lowerBound + res.count)
     }
@@ -136,7 +136,7 @@ extension KTextView {
         if range.isEmpty { return }
         if direction == .backward && range.lowerBound == 0 { return }
         if direction == .forward && range.upperBound == textStorage.count { return }
-
+        
         var rangeA:Range<Int>
         var rangeB:Range<Int>
         var newSelectionRange:Range<Int>
@@ -164,17 +164,17 @@ extension KTextView {
         let snapshot = textStorage.snapshot
         guard let indexRange = snapshot.paragraphIndexRange(containing: selectionRange),
               !indexRange.isEmpty else { log("1", from: self); return }
-
+        
         // 段落本体の文字範囲（[lower, upper)）
         var deleteRange = snapshot.paragraphRange(indexRange: indexRange)
-
+        
         // 最終段落を含まない場合は、後続の改行（1文字）も一緒に削除して繰り上げる
         if indexRange.upperBound < snapshot.paragraphs.count {
             if deleteRange.upperBound < textStorage.count {
                 deleteRange = deleteRange.lowerBound ..< (deleteRange.upperBound + 1)
             }
         }
-
+        
         textStorage.replaceString(in: deleteRange, with: "")
         // 削除開始位置にキャレットを置く
         selectionRange = deleteRange.lowerBound ..< deleteRange.lowerBound
@@ -184,17 +184,17 @@ extension KTextView {
         let snapshot = textStorage.snapshot
         guard let indexRange = snapshot.paragraphIndexRange(containing: selectionRange),
               !indexRange.isEmpty else { log("1", from: self); return }
-
+        
         // 対象段落の文字範囲と内容（段落はLFを含まない仕様）
         let totalRange = snapshot.paragraphRange(indexRange: indexRange)
         let block = textStorage.string(in: totalRange)
-
+        
         // 直下に複製する：挿入位置は対象ブロックの末尾
         let insertPosition = totalRange.upperBound
         let insertString = "\n" + block
-
+        
         textStorage.replaceString(in: insertPosition..<insertPosition, with: insertString)
-
+        
         // 複製された行群（先頭の改行は除外）を新たに選択
         let newStart = insertPosition + 1
         let newEnd = newStart + block.count
@@ -238,66 +238,66 @@ extension KTextView {
     func sortSelectedLines(options: String.CompareOptions = [], ascending: Bool = true) {
         let snapshot = textStorage.snapshot
         let sel = selectionRange
-
+        
         guard var paraRange = snapshot.paragraphIndexRange(containing: sel),
               !paraRange.isEmpty else { return }
-
+        
         // 全文選択で末尾LFがあるなら、空段落を含める
         if sel.lowerBound == 0, sel.upperBound == textStorage.count,
            let last = snapshot.paragraphs.last, last.range.isEmpty {
             paraRange = paraRange.lowerBound ..< (paraRange.upperBound + 1)
         }
-
+        
         var lines: [String] = []
         lines.reserveCapacity(paraRange.count)
         for i in paraRange { lines.append(snapshot.paragraphs[i].string) }
-
+        
         let locale = Locale.current
         lines.sort {
             let cmp = $0.compare($1, options: options, range: nil, locale: locale)
             return ascending ? (cmp == .orderedAscending) : (cmp == .orderedDescending)
         }
-
+        
         let lower = snapshot.paragraphs[paraRange.lowerBound].range.lowerBound
         let upper = snapshot.paragraphs[paraRange.upperBound - 1].range.upperBound
         let replaceRange = lower..<upper
-
+        
         let newBlock = lines.joined(separator: "\n")
         textStorage.replaceString(in: replaceRange, with: newBlock)
         selectionRange = replaceRange.lowerBound ..< (replaceRange.lowerBound + newBlock.count)
     }
     
     /*
-    func sortSelectedLines(options: String.CompareOptions = [], ascending: Bool = true) {
-        let snapshot = textStorage.snapshot
-        let selection = selectionRange
-        guard let paraRange = snapshot.paragraphRange(containing: selection),
-              !paraRange.isEmpty else { return }
-
-        var lines: [String] = []
-        for i in paraRange {
-            lines.append(snapshot.paragraphs[i].string)
-        }
-        
-        let locale = Locale.current
-        lines.sort {
-            let cmp = $0.compare($1,
-                                 options: options,
-                                 range: nil,
-                                 locale: locale)
-            return ascending
-                ? (cmp == .orderedAscending)
-                : (cmp == .orderedDescending)
-        }
-
-        let lower = snapshot.paragraphs[paraRange.lowerBound].range.lowerBound
-        let upper = snapshot.paragraphs[paraRange.upperBound - 1].range.upperBound
-        let replaceRange = lower..<upper
-
-        let newBlock = lines.joined(separator: "\n")
-        textStorage.replaceString(in: replaceRange, with: newBlock)
-        selectionRange = replaceRange.lowerBound ..< (replaceRange.lowerBound + newBlock.count)
-    }*/
+     func sortSelectedLines(options: String.CompareOptions = [], ascending: Bool = true) {
+     let snapshot = textStorage.snapshot
+     let selection = selectionRange
+     guard let paraRange = snapshot.paragraphRange(containing: selection),
+     !paraRange.isEmpty else { return }
+     
+     var lines: [String] = []
+     for i in paraRange {
+     lines.append(snapshot.paragraphs[i].string)
+     }
+     
+     let locale = Locale.current
+     lines.sort {
+     let cmp = $0.compare($1,
+     options: options,
+     range: nil,
+     locale: locale)
+     return ascending
+     ? (cmp == .orderedAscending)
+     : (cmp == .orderedDescending)
+     }
+     
+     let lower = snapshot.paragraphs[paraRange.lowerBound].range.lowerBound
+     let upper = snapshot.paragraphs[paraRange.upperBound - 1].range.upperBound
+     let replaceRange = lower..<upper
+     
+     let newBlock = lines.joined(separator: "\n")
+     textStorage.replaceString(in: replaceRange, with: newBlock)
+     selectionRange = replaceRange.lowerBound ..< (replaceRange.lowerBound + newBlock.count)
+     }*/
     
     
     // MARK: - Unique Lines
@@ -306,12 +306,12 @@ extension KTextView {
     @IBAction func uniqueLinesKeepFirst(_ sender: Any?) {
         uniqueSelectedLines(keepLast: false)
     }
-
+    
     // 後勝ち：最後の出現を残して重複行を削除
     @IBAction func uniqueLinesKeepLast(_ sender: Any?) {
         uniqueSelectedLines(keepLast: true)
     }
-
+    
     // 選択範囲にかかる段落の重複を削除する（順序は維持）
     // - Parameter keepLast: true で最後の出現を残す（後勝ち）、false で最初（先勝ち）
     func uniqueSelectedLines(keepLast: Bool) {
@@ -375,7 +375,7 @@ extension KTextView {
     @IBAction func joinLines(_ sender: Any?) {
         let snapshot = textStorage.snapshot
         let idxRange: Range<Int>
-
+        
         if selectionRange.isEmpty {
             idxRange = 0..<snapshot.paragraphs.count
         } else {
@@ -384,16 +384,16 @@ extension KTextView {
             idxRange = r
         }
         if idxRange.count <= 1 { return }
-
+        
         let totalRange = snapshot.paragraphRange(indexRange: idxRange)
-
+        
         var parts: [String] = []
         parts.reserveCapacity(idxRange.count)
         for i in idxRange {
             parts.append(snapshot.paragraphs[i].string)
         }
         let joined = parts.joined()
-
+        
         textStorage.replaceString(in: totalRange, with: joined)
         selectionRange = totalRange.lowerBound ..< (totalRange.lowerBound + joined.count)
         
@@ -405,18 +405,18 @@ extension KTextView {
     @IBAction func trimTrailingSpaces(_ sender: Any?) {
         let snapshot = textStorage.snapshot
         let sel = selectionRange
-
+        
         // 対象段落を決定
         guard let idxRange = snapshot.paragraphIndexRange(containing: sel) else {
             log("idx nil",from:self)
             return
         }
-           
-
+        
+        
         // 各段落を末尾トリム
         var resultLines: [String] = []
         resultLines.reserveCapacity(idxRange.count)
-
+        
         for i in idxRange {
             let para = snapshot.paragraphs[i]
             if para.range.isEmpty {
@@ -424,17 +424,17 @@ extension KTextView {
                 resultLines.append("")
                 continue
             }
-
+            
             // 末尾の空白とタブを削除
             let s = para.string
             let trimmed = s.replacingOccurrences(of: #"[ \t]+$"#, with: "", options: .regularExpression)
             resultLines.append(trimmed)
         }
-
+        
         // 置換範囲を確定
         let totalRange = snapshot.paragraphRange(indexRange: idxRange)
         let newBlock = resultLines.joined(separator: "\n")
-
+        
         textStorage.replaceString(in: totalRange, with: newBlock)
         selectionRange = totalRange.lowerBound ..< (totalRange.lowerBound + newBlock.count)
     }
@@ -446,11 +446,11 @@ extension KTextView {
         let snapshot = textStorage.snapshot
         guard let idxRange = snapshot.paragraphIndexRange(containing: selectionRange),
               !idxRange.isEmpty else { return }
-
+        
         var result: [String] = []
         result.reserveCapacity(idxRange.count)
         var prevEmpty = false
-
+        
         for i in idxRange {
             let p = snapshot.paragraphs[i]
             if p.range.isEmpty {
@@ -461,15 +461,15 @@ extension KTextView {
                 prevEmpty = false
             }
         }
-
+        
         let total = snapshot.paragraphRange(indexRange: idxRange)
         var newBlock = result.joined(separator: "\n")
-
+        
         // 末尾まで選択が届いており、最後が空行なら LF を1つ保持
         if idxRange.upperBound == snapshot.paragraphs.count, result.last == "" {
             newBlock.append("\n")
         }
-
+        
         textStorage.replaceString(in: total, with: newBlock)
         selectionRange = total.lowerBound ..< (total.lowerBound + newBlock.count)
     }
@@ -481,10 +481,10 @@ extension KTextView {
             log("1", from: self)
             return
         }
-
+        
         var result: [String] = []
         result.reserveCapacity(indexRange.count)
-
+        
         for i in indexRange {
             let paragraph = snapshot.paragraphs[i]
             // 空行でなければ残す（Collapseの逆）
@@ -492,15 +492,15 @@ extension KTextView {
                 result.append(paragraph.string)
             }
         }
-
+        
         let totalRange = snapshot.paragraphRange(indexRange: indexRange)
         var newBlock = result.joined(separator: "\n")
-
+        
         // 文末まで選択されている場合は、末尾LFを調整（必要なら付ける）
         if indexRange.upperBound == snapshot.paragraphs.count {
             newBlock.append("\n")
         }
-
+        
         textStorage.replaceString(in: totalRange, with: newBlock)
         selectionRange = totalRange.lowerBound ..< (totalRange.lowerBound + newBlock.count)
     }
@@ -512,14 +512,14 @@ extension KTextView {
         guard let indexRange = snapshot.paragraphIndexRange(containing: selectionRange),
               !indexRange.isEmpty else { log("1", from: self); return }
         guard let head = textStorage.parser.lineCommentPrefix, !head.isEmpty else { log("2", from: self); return }
-
+        
         // 対象段落を取得
         var lines: [String] = []
         lines.reserveCapacity(indexRange.count)
         for i in indexRange {
             lines.append(snapshot.paragraphs[i].string)
         }
-
+        
         // 非空行がすべてコメント済みなら「解除」、そうでなければ「付与」
         let headWithSpace = head + " "
         let isCommentedLine: (String) -> Bool = { line in
@@ -528,10 +528,10 @@ extension KTextView {
         }
         let nonEmpty = lines.filter { !$0.isEmpty }
         let allCommented = !nonEmpty.isEmpty && nonEmpty.allSatisfy(isCommentedLine)
-
+        
         var result: [String] = []
         result.reserveCapacity(lines.count)
-
+        
         if allCommented {
             // 解除：行頭の head を外し、続く 1 スペースがあれば外す
             for line in lines {
@@ -561,7 +561,7 @@ extension KTextView {
                 }
             }
         }
-
+        
         // 一括置換（Undo 1 回）
         let replaceRange = snapshot.paragraphRange(indexRange: indexRange)
         let newBlock = result.joined(separator: "\n")
@@ -571,11 +571,11 @@ extension KTextView {
     
     
     // MARK: - Reflow Paragraph (column wrap by display width)
-
+    
     @IBAction func reflowParagraph72(_ sender: Any?) { reflowSelectedParagraphs(columnLimit: 72) }
     @IBAction func reflowParagraph80(_ sender: Any?) { reflowSelectedParagraphs(columnLimit: 80) }
     @IBAction func reflowParagraph100(_ sender: Any?) { reflowSelectedParagraphs(columnLimit: 100) }
-
+    
     /// 選択中の段落ブロックを Reflow（幅指定で折り直し）
     /// - columnLimit: 列の上限（72/80/100 など）
     /// - tabWidth: タブ幅（Ganpi 既定に合わせる）
@@ -620,8 +620,8 @@ extension KTextView {
         textStorage.replaceString(in: replaceRange, with: newBlock)
         selectionRange = replaceRange.lowerBound ..< (replaceRange.lowerBound + newBlock.count)
     }
-
-
+    
+    
     /// 与えられたテキストを列幅で折り直す。
     /// CJK（ひらがな/カタカナ/漢字）を含む場合は CJK モード＝文字幅のみで改行（空白挿入なし）
     private func wrapToColumns(_ text: String, limit: Int, tabWidth: Int) -> [String] {
@@ -632,7 +632,7 @@ extension KTextView {
             return wrapLatinToColumns(text, limit: limit, tabWidth: tabWidth)
         }
     }
-
+    
     /// 英語（空白区切り）用：トークン単位で折り返し。トークン間には半角スペース 1 を入れる。
     /// 長大トークン（URLなど）は行頭にそのまま置いてはみ出し許容。
     private func wrapLatinToColumns(_ text: String, limit: Int, tabWidth: Int) -> [String] {
@@ -676,7 +676,7 @@ extension KTextView {
         if !line.isEmpty { lines.append(line) }
         return lines
     }
-
+    
     /// 日本語（CJK）用：文字幅の合計で折り返し。結合記号は幅 0。空白は挿入しない。
     // ASCII の「語っぽい」文字（英数と一部記号）だけを true にする
     private func isAsciiWordChar(_ ch: Character) -> Bool {
@@ -688,17 +688,17 @@ extension KTextView {
             return false
         }
     }
-
+    
     /// 日本語（CJK）用：文字幅の合計で折り返しつつ、ASCII の語連続は1トークンとして扱う
     private func wrapCJKToColumns(_ text: String, limit: Int) -> [String] {
         var lines: [String] = []
         var line = ""
         var col = 0
-
+        
         var i = text.startIndex
         while i < text.endIndex {
             let ch = text[i]
-
+            
             // 1) ASCII の語連続をまとめて1トークンにする
             if isAsciiWordChar(ch) {
                 let start = i
@@ -708,7 +708,7 @@ extension KTextView {
                 }
                 let token = text[start..<j]
                 let w = token.displayColumns(startColumn: 0, tabWidth: 8) // タブは来ない想定だが念のため
-
+                
                 if col + w > limit, !line.isEmpty {
                     lines.append(line)
                     line.removeAll(keepingCapacity: true)
@@ -719,7 +719,7 @@ extension KTextView {
                 i = j
                 continue
             }
-
+            
             // 2) それ以外は1文字ずつ扱う（CJK/絵文字/句読点など）
             if ch == "\n" { // 念のため無視（段落単位で来る想定）
                 i = text.index(after: i)
@@ -735,11 +735,11 @@ extension KTextView {
             col += w
             i = text.index(after: i)
         }
-
+        
         if !line.isEmpty { lines.append(line) }
         return lines
     }
-
+    
     /// 連続空白（space/tab）を単一スペースに正規化（LF は Ganpi 仕様で来ない前提）
     private func normalizeWhitespaces(_ s: String) -> String {
         var out = String()
@@ -764,7 +764,7 @@ extension KTextView {
     
     @IBAction func alignAssignmentEquals(_ sender: Any?) { alignOperator("=") }
     @IBAction func alignAssignmentColons(_ sender: Any?) { alignOperator(":") }
-
+    
     private func alignOperator(_ symbol: Character) {
         let snapshot = textStorage.snapshot
         guard let indexRange = snapshot.paragraphIndexRange(containing: selectionRange),
@@ -795,34 +795,34 @@ extension KTextView {
         
         for (offset, i) in indexRange.enumerated() {
             let line = snapshot.paragraphs[i].string
-
+            
             // 記号なし行 or 計測対象外はそのまま
             if line.firstIndex(of: symbol) == nil || leftWidths[offset] == nil {
                 out.append(line)
                 continue
             }
-
+            
             // ここから整形
             let opIdx = line.firstIndex(of: symbol)!        // 上で nil を弾いているので安全
             let leftRaw  = line[..<opIdx]
             let rightRaw = line[line.index(after: opIdx)...]
-
+            
             let leftTrimmed  = trimTrailingSpacesTabs(leftRaw)
             let rightTrimmed = trimLeadingSpacesTabs(rightRaw)
-
+            
             let currentLeftCols = leftTrimmed.displayColumns(startColumn: 0, tabWidth: layoutManager.tabWidth)
-
+            
             // “演算子の前に最低1スペース” を確保して整列
             let minLeftGap = 1
             let targetOpCol = maxLeft + minLeftGap
             let padSpaces = max(0, targetOpCol - currentLeftCols)
-
+            
             var newLine = String(leftTrimmed)
             if padSpaces > 0 { newLine += String(repeating: " ", count: padSpaces) }
             newLine.append(symbol)
             newLine.append(" ")
             newLine.append(contentsOf: rightTrimmed)
-
+            
             out.append(newLine)
         }
         
@@ -832,9 +832,9 @@ extension KTextView {
         textStorage.replaceString(in: replaceRange, with: newBlock)
         selectionRange = replaceRange.lowerBound ..< (replaceRange.lowerBound + newBlock.count)
     }
-
-        // MARK: - 小さなトリム関数（Substringを返す）
-
+    
+    // MARK: - 小さなトリム関数（Substringを返す）
+    
     private func trimTrailingSpacesTabs(_ s: Substring) -> Substring {
         var end = s.endIndex
         while end > s.startIndex {
@@ -848,7 +848,7 @@ extension KTextView {
         }
         return s[..<end]
     }
-
+    
     private func trimLeadingSpacesTabs(_ s: Substring) -> Substring {
         var i = s.startIndex
         while i < s.endIndex, (s[i] == " " || s[i] == "\t") {
@@ -881,7 +881,7 @@ extension KTextView {
         guard let panel = sender as? NSColorPanel else { log("sender is not NSColorPanel.", from:self); return }
         guard let string = panel.color.toHexString(includeAlpha: panel.showsAlpha) else { log("string is nil.", from:self); return }
         //guard let storage = textStorage as? KTextStorageProtocol else { log("textstorage is not writable.", from:self); return }
-
+        
         let selection = selectionRange
         textStorage.replaceString(in: selection, with: string)
         selectionRange = selection.lowerBound..<selection.lowerBound + string.count
@@ -1032,7 +1032,24 @@ extension KTextView {
         selectedString = Data(digest).base64EncodedString()
     }
     
+    // MARK: - Insert
+    
+    @IBAction func insertCurrentDateTime(_ sender: Any?) {
+        // ローカルタイムゾーン（システム既定）でISO 8601を生成
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds] // 高精度。不要なら後者を外す
+        let nowString = formatter.string(from: Date())
+        
+        textStorage.replaceString(in: selectionRange, with: nowString)
+        // caret移動は自動
+    }
+    
+    /// ランダムUUID（v4相当）を挿入。小文字・ハイフンあり。
+    @IBAction func insertUUID(_ sender: Any?) {
+        let uuid = UUID().uuidString.lowercased()
+        textStorage.replaceString(in: selectionRange, with: uuid)
+        // caret移動は自動
+    }
     
     
-     
 }
