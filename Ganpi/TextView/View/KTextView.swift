@@ -2399,11 +2399,11 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         _textStorageRef.replaceString(in: selectionRange, with: String(spaces))
     }
     
+
+    // 複数行を選択している場合はshiftRight:を実行する。
+    // 単行の場合は選択範囲を削除した上で、行頭の空白(space|tab混合)内ならtab stop相当までspaceを入力、
+    // そうでなければ1文字のspaceを入力する。
     @IBAction override func insertTab(_ sender: Any?) {
-        /*
-        _textStorageRef.replaceString(in: selectionRange, with: "\t")
-         */
-        
         let snapshot = textStorage.snapshot
         
         if let indexRange = snapshot.paragraphIndexRange(containing: selectionRange),
@@ -2427,12 +2427,67 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         textStorage.replaceString(in: selection, with: String(repeating: " ", count: max(1, width)))
     }
     
+    // insertTab()が標準でspaceを入力する仕様のため、代わりに\tを入力するためのアクション。
     @IBAction func insertLiteralTabCharacter(_ sender: Any?) {
         textStorage.replaceString(in: selectionRange, with: "\t")
     }
     
+    // 複数行を選択している場合はshiftLeft:を実行する。
+    // 単行の場合は選択範囲を削除した上で、行頭の空白(space|tab混合)内ならtab stop相当までspace|tabを削除、
+    // そうでなければ直前の1文字のspaceを削除するか、なにもしない。
     @IBAction override func insertBacktab(_ sender: Any?) {
-        log("do nothing.",from:self)
+        let tabWidth = layoutManager.tabWidth
+        let snapshot = textStorage.snapshot
+
+        if let idxRange = snapshot.paragraphIndexRange(containing: selectionRange),
+           idxRange.count > 1 {
+            shiftLeft(self)
+            return
+        }
+
+        // 選択があれば消去（caret は自動で末尾へ）
+        if !selectionRange.isEmpty {
+            textStorage.replaceString(in: selectionRange, with: "")
+        }
+
+        let caret = selectionRange.lowerBound
+        guard let pIndex = snapshot.paragraphIndex(containing: caret) else { log("paragraphIndex: nil", from: self); return }
+        let paragraph = snapshot.paragraphs[pIndex]
+
+        let head = paragraph.leadingWhitespaceRange
+        let isInIndent = head.contains(caret) || caret == head.upperBound
+
+        // インデント外：直前がスペースなら1つ削除
+        guard isInIndent else {
+            if caret > paragraph.range.lowerBound {
+                let skel = textStorage.skeletonString
+                let prev = caret - 1
+                if skel[prev] == FuncChar.space {
+                    textStorage.replaceString(in: prev..<caret, with: "")
+                }
+            }
+            return
+        }
+
+        // ★ まずタブを優先的に食う
+        let skel = textStorage.skeletonString
+        if caret > head.lowerBound, skel[caret - 1] == FuncChar.tab {
+            textStorage.replaceString(in: (caret - 1)..<caret, with: "")
+            return
+        }
+
+        // タブでなければ、前ストップまでのスペースを削除
+        let delta = paragraph.tabStopDeltaInIndent(at: caret, tabWidth: tabWidth, direction: .backward)
+
+        var to = caret
+        var remain = delta
+        while remain > 0, to > head.lowerBound, skel[to - 1] == FuncChar.space {
+            to -= 1
+            remain -= 1
+        }
+        if to < caret {
+            textStorage.replaceString(in: to..<caret, with: "")
+        }
     }
     
     
