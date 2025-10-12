@@ -18,6 +18,7 @@ class KLine: CustomStringConvertible {
     var range: Range<Int>
     var hardLineIndex: Int
     let softLineIndex: Int
+    let wordWrapOffset: CGFloat
     
     // CTLineを返す。
     var ctLine: CTLine? {
@@ -35,10 +36,11 @@ class KLine: CustomStringConvertible {
     }
     
     
-    init(range: Range<Int>, hardLineIndex: Int, softLineIndex: Int, layoutManager: KLayoutManager, textStorageRef: KTextStorageReadable){
+    init(range: Range<Int>, hardLineIndex: Int, softLineIndex: Int, wordWrapOffset: CGFloat, layoutManager: KLayoutManager, textStorageRef: KTextStorageReadable){
         self.range = range
         self.hardLineIndex = hardLineIndex
         self.softLineIndex = softLineIndex
+        self.wordWrapOffset = wordWrapOffset
         self._layoutManager = layoutManager
         self._textStorageRef = textStorageRef
         
@@ -67,9 +69,9 @@ class KLine: CustomStringConvertible {
     func characterOffset(at index:Int) -> CGFloat {
         if index < 0 || index >= characterOffsets.count {
             log("index(\(index)) out of range.",from:self)
-            return 0.0
+            return wordWrapOffset
         }
-        return characterOffsets[index]
+        return characterOffsets[index] + wordWrapOffset
     }
     
     
@@ -77,6 +79,10 @@ class KLine: CustomStringConvertible {
     // relativeX: 行左端=0基準のクリックX
     @inline(__always)
     func characterIndex(for relativeX: CGFloat) -> Int {
+        // offetが0未満であれば先頭の文字。
+        let relativeX = relativeX - wordWrapOffset
+        if relativeX < 0 { return 0 }
+        
         // 空行（edges==[0] 想定）
         guard characterOffsets.count >= 2 else { return 0 }
 
@@ -86,7 +92,6 @@ class KLine: CustomStringConvertible {
         // 端点ケア
         if x <= characterOffsets[0] { return 0 }
         if x >= characterOffsets[n] { return n }
-        //if x >= characterOffsets[n] { return n + 1 }
 
         // 区間 [lo, lo+1) を二分探索で特定（edges[lo] <= x < edges[lo+1]）
         var lower = 0, upper = n
@@ -137,7 +142,8 @@ class KLine: CustomStringConvertible {
         let baselineAligned = _alignToDevicePixel(baselineFromTop)
         
         let lineOriginY = bounds.height - baselineAligned
-        context.textPosition = CGPoint(x: point.x, y: lineOriginY)
+        //context.textPosition = CGPoint(x: point.x, y: lineOriginY)
+        context.textPosition = CGPoint(x: point.x + wordWrapOffset, y: lineOriginY)
         
         CTLineDraw(ctLine, context)
         
@@ -162,19 +168,17 @@ class KLine: CustomStringConvertible {
                     // 3) 箱の中央に置く（advance が小さい場合は左寄せにフォールバック）
                     let dx = max((advance - placeholderWidth) * 0.5, 0)
                     
-                    context.textPosition = CGPoint(x: point.x + x0 + dx, y: lineOriginY)
+                    //context.textPosition = CGPoint(x: point.x + x0 + dx, y: lineOriginY)
+                    context.textPosition = CGPoint(x: point.x + x0 + dx + wordWrapOffset, y: lineOriginY)
                     CTLineDraw(ctLine, context)
                 }
-                /*
-                 if let ctChar = textStorageRef.invisibleCharacters?.ctLine(for: char) {
-                 context.textPosition = CGPoint(x: point.x + _cachedOffsets[index], y: lineOriginY)
-                 CTLineDraw(ctChar, context)
-                 }*/
                 index += 1
             }
+            // 改行文字を表示
             if range.upperBound < textStorageRef.count, textStorageRef[range.upperBound] == newlineChar {
                 if let newlineCTChar = textStorageRef.invisibleCharacters?.ctLine(for: newlineChar) {
-                    context.textPosition = CGPoint(x: point.x + _cachedOffsets.last!, y: lineOriginY)
+                    //context.textPosition = CGPoint(x: point.x + _cachedOffsets.last!, y: lineOriginY)
+                    context.textPosition = CGPoint(x: point.x + _cachedOffsets.last! + wordWrapOffset, y: lineOriginY)
                     CTLineDraw(newlineCTChar, context)
                 }
             }
@@ -204,22 +208,8 @@ class KLine: CustomStringConvertible {
         }
 
         let ctLine = CTLineCreateWithAttributedString(attrString)
+        
         // CTLineから文字のoffsetを算出してcacheを入れ替える。
-        // 一度offsetを算出して_cachedOffsetsにセットしたら、次からはパスする。
-        /*
-        if !_widthAndOffsetsFixed {
-            let string = attrString.string
-            var offsets: [CGFloat] = []
-            
-            for i in 0...string.count {
-                let prefixCount = string.index(string.startIndex, offsetBy: i).utf16Offset(in: string)
-                let offset = CTLineGetOffsetForStringIndex(ctLine, prefixCount, nil)
-                offsets.append(offset)
-            }
-            _cachedOffsets = offsets.isEmpty ? [0.0] : offsets
-            _widthAndOffsetsFixed = true
-        }*/
-        // ここから新設
         if !_widthAndOffsetsFixed {
             // 1) UTF-16 境界ごとの x を用意（runs 一括で O(n) ）
             let ns = (attrString.string as NSString)
@@ -288,7 +278,6 @@ class KLine: CustomStringConvertible {
             _cachedOffsets = offsets.isEmpty ? [0.0] : offsets
             _widthAndOffsetsFixed = true
         }
-        // ここまで
         
         return ctLine
     }
@@ -312,11 +301,11 @@ final class KFakeLine : KLine {
     }
     
     
-    init(attributedString: NSAttributedString, hardLineIndex: Int, softLineIndex: Int, layoutManager: KLayoutManager, textStorageRef: KTextStorageReadable) {
+    init(attributedString: NSAttributedString, hardLineIndex: Int, softLineIndex: Int, wordWrapOffset: CGFloat, layoutManager: KLayoutManager, textStorageRef: KTextStorageReadable) {
         _ctLine = CTLineCreateWithAttributedString(attributedString)
         _attributedString = attributedString
         
-        super.init(range: 0..<0, hardLineIndex: hardLineIndex, softLineIndex: softLineIndex, layoutManager: layoutManager, textStorageRef: textStorageRef)
+        super.init(range: 0..<0, hardLineIndex: hardLineIndex, softLineIndex: softLineIndex, wordWrapOffset: wordWrapOffset, layoutManager: layoutManager, textStorageRef: textStorageRef)
         
         let string = _attributedString.string
         var offsets: [CGFloat] = []

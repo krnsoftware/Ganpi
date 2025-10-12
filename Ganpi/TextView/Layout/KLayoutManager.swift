@@ -24,8 +24,20 @@ protocol KLayoutManagerReadable: AnyObject {
     func makeFakeLines(from attributedString: NSAttributedString,hardLineIndex: Int, width: CGFloat?) -> [KFakeLine]
 }
 
+// MARK: - Struct and Enum.
+
+// 行の折り返しの際、折り返された2行目以降の行のオフセットをどうするかの種別。
+enum KWrapLineOffsetType {
+    case none // オフセットなし
+    case same // 最初の行と同じオフセット
+    case tab1 // 最初の行の更に1tab分右にオフセット
+    case tab2 // 最初の行の更に2tab分右にオフセット
+}
+
+
 // MARK: - KLayoutManager
 
+// テキストのレイアウトを担当するクラス。KTextViewインスタンスそれぞれに1つ存在する。
 final class KLayoutManager: KLayoutManagerReadable {
     
     // MARK: - Struct and Enum.
@@ -46,11 +58,13 @@ final class KLayoutManager: KLayoutManagerReadable {
     private var _maxLineWidth: CGFloat = 0
     
     // baseFontの現在のサイズにおけるspaceの幅の何倍かで指定する。
-    private var _tabWidth: Int = 4
+    private var _tabWidth: Int = 2
     
     private var _prevLineNumberRegionWidth: CGFloat = 0
     
     private var _lineSpacing: CGFloat = 2.0
+    
+    private var _wrapLineOffsetType: KWrapLineOffsetType = .tab1
     
     // 表示される行をまとめるKLinesクラスインスタンス。
     private lazy var _lines: KLines = {
@@ -69,8 +83,6 @@ final class KLayoutManager: KLayoutManagerReadable {
     
     var lineHeight: CGFloat {
         let font = _textStorageRef.baseFont
-        //return font.ascender + abs(font.descender) + lineSpacing
-        //return ceil(font.ascender - font.descender + font.leading + lineSpacing)
         return font.ascender - font.descender + font.leading + lineSpacing
     }
     
@@ -81,6 +93,10 @@ final class KLayoutManager: KLayoutManagerReadable {
     
     var lineCount: Int {
         return _lines.count
+    }
+    
+    var wrapLineOffsetType: KWrapLineOffsetType {
+        return _wrapLineOffsetType
     }
     
     // KLinesが持つ最も幅の大きな行の幅を返します。表示マージンなし。
@@ -252,13 +268,13 @@ final class KLayoutManager: KLayoutManagerReadable {
     
     // 表示用に空行を作成する。
     func makeEmptyLine(index: Int, hardLineIndex: Int) -> KLine {
-        return KLine(range: index..<index, hardLineIndex: hardLineIndex, softLineIndex: 0, layoutManager: self, textStorageRef: _textStorageRef)
+        return KLine(range: index..<index, hardLineIndex: hardLineIndex, softLineIndex: 0, wordWrapOffset: 0.0, layoutManager: self, textStorageRef: _textStorageRef)
     }
     
     // KLineインスタンスを作成する。
     func makeLines(range: Range<Int>, hardLineIndex: Int, width: CGFloat?) -> [KLine]? {
         
-        let hardLine = KLine(range: range, hardLineIndex: hardLineIndex, softLineIndex: 0, layoutManager: self, textStorageRef: _textStorageRef)
+        let hardLine = KLine(range: range, hardLineIndex: hardLineIndex, softLineIndex: 0, wordWrapOffset: 0.0, layoutManager: self, textStorageRef: _textStorageRef)
         
         if hardLine.range.count == 0 {
             return [hardLine]
@@ -268,6 +284,21 @@ final class KLayoutManager: KLayoutManagerReadable {
             
             return [hardLine]
         }
+        
+        let snapshot = _textStorageRef.snapshot
+        guard let paragIndex = snapshot.paragraphIndex(containing: range.lowerBound) else { log("1"); return nil }
+        let parag = snapshot.paragraphs[paragIndex]
+        let tabSpaceCount = parag.leadingWhitespaceWidth(tabWidth: tabWidth)
+        
+        let leadingLineOffset:CGFloat
+        switch wrapLineOffsetType {
+        case .none: leadingLineOffset = 0
+        case .same: leadingLineOffset = CGFloat(tabSpaceCount) * _textStorageRef.spaceAdvance
+        case .tab1: leadingLineOffset = CGFloat(tabSpaceCount + 1 * tabWidth) * _textStorageRef.spaceAdvance
+        case .tab2: leadingLineOffset = CGFloat(tabSpaceCount + 2 * tabWidth) * _textStorageRef.spaceAdvance
+        }
+        
+        let trailingLineWidth = textWidth - leadingLineOffset
         
         // オフセットリストを取得
         //let offsets = hardLine.characterOffsets()
@@ -281,23 +312,29 @@ final class KLayoutManager: KLayoutManagerReadable {
         var startIndex = range.lowerBound
         var lastOffset: CGFloat = 0.0
         var softLineIndex = 0
+        var isFirstLine = true
        
         for i in 0..<offsets.count {
             let currentOffset = offsets[i]
-
-            if currentOffset - lastOffset > textWidth {
+            let currentTextWidth = isFirstLine ? textWidth : trailingLineWidth
+            
+            if currentOffset - lastOffset > currentTextWidth {
                 let endIndex = range.lowerBound + i
                 let softRange = startIndex..<endIndex
                 let softLine = KLine(range: softRange,
                                      hardLineIndex: hardLineIndex,
                                      softLineIndex: softLineIndex,
+                                     wordWrapOffset: isFirstLine ? 0.0 : leadingLineOffset,
                                      layoutManager: self,
                                      textStorageRef: _textStorageRef)
                 softLines.append(softLine)
                 softLineIndex += 1
                 startIndex = endIndex
                 lastOffset = currentOffset
+                isFirstLine = false
             }
+            
+            
         }
         
         // 残りを追加
@@ -305,6 +342,7 @@ final class KLayoutManager: KLayoutManagerReadable {
             let softLine = KLine(range: startIndex..<range.upperBound,
                                  hardLineIndex: hardLineIndex,
                                  softLineIndex: softLineIndex,
+                                 wordWrapOffset: isFirstLine ? 0.0 : leadingLineOffset,
                                  layoutManager: self,
                                  textStorageRef: _textStorageRef)
             softLines.append(softLine)
@@ -318,7 +356,7 @@ final class KLayoutManager: KLayoutManagerReadable {
                        width: CGFloat?) -> [KFakeLine] {
         guard attributedString.length > 0 else { return [] }
         guard let width = width else {
-            return [KFakeLine(attributedString: attributedString, hardLineIndex: hardLineIndex, softLineIndex: 0, layoutManager: self, textStorageRef: _textStorageRef)]
+            return [KFakeLine(attributedString: attributedString, hardLineIndex: hardLineIndex, softLineIndex: 0, wordWrapOffset: 0.0, layoutManager: self, textStorageRef: _textStorageRef)]
         }
         
         var lines: [KFakeLine] = []
@@ -334,7 +372,7 @@ final class KLayoutManager: KLayoutManagerReadable {
             if offset - baseOffset >= width {
                 
                 let subAttr = attributedString.attributedSubstring(from: NSRange(location: baseIndex, length: i - baseIndex))
-                let fakeLine = KFakeLine(attributedString: subAttr, hardLineIndex: hardLineIndex, softLineIndex: softLineIndex, layoutManager: self, textStorageRef: _textStorageRef)
+                let fakeLine = KFakeLine(attributedString: subAttr, hardLineIndex: hardLineIndex, softLineIndex: softLineIndex, wordWrapOffset:0.0, layoutManager: self, textStorageRef: _textStorageRef)
                 lines.append(fakeLine)
                 baseIndex = i
                 baseOffset = offset
@@ -343,7 +381,7 @@ final class KLayoutManager: KLayoutManagerReadable {
         }
         let subAttr = attributedString.attributedSubstring(from: NSRange(location: baseIndex, length: attributedString.length - baseIndex))
         
-        lines.append(KFakeLine(attributedString: subAttr, hardLineIndex: hardLineIndex, softLineIndex: softLineIndex, layoutManager: self, textStorageRef: _textStorageRef))
+        lines.append(KFakeLine(attributedString: subAttr, hardLineIndex: hardLineIndex, softLineIndex: softLineIndex, wordWrapOffset: 0.0, layoutManager: self, textStorageRef: _textStorageRef))
         
         return lines
     }
