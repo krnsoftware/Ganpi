@@ -525,6 +525,14 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         // if verticalRange.contains(textPoint.y) のようにして使う。
         let verticalRange = (visibleRect.minY - lineHeight)..<visibleRect.maxY
         
+        /*
+        // 見える範囲だけを走査するようにしてみたが、10万行で1msの差も出ないため外した。
+        let visibleLowerBound = max(0, Int((verticalRange.lowerBound - layoutRects.textEdgeInsets.top) / lineHeight))
+        let visibleUpperBound = min(lines.count, Int((verticalRange.upperBound - layoutRects.textEdgeInsets.top) / lineHeight))
+        let visibleLineRange = visibleLowerBound..<visibleUpperBound
+        //log("visibleLineRange: \(visibleLineRange)")
+        */
+        
         // 背景透け対策。
         let bgColor = NSColor.textBackgroundColor.usingColorSpace(.deviceRGB)?.withAlphaComponent(1.0) ?? .red
         bgColor.setFill()
@@ -536,6 +544,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         
         for i in 0..<lines.count {
+        //for i in visibleLineRange {
             guard let line = lines[i] else { log("line[i] is nil.", from:self); continue }
             let y = CGFloat(i) * lineHeight + layoutRects.textEdgeInsets.top
             
