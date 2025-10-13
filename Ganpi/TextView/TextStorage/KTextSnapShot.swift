@@ -26,6 +26,28 @@ class KTextParagraph {
     private unowned let _storage: KTextStorageReadable
     let range: Range<Int>
     
+    static func leadingWhitespaceWidth(storage: KTextStorageReadable, range: Range<Int>, tabWidth: Int) -> Int {
+        let skeleton = storage.skeletonString
+        var whitespaceWidth = 0
+        var isInLeadingTabs = true
+        for i in range {
+            if skeleton[i] == FuncChar.tab {
+                if isInLeadingTabs {
+                    whitespaceWidth += tabWidth
+                } else {
+                    whitespaceWidth += 1
+                }
+                continue
+            } else if skeleton[i] == FuncChar.space {
+                whitespaceWidth += 1
+                isInLeadingTabs = false
+                continue
+            }
+            break
+        }
+        return whitespaceWidth
+    }
+    
     init(storage: KTextStorageReadable, range: Range<Int>) {
         _storage = storage
         self.range = range
@@ -41,26 +63,7 @@ class KTextParagraph {
     
     // spaceの幅に換算した行頭の連続するtab|spaceの幅を返す。
     func leadingWhitespaceWidth(tabWidth: Int) -> Int {
-        
-        let skeleton = _storage.skeletonString
-        var width = 0
-        var isInLeadingTabs = true
-        for i in range {
-            if skeleton[i] == FuncChar.tab {
-                if isInLeadingTabs {
-                    width += tabWidth
-                } else {
-                    width += 1
-                }
-                continue
-            } else if skeleton[i] == FuncChar.space {
-                width += 1
-                isInLeadingTabs = false
-                continue
-            }
-            break
-        }
-        return width
+        return Self.leadingWhitespaceWidth(storage: _storage, range: range, tabWidth: tabWidth)
     }
     
     // 行頭の連続するtab|spaceの個数を返す。

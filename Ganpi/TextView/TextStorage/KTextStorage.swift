@@ -30,7 +30,6 @@ enum KDirection: Int {
 }
 
 /// ストレージ上の範囲をゼロコピーで等価判定するためのキー。
-// KTextRangeRef.swift
 struct TextRangeRef: Hashable {
     unowned let storage: KTextStorageReadable
     let range: Range<Int>
@@ -39,17 +38,14 @@ struct TextRangeRef: Hashable {
     init(storage: KTextStorageReadable, range: Range<Int>) {
         self.storage = storage
         self.range = range
-        self._cachedHash = storage.hash(of: range)   // ゼロコピーで事前計算
+        self._cachedHash = storage.hash(of: range)
     }
 
-    // Set/Dict 用：キャッシュしたハッシュだけで十分
     func hash(into hasher: inout Hasher) {
         hasher.combine(_cachedHash)
-        // （任意）hasher.combine(range.count) を混ぜてもOK
     }
 
     static func == (lhs: TextRangeRef, rhs: TextRangeRef) -> Bool {
-        // 本番はコストをかけない。DEBUG だけ検知。
         #if DEBUG
         precondition(lhs.storage === rhs.storage, "TextRangeRef compared across different storages.")
         #endif
@@ -103,7 +99,7 @@ protocol KTextStorageReadable: KTextStorageCommon {
     func attributedString(for range: Range<Int>, tabWidth: Int?, withoutColors: Bool) -> NSAttributedString?
     func lineRange(at index: Int) -> Range<Int>?
     func lineRange(in range: Range<Int>) -> Range<Int>?
-    func lineAndColumNumber(at index:Int) -> (line:Int, column:Int) // index(0..), line(1..), column(1..)
+    func lineAndColumnNumber(at index:Int) -> (line:Int, column:Int) // index(0..), line(1..), column(1..)
     
     // comparing characters using ranges.
     func equals(_ rangeA: Range<Int>, _ rangeB: Range<Int>) -> Bool
@@ -370,7 +366,7 @@ final class KTextStorage: KTextStorageProtocol {
         _parser.noteEdit(oldRange: range, newCount: newCharacters.count)
         
         // notification.
-        let timer = KTimeChecker(name:"observer")
+        //let timer = KTimeChecker(name:"observer")
         notifyObservers(.textChanged(
                 info: .init(
                     range: range,
@@ -380,7 +376,7 @@ final class KTextStorage: KTextStorageProtocol {
                 )
             )
         )
-        timer.stop()
+        //timer.stop()
         
         return true
     }
@@ -591,7 +587,7 @@ final class KTextStorage: KTextStorageProtocol {
     }
     
     // 指定したindexが論理行の何行目で、行頭から何文字目かを返す。いずれも1スタート。
-    func lineAndColumNumber(at index:Int) -> (line:Int, column:Int) {
+    func lineAndColumnNumber(at index:Int) -> (line:Int, column:Int) {
         guard index >= 0, index <= _skeletonString.bytes.count else {
             log("index is out of range.",from:self)
             return (0,0)

@@ -1431,11 +1431,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         return .zero
     }
-    
-    /*
-    func doCommand(by selector: Selector) {
-        // 例: deleteBackward:, insertNewline: などに対応するならここに分岐追加
-    }*/
 
     func baselineDelta(for characterIndex: Int) -> CGFloat {
         0
@@ -1476,7 +1471,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             
         }
         
-        updateFrameSizeToFitContent()
+        updateFrameSizeToFitContent()        
         updateCaretPosition()
         scrollCaretToVisible()
         needsDisplay = true
@@ -1490,6 +1485,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         showLineNumbers = textView.showLineNumbers
         
         layoutManager.lineSpacing = textView.layoutManager.lineSpacing
+        layoutManager.wrapLineOffsetType = textView.layoutManager.wrapLineOffsetType
     }
     
     // 現在選択されている文字列を扱う。
@@ -1528,38 +1524,17 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     // characterIndex文字目の文字が含まれる行の位置。textRegion左上原点。
     private func linePosition(at characterIndex:Int) -> CGPoint {
-        guard let layoutRects = _layoutManager.makeLayoutRects() else {
-        print("\(#function): failed to make layoutRects"); return .zero }
-        //let lineInfo = _layoutManager.line(at: characterIndex)
-        /*guard let line = lineInfo.line else {
-            print("\(#function): failed to make line"); return .zero }*/
-                
-        /*let x = layoutRects.textRegion.rect.origin.x + layoutRects.horizontalInsets
-        let y = layoutRects.textRegion.rect.origin.y + CGFloat(lineInfo.lineIndex) * _layoutManager.lineHeight + layoutRects.textEdgeInsets.top
-        return CGPoint(x: x, y: y)*/
-        
-        guard let lineIndex = layoutManager.lines.lineIndex(at: characterIndex) else { log("lineIndex is nil.",from:self); return .zero }
+        guard let layoutRects = _layoutManager.makeLayoutRects() else { log("#0"); return .zero }
+        guard let lineIndex = layoutManager.lines.lineIndex(at: characterIndex) else { log("#1"); return .zero }
         return layoutRects.linePosition(at: lineIndex)
         
     }
     
     // characterIndex文字目の文字の位置。textRegion左上原点。
     private func characterPosition(at characterIndex:Int) -> CGPoint {
-        /*
-        let lineInfo = _layoutManager.line(at: characterIndex)
-        guard let line = lineInfo.line else {
-            log("failed to make line", from:self); return .zero }
-        
-        
-        let linePoint = linePosition(at: characterIndex)
-        
-        let indexInLine = characterIndex - line.range.lowerBound
-        return CGPoint(x: linePoint.x + line.characterOffset(at: indexInLine), y: linePoint.y)
-         */
-        guard let layoutRects = layoutManager.makeLayoutRects() else { log("lineIndex is nil.",from:self); return .zero }
-        guard let lineIndex = layoutManager.lines.lineIndex(at: characterIndex) else { log("lineIndex is nil.",from:self); return .zero }
+        guard let layoutRects = layoutManager.makeLayoutRects() else { log("#0"); return .zero }
+        guard let lineIndex = layoutManager.lines.lineIndex(at: characterIndex) else { log("#1"); return .zero }
         return layoutRects.characterPosition(lineIndex: lineIndex, characterIndex: characterIndex)
-
     }
     
     

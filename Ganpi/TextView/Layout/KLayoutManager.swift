@@ -157,14 +157,11 @@ final class KLayoutManager: KLayoutManagerReadable {
             case .textChanged(let info):
                 self.rebuildLayout(reason: .charactersChanged(info: info))
                 self.textView?.textStorageDidModify(note)
-            case .colorChanged(let range):
+            case .colorChanged(_):
                 self.rebuildLayout(reason: .destructiveChange)
                 self.textView?.textStorageDidModify(.colorChanged(range: 0..<_textStorageRef.count))
             }
         }
-                
-        //rebuildLayout()
-        
         
     }
     
@@ -189,7 +186,9 @@ final class KLayoutManager: KLayoutManagerReadable {
         
         switch reason {
         case .charactersChanged(let info):
+            //let timer = KTimeChecker(name:".charactersChanged")
             _lines.rebuildLines(with: info)
+            //timer.stop()
         case .attributesChanged:
             log("attributedChanged?", from:self)
         case .destructiveChange:
@@ -198,24 +197,6 @@ final class KLayoutManager: KLayoutManagerReadable {
         
     }
     
-    /*
-    // TextStorageが変更された際に呼び出される。
-    func textStorageDidModify(_ modification: KStorageModified) {
-        guard let textView = _textView else { log("textView is nil", from:self); return }
-        log("here",from:self)
-
-        switch modification {
-        case .textChanged(let info):
-            rebuildLayout(reason: .charactersChanged(info: info))
-            textView.textStorageDidModify(modification)
-
-        case .colorChanged(let range):
-            print("🎨 カラー変更: range = \(range)")
-            textView.textStorageDidModify(modification)
-            
-        }
-    }*/
-    
     // TextViewのframeが変更された際に呼び出される。
     func textViewFrameInvalidated() {
         if let wordWrap = _textView?.wordWrap, wordWrap {
@@ -223,37 +204,6 @@ final class KLayoutManager: KLayoutManagerReadable {
         }
         
     }
- 
-    
-    // characterIndex文字目の文字が含まれるKLineとその行番号(ソフトラップの)を返す。
-    // 現在の文字がテキストの最後の場合には(nil, -1)が返る。
-    /*func line(at characterIndex: Int) -> (line: KLine?, lineIndex: Int) {
-        
-       
-        let count = _textStorageRef.count
-        if characterIndex == 0 { return (line: _lines[0], lineIndex: 0)}
-        if characterIndex == count { return (line: _lines[_lines.count - 1], lineIndex: _lines.count - 1)}
-                
-        var low = 0, high = _lines.count - 1
-        while low <= high {
-            let mid = (low + high) / 2
-            guard let range = _lines[mid]?.range else { log("_lines[mid] is nil.", from:self); return (nil, -1) }
-            let isLF = characterIndex < count
-                    && characterIndex == range.upperBound
-                    && _textStorageRef.skeletonString[characterIndex] == FuncChar.lf
-            if range.contains(characterIndex) || isLF  { 
-                return (_lines[mid], mid)
-            } else if characterIndex < range.lowerBound {
-                high = mid - 1
-            } else {
-                low = mid + 1
-            }
-        }
-        log("no match. characterIndex: \(characterIndex)", from:self)
-        return (nil, -1)
-        
-    }*/
-    
     
     // 現在のLayoutRectsを生成する。専らTextViewから呼び出される。
     func makeLayoutRects() -> KLayoutRects? {
@@ -291,7 +241,7 @@ final class KLayoutManager: KLayoutManagerReadable {
             return [hardLine]
         }
         
-        let leadingLineOffset = leadingWhitespaceOffset(at: range.lowerBound)
+        let leadingLineOffset = leadingWhitespaceOffset(in: range)
         let trailingLineWidth = textWidth - leadingLineOffset
         
         // オフセットリストを取得
@@ -356,9 +306,9 @@ final class KLayoutManager: KLayoutManagerReadable {
         
         let fullLine = CTLineCreateWithAttributedString(attributedString)
         
-        //test
+        
         guard let hardLineRange = lines.hardLineRange(hardLineIndex: hardLineIndex) else { log("0"); return [] }
-        let leadingLineOffset = leadingWhitespaceOffset(at: hardLineRange.lowerBound)
+        let leadingLineOffset = leadingWhitespaceOffset(in: hardLineRange)
         var isFirstLine = true
         let trailingLineWidth = textWidth - leadingLineOffset
         
@@ -399,13 +349,10 @@ final class KLayoutManager: KLayoutManagerReadable {
     
     
     // ソフトウェア行の2行目以降の右オフセットの量を返す。
-    private func leadingWhitespaceOffset(at index:Int) -> CGFloat {
+    private func leadingWhitespaceOffset(in range:Range<Int>) -> CGFloat {
         if wrapLineOffsetType == .none { return 0.0 }
         
-        let snapshot = _textStorageRef.snapshot
-        guard let paragIndex = snapshot.paragraphIndex(containing: index) else { log("1"); return 0.0 }
-        let parag = snapshot.paragraphs[paragIndex]
-        let tabSpaceCount = parag.leadingWhitespaceWidth(tabWidth: tabWidth)
+        let tabSpaceCount = KTextParagraph.leadingWhitespaceWidth(storage: _textStorageRef, range: range, tabWidth: tabWidth)
         
         let leadingLineOffset:CGFloat
         switch wrapLineOffsetType {

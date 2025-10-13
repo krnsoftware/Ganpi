@@ -456,35 +456,6 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         guard let textView = activeTextView() else { return }
         for outlineItem in outlineItems {
             let menuItem = NSMenuItem(title: outlineItem.name, action: #selector(textView.selectRange(_:)), keyEquivalent: "")
-            //let font = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
-            //let font = NSFont.monospacedSystemFont(ofSize: 12.0, weight: .regular)
-            /*
-            let attrs: [NSAttributedString.Key: Any] = [
-                //.font: font,
-                .foregroundColor: NSColor.labelColor
-            ]
-            let color:NSColor
-            let char:String
-            switch outlineItem.kind {
-            case .class:
-                color = NSColor.systemPurple
-                char = "C"
-            case .module:
-                color = NSColor.systemOrange
-                char = "M"
-            case .method:
-                if outlineItem.isSingleton {
-                    color = NSColor.init(hexString: "#22B023") ?? NSColor.systemGreen
-                    char = "S"
-                } else {
-                    color = NSColor.systemBlue
-                    char = "F"
-                }
-            }
-            if outlineItem.kind != .class { menuItem.indentationLevel = 1 }
-            let img = KOutlineBadgeFactory.shared.badge(letter: char,color: color, size: 16.0 )
-            menuItem.attributedTitle = NSAttributedString(string: outlineItem.name, attributes: attrs)
-            */
             switch outlineItem.kind {
             case .class: menuItem.image = KOutlineBadgeFactory.shared.classBadge()
             case .module: menuItem.image = KOutlineBadgeFactory.shared.moduleBadge()
@@ -698,15 +669,14 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         if let textView = activeTextView() {
             let ts = textView.textStorage
             let caret = textView.caretIndex
-            let m = ts.lineAndColumNumber(at: caret)
-
+            
+            let m = ts.lineAndColumnNumber(at: caret)
+            
             let totalLineCount = ts.hardLineCount.formatted(.number.locale(.init(identifier: "en_US")))
             let totalCharacterCount = ts.count.formatted(.number.locale(.init(identifier: "en_US")))
             let currentLineNumber = m.line.formatted(.number.locale(.init(identifier: "en_US")))
             let currentLineColumn = m.column.formatted(.number.locale(.init(identifier: "en_US")))
             _caretButton.title = "Line: \(currentLineNumber):\(currentLineColumn)  [ch:\(totalCharacterCount) ln:\(totalLineCount)]"
- 
-            
             
             _editModeButton.wantsLayer = true
             _editModeButton.isBordered = false
@@ -725,6 +695,7 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
             let (display, tooltip) = makeStatusTitle(from: ctx)
             _funcMenuButton.title = display
             _funcMenuButton.toolTip = tooltip
+            
         } else {
             _caretButton.title = ""
             _editModeButton.title = ""
