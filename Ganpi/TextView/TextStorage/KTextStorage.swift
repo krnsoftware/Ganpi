@@ -366,7 +366,7 @@ final class KTextStorage: KTextStorageProtocol {
         _parser.noteEdit(oldRange: range, newCount: newCharacters.count)
         
         // notification.
-        //let timer = KTimeChecker(name:"observer")
+        let timer = KTimeChecker("observer")
         notifyObservers(.textChanged(
                 info: .init(
                     range: range,
@@ -376,7 +376,7 @@ final class KTextStorage: KTextStorageProtocol {
                 )
             )
         )
-        //timer.stop()
+        timer.stop()
         
         return true
     }
@@ -587,22 +587,19 @@ final class KTextStorage: KTextStorageProtocol {
     }
     
     // 指定したindexが論理行の何行目で、行頭から何文字目かを返す。いずれも1スタート。
-    func lineAndColumnNumber(at index:Int) -> (line:Int, column:Int) {
-        guard index >= 0, index <= _skeletonString.bytes.count else {
-            log("index is out of range.",from:self)
-            return (0,0)
+    func lineAndColumnNumber(at index: Int) -> (line: Int, column: Int) {
+        let lfIndices = _skeletonString.newlineIndices
+        guard index >= 0, index <= _skeletonString.bytes.count else { return (0, 0) }
+
+        // 行番号は改行数 +1
+        var lo = 0, hi = lfIndices.count
+        while lo < hi {
+            let mid = (lo + hi) >> 1
+            if lfIndices[mid] < index { lo = mid + 1 } else { hi = mid }
         }
-        var lineNo = 1
-        var columnNo = 1
-        for i in 0..<index {
-            let ch = _skeletonString.bytes[i]
-            if ch == FuncChar.lf {
-                lineNo += 1
-                columnNo = 1
-                continue
-            }
-            columnNo += 1
-        }
+        let lineNo = lo + 1
+        let colStart = (lo == 0) ? 0 : (lfIndices[lo - 1] + 1)
+        let columnNo = index - colStart + 1
         return (lineNo, columnNo)
     }
 

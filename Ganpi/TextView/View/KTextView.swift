@@ -1472,7 +1472,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 }
             }
             
-            sendStatusBarUpdateAction()
+            //sendStatusBarUpdateAction()
             sendEditedToDocument()
             
         case let .colorChanged(range):

@@ -28,12 +28,12 @@ final class KTimeChecker {
     private var _startTime: DispatchTime
     private var _message: String = ""
 
-    init(name: String = "") {
+    init(_ name: String = "") {
         _name = name
         _startTime = DispatchTime.now()
     }
 
-    func start(message: String = "") {
+    func start(_ message: String = "") {
         _message = message
         _startTime = DispatchTime.now()
     }
@@ -44,9 +44,9 @@ final class KTimeChecker {
         print(String(format: "[%@:%@] elapsed: %.3f ms", _name, _message, elapsed))
     }
     
-    func stopAndGo(message: String = "") {
+    func stopAndGo(_ message: String = "") {
         stop()
-        start(message: message)
+        start(message)
     }
     
     private static func elapsedTime(from: DispatchTime, to: DispatchTime) -> Double {

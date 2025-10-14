@@ -690,11 +690,14 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
             let height = max(_editModeButton.bounds.height, 14)
             _editModeButton.layer?.cornerRadius = height / 4
             
+            //ここのparser.currentContext()が13万行のファイルで400ms以上かかってしまう。
+            // 今後改善予定。
             let parser = textView.textStorage.parser
             let ctx = parser.currentContext(at: caret)
             let (display, tooltip) = makeStatusTitle(from: ctx)
             _funcMenuButton.title = display
             _funcMenuButton.toolTip = tooltip
+             
             
         } else {
             _caretButton.title = ""
