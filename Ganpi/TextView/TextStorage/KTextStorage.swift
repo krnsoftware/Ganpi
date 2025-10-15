@@ -291,15 +291,10 @@ final class KTextStorage: KTextStorageProtocol {
     
     // 論理行の数を返す。
     var hardLineCount: Int {
-        
-        if let hardLineCount = _hardLineCount {
-            return hardLineCount
-        }
-        var count = 1
-        for c in _characters { if c == "\n" { count += 1 } }
+        if let cached = _hardLineCount { return cached }
+        let count = skeletonString.newlineIndices.count + 1
         _hardLineCount = count
         return count
-         
     }
     
     // タブ幅の元になるspaceの幅を返す。

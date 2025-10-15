@@ -184,14 +184,6 @@ final class KSkeletonStringInUTF8 {
         _newlineCache = res
         return res
     }
-    /*
-    func newlineIndices() -> [Int] {
-        if let cache = _newlineCache { return cache }
-        
-        let res = Self.indicesOfCharacter(in: _bytes, range: 0..<_bytes.count, target: FuncChar.lf)
-        _newlineCache = res
-        return res
-    }*/
     
     // 行頭のインデックスを全て返す。昇順。
     var lineStartIndices: [Int] {
