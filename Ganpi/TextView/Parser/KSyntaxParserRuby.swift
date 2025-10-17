@@ -24,7 +24,8 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
 
     private struct LineInfo {
         var endState: EndState = .neutral
-        var persistentSpans: [KAttributedSpan] = []   // 恒久スパンのみ
+        var persistentSpans: [KAttributedSpan] = []   // 恒久スパン（色つき）
+        var persistentRanges: [Range<Int>] = []       // ↑のrangeだけキャッシュ
         var isDirty: Bool = true
     }
 
@@ -86,37 +87,63 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
 
     // MARK: - 編集通知（差分行だけ dirty に）
 
+    // 編集通知：後続の恒久スパン位置をΔだけ即時補正し、編集行以降をdirty化
     func noteEdit(oldRange: Range<Int>, newCount: Int) {
+        let delta = newCount - (oldRange.upperBound - oldRange.lowerBound)
+
         let newLineStarts = storage.skeletonString.lineStartIndices
         let newLineCount = max(0, newLineStarts.count - 1)
 
-        if _lineStarts.isEmpty {
-            _lineStarts = newLineStarts
-            _lines = Array(repeating: LineInfo(), count: newLineCount)
-            return
-        }
-
-        let oldLineCount = max(0, _lineStarts.count - 1)
-        let deltaLines = newLineCount - oldLineCount
-        let startLineInNew = lineIndex(in: newLineStarts, atOffset: oldRange.lowerBound)
-
-        if deltaLines > 0 {
-            let insertAt = min(max(0, startLineInNew), _lines.count)
-            _lines.insert(contentsOf: Array(repeating: LineInfo(), count: deltaLines), at: insertAt)
-        } else if deltaLines < 0 {
-            let removeAt = min(max(0, startLineInNew), _lines.count)
-            let removeCount = min(-deltaLines, max(0, _lines.count - removeAt))
-            if removeCount > 0 { _lines.removeSubrange(removeAt ..< removeAt + removeCount) }
+        if _lines.count != newLineCount {
+            var resized = Array(repeating: LineInfo(), count: newLineCount)
+            let keep = min(_lines.count, newLineCount)
+            if keep > 0 { resized.replaceSubrange(0..<keep, with: _lines[0..<keep]) }
+            _lines = resized
         }
 
         _lineStarts = newLineStarts
+        if newLineCount == 0 { return }
 
-        let newUpper = oldRange.lowerBound + max(0, newCount)
-        let endLineInNew = lineIndex(in: newLineStarts, atOffset: max(0, min(newUpper, max(storage.count - 1, 0))))
-        let loLine = max(0, startLineInNew - 1)
-        let hiLine = min(_lines.count, endLineInNew + 2)
-        if loLine < hiLine {
-            for line in loLine..<hiLine { _lines[line].isDirty = true }
+        let affectedChar = max(0, min(oldRange.lowerBound, storage.count))
+        var firstLine = lineIndex(atOffset: affectedChar)
+        if firstLine > 0 { firstLine -= 1 }
+
+        let editStartLine = lineIndex(atOffset: oldRange.lowerBound)
+
+        for li in firstLine..<_lines.count {
+            if li == editStartLine {
+                _lines[li].persistentSpans.removeAll(keepingCapacity: false)
+                _lines[li].persistentRanges.removeAll(keepingCapacity: false)
+                _lines[li].isDirty = true
+                continue
+            }
+
+            guard delta != 0 else {
+                _lines[li].isDirty = true
+                continue
+            }
+
+            if !_lines[li].persistentSpans.isEmpty {
+                var shifted: [KAttributedSpan] = []
+                shifted.reserveCapacity(_lines[li].persistentSpans.count)
+                for span in _lines[li].persistentSpans {
+                    if span.range.upperBound <= affectedChar {
+                        shifted.append(span)
+                    } else {
+                        let newLo = max(0, span.range.lowerBound + delta)
+                        let newHi = max(newLo, span.range.upperBound + delta)
+                        shifted.append(KAttributedSpan(range: newLo..<newHi, attributes: span.attributes))
+                    }
+                }
+                _lines[li].persistentSpans = shifted
+
+                var ranges: [Range<Int>] = []
+                ranges.reserveCapacity(shifted.count)
+                for s in shifted { ranges.append(s.range) }
+                _lines[li].persistentRanges = ranges
+            }
+
+            _lines[li].isDirty = true
         }
     }
 
@@ -176,7 +203,7 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
                 let len = end - start
                 if len <= 0 { continue }
                 let base = whole.baseAddress! + start
-                let excluded = _lines[li].persistentSpans.map { $0.range }
+                let excluded = _lines[li].persistentRanges   // ← map をやめてキャッシュ利用
                 appendOnDemandSingleLine(lineBase: base,
                                          length: len,
                                          documentStartOffset: start,
@@ -253,40 +280,68 @@ extension KSyntaxParserRuby {
 
     // MARK: - 行パース（dirty 行を優先）
 
+    // === 置換対象：KSyntaxParserRuby.parseLines(in:) ===
     fileprivate func parseLines(in candidateLines: Range<Int>) {
-        let lineCount = max(0, _lineStarts.count - 1)
-        if _lines.count != lineCount {
-            _lines = Array(repeating: LineInfo(), count: lineCount)
+        // 現在の行数に _lines 配列を合わせる
+        let totalLineCount = max(0, _lineStarts.count - 1)
+        if _lines.count != totalLineCount {
+            _lines = Array(repeating: LineInfo(), count: totalLineCount)
         }
-        if lineCount == 0 { return }
+        if totalLineCount == 0 { return }
 
-        let lo = max(0, min(candidateLines.lowerBound, lineCount))
-        let hi = max(lo, min(candidateLines.upperBound, lineCount))
-        if lo >= hi { return }
+        // 解析対象の行範囲をクランプ
+        let clampedLower = max(0, min(candidateLines.lowerBound, totalLineCount))
+        let clampedUpper = max(clampedLower, min(candidateLines.upperBound, totalLineCount))
+        if clampedLower >= clampedUpper { return }
+
+        // 直前行の継続状態を引き継いでスタート
+        var carryState: EndState = (clampedLower > 0) ? _lines[clampedLower - 1].endState : .neutral
 
         let skeleton = storage.skeletonString
-        var carryState: EndState = (lo > 0) ? _lines[lo - 1].endState : .neutral
-
         skeleton.bytes.withUnsafeBufferPointer { whole in
-            let documentBytes = whole.baseAddress!
-            for lineIndex in lo..<hi {
+            let docBytes = whole.baseAddress!
+
+            for lineIndex in clampedLower..<clampedUpper {
+                // すでに clean で、かつ前行からの継続状態と一致していればスキップ
                 if !_lines[lineIndex].isDirty && _lines[lineIndex].endState == carryState {
                     carryState = _lines[lineIndex].endState
                     continue
                 }
 
+                // 行のオフセット計算
                 let startOffset = _lineStarts[lineIndex]
                 let endOffset   = _lineStarts[lineIndex + 1]
                 let length      = endOffset - startOffset
-                let lineBase    = documentBytes + startOffset
+                if length <= 0 {
+                    _lines[lineIndex].persistentSpans  = []
+                    _lines[lineIndex].persistentRanges = []
+                    _lines[lineIndex].endState         = carryState
+                    _lines[lineIndex].isDirty          = false
+                    continue
+                }
 
+                let lineBase = docBytes + startOffset
+
+                // 1行字句解析（恒久スパンのみ構築）
                 let (newState, spans) = lexOneLine(base: lineBase,
                                                    count: length,
                                                    startOffset: startOffset,
                                                    initial: carryState)
-                _lines[lineIndex].endState       = newState
+
+                // 結果を保存（range キャッシュも同時に構築）
+                _lines[lineIndex].endState        = newState
                 _lines[lineIndex].persistentSpans = spans
-                _lines[lineIndex].isDirty        = false
+                if spans.isEmpty {
+                    _lines[lineIndex].persistentRanges = []
+                } else {
+                    var onlyRanges: [Range<Int>] = []
+                    onlyRanges.reserveCapacity(spans.count)
+                    for s in spans { onlyRanges.append(s.range) }
+                    _lines[lineIndex].persistentRanges = onlyRanges
+                }
+                _lines[lineIndex].isDirty = false
+
+                // 次行へ状態を引き継ぎ
                 carryState = newState
             }
         }
@@ -294,137 +349,136 @@ extension KSyntaxParserRuby {
 
     // MARK: - 1行字句解析（恒久スパン：複数行 + /regex/）
 
-    private func lexOneLine(base: UnsafePointer<UInt8>, count: Int, startOffset: Int, initial: EndState)
+    // 恒久スパンを構築する 1 行 lexer（複数行リテラル・%系・/regex/・heredoc・=begin/=end）
+    private func lexOneLine(base: UnsafePointer<UInt8>,
+                            count: Int,
+                            startOffset: Int,
+                            initial: EndState)
     -> (EndState, [KAttributedSpan]) {
         _scratchSpans.removeAll(keepingCapacity: true)
         var state = initial
-        var indexInLine = 0
-        let lineLength = count
+        var i = 0
+        let n = count
 
-        // --- 継続状態の処理（行頭） ---
+        // --- 行頭：継続状態の前処理 ---
         if state == .inMultiComment {
-            if matchLineHead(base, lineLength, token: "=end") {
-                appendSpan(documentStart: startOffset, fromLocal: 0, toLocal: lineLength, color: _colorComment)
+            if matchLineHead(base, n, token: "=end") {
+                appendSpan(documentStart: startOffset, fromLocal: 0, toLocal: n, color: _colorComment)
                 return (.neutral, _scratchSpans)
             } else {
-                appendSpan(documentStart: startOffset, fromLocal: 0, toLocal: lineLength, color: _colorComment)
+                appendSpan(documentStart: startOffset, fromLocal: 0, toLocal: n, color: _colorComment)
                 return (.inMultiComment, _scratchSpans)
             }
         }
         if state == .inStringSingle {
-            let (closed, localEnd) = scanQuotedNoInterpolation(base, lineLength, from: 0, quote: FuncChar.singleQuote)
-            appendSpan(documentStart: startOffset, fromLocal: 0, toLocal: localEnd, color: _colorString)
-            if closed { indexInLine = localEnd; state = .neutral } else { return (.inStringSingle, _scratchSpans) }
+            let (closed, end) = scanQuotedNoInterpolation(base, n, from: 0, quote: FuncChar.singleQuote)
+            appendSpan(documentStart: startOffset, fromLocal: 0, toLocal: end, color: _colorString)
+            if closed { i = end; state = .neutral } else { return (.inStringSingle, _scratchSpans) }
         }
         if state == .inStringDouble {
-            let (closed, localEnd) = scanQuotedNoInterpolation(base, lineLength, from: 0, quote: FuncChar.doubleQuote)
-            appendSpan(documentStart: startOffset, fromLocal: 0, toLocal: localEnd, color: _colorString)
-            if closed { indexInLine = localEnd; state = .neutral } else { return (.inStringDouble, _scratchSpans) }
+            let (closed, end) = scanQuotedNoInterpolation(base, n, from: 0, quote: FuncChar.doubleQuote)
+            appendSpan(documentStart: startOffset, fromLocal: 0, toLocal: end, color: _colorString)
+            if closed { i = end; state = .neutral } else { return (.inStringDouble, _scratchSpans) }
         }
         if case let .inPercentLiteral(closing) = state {
-            let scan = scanUntil(base, lineLength, from: 0, closing: closing)
-            appendSpan(documentStart: startOffset, fromLocal: 0, toLocal: scan.end, color: _colorString)
-            if scan.closed { indexInLine = scan.end; state = .neutral } else { return (.inPercentLiteral(closing: closing), _scratchSpans) }
+            let res = scanUntil(base, n, from: 0, closing: closing)
+            appendSpan(documentStart: startOffset, fromLocal: 0, toLocal: res.end, color: _colorString)
+            if res.closed { i = res.end; state = .neutral } else { return (.inPercentLiteral(closing: closing), _scratchSpans) }
         }
         if case let .inHereDoc(term, allowIndent, interpolation) = state {
-            let endAt = matchHereDocTerm(base, lineLength, term: term, allowIndent: allowIndent)
+            let endAt = matchHereDocTerm(base, n, term: term, allowIndent: allowIndent)
             if endAt >= 0 {
                 appendSpan(documentStart: startOffset, fromLocal: 0, toLocal: endAt, color: _colorString)
-                indexInLine = endAt; state = .neutral
+                i = endAt; state = .neutral
             } else {
-                appendSpan(documentStart: startOffset, fromLocal: 0, toLocal: lineLength, color: _colorString)
+                appendSpan(documentStart: startOffset, fromLocal: 0, toLocal: n, color: _colorString)
                 return (.inHereDoc(term: term, allowIndent: allowIndent, interpolation: interpolation), _scratchSpans)
             }
         }
         if state == .inRegexSlash {
-            let rx = scanRegexSlash(base, lineLength, from: 0)
+            let rx = scanRegexSlash(base, n, from: 0)
             appendSpan(documentStart: startOffset, fromLocal: 0, toLocal: rx.closedTo, color: _colorString)
-            if rx.closed { state = .neutral; indexInLine = rx.closedTo } else { return (.inRegexSlash, _scratchSpans) }
+            if rx.closed { state = .neutral; i = rx.closedTo } else { return (.inRegexSlash, _scratchSpans) }
         }
 
-        // "=begin" 行頭
-        if matchLineHead(base, lineLength, token: "=begin") {
-            appendSpan(documentStart: startOffset, fromLocal: 0, toLocal: lineLength, color: _colorComment)
+        // "=begin" 行頭（中に入ったら丸ごとコメント色）
+        if matchLineHead(base, n, token: "=begin") {
+            appendSpan(documentStart: startOffset, fromLocal: 0, toLocal: n, color: _colorComment)
             return (.inMultiComment, _scratchSpans)
         }
 
         // --- 通常走査 ---
-        while indexInLine < lineLength {
-            let ch = base[indexInLine]
+        while i < n {
+            let c = base[i]
 
-            // 行コメント（#以降はオンデマンドでも塗るが、恒久では保持しない）
-            if ch == FuncChar.numeric { break }
+            // 行コメント (#) は恒久スパンにしない（オンデマンドで塗る）ので break
+            if c == FuncChar.numeric { break }
 
-            // 単引号 / 双引号（恒久扱い：改行で閉じない場合があるため）
-            if ch == FuncChar.singleQuote {
-                let (closed, endLocal) = scanQuotedNoInterpolation(base, lineLength, from: indexInLine, quote: FuncChar.singleQuote)
-                appendSpan(documentStart: startOffset, fromLocal: indexInLine, toLocal: endLocal, color: _colorString)
-                if closed { indexInLine = endLocal; continue } else { return (.inStringSingle, _scratchSpans) }
+            // '...' / "..."
+            if c == FuncChar.singleQuote {
+                let (closed, end) = scanQuotedNoInterpolation(base, n, from: i, quote: FuncChar.singleQuote)
+                appendSpan(documentStart: startOffset, fromLocal: i, toLocal: end, color: _colorString)
+                if closed { i = end } else { return (.inStringSingle, _scratchSpans) }
+                continue
             }
-            if ch == FuncChar.doubleQuote {
-                let (closed, endLocal) = scanQuotedNoInterpolation(base, lineLength, from: indexInLine, quote: FuncChar.doubleQuote)
-                appendSpan(documentStart: startOffset, fromLocal: indexInLine, toLocal: endLocal, color: _colorString)
-                if closed { indexInLine = endLocal; continue } else { return (.inStringDouble, _scratchSpans) }
+            if c == FuncChar.doubleQuote {
+                let (closed, end) = scanQuotedNoInterpolation(base, n, from: i, quote: FuncChar.doubleQuote)
+                appendSpan(documentStart: startOffset, fromLocal: i, toLocal: end, color: _colorString)
+                if closed { i = end } else { return (.inStringDouble, _scratchSpans) }
+                continue
             }
 
             // heredoc ヘッダ
-            if ch == FuncChar.lt, indexInLine + 1 < lineLength, base[indexInLine + 1] == FuncChar.lt {
-                let (ok, _, term, allowIndent, interp) = parseHereDocHead(base, lineLength, from: indexInLine)
+            if c == FuncChar.lt, i + 1 < n, base[i + 1] == FuncChar.lt {
+                let (ok, _, term, allowIndent, interp) = parseHereDocHead(base, n, from: i)
                 if ok {
-                    appendSpan(documentStart: startOffset, fromLocal: indexInLine, toLocal: lineLength, color: _colorString)
+                    appendSpan(documentStart: startOffset, fromLocal: i, toLocal: n, color: _colorString)
                     return (.inHereDoc(term: term, allowIndent: allowIndent, interpolation: interp), _scratchSpans)
                 }
             }
 
-            // % 系（regex を含む）
-            if ch == FuncChar.percent, indexInLine + 2 < lineLength {
-                let typeCode = base[indexInLine + 1]
-                let typeLower = isAsciiUpper(typeCode) ? (typeCode &+ 0x20) : typeCode
-                let delimiter = base[indexInLine + 2]
+            // % 系（%r も含む）
+            if c == FuncChar.percent, i + 2 < n {
+                let typeCode = base[i + 1]
+                let typeLower = (typeCode >= 0x41 && typeCode <= 0x5A) ? (typeCode &+ 0x20) : typeCode
+                let delimiter = base[i + 2]
                 let isRegex = (typeLower == 0x72) // 'r'
                 let isStringLike = (typeLower == 0x71 || typeLower == 0x77 || typeLower == 0x69 ||
                                     typeLower == 0x73 || typeLower == 0x78) // q,w,i,s,x
                 if isRegex || isStringLike {
                     let closing = pairedClosing(for: delimiter)
-                    let scan = scanUntil(base, lineLength, from: indexInLine + 3, closing: closing)
-                    appendSpan(documentStart: startOffset, fromLocal: indexInLine, toLocal: scan.end, color: _colorString)
-                    if scan.closed { indexInLine = scan.end; continue }
+                    let res = scanUntil(base, n, from: i + 3, closing: closing)
+                    appendSpan(documentStart: startOffset, fromLocal: i, toLocal: res.end, color: _colorString)
+                    if res.closed { i = res.end; continue }
                     return (.inPercentLiteral(closing: closing), _scratchSpans)
                 }
             }
 
-            // /regex/ 文脈
-            if ch == FuncChar.slash, isRegexLikelyAfterSlash(base, lineLength, at: indexInLine) {
-                let rx = scanRegexSlash(base, lineLength, from: indexInLine)
-                appendSpan(documentStart: startOffset, fromLocal: indexInLine, toLocal: rx.closedTo, color: _colorString)
-                indexInLine = rx.closedTo
+            // /regex/（スラッシュ始まり）
+            if c == FuncChar.slash, isRegexLikelyAfterSlash(base, n, at: i) {
+                let rx = scanRegexSlash(base, n, from: i)
+                appendSpan(documentStart: startOffset, fromLocal: i, toLocal: rx.closedTo, color: _colorString)
+                i = rx.closedTo
                 if rx.closed { continue } else { return (.inRegexSlash, _scratchSpans) }
             }
 
-            // 以下は恒久スパンは作らず、字句境界だけ進める（オンデマンドで塗る）
-            if ch == FuncChar.dollar { let end = scanGlobalVar(base, lineLength, from: indexInLine); indexInLine = end; continue }
-            if ch == FuncChar.at {
-                let end = scanAtVar(base, lineLength, from: indexInLine)
-                if end > indexInLine { indexInLine = end; continue }
+            // 以降は恒久スパンを作らず、位置だけ前に進める（オンデマンドで色付け）
+            if c == FuncChar.dollar { i = scanGlobalVar(base, n, from: i); continue }
+            if c == FuncChar.at {
+                let end = scanAtVar(base, n, from: i)
+                if end > i { i = end; continue }
             }
-            if ch == FuncChar.colon {
-                let end = scanSymbolLiteral(base, lineLength, from: indexInLine)
-                if end > indexInLine {
-                    // :symbol / :"..." は文字列色（ただし恒久保持はしない）
-                    appendSpan(documentStart: startOffset, fromLocal: indexInLine, toLocal: end, color: _colorString)
-                    indexInLine = end; continue
+            if c == FuncChar.colon {
+                let end = scanSymbolLiteral(base, n, from: i)
+                if end > i {
+                    // :"..." / :symbol は“文字列色”だが恒久保持はしないので span 追加はしない
+                    i = end; continue
                 }
             }
-            if ch == FuncChar.minus || isAsciiDigit(ch) {
-                let end = scanNumber(base, lineLength, from: indexInLine)
-                indexInLine = end; continue
-            }
-            if isIdentStartAZ_(ch) {
-                let end = scanIdentEnd(base, lineLength, from: indexInLine)
-                indexInLine = end; continue
-            }
+            if c == FuncChar.minus || (c >= 0x30 && c <= 0x39) { i = scanNumber(base, n, from: i); continue }
+            if isIdentStartAZ_(c) { i = scanIdentEnd(base, n, from: i); continue }
 
-            indexInLine += 1
+            i += 1
         }
 
         return (state, _scratchSpans)
