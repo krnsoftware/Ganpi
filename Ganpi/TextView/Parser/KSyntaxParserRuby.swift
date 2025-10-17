@@ -933,6 +933,23 @@ extension KSyntaxParserRuby {
             return true
         default: break
         }
+
+        // ★ 追加：直前の英小文字連続が if / elsif なら regex とみなす（例: `if /.../`, `elsif /.../`）
+        if isAsciiLower(base[j]) {
+            var k = j
+            while k >= 0, isAsciiLower(base[k]) { k -= 1 }
+            let start = k + 1
+            let len = j - start + 1
+            if len == 2, base[start] == 0x69, base[start + 1] == 0x66 { // "if"
+                return true
+            }
+            if len == 5,
+               base[start] == 0x65, base[start + 1] == 0x6C, base[start + 2] == 0x73,
+               base[start + 3] == 0x69, base[start + 4] == 0x66 {       // "elsif"
+                return true
+            }
+        }
+
         if isIdentStartAZ_(base[j]) || isAsciiDigit(base[j]) { return false }
         if base[j] == FuncChar.rightParen || base[j] == FuncChar.rightBracket || base[j] == FuncChar.rightBrace { return false }
         return true
