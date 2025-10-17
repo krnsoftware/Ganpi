@@ -532,6 +532,51 @@ extension KSyntaxParserRuby {
             }
 
             let ch = lineBase[localIndex]
+            // グローバル変数（$...）：$[0-9]+ / $! / $~ / $_ / $$ / $-w など含む
+            if ch == FuncChar.dollar {
+                let end = scanGlobalVar(lineBase, lineEnd, from: localIndex)
+                if end > localIndex, let rng = clipped(documentStartOffset + localIndex, documentStartOffset + end) {
+                    out.append(KAttributedSpan(range: rng, attributes: [.foregroundColor: _colorVariable]))
+                    localIndex = end
+                    continue
+                }
+            }
+
+            // インスタンス/クラス変数（@... / @@...）
+            if ch == FuncChar.at {
+                let end = scanAtVar(lineBase, lineEnd, from: localIndex)
+                if end > localIndex, let rng = clipped(documentStartOffset + localIndex, documentStartOffset + end) {
+                    out.append(KAttributedSpan(range: rng, attributes: [.foregroundColor: _colorVariable]))
+                    localIndex = end
+                    continue
+                }
+            }
+            
+            // シンボルリテラル ( :$something / :name )
+            if ch == FuncChar.colon {
+                // ★ 追加：スコープ演算子 :: は除外（Prefs::DateTimeFormat など）
+                if localIndex + 1 < lineEnd, lineBase[localIndex + 1] == FuncChar.colon {
+                    localIndex += 2
+                    continue
+                } else {
+                    let next = localIndex + 1
+                    if next < lineEnd {
+                        let nc = lineBase[next]
+                        var end = next
+                        if nc == FuncChar.dollar {                    // :$foo
+                            end = scanGlobalVar(lineBase, lineEnd, from: next)
+                        } else if isIdentStartAZ_(nc) {               // :symbol
+                            end = scanIdentEnd(lineBase, lineEnd, from: next)
+                        }
+                        if end > next,
+                           let rng = clipped(documentStartOffset + localIndex, documentStartOffset + end) {
+                            out.append(KAttributedSpan(range: rng, attributes: [.foregroundColor: _colorVariable]))
+                            localIndex = end
+                            continue
+                        }
+                    }
+                }
+            }
 
             // 行コメント：'#' は恒久スパン外でのみ有効
             if ch == FuncChar.numeric {
