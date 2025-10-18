@@ -808,10 +808,16 @@ CQ
                                                 <action selector="lineWrapAlignment:" target="-1" id="z8z-KF-bbJ"/>
                                             </connections>
                                         </menuItem>
-                                        <menuItem title="Indent +2 Tab" tag="3" id="fpv-3B-6Be">
+                                        <menuItem title="Indent +1.5 Tab" tag="3" id="fpv-3B-6Be">
                                             <modifierMask key="keyEquivalentModifierMask"/>
                                             <connections>
                                                 <action selector="lineWrapAlignment:" target="-1" id="5dk-GL-WI4"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Indent +2 Tab" tag="4" id="5ms-mc-eQx">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="lineWrapAlignment:" target="-1" id="Wpq-Do-oSZ"/>
                                             </connections>
                                         </menuItem>
                                     </items>

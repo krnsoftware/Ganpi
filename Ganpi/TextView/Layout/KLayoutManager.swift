@@ -31,7 +31,8 @@ enum KWrapLineOffsetType : Int {
     case none = 0 // オフセットなし
     case same = 1 // 最初の行と同じオフセット
     case tab1 = 2 // 最初の行の更に1tab分右にオフセット
-    case tab2 = 3 // 最初の行の更に2tab分右にオフセット
+    case tab1_5 = 3 // 最初の行の更に1.5tab分右にオフセット
+    case tab2 = 4 // 最初の行の更に2tab分右にオフセット
 }
 
 
@@ -359,6 +360,7 @@ final class KLayoutManager: KLayoutManagerReadable {
         case .none: leadingLineOffset = 0
         case .same: leadingLineOffset = CGFloat(tabSpaceCount) * _textStorageRef.spaceAdvance
         case .tab1: leadingLineOffset = CGFloat(tabSpaceCount + 1 * tabWidth) * _textStorageRef.spaceAdvance
+        case .tab1_5: leadingLineOffset = (CGFloat(tabSpaceCount) + 1.5 * CGFloat(tabWidth)) * _textStorageRef.spaceAdvance
         case .tab2: leadingLineOffset = CGFloat(tabSpaceCount + 2 * tabWidth) * _textStorageRef.spaceAdvance
         }
         return leadingLineOffset
