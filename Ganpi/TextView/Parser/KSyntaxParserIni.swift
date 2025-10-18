@@ -47,6 +47,10 @@ final class KSyntaxParserIni: KSyntaxParserProtocol {
     func setKeywords(_ words: [String]) {
         // do nothing.
     }
+    
+    func setTheme(_ theme: [KFunctionalColor : NSColor]) {
+        // do nothing.
+    }
 
     // MARK: - Painter hook
 

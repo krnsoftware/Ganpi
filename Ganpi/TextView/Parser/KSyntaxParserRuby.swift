@@ -51,14 +51,11 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
     // 一時バッファ（恒久スパン構築用）
     private var _scratchSpans: [KAttributedSpan] = []
 
-    // 配色（仮。テーマ注入可）
-    private let _colorBase       = NSColor.labelColor
-    private let _colorString     = NSColor.systemRed
-    private let _colorComment    = NSColor.systemGreen
-    private let _colorKeyword    = NSColor.systemBlue
-    private let _colorNumber     = NSColor.systemBlue
-    private let _colorVariable   = NSColor.systemBrown
-    private let _colorBackground = NSColor.white
+    // 配色
+    private var _theme: [KFunctionalColor: NSColor] = [:]
+    @inline(__always) private func color(_ role: KFunctionalColor) -> NSColor {
+        _theme[role] ?? _theme[.base] ?? NSColor.labelColor
+    }
 
     // ソート済みのキーワード（UTF-8バイト列）。辞書は使わずフラット配列だけを持つ。
     private var _keywordsFlat: [[UInt8]] = []
@@ -72,6 +69,20 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
         "module","ensure","unless","return","rescue",
         "defined?"
     ]
+    
+    // 既定テーマ（必要最小限）
+    private static let _builtInTheme: [KFunctionalColor: NSColor] = [
+        .base:       NSColor.labelColor,
+        .background: NSColor.textBackgroundColor,
+        .comment:    NSColor.systemGreen,
+        .string:     NSColor.systemRed,
+        .keyword:    NSColor.systemBlue,
+        .number:     NSColor.systemBlue,
+        .variable:   NSColor.systemBrown,
+        .tag:        NSColor.systemBlue,              // no use.
+        .attribute:  NSColor.secondaryLabelColor,     //
+        .selector:   NSColor.systemPurple             //
+    ]
 
     // ストレージ
     let storage: KTextStorageReadable
@@ -79,13 +90,14 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
     init(storage: KTextStorageReadable) {
         self.storage = storage
         setKeywords(Self._defaultKeywords)
+        setTheme(Self._builtInTheme)
     }
 
     // MARK: - Protocol basics
 
     var lineCommentPrefix: String? { "#" }
-    var baseTextColor: NSColor { _colorBase }
-    var backgroundColor: NSColor { _colorBackground }
+    var baseTextColor: NSColor { color(.base) }
+    var backgroundColor: NSColor { color(.background) }
 
     // MARK: - ASCII 判定ヘルパ（関数名は説明的に）
 
@@ -374,47 +386,47 @@ extension KSyntaxParserRuby {
         // --- 行頭：継続状態の前処理 ---
         if state == .inMultiComment {
             if matchLineHead(base, n, token: "=end") {
-                appendSpan(documentStart: startOffset, fromLocal: 0, toLocal: n, color: _colorComment)
+                appendSpan(documentStart: startOffset, fromLocal: 0, toLocal: n, color: color(.comment))
                 return (.neutral, _scratchSpans)
             } else {
-                appendSpan(documentStart: startOffset, fromLocal: 0, toLocal: n, color: _colorComment)
+                appendSpan(documentStart: startOffset, fromLocal: 0, toLocal: n, color: color(.comment))
                 return (.inMultiComment, _scratchSpans)
             }
         }
         if state == .inStringSingle {
             let (closed, end) = scanQuotedNoInterpolation(base, n, from: 0, quote: FuncChar.singleQuote)
-            appendSpan(documentStart: startOffset, fromLocal: 0, toLocal: end, color: _colorString)
+            appendSpan(documentStart: startOffset, fromLocal: 0, toLocal: end, color: color(.string))
             if closed { i = end; state = .neutral } else { return (.inStringSingle, _scratchSpans) }
         }
         if state == .inStringDouble {
             let (closed, end) = scanQuotedNoInterpolation(base, n, from: 0, quote: FuncChar.doubleQuote)
-            appendSpan(documentStart: startOffset, fromLocal: 0, toLocal: end, color: _colorString)
+            appendSpan(documentStart: startOffset, fromLocal: 0, toLocal: end, color: color(.string))
             if closed { i = end; state = .neutral } else { return (.inStringDouble, _scratchSpans) }
         }
         if case let .inPercentLiteral(closing) = state {
             let res = scanUntil(base, n, from: 0, closing: closing)
-            appendSpan(documentStart: startOffset, fromLocal: 0, toLocal: res.end, color: _colorString)
+            appendSpan(documentStart: startOffset, fromLocal: 0, toLocal: res.end, color: color(.string))
             if res.closed { i = res.end; state = .neutral } else { return (.inPercentLiteral(closing: closing), _scratchSpans) }
         }
         if case let .inHereDoc(term, allowIndent, interpolation) = state {
             let endAt = matchHereDocTerm(base, n, term: term, allowIndent: allowIndent)
             if endAt >= 0 {
-                appendSpan(documentStart: startOffset, fromLocal: 0, toLocal: endAt, color: _colorString)
+                appendSpan(documentStart: startOffset, fromLocal: 0, toLocal: endAt, color: color(.string))
                 i = endAt; state = .neutral
             } else {
-                appendSpan(documentStart: startOffset, fromLocal: 0, toLocal: n, color: _colorString)
+                appendSpan(documentStart: startOffset, fromLocal: 0, toLocal: n, color: color(.string))
                 return (.inHereDoc(term: term, allowIndent: allowIndent, interpolation: interpolation), _scratchSpans)
             }
         }
         if state == .inRegexSlash {
             let rx = scanRegexSlash(base, n, from: 0)
-            appendSpan(documentStart: startOffset, fromLocal: 0, toLocal: rx.closedTo, color: _colorString)
+            appendSpan(documentStart: startOffset, fromLocal: 0, toLocal: rx.closedTo, color: color(.string))
             if rx.closed { state = .neutral; i = rx.closedTo } else { return (.inRegexSlash, _scratchSpans) }
         }
 
         // "=begin" 行頭（中に入ったら丸ごとコメント色）
         if matchLineHead(base, n, token: "=begin") {
-            appendSpan(documentStart: startOffset, fromLocal: 0, toLocal: n, color: _colorComment)
+            appendSpan(documentStart: startOffset, fromLocal: 0, toLocal: n, color: color(.comment))
             return (.inMultiComment, _scratchSpans)
         }
 
@@ -428,13 +440,13 @@ extension KSyntaxParserRuby {
             // '...' / "..."
             if c == FuncChar.singleQuote {
                 let (closed, end) = scanQuotedNoInterpolation(base, n, from: i, quote: FuncChar.singleQuote)
-                appendSpan(documentStart: startOffset, fromLocal: i, toLocal: end, color: _colorString)
+                appendSpan(documentStart: startOffset, fromLocal: i, toLocal: end, color: color(.string))
                 if closed { i = end } else { return (.inStringSingle, _scratchSpans) }
                 continue
             }
             if c == FuncChar.doubleQuote {
                 let (closed, end) = scanQuotedNoInterpolation(base, n, from: i, quote: FuncChar.doubleQuote)
-                appendSpan(documentStart: startOffset, fromLocal: i, toLocal: end, color: _colorString)
+                appendSpan(documentStart: startOffset, fromLocal: i, toLocal: end, color: color(.string))
                 if closed { i = end } else { return (.inStringDouble, _scratchSpans) }
                 continue
             }
@@ -443,7 +455,7 @@ extension KSyntaxParserRuby {
             if c == FuncChar.lt, i + 1 < n, base[i + 1] == FuncChar.lt {
                 let (ok, _, term, allowIndent, interp) = parseHereDocHead(base, n, from: i)
                 if ok {
-                    appendSpan(documentStart: startOffset, fromLocal: i, toLocal: n, color: _colorString)
+                    appendSpan(documentStart: startOffset, fromLocal: i, toLocal: n, color: color(.string))
                     return (.inHereDoc(term: term, allowIndent: allowIndent, interpolation: interp), _scratchSpans)
                 }
             }
@@ -459,7 +471,7 @@ extension KSyntaxParserRuby {
                 if isRegex || isStringLike {
                     let closing = pairedClosing(for: delimiter)
                     let res = scanUntil(base, n, from: i + 3, closing: closing)
-                    appendSpan(documentStart: startOffset, fromLocal: i, toLocal: res.end, color: _colorString)
+                    appendSpan(documentStart: startOffset, fromLocal: i, toLocal: res.end, color: color(.string))
                     if res.closed { i = res.end; continue }
                     return (.inPercentLiteral(closing: closing), _scratchSpans)
                 }
@@ -468,7 +480,7 @@ extension KSyntaxParserRuby {
             // /regex/（スラッシュ始まり）
             if c == FuncChar.slash, isRegexLikelyAfterSlash(base, n, at: i) {
                 let rx = scanRegexSlash(base, n, from: i)
-                appendSpan(documentStart: startOffset, fromLocal: i, toLocal: rx.closedTo, color: _colorString)
+                appendSpan(documentStart: startOffset, fromLocal: i, toLocal: rx.closedTo, color: color(.string))
                 i = rx.closedTo
                 if rx.closed { continue } else { return (.inRegexSlash, _scratchSpans) }
             }
@@ -547,7 +559,7 @@ extension KSyntaxParserRuby {
             if ch == FuncChar.dollar {
                 let end = scanGlobalVar(lineBase, lineEnd, from: localIndex)
                 if end > localIndex, let rng = clipped(documentStartOffset + localIndex, documentStartOffset + end) {
-                    out.append(KAttributedSpan(range: rng, attributes: [.foregroundColor: _colorVariable]))
+                    out.append(KAttributedSpan(range: rng, attributes: [.foregroundColor: color(.variable)]))
                     localIndex = end
                     continue
                 }
@@ -557,7 +569,7 @@ extension KSyntaxParserRuby {
             if ch == FuncChar.at {
                 let end = scanAtVar(lineBase, lineEnd, from: localIndex)
                 if end > localIndex, let rng = clipped(documentStartOffset + localIndex, documentStartOffset + end) {
-                    out.append(KAttributedSpan(range: rng, attributes: [.foregroundColor: _colorVariable]))
+                    out.append(KAttributedSpan(range: rng, attributes: [.foregroundColor: color(.variable)]))
                     localIndex = end
                     continue
                 }
@@ -581,7 +593,7 @@ extension KSyntaxParserRuby {
                         }
                         if end > next,
                            let rng = clipped(documentStartOffset + localIndex, documentStartOffset + end) {
-                            out.append(KAttributedSpan(range: rng, attributes: [.foregroundColor: _colorVariable]))
+                            out.append(KAttributedSpan(range: rng, attributes: [.foregroundColor: color(.variable)]))
                             localIndex = end
                             continue
                         }
@@ -598,7 +610,7 @@ extension KSyntaxParserRuby {
                     break
                 }
                 if absEnd > absStart, let rng = clipped(absStart, absEnd) {
-                    out.append(KAttributedSpan(range: rng, attributes: [.foregroundColor: _colorComment]))
+                    out.append(KAttributedSpan(range: rng, attributes: [.foregroundColor: color(.comment)]))
                 }
                 break
             }
@@ -607,7 +619,7 @@ extension KSyntaxParserRuby {
             if ch == FuncChar.singleQuote || ch == FuncChar.doubleQuote {
                 let (closed, endLocal) = scanQuotedNoInterpolation(lineBase, lineEnd, from: localIndex, quote: ch)
                 if closed, let rng = clipped(documentStartOffset + localIndex, documentStartOffset + endLocal) {
-                    out.append(KAttributedSpan(range: rng, attributes: [.foregroundColor: _colorString]))
+                    out.append(KAttributedSpan(range: rng, attributes: [.foregroundColor: color(.string)]))
                     localIndex = endLocal; continue
                 }
             }
@@ -623,7 +635,7 @@ extension KSyntaxParserRuby {
                     let closing = pairedClosing(for: delim)
                     let scan = scanUntil(lineBase, lineEnd, from: localIndex + 3, closing: closing)
                     if scan.closed, let rr = clipped(documentStartOffset + localIndex, documentStartOffset + scan.end) {
-                        out.append(KAttributedSpan(range: rr, attributes: [.foregroundColor: _colorString]))
+                        out.append(KAttributedSpan(range: rr, attributes: [.foregroundColor: color(.string)]))
                         localIndex = scan.end; continue
                     }
                 }
@@ -633,7 +645,7 @@ extension KSyntaxParserRuby {
             if ch == FuncChar.minus || isAsciiDigit(ch) {
                 let end = scanNumber(lineBase, lineEnd, from: localIndex)
                 if end > localIndex, let rng = clipped(documentStartOffset + localIndex, documentStartOffset + end) {
-                    out.append(KAttributedSpan(range: rng, attributes: [.foregroundColor: _colorNumber]))
+                    out.append(KAttributedSpan(range: rng, attributes: [.foregroundColor: color(.number)]))
                 }
                 localIndex = max(end, localIndex + 1); continue
             }
@@ -644,7 +656,7 @@ extension KSyntaxParserRuby {
                 if end > localIndex,
                    isKeywordToken(lineBase, lineEnd, start: localIndex, end: end, documentStart: documentStartOffset),
                    let rng = clipped(documentStartOffset + localIndex, documentStartOffset + end) {
-                    out.append(KAttributedSpan(range: rng, attributes: [.foregroundColor: _colorKeyword]))
+                    out.append(KAttributedSpan(range: rng, attributes: [.foregroundColor: color(.keyword)]))
                 }
                 localIndex = end; continue
             }
@@ -1231,6 +1243,12 @@ extension KSyntaxParserRuby {
         }
 
         _keywordsFlat = flat
+    }
+    
+    // MARK: - Theme
+    
+    func setTheme(_ theme: [KFunctionalColor : NSColor]) {
+        _theme = theme
     }
 
     // MARK: - Completion（語彙のスナップショット）

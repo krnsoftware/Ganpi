@@ -17,6 +17,20 @@ struct KAttributedSpan {
     let attributes: [NSAttributedString.Key: Any]
 }
 
+/// 言語共通で使う機能別カラー
+enum KFunctionalColor {
+    case base
+    case background
+    case comment
+    case string
+    case keyword
+    case number
+    case variable
+    case tag
+    case attribute
+    case selector
+}
+
 enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
     case plain = "public.plain-text"
     case ruby  = "public.ruby-script"
@@ -149,9 +163,10 @@ protocol KSyntaxParserProtocol: AnyObject {
     // Painter hook: attribute spans (font is applied by TextStorage)
     func attributes(in range: Range<Int>, tabWidth: Int) -> [KAttributedSpan]
     
-    // 基本となる文字列の色を返す。ベースカラー。
+    // 文字色の設定など
     var baseTextColor: NSColor { get }
     var backgroundColor: NSColor { get }
+    func setTheme(_ theme: [KFunctionalColor: NSColor])
     
     // caretのindex:iに於いてそれに属すると思われる単語の領域。
     func wordRange(at index: Int) -> Range<Int>?

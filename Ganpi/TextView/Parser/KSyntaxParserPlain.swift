@@ -9,6 +9,7 @@ import AppKit
 
 // KSyntaxParserProtocolの最小実装。
 final class KSyntaxParserPlain: KSyntaxParserProtocol {
+    
     private unowned let _storage: KTextStorageReadable
     var storage: KTextStorageReadable { _storage }
     init(storage: KTextStorageReadable) { _storage = storage }
@@ -22,11 +23,13 @@ final class KSyntaxParserPlain: KSyntaxParserProtocol {
     func completionEntries(prefix: String,around index: Int,limit: Int, policy: KCompletionPolicy) -> [KCompletionEntry]{ return [] }
     var lineCommentPrefix: String? { nil }
     func setKeywords(_ words: [String]) { /* no-op */ }
+    func setTheme(_ theme: [KFunctionalColor : NSColor]) { /* no-op */ }
 
     // ハイライトなし
     func attributes(in range: Range<Int>, tabWidth: Int) -> [KAttributedSpan] { [] }
     
-    var baseTextColor: NSColor { get { return NSColor.black }}
+    var baseTextColor: NSColor { NSColor.black }
+    var backgroundColor: NSColor { NSColor.white }
     
     // 欧文のみ（日本語は storage.wordRange が先に処理）
     func wordRange(at index: Int) -> Range<Int>? { return nil }
