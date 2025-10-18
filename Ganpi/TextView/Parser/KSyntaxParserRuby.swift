@@ -100,13 +100,13 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
     var backgroundColor: NSColor { color(.background) }
 
     // MARK: - ASCII 判定ヘルパ（関数名は説明的に）
-
+/*
     @inline(__always) private func isAsciiDigit(_ b: UInt8) -> Bool { b >= 0x30 && b <= 0x39 }
     @inline(__always) private func isAsciiUpper(_ b: UInt8) -> Bool { b >= 0x41 && b <= 0x5A }
     @inline(__always) private func isAsciiLower(_ b: UInt8) -> Bool { b >= 0x61 && b <= 0x7A }
     @inline(__always) private func isAsciiAlpha(_ b: UInt8) -> Bool { isAsciiUpper(b) || isAsciiLower(b) }
     @inline(__always) private func isIdentStartAZ_(_ b: UInt8) -> Bool { isAsciiAlpha(b) || b == FuncChar.underscore }
-    @inline(__always) private func isIdentPartAZ09_(_ b: UInt8) -> Bool { isIdentStartAZ_(b) || isAsciiDigit(b) }
+    @inline(__always) private func isIdentPartAZ09_(_ b: UInt8) -> Bool { isIdentStartAZ_(b) || isAsciiDigit(b) }*/
 
     // MARK: - 編集通知（差分行だけ dirty に）
 
@@ -499,7 +499,7 @@ extension KSyntaxParserRuby {
                 }
             }
             if c == FuncChar.minus || (c >= 0x30 && c <= 0x39) { i = scanNumber(base, n, from: i); continue }
-            if isIdentStartAZ_(c) { i = scanIdentEnd(base, n, from: i); continue }
+            if c.isIdentStartAZ_ { i = scanIdentEnd(base, n, from: i); continue }
 
             i += 1
         }
@@ -588,7 +588,7 @@ extension KSyntaxParserRuby {
                         var end = next
                         if nc == FuncChar.dollar {                    // :$foo
                             end = scanGlobalVar(lineBase, lineEnd, from: next)
-                        } else if isIdentStartAZ_(nc) {               // :symbol
+                        } else if nc.isIdentStartAZ_ {               // :symbol
                             end = scanIdentEnd(lineBase, lineEnd, from: next)
                         }
                         if end > next,
@@ -627,7 +627,7 @@ extension KSyntaxParserRuby {
             // 単行の %q/%Q/%w/%W/%i/%I/%s/%S/%x/%X（regex %r は恒久スパン側で処理）
             if ch == FuncChar.percent, localIndex + 2 < lineEnd {
                 let typeCode = lineBase[localIndex + 1]
-                let typeLower = isAsciiUpper(typeCode) ? (typeCode &+ 0x20) : typeCode
+                let typeLower = typeCode.isAsciiUpper ? (typeCode &+ 0x20) : typeCode
                 let delim = lineBase[localIndex + 2]
                 let isStringLike = (typeLower == 0x71 || typeLower == 0x77 || typeLower == 0x69 ||
                                     typeLower == 0x73 || typeLower == 0x78)
@@ -642,7 +642,7 @@ extension KSyntaxParserRuby {
             }
 
             // 数値
-            if ch == FuncChar.minus || isAsciiDigit(ch) {
+            if ch == FuncChar.minus || ch.isAsciiDigit {
                 let end = scanNumber(lineBase, lineEnd, from: localIndex)
                 if end > localIndex, let rng = clipped(documentStartOffset + localIndex, documentStartOffset + end) {
                     out.append(KAttributedSpan(range: rng, attributes: [.foregroundColor: color(.number)]))
@@ -651,7 +651,7 @@ extension KSyntaxParserRuby {
             }
 
             // キーワード（左境界チェック付き）
-            if isIdentStartAZ_(ch) {
+            if ch.isIdentStartAZ_ {
                 let end = scanIdentEnd(lineBase, lineEnd, from: localIndex)
                 if end > localIndex,
                    isKeywordToken(lineBase, lineEnd, start: localIndex, end: end, documentStart: documentStartOffset),
@@ -730,7 +730,7 @@ extension KSyntaxParserRuby {
                     // フラグ（i,m,x,o,n,e,u,s,d…）をざっくり読み飛ばす
                     while i < n {
                         let f = base[i]
-                        if isAsciiAlpha(f) { i += 1 } else { break }
+                        if f.isAsciiAlpha { i += 1 } else { break }
                     }
                     return RegexScanResult(closed: true, closedTo: i)
                 }
@@ -785,7 +785,7 @@ extension KSyntaxParserRuby {
 
         let head = base[i]
         let isQuoted = (head == FuncChar.singleQuote || head == FuncChar.doubleQuote)
-        let isIdent0 = (head == FuncChar.underscore) || isAsciiAlpha(head)
+        let isIdent0 = (head == FuncChar.underscore) || head.isAsciiAlpha
         if !(isIdent0 || isQuoted) { return (false, from, [], false, false) }
 
         var interpolation = true
@@ -799,14 +799,14 @@ extension KSyntaxParserRuby {
             term = Array(UnsafeBufferPointer(start: base + start, count: i - start))
             i += 1
             for b in term {
-                let ok = (b == FuncChar.underscore) || isAsciiAlpha(b) || isAsciiDigit(b)
+                let ok = (b == FuncChar.underscore) || b.isAsciiAlpha || b.isAsciiDigit
                 if !ok { return (false, from, [], false, false) }
             }
         } else {
             let start = i
             while i < n {
                 let c = base[i]
-                let ok = (c == FuncChar.underscore) || isAsciiAlpha(c) || isAsciiDigit(c)
+                let ok = (c == FuncChar.underscore) || c.isAsciiAlpha || c.isAsciiDigit
                 if !ok { break }
                 i += 1
             }
@@ -815,8 +815,8 @@ extension KSyntaxParserRuby {
 
             var hasUpper = false, allUpperAZ09_ = true
             for b in term {
-                if isAsciiUpper(b) { hasUpper = true }
-                if !(isAsciiUpper(b) || isAsciiDigit(b) || b == FuncChar.underscore) {
+                if b.isAsciiUpper { hasUpper = true }
+                if !(b.isAsciiUpper || b.isAsciiDigit || b == FuncChar.underscore) {
                     allUpperAZ09_ = false; break
                 }
             }
@@ -890,16 +890,16 @@ extension KSyntaxParserRuby {
             if i + 1 < n { i += 2; return i }
             return i + 1
         }
-        if isAsciiDigit(c) {
+        if c.isAsciiDigit {
             i += 1
-            while i < n, isAsciiDigit(base[i]) { i += 1 }
+            while i < n, base[i].isAsciiDigit { i += 1 }
             return i
         }
-        if isIdentStartAZ_(c) {
+        if c.isIdentStartAZ_ {
             i += 1
             while i < n {
                 let b = base[i]
-                if isIdentStartAZ_(b) || isAsciiDigit(b) || b == FuncChar.question || b == FuncChar.exclamation { i += 1 } else { break }
+                if b.isIdentStartAZ_ || b.isAsciiDigit || b == FuncChar.question || b == FuncChar.exclamation { i += 1 } else { break }
             }
             return i
         }
@@ -910,22 +910,22 @@ extension KSyntaxParserRuby {
         var i = from
         if i + 1 < n, base[i] == FuncChar.at, base[i + 1] == FuncChar.at {
             i += 2
-            if i < n, isIdentStartAZ_(base[i]) {
+            if i < n, base[i].isIdentStartAZ_ {
                 i += 1
                 while i < n {
                     let b = base[i]
-                    if isIdentStartAZ_(b) || isAsciiDigit(b) || b == FuncChar.question || b == FuncChar.exclamation { i += 1 } else { break }
+                    if b.isIdentStartAZ_ || b.isAsciiDigit || b == FuncChar.question || b == FuncChar.exclamation { i += 1 } else { break }
                 }
                 return i
             }
             return from
         } else if base[i] == FuncChar.at {
             i += 1
-            if i < n, isIdentStartAZ_(base[i]) {
+            if i < n, base[i].isIdentStartAZ_ {
                 i += 1
                 while i < n {
                     let b = base[i]
-                    if isIdentStartAZ_(b) || isAsciiDigit(b) || b == FuncChar.question || b == FuncChar.exclamation { i += 1 } else { break }
+                    if b.isIdentStartAZ_ || b.isAsciiDigit || b == FuncChar.question || b == FuncChar.exclamation { i += 1 } else { break }
                 }
                 return i
             }
@@ -943,11 +943,11 @@ extension KSyntaxParserRuby {
         if c == FuncChar.singleQuote || c == FuncChar.doubleQuote {
             let (closed, end) = scanQuotedNoInterpolation(base, n, from: i, quote: c)
             return closed ? end : n
-        } else if isIdentStartAZ_(c) {
+        } else if c.isIdentStartAZ_ {
             var j = i + 1
             while j < n {
                 let b = base[j]
-                if isIdentStartAZ_(b) || isAsciiDigit(b) || b == FuncChar.question || b == FuncChar.exclamation { j += 1 } else { break }
+                if b.isIdentStartAZ_ || b.isAsciiDigit || b == FuncChar.question || b == FuncChar.exclamation { j += 1 } else { break }
             }
             return j
         }
@@ -959,7 +959,7 @@ extension KSyntaxParserRuby {
         if i < n, base[i] == FuncChar.minus { i += 1 }
         while i < n {
             let c = base[i]
-            if !(isAsciiDigit(c) || c == FuncChar.period || isAsciiAlpha(c)) { break }
+            if !(c.isAsciiDigit || c == FuncChar.period || c.isAsciiAlpha) { break }
             i += 1
         }
         return i
@@ -969,8 +969,8 @@ extension KSyntaxParserRuby {
         var i = from
         while i < n {
             let c = base[i]
-            let alpha = isAsciiAlpha(c) || c == FuncChar.underscore
-            let digit = isAsciiDigit(c)
+            let alpha = c.isAsciiAlpha || c == FuncChar.underscore
+            let digit = c.isAsciiDigit
             if !(alpha || digit || c == FuncChar.exclamation || c == FuncChar.question) { break }
             i += 1
         }
@@ -993,9 +993,9 @@ extension KSyntaxParserRuby {
         }
 
         // ★ 追加：直前の英小文字連続が if / elsif なら regex とみなす（例: `if /.../`, `elsif /.../`）
-        if isAsciiLower(base[j]) {
+        if base[j].isAsciiLower {
             var k = j
-            while k >= 0, isAsciiLower(base[k]) { k -= 1 }
+            while k >= 0, base[k].isAsciiLower { k -= 1 }
             let start = k + 1
             let len = j - start + 1
             if len == 2, base[start] == 0x69, base[start + 1] == 0x66 { // "if"
@@ -1008,7 +1008,7 @@ extension KSyntaxParserRuby {
             }
         }
 
-        if isIdentStartAZ_(base[j]) || isAsciiDigit(base[j]) { return false }
+        if base[j].isIdentStartAZ_ || base[j].isAsciiDigit { return false }
         if base[j] == FuncChar.rightParen || base[j] == FuncChar.rightBracket || base[j] == FuncChar.rightBrace { return false }
         return true
     }
@@ -1039,7 +1039,7 @@ extension KSyntaxParserRuby {
 
             func isWordish(_ c: UInt8) -> Bool {
                 c == FuncChar.dollar || c == FuncChar.at || c == FuncChar.colon ||
-                c == FuncChar.minus || isAsciiAlpha(c) || isAsciiDigit(c) || c == FuncChar.underscore
+                c == FuncChar.minus || c.isAsciiAlpha || c.isAsciiDigit || c == FuncChar.underscore
             }
             if !isWordish(base[pivot]) && pivot > 0 && isWordish(base[pivot - 1]) { pivot -= 1 }
             if !isWordish(base[pivot]) { return nil }
@@ -1055,19 +1055,19 @@ extension KSyntaxParserRuby {
             // 数値（- 接頭と小数・指数表記の断片を大雑把に）
             func expandNumber(from p: Int) -> Range<Int>? {
                 var lo = p, hi = p
-                if !isAsciiDigit(base[p]) {
-                    if p + 1 < total, isAsciiDigit(base[p + 1]) { lo = p + 1; hi = lo }
-                    else if base[p] == FuncChar.minus, p + 1 < total, isAsciiDigit(base[p + 1]) { lo = p; hi = p + 1 }
+                if !base[p].isAsciiDigit {
+                    if p + 1 < total, base[p + 1].isAsciiDigit { lo = p + 1; hi = lo }
+                    else if base[p] == FuncChar.minus, p + 1 < total, base[p + 1].isAsciiDigit { lo = p; hi = p + 1 }
                     else { return nil }
                 }
-                while lo > 0, isAsciiDigit(base[lo - 1]) { lo -= 1 }
+                while lo > 0, base[lo - 1].isAsciiDigit { lo -= 1 }
                 if lo > 1, base[lo - 1] == FuncChar.minus,
-                   !((lo - 2) >= 0 && (isAsciiDigit(base[lo - 2]) || isAsciiAlpha(base[lo - 2]) || base[lo - 2] == FuncChar.underscore)) {
+                   !((lo - 2) >= 0 && (base[lo - 2].isAsciiDigit || base[lo - 2].isAsciiAlpha || base[lo - 2] == FuncChar.underscore)) {
                     lo -= 1
                 }
                 while hi < total {
                     let c = base[hi]
-                    if isAsciiDigit(c) || c == FuncChar.period || isAsciiAlpha(c) { hi += 1 } else { break }
+                    if c.isAsciiDigit || c == FuncChar.period || c.isAsciiAlpha { hi += 1 } else { break }
                 }
                 return lo..<hi
             }
@@ -1075,7 +1075,7 @@ extension KSyntaxParserRuby {
 
             // 識別子
             func isIdentPartRuby(_ c: UInt8) -> Bool {
-                isIdentStartAZ_(c) || isAsciiDigit(c) || c == FuncChar.question || c == FuncChar.exclamation
+                c.isIdentStartAZ_ || c.isAsciiDigit || c == FuncChar.question || c == FuncChar.exclamation
             }
             var lo = pivot, hi = pivot
             if !isIdentPartRuby(base[pivot]) && pivot + 1 < total && isIdentPartRuby(base[pivot + 1]) {
@@ -1267,10 +1267,10 @@ extension KSyntaxParserRuby {
 
         // Ruby的語の定義（!/? 終端許可）
         @inline(__always) func isHead(_ b: UInt8) -> Bool {
-            b == FuncChar.at || b == FuncChar.dollar || b == FuncChar.underscore || isAsciiAlpha(b)
+            b == FuncChar.at || b == FuncChar.dollar || b == FuncChar.underscore || b.isAsciiAlpha
         }
         @inline(__always) func isBody(_ b: UInt8) -> Bool {
-            isAsciiDigit(b) || b == FuncChar.underscore || isAsciiAlpha(b)
+            b.isAsciiDigit || b == FuncChar.underscore || b.isAsciiAlpha
         }
 
         // 一意化用の Set<[UInt8]>
@@ -1285,7 +1285,7 @@ extension KSyntaxParserRuby {
                 i += 1
                 while i < n, isBody(bytes[i]) { i += 1 }
                 if i < n, (bytes[i] == FuncChar.exclamation || bytes[i] == FuncChar.question) { i += 1 }
-                if !isAsciiDigit(bytes[s]) {
+                if !bytes[s].isAsciiDigit {
                     if i - s <= 128 {
                         let token = Array(bytes[s..<i])
                         unique.insert(token)
