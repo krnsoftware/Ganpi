@@ -46,8 +46,8 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
     private var _lines: [LineInfo] = []
 
     private var _outlineSpans: [OutlineSpan] = []
-    private var _completionLexicon: [Data] = []
-
+    private var _completionLexicon: [[UInt8]] = []
+    
     // 一時バッファ（恒久スパン構築用）
     private var _scratchSpans: [KAttributedSpan] = []
 
@@ -1253,58 +1253,134 @@ extension KSyntaxParserRuby {
 
     // MARK: - Completion（語彙のスナップショット）
 
+    // Ganpi: 補完語彙を毎回全文スキャンして再構築
+    // - 文書全体＋Rubyキーワードを含む
+    // - Data未使用、安全な [UInt8] ベース
+    // - case-sensitive 前方一致に対応
     func rebuildCompletionsIfNeeded(dirtyRange: Range<Int>?) {
         let bytes = storage.skeletonString.bytes
-        var unique = Set<Data>()
-        var i = 0
         let n = bytes.count
+        if n == 0 {
+            _completionLexicon.removeAll(keepingCapacity: false)
+            return
+        }
 
-        @inline(__always) func isHead(_ b: UInt8) -> Bool { b == FuncChar.at || b == FuncChar.dollar || b == FuncChar.underscore || isAsciiAlpha(b) }
-        @inline(__always) func isBody(_ b: UInt8) -> Bool { isAsciiDigit(b) || b == FuncChar.underscore || isAsciiAlpha(b) }
+        // Ruby的語の定義（!/? 終端許可）
+        @inline(__always) func isHead(_ b: UInt8) -> Bool {
+            b == FuncChar.at || b == FuncChar.dollar || b == FuncChar.underscore || isAsciiAlpha(b)
+        }
+        @inline(__always) func isBody(_ b: UInt8) -> Bool {
+            isAsciiDigit(b) || b == FuncChar.underscore || isAsciiAlpha(b)
+        }
 
+        // 一意化用の Set<[UInt8]>
+        var unique = Set<[UInt8]>()
+        unique.reserveCapacity(max(64, n >> 4))
+
+        var i = 0
         while i < n {
             let b = bytes[i]
             if isHead(b) {
-                let s = i; i += 1
+                let s = i
+                i += 1
                 while i < n, isBody(bytes[i]) { i += 1 }
                 if i < n, (bytes[i] == FuncChar.exclamation || bytes[i] == FuncChar.question) { i += 1 }
-                unique.insert(Data(bytes[s..<i]))
-            } else { i += 1 }
+                if !isAsciiDigit(bytes[s]) {
+                    if i - s <= 128 {
+                        let token = Array(bytes[s..<i])
+                        unique.insert(token)
+                    }
+                }
+            } else {
+                i += 1
+            }
         }
-        _completionLexicon = unique.sorted { $0.lexicographicallyPrecedes($1) }
+
+        // Rubyキーワードも補完候補に加える（重複は自動で除外）
+        for kw in _keywordsFlat {
+            unique.insert(kw)
+        }
+
+        // ソート（memcmp相当の辞書順）
+        var list = Array(unique)
+        list.sort { (a, b) -> Bool in
+            let m = min(a.count, b.count)
+            for k in 0..<m {
+                let x = a[k], y = b[k]
+                if x != y { return x < y }
+            }
+            return a.count < b.count
+        }
+
+        _completionLexicon = list
     }
+    
+    // KSyntaxParserRuby.swift / class KSyntaxParserRuby
+    // 辞書順（memcmp 相当）：完全バイト順、case-sensitive
+    @inline(__always)
+    private func dataLessThan(_ a: Data, _ b: Data) -> Bool {
+        let len = min(a.count, b.count)
+        return a.withUnsafeBytes { pa in
+            return b.withUnsafeBytes { pb in
+                guard let paBase = pa.baseAddress, let pbBase = pb.baseAddress else { return false }
+                let cmp = memcmp(paBase, pbBase, len)
+                return cmp < 0 || (cmp == 0 && a.count < b.count)
+            }
+        }
+    }
+    
+
+    // KSyntaxParserRuby.swift / class KSyntaxParserRuby
+    // メソッド: completionEntries(prefix:around:limit:policy:)
+    // 目的: prefix（UTF-8）を [UInt8] にし、[key, key+0xFF) の範囲を二分探索で取得（安全）
 
     func completionEntries(prefix: String,
                            around index: Int,
                            limit: Int,
                            policy: KCompletionPolicy) -> [KCompletionEntry] {
-        guard !prefix.isEmpty, let key = prefix.data(using: .utf8) else { return [] }
+        // 数MB前提: 毎回再構築
+        rebuildCompletionsIfNeeded(dirtyRange: nil)
 
-        func lowerBound(_ a: [Data], _ k: Data) -> Int {
+        guard !prefix.isEmpty else { return [] }
+        let key: [UInt8] = Array(prefix.utf8)
+
+        @inline(__always)
+        func less(_ a: [UInt8], _ b: [UInt8]) -> Bool {
+            let m = min(a.count, b.count)
+            var i = 0
+            while i < m {
+                let x = a[i], y = b[i]
+                if x != y { return x < y }
+                i += 1
+            }
+            return a.count < b.count
+        }
+
+        @inline(__always)
+        func lowerBound(_ a: [[UInt8]], _ k: [UInt8]) -> Int {
             var lo = 0, hi = a.count
             while lo < hi {
                 let mid = (lo + hi) >> 1
-                if a[mid].lexicographicallyPrecedes(k) { lo = mid + 1 } else { hi = mid }
-            }
-            return lo
-        }
-        func upperBound(_ a: [Data], _ k: Data) -> Int {
-            var lo = 0, hi = a.count
-            while lo < hi {
-                let mid = (lo + hi) >> 1
-                if k.lexicographicallyPrecedes(a[mid]) { hi = mid } else { lo = mid + 1 }
+                if less(a[mid], k) { lo = mid + 1 } else { hi = mid }
             }
             return lo
         }
 
+        // 前方一致レンジ: [ key, key + [0xFF) )
         let lo = lowerBound(_completionLexicon, key)
-        let hi = upperBound(_completionLexicon, key)
+        var highKey = key; highKey.append(0xFF)
+        let hi = lowerBound(_completionLexicon, highKey)
+
         if lo >= hi { return [] }
 
         var out: [KCompletionEntry] = []
+        out.reserveCapacity(min(limit, 64))
+
         var i = lo
         while i < hi && out.count < limit {
-            if let s = String(data: _completionLexicon[i], encoding: .utf8), s != prefix {
+            let token = _completionLexicon[i]
+            // UTF-8前提：不正列はスキップ
+            if let s = String(bytes: token, encoding: .utf8), s != prefix {
                 out.append(KCompletionEntry(text: s, kind: .keyword, detail: nil, score: 0))
             }
             i += 1
