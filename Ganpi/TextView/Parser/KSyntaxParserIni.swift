@@ -43,6 +43,10 @@ final class KSyntaxParserIni: KSyntaxParserProtocol {
     func parse(range: Range<Int>) {
         // 何もしない（都度 attributes(in:) で行う）
     }
+    
+    func setKeywords(_ words: [String]) {
+        // do nothing.
+    }
 
     // MARK: - Painter hook
 
@@ -50,47 +54,44 @@ final class KSyntaxParserIni: KSyntaxParserProtocol {
     /// 返却は元の range と交差するスパンのみ。
     // KSyntaxParserIni.swift / class KSyntaxParserIni 内にそのまま置き換え
     func attributes(in range: Range<Int>, tabWidth: Int) -> [KAttributedSpan] {
-            let bytes: [UInt8] = storage.skeletonString.bytes
-            let n = bytes.count
-            if n == 0 { return [] }
-
-            // 1) 可視レンジを物理行境界に拡大
-            let lo = max(0, min(range.lowerBound, n - 1))
-            let hi = max(0, min(range.upperBound, n))
-            let lineLo = findLineHead(bytes, from: lo)
-            let lineHi = findLineTail(bytes, from: hi)
-
-            // 2) 行ごとにスキャンしてスパン生成
-            var out: [KAttributedSpan] = []
-            var i = lineLo
-            while i < lineHi {
-                let lineStart = i
-                let lineEnd = findLineEnd(bytes, from: i, limit: lineHi)
-                scanOneLine(bytes,
-                            start: lineStart,
-                            end: lineEnd,
-                            into: &out)
-                i = lineEnd < n ? lineEnd + 1 : lineEnd // 改行を飛ばす
-            }
-
-            // 3) 元の可視レンジと交差するスパンだけ返す
-            if range.lowerBound <= lineLo && lineHi <= range.upperBound {
-                return out
-            } else {
-                let vis = range
-                return out.compactMap { span in
-                    let a = max(span.range.lowerBound, vis.lowerBound)
-                    let b = min(span.range.upperBound,   vis.upperBound)
-                    return (a < b) ? KAttributedSpan(range: a..<b, attributes: span.attributes) : nil
-                }
-            }
+        let bytes: [UInt8] = storage.skeletonString.bytes
+        let n = bytes.count
+        if n == 0 { return [] }
+        
+        // 1) 可視レンジを物理行境界に拡大
+        let lo = max(0, min(range.lowerBound, n - 1))
+        let hi = max(0, min(range.upperBound, n))
+        let lineLo = findLineHead(bytes, from: lo)
+        let lineHi = findLineTail(bytes, from: hi)
+        
+        // 2) 行ごとにスキャンしてスパン生成
+        var out: [KAttributedSpan] = []
+        var i = lineLo
+        while i < lineHi {
+            let lineStart = i
+            let lineEnd = findLineEnd(bytes, from: i, limit: lineHi)
+            scanOneLine(bytes,
+                        start: lineStart,
+                        end: lineEnd,
+                        into: &out)
+            i = lineEnd < n ? lineEnd + 1 : lineEnd // 改行を飛ばす
         }
-    
-    var baseTextColor: NSColor {
-        get {
-            _colorBase
+        
+        // 3) 元の可視レンジと交差するスパンだけ返す
+        if range.lowerBound <= lineLo && lineHi <= range.upperBound {
+            return out
+        } else {
+            let vis = range
+            return out.compactMap { span in
+                let a = max(span.range.lowerBound, vis.lowerBound)
+                let b = min(span.range.upperBound,   vis.upperBound)
+                return (a < b) ? KAttributedSpan(range: a..<b, attributes: span.attributes) : nil
+            }
         }
     }
+    
+    var baseTextColor: NSColor {  _colorBase  }
+    var backgroundColor: NSColor { NSColor.white }
     
     // KSyntaxParserIni 内（他の private func と同じ場所）に追加
     private func mergeRanges(_ ranges: [Range<Int>]) -> [Range<Int>] {

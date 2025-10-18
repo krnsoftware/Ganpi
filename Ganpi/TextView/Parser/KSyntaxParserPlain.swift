@@ -21,6 +21,7 @@ final class KSyntaxParserPlain: KSyntaxParserProtocol {
     func rebuildCompletionsIfNeeded(dirtyRange: Range<Int>?) { /* no-op */ }
     func completionEntries(prefix: String,around index: Int,limit: Int, policy: KCompletionPolicy) -> [KCompletionEntry]{ return [] }
     var lineCommentPrefix: String? { nil }
+    func setKeywords(_ words: [String]) { /* no-op */ }
 
     // ハイライトなし
     func attributes(in range: Range<Int>, tabWidth: Int) -> [KAttributedSpan] { [] }

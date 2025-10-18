@@ -151,6 +151,7 @@ protocol KSyntaxParserProtocol: AnyObject {
     
     // 基本となる文字列の色を返す。ベースカラー。
     var baseTextColor: NSColor { get }
+    var backgroundColor: NSColor { get }
     
     // caretのindex:iに於いてそれに属すると思われる単語の領域。
     func wordRange(at index: Int) -> Range<Int>?
@@ -168,6 +169,9 @@ protocol KSyntaxParserProtocol: AnyObject {
     
     // コメント用のプロパティ
     var lineCommentPrefix: String? { get }
+    
+    // ランタイムでキーワードを差し替える（語彙は [String] で供給）
+    func setKeywords(_ words: [String])
     
 }
 

@@ -58,23 +58,34 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
     private let _colorKeyword    = NSColor.systemBlue
     private let _colorNumber     = NSColor.systemBlue
     private let _colorVariable   = NSColor.systemBrown
+    private let _colorBackground = NSColor.white
 
-    // キーワード（長さ別）
-    private static let _keywordsLen2: [[UInt8]] = [Array("do".utf8), Array("in".utf8), Array("or".utf8), Array("if".utf8)]
-    private static let _keywordsLen3: [[UInt8]] = [Array("end".utf8), Array("and".utf8), Array("for".utf8), Array("def".utf8), Array("nil".utf8), Array("not".utf8)]
-    private static let _keywordsLen4: [[UInt8]] = [Array("then".utf8), Array("true".utf8), Array("next".utf8), Array("redo".utf8), Array("case".utf8), Array("else".utf8), Array("self".utf8), Array("when".utf8), Array("retry".utf8)]
-    private static let _keywordsLen5: [[UInt8]] = [Array("class".utf8), Array("false".utf8), Array("yield".utf8), Array("until".utf8), Array("super".utf8), Array("while".utf8), Array("break".utf8), Array("alias".utf8), Array("begin".utf8), Array("undef".utf8), Array("elsif".utf8)]
-    private static let _keywordsLen6: [[UInt8]] = [Array("module".utf8), Array("ensure".utf8), Array("unless".utf8), Array("return".utf8), Array("rescue".utf8)]
-    private static let _keywordsLen7: [[UInt8]] = [Array("defined?".utf8)]
+    // ソート済みのキーワード（UTF-8バイト列）。辞書は使わずフラット配列だけを持つ。
+    private var _keywordsFlat: [[UInt8]] = []
+
+    // デフォルト語彙（[String] で内装し、自分で setKeywords() で取り込む）
+    private static let _defaultKeywords: [String] = [
+        "do","in","or","if",
+        "end","and","for","def","nil","not",
+        "then","true","next","redo","case","else","self","when","retry",
+        "class","false","yield","until","super","while","break","alias","begin","undef","elsif",
+        "module","ensure","unless","return","rescue",
+        "defined?"
+    ]
 
     // ストレージ
     let storage: KTextStorageReadable
-    init(storage: KTextStorageReadable) { self.storage = storage }
+    
+    init(storage: KTextStorageReadable) {
+        self.storage = storage
+        setKeywords(Self._defaultKeywords)
+    }
 
     // MARK: - Protocol basics
 
     var lineCommentPrefix: String? { "#" }
     var baseTextColor: NSColor { _colorBase }
+    var backgroundColor: NSColor { _colorBackground }
 
     // MARK: - ASCII 判定ヘルパ（関数名は説明的に）
 
@@ -830,41 +841,31 @@ extension KSyntaxParserRuby {
         }
     }
 
-    // キーワード判定：左境界もチェックし、コロン直後は無効化
     private func isKeywordToken(_ base: UnsafePointer<UInt8>, _ n: Int,
                                 start: Int, end: Int, documentStart: Int) -> Bool {
-        // 右側は非単語であること（既存）
+        // 右境界・左境界チェック（既存）
         if end < n && !isDelimiter(base[end]) { return false }
-
-        // 左側：先頭でないなら「非単語 or 改行」かつ「直前が ':' ではない」ことを要求
         if start > 0 {
             let prev = base[start - 1]
-            // 区切りでなければ（例: foo.then）アウト
             if !isDelimiter(prev) { return false }
-            // コロン直後（:then / ::end など）はアウト
-            if prev == FuncChar.colon { return false }
+            if prev == FuncChar.colon { return false }  // :then / ::end などを除外
         }
 
         let tokenLength = end - start
-        if tokenLength < 2 || tokenLength > 7 { return false }
+        if tokenLength <= 0 { return false }
 
         let pos = documentStart + start
+        let firstByte = base[start]
         let skel = storage.skeletonString
 
-        @inline(__always) func match(_ pool: [[UInt8]]) -> Bool {
-            for w in pool { if skel.matchesKeyword(at: pos, word: w) { return true } }
-            return false
+        // フラット配列を線形に走査：
+        // 1) 長さ一致 2) 先頭バイト一致 3) バイト列一致（matchesKeyword）
+        for w in _keywordsFlat {
+            if w.count != tokenLength { continue }
+            if w[0] != firstByte { continue }
+            if skel.matchesKeyword(at: pos, word: w) { return true }
         }
-
-        switch tokenLength {
-        case 2:  return match(Self._keywordsLen2)
-        case 3:  return match(Self._keywordsLen3)
-        case 4:  return match(Self._keywordsLen4)
-        case 5:  return match(Self._keywordsLen5)
-        case 6:  return match(Self._keywordsLen6)
-        case 7:  return match(Self._keywordsLen7)
-        default: return false
-        }
+        return false
     }
 
     // 変数・数値・識別子スキャナ
@@ -1200,6 +1201,36 @@ extension KSyntaxParserRuby {
                 }
             }
         }
+    }
+    
+    // MARK: - Keywords
+    
+    func setKeywords(_ words: [String]) {
+        // 重複除去（大文字小文字はそのまま保持）
+        var unique = Set<String>()
+        unique.reserveCapacity(words.count)
+        for w in words where !w.isEmpty {
+            unique.insert(w)
+        }
+
+        // UTF-8 バイト列に変換してフラット配列化
+        var flat: [[UInt8]] = []
+        flat.reserveCapacity(unique.count)
+        for w in unique {
+            flat.append(Array(w.utf8))
+        }
+
+        // バイト列として辞書順にソート（1文字目で大半が弾かれる）
+        flat.sort { (a, b) -> Bool in
+            // 長さより「辞書順の早い判定」を優先（memcmp 相当）
+            let n = min(a.count, b.count)
+            for i in 0..<n {
+                if a[i] != b[i] { return a[i] < b[i] }
+            }
+            return a.count < b.count
+        }
+
+        _keywordsFlat = flat
     }
 
     // MARK: - Completion（語彙のスナップショット）
