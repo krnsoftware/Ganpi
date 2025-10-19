@@ -101,8 +101,7 @@ final class KLayoutManager: KLayoutManagerReadable {
         set {
             _wrapLineOffsetType = newValue
             rebuildLayout()
-            //textView?.updateFrameSizeToFitContent()
-            //textView?.updateCaretPosition()
+            
             textView?.textStorageDidModify(.colorChanged(range: 0..<_textStorageRef.count))
         }
     }

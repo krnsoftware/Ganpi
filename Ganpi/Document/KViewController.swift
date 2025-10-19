@@ -605,12 +605,15 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         second.translatesAutoresizingMaskIntoConstraints = true
         second.autoresizingMask = [.width, .height]
 
+        // 設定同期。adjustSubviews()の前でないとwrapLineOffsetTypeの設定が反映されない。
+        second.textView.loadSettings(from: firstTextView)
+        
         _panes.append(second)
         sv.addSubview(second)
         sv.adjustSubviews()
 
         // 設定同期
-        second.textView.loadSettings(from: firstTextView)
+        //second.textView.loadSettings(from: firstTextView)
 
         // 半分位置へ
         let mid: CGFloat = sv.isVertical ? sv.bounds.width / 2 : sv.bounds.height / 2
