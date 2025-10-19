@@ -709,7 +709,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
         
         // キーアサインに適合するかチェック。適合しなければinputContextに投げて、そちらでも使われなければkeyDown()へ。
-        let keyStroke = KKeyStroke(event: event)
+        // let keyStroke = KKeyStroke(event: event)
+        guard let keyStroke = KKeyStroke(event: event) else { log("#01"); return }
         let status = KKeyAssign.shared.estimateKeyStroke(keyStroke, requester: self, mode: _editMode)
         if status == .passthrough {
             if inputContext?.handleEvent(event) == true { return }

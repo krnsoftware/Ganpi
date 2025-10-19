@@ -7,6 +7,15 @@
 //  with architectural assistance by Sebastian, his loyal AI butler.
 //  All rights reserved.
 //
+//
+//  KKeyAssign.swift
+//
+//  Ganpi - macOS Text Editor
+//
+//  Created by KARINO Masatsugu for Ganpi Project on 2025/09/21,
+//  with architectural assistance by Sebastian, his loyal AI butler.
+//  All rights reserved.
+//
 
 import Cocoa
 
@@ -15,36 +24,36 @@ enum KEditMode {
     case edit
 }
 
-
 class KKeyAssign {
     
     enum KStatusCode {
-        case passthrough
-        case preserve
-        case execute
-        case block
+        case passthrough   // システム/Responder に流す
+        case preserve      // さらなるキー入力を待つ（多段ストロークの途中）
+        case execute       // 対応アクションを実行
+        case block         // Editモード時などでブロック
     }
     
     struct KShortCut {
         var keys: [KKeyStroke]
-        var actions: [String]
+        var actions: [String]   // セレクタ名（":" 必須）
     }
     
     static let shared: KKeyAssign = .init()
     
     private var _normalmodeShortcuts: [KShortCut] = defaultNormalModeKeyAssign
-    private var _editmodeShortCuts: [KShortCut] = defaultEditModeKeyAssign
+    private var _editmodeShortCuts: [KShortCut]   = defaultEditModeKeyAssign
     
     private var _storedKeyStrokes: [KKeyStroke] = []
     private var _mode: KEditMode = .normal
     
-    // owner.
+    // owner（複数テキストビュー間の遷移対策）
     private weak var _pendingOwner: NSResponder? = nil
     private var _pendingOwnerID: ObjectIdentifier? = nil
     
     private var mode: KEditMode {
         get { _mode }
         set {
+            // モード変更時は入力中の多段ストロークを破棄
             if _mode != newValue { _storedKeyStrokes.removeAll() }
             _mode = newValue
         }
@@ -54,28 +63,25 @@ class KKeyAssign {
         get { mode == .normal ? _normalmodeShortcuts : _editmodeShortCuts }
     }
     
-    var hasStoredKeyStrokes: Bool { _storedKeyStrokes.count > 0 }
+    var hasStoredKeyStrokes: Bool { !_storedKeyStrokes.isEmpty }
     
-    
-    
-    init() {
-        
-    }
+    init() {}
     
     func setShortcuts(with shortcuts:[KShortCut], for mode:KEditMode = .normal) {
         switch mode {
         case .normal: _normalmodeShortcuts = shortcuts
-        case .edit: _editmodeShortCuts = shortcuts
+        case .edit:   _editmodeShortCuts   = shortcuts
         }
     }
     
     func reset() { _storedKeyStrokes.removeAll(); _pendingOwner = nil }
     
     func estimateKeyStroke(_ key: KKeyStroke, requester: NSResponder, mode: KEditMode = .normal) -> KStatusCode {
-        if let owner = _pendingOwner, let oid = _pendingOwnerID, !(owner === requester && oid == ObjectIdentifier(requester)){
+        // フォーカス移動などでオーナーが変わったらペンディング破棄
+        if let owner = _pendingOwner, let oid = _pendingOwnerID, !(owner === requester && oid == ObjectIdentifier(requester)) {
             resetPending()
         }
-        _pendingOwner = requester
+        _pendingOwner   = requester
         _pendingOwnerID = ObjectIdentifier(requester)
         
         self.mode = mode
@@ -84,29 +90,36 @@ class KKeyAssign {
         var executeShortcut: KShortCut? = nil
         var hasLongCandidate = false
         
-        assingLoop: for shortcut in shortcuts {
+        assignLoop: for shortcut in shortcuts {
             if shortcut.keys.count < _storedKeyStrokes.count { continue }
             for i in 0..<_storedKeyStrokes.count {
-                if _storedKeyStrokes[i] != shortcut.keys[i] { continue assingLoop }
+                if _storedKeyStrokes[i] != shortcut.keys[i] { continue assignLoop }
             }
-            if shortcut.keys.count == _storedKeyStrokes.count { executeShortcut = shortcut }
-            hasLongCandidate = true
+            if shortcut.keys.count == _storedKeyStrokes.count {
+                executeShortcut = shortcut
+            } else {
+                hasLongCandidate = true
+            }
         }
+        
         if let exec = executeShortcut {
-            for action in exec.actions {
-                //NSApp.sendAction(Selector(action), to: nil, from: self)
-                if let owner = _pendingOwner {
+            // 実行（複数アクション対応）
+            if let owner = _pendingOwner {
+                for action in exec.actions {
                     owner.doCommand(by: Selector(action))
                 }
             }
             reset()
             return .execute
         } else if hasLongCandidate {
+            // さらなるキー入力待ち
             return .preserve
         } else if mode == .edit {
+            // Editモードでは未定義はブロック（文字入力抑止）
             reset()
             return .block
         } else {
+            // Normalモードではシステムにパススルー
             reset()
             return .passthrough
         }
@@ -118,58 +131,66 @@ class KKeyAssign {
         reset()
     }
     
-    private static let defaultNormalModeKeyAssign:[KShortCut] = [
-        .init(keys:[KKeyStroke("A", [.control])], actions: ["moveToBeginningOfParagraph:"]),
-        //.init(keys:[KKeyStroke("S", [.control])], actions: ["moveBackward:"]),
-        .init(keys:[KKeyStroke("S", [.control])], actions: ["moveLeft:"]),
-        //.init(keys:[KKeyStroke("D", [.control])], actions: ["moveForward:"]),
-        .init(keys:[KKeyStroke("D", [.control])], actions: ["moveRight:"]),
-        .init(keys:[KKeyStroke("F", [.control])], actions: ["moveToEndOfParagraph:"]),
-        .init(keys:[KKeyStroke("E", [.control])], actions: ["moveUp:"]),
-        .init(keys:[KKeyStroke("X", [.control])], actions: ["moveDown:"]),
-        .init(keys:[KKeyStroke("R", [.control])], actions: ["pageUp:"]),
-        .init(keys:[KKeyStroke("C", [.control])], actions: ["pageDown:"]),
-        .init(keys:[KKeyStroke("H", [.control])], actions: ["deleteBackward:"]),
-        .init(keys:[KKeyStroke("G", [.control])], actions: ["deleteForward:"]),
-        //.init(keys:[KKeyStroke("Y", [.control])], actions: ["deleteToEndOfParagraph:"]),
-        //.init(keys:[KKeyStroke("Y", [.control])], actions: ["yank:"]),
-        .init(keys:[KKeyStroke("Y", [.option])], actions: ["yankPop:"]),
-        .init(keys:[KKeyStroke("Y", [.option, .shift])], actions: ["yankPopReverse:"]),
-        .init(keys:[KKeyStroke("I", [.control])], actions: ["insertTab:"]),
-        .init(keys:[KKeyStroke("M", [.control])], actions: ["insertNewline:"]),
-        .init(keys:[KKeyStroke("U", [.control])], actions: ["uppercaseWord:"]),
-        .init(keys:[KKeyStroke("L", [.control])], actions: ["lowercaseWord:"]),
-
-        .init(keys:[KKeyStroke("P", [.control])], actions: ["toggleCompletionMode:"]),
-/*
-        .init(keys:[KKeyStroke.init(keys.leftArrow, [.control])], actions: ["moveDividerUp:"]),
-        .init(keys:[KKeyStroke.init(keys.rightArrow, [.control])], actions: ["moveDividerDown:"]),
-        .init(keys:[KKeyStroke.init(keys.upArrow, [.control])], actions: ["makeFirstResponderToUpperTextView:"]),
-        .init(keys:[KKeyStroke.init(keys.downArrow, [.control])], actions: ["makeFirstResponderToLowerTextView:"]),
-*/
-        .init(keys:[KKeyStroke("A", [.control, .shift])], actions: ["moveToBeginningOfParagraphAndModifySelection:"]),
-        .init(keys:[KKeyStroke("S", [.control, .shift])], actions: ["moveLeftAndModifySelection:"]),
-        .init(keys:[KKeyStroke("D", [.control, .shift])], actions: ["moveRightAndModifySelection:"]),
-        .init(keys:[KKeyStroke("F", [.control, .shift])], actions: ["moveToEndOfParagraphAndModifySelection:"]),
-
-        .init(keys:[KKeyStroke("Q", [.control]), KKeyStroke("R", [.control])], actions: ["moveToBeginningOfDocument:"]),
-        .init(keys:[KKeyStroke("Q", [.control]), KKeyStroke("C", [.control])], actions: ["moveToEndOfDocument:"]),
-        .init(keys:[KKeyStroke("Q", [.control]), KKeyStroke("1", [.control])], actions: ["removeSplit:"]),
-        .init(keys:[KKeyStroke("Q", [.control]), KKeyStroke("2", [.control])], actions: ["splitHorizontally:"]),
-        .init(keys:[KKeyStroke("Q", [.control]), KKeyStroke("3", [.control])], actions: ["focusForwardTextView:"]),
+    // MARK: - 既定キーバインド（Normal）
+    // すべて KC（KKeyCode）ベースで非オプショナル生成
+    private static let defaultNormalModeKeyAssign: [KShortCut] = [
+        .init(keys: [KKeyStroke(code: KC.a, modifiers: [.control])], actions: ["moveToBeginningOfParagraph:"]),
+        .init(keys: [KKeyStroke(code: KC.s, modifiers: [.control])], actions: ["moveLeft:"]),
+        .init(keys: [KKeyStroke(code: KC.d, modifiers: [.control])], actions: ["moveRight:"]),
+        .init(keys: [KKeyStroke(code: KC.f, modifiers: [.control])], actions: ["moveToEndOfParagraph:"]),
+        .init(keys: [KKeyStroke(code: KC.e, modifiers: [.control])], actions: ["moveUp:"]),
+        .init(keys: [KKeyStroke(code: KC.x, modifiers: [.control])], actions: ["moveDown:"]),
+        .init(keys: [KKeyStroke(code: KC.r, modifiers: [.control])], actions: ["pageUp:"]),
+        .init(keys: [KKeyStroke(code: KC.c, modifiers: [.control])], actions: ["pageDown:"]),
         
+        .init(keys: [KKeyStroke(code: KC.h, modifiers: [.control])], actions: ["deleteBackward:"]),
+        .init(keys: [KKeyStroke(code: KC.g, modifiers: [.control])], actions: ["deleteForward:"]),
         
-        .init(keys:[KKeyStroke("[", [.control])], actions: ["setEditModeToEdit:"]),
+        .init(keys: [KKeyStroke(code: KC.y, modifiers: [.option])], actions: ["yankPop:"]),
+        .init(keys: [KKeyStroke(code: KC.y, modifiers: [.option, .shift])], actions: ["yankPopReverse:"]),
+        
+        .init(keys: [KKeyStroke(code: KC.i, modifiers: [.control])], actions: ["insertTab:"]),
+        .init(keys: [KKeyStroke(code: KC.m, modifiers: [.control])], actions: ["insertNewline:"]),
+        
+        .init(keys: [KKeyStroke(code: KC.u, modifiers: [.control])], actions: ["uppercaseWord:"]),
+        .init(keys: [KKeyStroke(code: KC.l, modifiers: [.control])], actions: ["lowercaseWord:"]),
+        
+        .init(keys: [KKeyStroke(code: KC.p, modifiers: [.control])], actions: ["toggleCompletionMode:"]),
+        
+        .init(keys: [KKeyStroke(code: KC.a, modifiers: [.control, .shift])], actions: ["moveToBeginningOfParagraphAndModifySelection:"]),
+        .init(keys: [KKeyStroke(code: KC.s, modifiers: [.control, .shift])], actions: ["moveLeftAndModifySelection:"]),
+        .init(keys: [KKeyStroke(code: KC.d, modifiers: [.control, .shift])], actions: ["moveRightAndModifySelection:"]),
+        .init(keys: [KKeyStroke(code: KC.f, modifiers: [.control, .shift])], actions: ["moveToEndOfParagraphAndModifySelection:"]),
+        
+        // 2ストローク
+        .init(keys: [KKeyStroke(code: KC.q, modifiers: [.control]),
+                     KKeyStroke(code: KC.r, modifiers: [.control])],
+              actions: ["moveToBeginningOfDocument:"]),
+        .init(keys: [KKeyStroke(code: KC.q, modifiers: [.control]),
+                     KKeyStroke(code: KC.c, modifiers: [.control])],
+              actions: ["moveToEndOfDocument:"]),
+        .init(keys: [KKeyStroke(code: KC.q, modifiers: [.control]),
+                     KKeyStroke(code: KC.n1, modifiers: [.control])],
+              actions: ["removeSplit:"]),
+        .init(keys: [KKeyStroke(code: KC.q, modifiers: [.control]),
+                     KKeyStroke(code: KC.n2, modifiers: [.control])],
+              actions: ["splitHorizontally:"]),
+        .init(keys: [KKeyStroke(code: KC.q, modifiers: [.control]),
+                     KKeyStroke(code: KC.n3, modifiers: [.control])],
+              actions: ["focusForwardTextView:"]),
+        
+        // Ctrl+[ → Editモードへ（Esc 等価：KKeyStroke(event:) で正規化済み）
+        .init(keys: [KKeyStroke(code: KC.leftBracket, modifiers: [.control])], actions: ["setEditModeToEdit:"]),
     ]
     
-    private static let defaultEditModeKeyAssign:[KShortCut] = [
-        .init(keys:[KKeyStroke("H", [])], actions: ["moveLeft:"]),
-        .init(keys:[KKeyStroke("J", [])], actions: ["moveDown:"]),
-        .init(keys:[KKeyStroke("K", [])], actions: ["moveUp:"]),
-        .init(keys:[KKeyStroke("L", [])], actions: ["moveRight:"]),
+    // MARK: - 既定キーバインド（Edit）
+    private static let defaultEditModeKeyAssign: [KShortCut] = [
+        .init(keys: [KKeyStroke(code: KC.h)], actions: ["moveLeft:"]),
+        .init(keys: [KKeyStroke(code: KC.j)], actions: ["moveDown:"]),
+        .init(keys: [KKeyStroke(code: KC.k)], actions: ["moveUp:"]),
+        .init(keys: [KKeyStroke(code: KC.l)], actions: ["moveRight:"]),
         
-        .init(keys:[KKeyStroke("i", [])], actions: ["setEditModeToNormal:"]),
+        // Insert（Normalへ戻る）
+        .init(keys: [KKeyStroke(code: KC.i)], actions: ["setEditModeToNormal:"]),
     ]
 }
-
-
