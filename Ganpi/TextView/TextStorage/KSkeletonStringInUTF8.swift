@@ -32,7 +32,7 @@ final class KSkeletonStringInUTF8 {
     
     // [Character]をUTF-8実装のUnicodeに変換するが、その際、複数バイトになる文字については"a"を代替文字とする。
     // 元の[Character]と文字の位置が一致するためRange<Int>をそのまま使用できるが、生成した文字列から元の文字列は復元できない。
-    static func convertCharactersToApproximateUTF8(_ characters: [Character]) -> [UInt8] {
+    /*static func convertCharactersToApproximateUTF8(_ characters: [Character]) -> [UInt8] {
         var result: [UInt8] = []
 
         for char in characters {
@@ -44,6 +44,20 @@ final class KSkeletonStringInUTF8 {
             }
         }
 
+        return result
+    }*/
+    static func convertCharactersToApproximateUTF8(_ characters: [Character]) -> [UInt8] {
+        var result: [UInt8] = []
+        result.reserveCapacity(characters.count) // 出力は必ず等長
+
+        for ch in characters {
+            // ASCII: 単一スカラ かつ < 0x80
+            if ch.unicodeScalars.count == 1, let s = ch.unicodeScalars.first, s.value < 0x80 {
+                result.append(UInt8(truncatingIfNeeded: s.value))
+            } else {
+                result.append(0x61) // 'a'
+            }
+        }
         return result
     }
     

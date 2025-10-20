@@ -47,7 +47,7 @@ struct KKeyStroke: Equatable, Hashable {
 
     /// 記述式（1ストローク専用）。例: "ctrl+[", "alt+;", "shift+<tab>", "<esc>", "<home>"
     init?(_ description: String) {
-        guard let (mods, core) = Self._parseDescription(description) else { return nil }
+        guard let (mods, core) = Self.parseDescription(description) else { return nil }
 
         // まず <token> を優先的に解決
         if let kc = KKeyCode.specialToKC[core] {
@@ -129,7 +129,7 @@ struct KKeyStroke: Equatable, Hashable {
 
     /// "ctrl+[", "shift+<tab>", "<esc>" などを (mods, coreToken) に分解する。
     /// coreToken は "<...>" 形式または 1 文字（小文字）に正規化して返す。
-    private static func _parseDescription(_ raw: String) -> (NSEvent.ModifierFlags, String)? {
+    private static func parseDescription(_ raw: String) -> (NSEvent.ModifierFlags, String)? {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
         let lower = trimmed.lowercased()
@@ -142,7 +142,7 @@ struct KKeyStroke: Equatable, Hashable {
         // 区切りは '+' 推奨（互換で '-' も splitter に含める）
         let tokens = lower
             .replacingOccurrences(of: " ", with: "")
-            .split(whereSeparator: { $0 == "+" || $0 == "-" })
+            .split(whereSeparator: { $0 == "+" })
             .map { String($0) }
 
         guard !tokens.isEmpty else { return nil }
@@ -152,18 +152,17 @@ struct KKeyStroke: Equatable, Hashable {
 
         for t in tokens {
             switch t {
-            case "ctrl", "control", "c":
+            case "ctrl", "control":
                 mods.insert(.control)
-            case "alt", "option", "opt", "m":
+            case "alt", "option", "opt":
                 mods.insert(.option)
-            case "shift", "s":
+            case "shift":
                 mods.insert(.shift)
             default:
                 if core == nil {
                     core = t
                 } else {
-                    // 非修飾トークンが複数出るのは 1 ストローク仕様的に不正
-                    return nil
+                    return nil // 非修飾トークンが複数は不正
                 }
             }
         }

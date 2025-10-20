@@ -65,7 +65,11 @@ class KKeyAssign {
     
     var hasStoredKeyStrokes: Bool { !_storedKeyStrokes.isEmpty }
     
-    init() {}
+    init() {
+        if let path = Bundle.main.path(forResource: "keymap_ganpi", ofType: "ini") {
+            loadUserKeymap(at: URL(fileURLWithPath: path))
+        }
+    }
     
     func setShortcuts(with shortcuts:[KShortCut], for mode:KEditMode = .normal) {
         switch mode {
@@ -193,4 +197,21 @@ class KKeyAssign {
         // Insert（Normalへ戻る）
         .init(keys: [KKeyStroke(code: KC.i)], actions: ["setEditModeToNormal:"]),
     ]
+}
+
+// MARK: - User Keymap Loader
+
+extension KKeyAssign {
+
+    /// Load user-defined keymap from INI file and apply to singleton instance.
+    func loadUserKeymap(at url: URL) {
+        do {
+            let bundle = try KKeymapLoader.load(from: url)
+            setShortcuts(with: bundle.normal, for: .normal)
+            setShortcuts(with: bundle.edit, for: .edit)
+            log("User keymap loaded successfully: \(url.lastPathComponent)")
+        } catch {
+            log("Failed to load user keymap: \(error.localizedDescription)")
+        }
+    }
 }
