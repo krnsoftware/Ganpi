@@ -8,119 +8,119 @@
 //  All rights reserved.
 //
 
-
-
-//
-//  KKeymapLoader.swift
-//  Ganpi
-//
-//  Created by KARINO Masatsugu for Ganpi Project.
-//  All rights reserved.
-//
-//  Keymap INI file loader for Ganpi
-//  - Format:
-//      [normal]
-//      ctrl+a : moveToBeginningOfParagraph
-//      [edit]
-//      h : moveLeft
-//
-//  Supports UTF-8 LF only.
-//  Comments: lines beginning with # or ; are ignored.
-//  No inline comment supported.
-//
-
-import Foundation
-import AppKit
+import Cocoa
 
 struct KKeymapBundle {
-    var normal: [KKeyAssign.KShortCut]
-    var edit:   [KKeyAssign.KShortCut]
+    let normal: [KShortCut]
+    let edit: [KShortCut]
 }
 
-struct KKeymapLoader {
+enum KKeymapError: Error {
+    case cannotRead
+    case invalidFormat(Int)
+}
 
-    private init() {}
+enum KKeymapLoader {
 
     static func load(from url: URL) throws -> KKeymapBundle {
-
         guard let data = try? Data(contentsOf: url),
-              let content = String(data: data, encoding: .utf8) else {
-            throw NSError(domain: "KKeymapLoader", code: 1,
-                          userInfo: [NSLocalizedDescriptionKey: "Failed to read keymap file (not UTF-8)"])
+              let text = String(data: data, encoding: .utf8) else {
+            throw KKeymapError.cannotRead
         }
+
+        var shortcutsNormal: [KShortCut] = []
+        var shortcutsEdit: [KShortCut] = []
 
         var currentMode: KEditMode = .normal
-        var normal: [KKeyAssign.KShortCut] = []
-        var edit: [KKeyAssign.KShortCut] = []
+        let lines = text.split(whereSeparator: \.isNewline)
+        var lineNo = 0
 
-        let lines = content.components(separatedBy: .newlines)
-        var lineNumber = 0
+        for raw in lines {
+            lineNo += 1
+            let line = raw.trimmingCharacters(in: .whitespaces)
 
-        for rawLine in lines {
-            lineNumber += 1
-            let line = rawLine.trimmingCharacters(in: .whitespaces)
-
-            // skip empty and comment
-            if line.isEmpty || line.hasPrefix("#") || line.hasPrefix(";") { continue }
-
-            // section header
-            if line.lowercased() == "[normal]" {
-                currentMode = .normal
-                continue
-            } else if line.lowercased() == "[edit]" {
-                currentMode = .edit
+            // Skip blank or comment line
+            if line.isEmpty || line.hasPrefix("#") || line.hasPrefix(";") {
                 continue
             }
 
-            // "keys : actions"
-            let parts = line.split(separator: ":", maxSplits: 1).map { String($0).trimmingCharacters(in: .whitespaces) }
-            guard parts.count == 2 else {
-                log("Parse error at line \(lineNumber): missing ':' separator")
+            // Section header
+            if line.hasPrefix("[") && line.hasSuffix("]") {
+                let name = line.dropFirst().dropLast().lowercased()
+                switch name {
+                case "normal": currentMode = .normal
+                case "edit":   currentMode = .edit
+                default:
+                    log("load(from:): Line \(lineNo): unknown section '\(name)'")
+                }
                 continue
             }
 
-            let keyTokens = parts[0].split(whereSeparator: { $0 == " " || $0 == "," || $0 == "\t" }).map { String($0) }
-            let actionTokens = parts[1].split(whereSeparator: { $0 == " " || $0 == "," || $0 == "\t" }).map { String($0) }
+            // Split at ":"
+            guard let colon = line.firstIndex(of: ":") else {
+                log("load(from:): Line \(lineNo): missing ':'")
+                continue
+            }
 
-            var strokes: [KKeyStroke] = []
-            var actions: [String] = []
+            let leftText = String(line[..<colon]).trimmingCharacters(in: .whitespaces)
+            let rightText = String(line[line.index(after: colon)...]).trimmingCharacters(in: .whitespaces)
 
-            for token in keyTokens {
-                if let stroke = KKeyStroke(token) {
-                    strokes.append(stroke)
+            // Parse keys
+            let keyTokens = leftText.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
+            var keySeq: [KKeyStroke] = []
+
+            for tok in keyTokens {
+                if let ks = KKeyStroke(tok) {
+                    keySeq.append(ks)
                 } else {
-                    log("Line \(lineNumber): invalid keystroke token '\(token)'")
+                    log("load(from:): Line \(lineNo): invalid keystroke token '\(tok)'")
                 }
             }
 
-            for token in actionTokens {
-                let trimmed = token.trimmingCharacters(in: .whitespaces)
-                if trimmed.isEmpty { continue }
+            // Parse right-hand actions
+            let actions = parseActions(from: rightText)
 
-                // command形式 execute[file], load[file], or [file]
-                if trimmed.hasPrefix("execute[") || trimmed.hasPrefix("load[") || trimmed.hasPrefix("[") {
-                    actions.append(trimmed)
-                } else {
-                    // セレクタ名として":"を付ける（未指定なら）
-                    actions.append(trimmed.hasSuffix(":") ? trimmed : trimmed + ":")
-                }
-            }
-
-            if strokes.isEmpty || actions.isEmpty {
-                log("Line \(lineNumber): skipped (no valid keys or actions)")
+            if keySeq.isEmpty || actions.isEmpty {
+                log("load(from:): Line \(lineNo): skipped (no valid keys or actions)")
                 continue
             }
 
-            let shortcut = KKeyAssign.KShortCut(keys: strokes, actions: actions)
-
+            let sc = KShortCut(keys: keySeq, actions: actions)
             switch currentMode {
-            case .normal: normal.append(shortcut)
-            case .edit:   edit.append(shortcut)
+            case .normal: shortcutsNormal.append(sc)
+            case .edit:   shortcutsEdit.append(sc)
             }
         }
 
-        log("Loaded \(normal.count) normal shortcuts and \(edit.count) edit shortcuts from INI file")
+        log("load(from:): Loaded \(shortcutsNormal.count) normal and \(shortcutsEdit.count) edit shortcuts from INI file")
+        return KKeymapBundle(normal: shortcutsNormal, edit: shortcutsEdit)
+    }
 
-        return KKeymapBundle(normal: normal, edit: edit)
+    // MARK: - Parse right-hand actions into [KAction]
+    private static func parseActions(from rightSide: String) -> [KAction] {
+        let tokens = rightSide
+            .split(whereSeparator: { $0 == "," || $0 == "\t" || $0 == " " })
+            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        var result: [KAction] = []
+
+        for tok in tokens {
+            if let open = tok.firstIndex(of: "["), let close = tok.lastIndex(of: "]"), close > open {
+                let head = String(tok[..<open]).lowercased()
+                let body = String(tok[tok.index(after: open)..<close])
+                switch head {
+                case "execute":
+                    result.append(.command(.execute(body)))
+                case "load", "":
+                    result.append(.command(.load(body))) // "[path]" is shorthand of "load[path]"
+                default:
+                    log("Unknown command '\(head)' ignored")
+                }
+            } else {
+                result.append(.selector(tok.hasSuffix(":") ? String(tok.dropLast()) : tok))
+            }
+        }
+        return result
     }
 }

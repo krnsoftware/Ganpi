@@ -1,20 +1,10 @@
 //
 //  KKeyAssign.swift
-//
 //  Ganpi - macOS Text Editor
 //
-//  Created by KARINO Masatsugu for Ganpi Project on 2025/09/21,
-//  with architectural assistance by Sebastian, his loyal AI butler.
-//  All rights reserved.
-//
-//
-//  KKeyAssign.swift
-//
-//  Ganpi - macOS Text Editor
-//
-//  Created by KARINO Masatsugu for Ganpi Project on 2025/09/21,
-//  with architectural assistance by Sebastian, his loyal AI butler.
-//  All rights reserved.
+//  Strict literal matching. No modifier carry-over/ignore.
+//  Normal can accept bare first key if it is explicitly defined.
+//  No timer. No ambiguity handling at runtime.
 //
 
 import Cocoa
@@ -24,48 +14,63 @@ enum KEditMode {
     case edit
 }
 
+// MARK: - Actions (strict & type-safe)
+
+enum KAction {
+    case selector(String)        // e.g. "moveRight" (no trailing ":")
+    case command(KCommand)       // e.g. .execute("/usr/bin/sort")
+}
+
+enum KCommand {
+    case load(String)            // load[PATH] or [PATH]
+    case execute(String)         // execute[PATH]
+}
+
+struct KShortCut {
+    var keys: [KKeyStroke]
+    var actions: [KAction]
+}
+
+// MARK: - Key Assign Core
+
 class KKeyAssign {
     
     enum KStatusCode {
-        case passthrough   // システム/Responder に流す
-        case preserve      // さらなるキー入力を待つ（多段ストロークの途中）
-        case execute       // 対応アクションを実行
-        case block         // Editモード時などでブロック
-    }
-    
-    struct KShortCut {
-        var keys: [KKeyStroke]
-        var actions: [String]   // セレクタ名（":" 必須）
+        case passthrough   // let system/Responder handle it
+        case preserve      // waiting for further keystrokes (prefix-only)
+        case execute       // run actions
+        case block         // block in edit mode
     }
     
     static let shared: KKeyAssign = .init()
     
-    private var _normalmodeShortcuts: [KShortCut] = []//defaultNormalModeKeyAssign
-    private var _editmodeShortCuts: [KShortCut]   = []//defaultEditModeKeyAssign
+    // Tables
+    private var _normalmodeShortcuts: [KShortCut] = []
+    private var _editmodeShortCuts:   [KShortCut] = []
     
+    // Sequence buffer & mode/owner
     private var _storedKeyStrokes: [KKeyStroke] = []
     private var _mode: KEditMode = .normal
     
-    // owner（複数テキストビュー間の遷移対策）
     private weak var _pendingOwner: NSResponder? = nil
     private var _pendingOwnerID: ObjectIdentifier? = nil
     
     private var mode: KEditMode {
         get { _mode }
         set {
-            // モード変更時は入力中の多段ストロークを破棄
-            if _mode != newValue { _storedKeyStrokes.removeAll() }
+            if _mode != newValue { resetSequence() }
             _mode = newValue
         }
     }
     
     var shortcuts: [KShortCut] {
-        get { mode == .normal ? _normalmodeShortcuts : _editmodeShortCuts }
+        mode == .normal ? _normalmodeShortcuts : _editmodeShortCuts
     }
     
     var hasStoredKeyStrokes: Bool { !_storedKeyStrokes.isEmpty }
     
     init() {
+        // Load bundled keymap on launch if present
         if let path = Bundle.main.path(forResource: "keymap_ganpi", ofType: "ini") {
             loadUserKeymap(at: URL(fileURLWithPath: path))
         }
@@ -78,136 +83,111 @@ class KKeyAssign {
         }
     }
     
-    func reset() { _storedKeyStrokes.removeAll(); _pendingOwner = nil }
+    func reset() {
+        resetSequence()
+        _pendingOwner = nil
+        _pendingOwnerID = nil
+    }
     
+    // MARK: - Matching (strict, no timer)
+    //
+    // - Exact match -> execute
+    // - Prefix-only  -> preserve (no timeout; wait indefinitely)
+    // - No match     -> passthrough (normal) / block (edit)
+    //
     func estimateKeyStroke(_ key: KKeyStroke, requester: NSResponder, mode: KEditMode = .normal) -> KStatusCode {
-        // フォーカス移動などでオーナーが変わったらペンディング破棄
-        if let owner = _pendingOwner, let oid = _pendingOwnerID, !(owner === requester && oid == ObjectIdentifier(requester)) {
+        // owner change -> drop pending
+        if let owner = _pendingOwner, let oid = _pendingOwnerID,
+           !(owner === requester && oid == ObjectIdentifier(requester)) {
             resetPending()
+            log("Sequence buffer reset due to owner change")
         }
         _pendingOwner   = requester
         _pendingOwnerID = ObjectIdentifier(requester)
-        
         self.mode = mode
         
+        // append
         _storedKeyStrokes.append(key)
-        var executeShortcut: KShortCut? = nil
-        var hasLongCandidate = false
+        let table = shortcuts
         
-        assignLoop: for shortcut in shortcuts {
-            if shortcut.keys.count < _storedKeyStrokes.count { continue }
+        var hasExact = false
+        var hasPrefixOnly = false
+        var exactShortcut: KShortCut? = nil
+        
+        outer: for sc in table {
+            if sc.keys.count < _storedKeyStrokes.count { continue }
             for i in 0..<_storedKeyStrokes.count {
-                if _storedKeyStrokes[i] != shortcut.keys[i] { continue assignLoop }
+                if _storedKeyStrokes[i] != sc.keys[i] { continue outer }
             }
-            if shortcut.keys.count == _storedKeyStrokes.count {
-                executeShortcut = shortcut
+            if sc.keys.count == _storedKeyStrokes.count {
+                hasExact = true
+                exactShortcut = sc
             } else {
-                hasLongCandidate = true
+                hasPrefixOnly = true
             }
         }
         
-        if let exec = executeShortcut {
-            // 実行（複数アクション対応）
-            if let owner = _pendingOwner {
-                for action in exec.actions {
-                    owner.doCommand(by: Selector(action))
-                }
-            }
-            reset()
+        if hasExact && !hasPrefixOnly {
+            // exact only -> execute now
+            executeActions(exactShortcut!.actions)
+            resetSequence()
             return .execute
-        } else if hasLongCandidate {
-            // さらなるキー入力待ち
-            return .preserve
-        } else if mode == .edit {
-            // Editモードでは未定義はブロック（文字入力抑止）
-            reset()
-            return .block
-        } else {
-            // Normalモードではシステムにパススルー
-            reset()
-            return .passthrough
         }
+        if hasExact && hasPrefixOnly {
+            // exact & longer candidates -> preserve (no timer; spec keeps waiting)
+            log("Preserve (exact & longer candidates) buffer=\(_storedKeyStrokes)")
+            return .preserve
+        }
+        if !hasExact && hasPrefixOnly {
+            // prefix only -> preserve (no timer)
+            log("Preserve (prefix only) buffer=\(_storedKeyStrokes)")
+            return .preserve
+        }
+        
+        // no match
+        log("No match; sequence cleared (buffer was \(_storedKeyStrokes))")
+        resetSequence()
+        return (mode == .edit) ? .block : .passthrough
     }
+    
+    // MARK: - Helpers
     
     private func resetPending() {
         _pendingOwner = nil
         _pendingOwnerID = nil
-        reset()
+        resetSequence()
+    }
+    
+    private func resetSequence() {
+        _storedKeyStrokes.removeAll()
+    }
+    
+    private func executeActions(_ actions: [KAction]) {
+        guard let owner = _pendingOwner else {
+            log("No owner to receive actions")
+            return
+        }
+        for a in actions {
+            switch a {
+            case .selector(let name):
+                owner.doCommand(by: Selector(name + ":"))
+            case .command(let cmd):
+                switch cmd {
+                case .load(let path):
+                    log("load[\(path)] (stub)")
+                case .execute(let path):
+                    log("execute[\(path)] (stub)")
+                }
+            }
+        }
     }
     
     
-    // MARK: - 既定キーバインド（Normal）
-    /*
-    // すべて KC（KKeyCode）ベースで非オプショナル生成
-    private static let defaultNormalModeKeyAssign: [KShortCut] = [
-        .init(keys: [KKeyStroke(code: KC.a, modifiers: [.control])], actions: ["moveToBeginningOfParagraph:"]),
-        .init(keys: [KKeyStroke(code: KC.s, modifiers: [.control])], actions: ["moveLeft:"]),
-        .init(keys: [KKeyStroke(code: KC.d, modifiers: [.control])], actions: ["moveRight:"]),
-        .init(keys: [KKeyStroke(code: KC.f, modifiers: [.control])], actions: ["moveToEndOfParagraph:"]),
-        .init(keys: [KKeyStroke(code: KC.e, modifiers: [.control])], actions: ["moveUp:"]),
-        .init(keys: [KKeyStroke(code: KC.x, modifiers: [.control])], actions: ["moveDown:"]),
-        .init(keys: [KKeyStroke(code: KC.r, modifiers: [.control])], actions: ["pageUp:"]),
-        .init(keys: [KKeyStroke(code: KC.c, modifiers: [.control])], actions: ["pageDown:"]),
-        
-        .init(keys: [KKeyStroke(code: KC.h, modifiers: [.control])], actions: ["deleteBackward:"]),
-        .init(keys: [KKeyStroke(code: KC.g, modifiers: [.control])], actions: ["deleteForward:"]),
-        
-        .init(keys: [KKeyStroke(code: KC.y, modifiers: [.option])], actions: ["yankPop:"]),
-        .init(keys: [KKeyStroke(code: KC.y, modifiers: [.option, .shift])], actions: ["yankPopReverse:"]),
-        
-        .init(keys: [KKeyStroke(code: KC.i, modifiers: [.control])], actions: ["insertTab:"]),
-        .init(keys: [KKeyStroke(code: KC.m, modifiers: [.control])], actions: ["insertNewline:"]),
-        
-        .init(keys: [KKeyStroke(code: KC.u, modifiers: [.control])], actions: ["uppercaseWord:"]),
-        .init(keys: [KKeyStroke(code: KC.l, modifiers: [.control])], actions: ["lowercaseWord:"]),
-        
-        .init(keys: [KKeyStroke(code: KC.p, modifiers: [.control])], actions: ["toggleCompletionMode:"]),
-        
-        .init(keys: [KKeyStroke(code: KC.a, modifiers: [.control, .shift])], actions: ["moveToBeginningOfParagraphAndModifySelection:"]),
-        .init(keys: [KKeyStroke(code: KC.s, modifiers: [.control, .shift])], actions: ["moveLeftAndModifySelection:"]),
-        .init(keys: [KKeyStroke(code: KC.d, modifiers: [.control, .shift])], actions: ["moveRightAndModifySelection:"]),
-        .init(keys: [KKeyStroke(code: KC.f, modifiers: [.control, .shift])], actions: ["moveToEndOfParagraphAndModifySelection:"]),
-        
-        // 2ストローク
-        .init(keys: [KKeyStroke(code: KC.q, modifiers: [.control]),
-                     KKeyStroke(code: KC.r, modifiers: [.control])],
-              actions: ["moveToBeginningOfDocument:"]),
-        .init(keys: [KKeyStroke(code: KC.q, modifiers: [.control]),
-                     KKeyStroke(code: KC.c, modifiers: [.control])],
-              actions: ["moveToEndOfDocument:"]),
-        .init(keys: [KKeyStroke(code: KC.q, modifiers: [.control]),
-                     KKeyStroke(code: KC.n1, modifiers: [.control])],
-              actions: ["removeSplit:"]),
-        .init(keys: [KKeyStroke(code: KC.q, modifiers: [.control]),
-                     KKeyStroke(code: KC.n2, modifiers: [.control])],
-              actions: ["splitHorizontally:"]),
-        .init(keys: [KKeyStroke(code: KC.q, modifiers: [.control]),
-                     KKeyStroke(code: KC.n3, modifiers: [.control])],
-              actions: ["focusForwardTextView:"]),
-        
-        // Ctrl+[ → Editモードへ（Esc 等価：KKeyStroke(event:) で正規化済み）
-        .init(keys: [KKeyStroke(code: KC.leftBracket, modifiers: [.control])], actions: ["setEditModeToEdit:"]),
-    ]
-    
-    // MARK: - 既定キーバインド（Edit）
-    private static let defaultEditModeKeyAssign: [KShortCut] = [
-        .init(keys: [KKeyStroke(code: KC.h)], actions: ["moveLeft:"]),
-        .init(keys: [KKeyStroke(code: KC.j)], actions: ["moveDown:"]),
-        .init(keys: [KKeyStroke(code: KC.k)], actions: ["moveUp:"]),
-        .init(keys: [KKeyStroke(code: KC.l)], actions: ["moveRight:"]),
-        
-        // Insert（Normalへ戻る）
-        .init(keys: [KKeyStroke(code: KC.i)], actions: ["setEditModeToNormal:"]),
-    ]
-     */
 }
 
-
-// MARK: - User Keymap Loader
+// MARK: - User Keymap Loader hook
 
 extension KKeyAssign {
-
-    /// Load user-defined keymap from INI file and apply to singleton instance.
     func loadUserKeymap(at url: URL) {
         do {
             let bundle = try KKeymapLoader.load(from: url)
