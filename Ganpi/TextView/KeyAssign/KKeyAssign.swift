@@ -40,8 +40,8 @@ class KKeyAssign {
     
     static let shared: KKeyAssign = .init()
     
-    private var _normalmodeShortcuts: [KShortCut] = defaultNormalModeKeyAssign
-    private var _editmodeShortCuts: [KShortCut]   = defaultEditModeKeyAssign
+    private var _normalmodeShortcuts: [KShortCut] = []//defaultNormalModeKeyAssign
+    private var _editmodeShortCuts: [KShortCut]   = []//defaultEditModeKeyAssign
     
     private var _storedKeyStrokes: [KKeyStroke] = []
     private var _mode: KEditMode = .normal
@@ -135,7 +135,9 @@ class KKeyAssign {
         reset()
     }
     
+    
     // MARK: - 既定キーバインド（Normal）
+    /*
     // すべて KC（KKeyCode）ベースで非オプショナル生成
     private static let defaultNormalModeKeyAssign: [KShortCut] = [
         .init(keys: [KKeyStroke(code: KC.a, modifiers: [.control])], actions: ["moveToBeginningOfParagraph:"]),
@@ -197,7 +199,9 @@ class KKeyAssign {
         // Insert（Normalへ戻る）
         .init(keys: [KKeyStroke(code: KC.i)], actions: ["setEditModeToNormal:"]),
     ]
+     */
 }
+
 
 // MARK: - User Keymap Loader
 
