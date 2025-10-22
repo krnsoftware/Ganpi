@@ -1165,7 +1165,8 @@ extension KSyntaxParserRuby {
                     let start = i
                     while i < L, !isDelimiter(line[i]) { i += 1 }
                     let text = String(decoding: UnsafeBufferPointer(start: line + start, count: i - start), as: UTF8.self)
-                    return (text, baseOffset + start ..< baseOffset + i)
+                    //return (text, baseOffset + start ..< baseOffset + i)
+                    return (text, baseOffset + (start - from) ..< baseOffset + (i - from))
                 }
 
                 // def
