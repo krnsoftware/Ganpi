@@ -536,9 +536,9 @@ final class KLines: CustomStringConvertible {
     
     // 行の構成を再構築する。
     func rebuildLines(with info: KStorageModifiedInfo? = nil) {
-        guard let textStorageRef = _textStorageRef else { log("textStorageRef is nil", from:self); return }
-        guard let layoutManager = _layoutManager else { log("layoutManager is nil", from:self); return }
-        guard let layoutRects = layoutManager.makeLayoutRects() else { log("layoutRects is nil", from:self); return }
+        guard let textStorageRef = _textStorageRef else { log("#00"); return }
+        guard let layoutManager = _layoutManager else { log("#01"); return }
+        guard let layoutRects = layoutManager.makeLayoutRects() else { log("#02"); return }
         
         let skeleton = textStorageRef.skeletonString
         
@@ -551,19 +551,13 @@ final class KLines: CustomStringConvertible {
         
         if let info = info {
             /// 削除前の range.lowerBound に属していた KLine を特定
-            guard let startSoftLine = lineAt(characterIndex: info.range.lowerBound) else {
-                log("startLine not found", from: self)
-                return
-            }
+            guard let startSoftLine = lineAt(characterIndex: info.range.lowerBound) else { log("#03"); return }
 
             /// その行の hardLineIndex を取得
             let startHardLineIndex = startSoftLine.hardLineIndex
 
             /// KLine 配列上の startIndex を取得
-            guard let startHardLineArrayIndex = lineArrayIndex(for: startHardLineIndex) else {
-                log("startIndex not found", from: self)
-                return
-            }
+            guard let startHardLineArrayIndex = lineArrayIndex(for: startHardLineIndex) else { log("#04"); return }
 
             /// 削除対象のハード行数（改行 + 1）
             let deleteHardLineCount = info.deletedNewlineCount + 1
@@ -572,10 +566,7 @@ final class KLines: CustomStringConvertible {
             let lastHardLineIndex = startHardLineIndex + deleteHardLineCount - 1
 
             /// 末尾ハード行の先頭 index を取得
-            guard let lastHardLineStartIndex = lineArrayIndex(for: lastHardLineIndex) else {
-                log("lastHardLineStartIndex not found", from: self)
-                return
-            }
+            guard let lastHardLineStartIndex = lineArrayIndex(for: lastHardLineIndex) else { log("#05"); return }
 
             /// 末尾ハード行のソフト行数を取得
             guard let softCount = countSoftLinesOf(hardLineIndex: lastHardLineIndex) else {
@@ -636,10 +627,7 @@ final class KLines: CustomStringConvertible {
         
         
         // 並列処理を導入する。15000行のデータで1200ms->460msに短縮。
-        guard let newStartLine = lineAt(characterIndex: newRange.lowerBound) else {
-            log("newStartLine is nil", from: self)
-            return
-        }
+        guard let newStartLine = lineAt(characterIndex: newRange.lowerBound) else { log("#10"); return }
         
         let newStartHardLineIndex = newStartLine.hardLineIndex
 
@@ -659,10 +647,7 @@ final class KLines: CustomStringConvertible {
         let newLines = newLinesBuffer.flatMap { $0 }
         _lines.replaceSubrange(removeRange, with: newLines)
                 
-        guard let newLastLine = _lines.last else {
-            log("newLastLine is nil", from: self)
-            return
-        }
+        guard let newLastLine = _lines.last else { log("#11"); return }
 
         // 最後の文字が改行で、かつ最後のKLineが末尾に達していなければ空行を追加
         if skeleton.bytes.last == FuncChar.lf && newLastLine.range.upperBound < skeleton.bytes.count {
