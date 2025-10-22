@@ -20,7 +20,8 @@ enum KKeymapError: Error {
     case invalidFormat(Int)
 }
 
-enum KKeymapLoader {
+struct KKeymapLoader {
+    private init(){}
 
     static func load(from url: URL) throws -> KKeymapBundle {
         guard let data = try? Data(contentsOf: url),
