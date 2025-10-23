@@ -329,7 +329,8 @@ final class KLines: CustomStringConvertible {
     private var _lines: [KLine] = []
     
     // cache.
-    private var _hardLineIndexMap: [Int:Int] = [:]
+    //private var _hardLineIndexMap: [Int:Int] = [:]
+    private var _hardLineIndexMap:[Int] = []
     private var _replaceLineIndex: Int? // index of first line of replaced lines (soft-lines)
     private var _replaceLineCount: Int? // count of replaced lines (soft-lines)
     
@@ -552,41 +553,41 @@ final class KLines: CustomStringConvertible {
         if let info = info {
             /// 削除前の range.lowerBound に属していた KLine を特定
             guard let startSoftLine = lineAt(characterIndex: info.range.lowerBound) else { log("#03"); return }
-
+            
             /// その行の hardLineIndex を取得
             let startHardLineIndex = startSoftLine.hardLineIndex
-
+            
             /// KLine 配列上の startIndex を取得
             guard let startHardLineArrayIndex = lineArrayIndex(for: startHardLineIndex) else { log("#04"); return }
-
+            
             /// 削除対象のハード行数（改行 + 1）
             let deleteHardLineCount = info.deletedNewlineCount + 1
-
+            
             /// 削除対象の末尾ハード行の行番号
             let lastHardLineIndex = startHardLineIndex + deleteHardLineCount - 1
-
+            
             /// 末尾ハード行の先頭 index を取得
             guard let lastHardLineStartIndex = lineArrayIndex(for: lastHardLineIndex) else { log("#05"); return }
-
+            
             /// 末尾ハード行のソフト行数を取得
             guard let softCount = countSoftLinesOf(hardLineIndex: lastHardLineIndex) else {
                 log("softLine count not found for hardLineIndex \(lastHardLineIndex)", from: self)
                 return
             }
-
+            
             /// 削除対象の範囲
             let endIndex = lastHardLineStartIndex + softCount
             removeRange = startHardLineArrayIndex..<endIndex
-
+            
             var lower = info.range.lowerBound
             var upper = info.range.lowerBound + info.insertedCount
-
+            
             // 前方：行頭まで戻る
             while lower > 0 {
                 if skeleton.bytes[lower - 1] == FuncChar.lf { break }
                 lower -= 1
             }
-
+            
             // 後方：行末（改行を含めた直後）まで進む
             while upper < skeleton.bytes.count {
                 //if characters[upper] == newLineCharacter {
@@ -596,7 +597,7 @@ final class KLines: CustomStringConvertible {
                 }
                 upper += 1
             }
-
+            
             newRange = lower..<upper
             
             DispatchQueue.concurrentPerform(iterations: _lines.count - removeRange.upperBound) { i in
@@ -606,7 +607,7 @@ final class KLines: CustomStringConvertible {
             }
         }
         
-
+        
         // その領域の文字列に含まれる行の領域の配列を得る。
         var lineRanges:[Range<Int>] = []
         var start = newRange.lowerBound
@@ -630,7 +631,7 @@ final class KLines: CustomStringConvertible {
         guard let newStartLine = lineAt(characterIndex: newRange.lowerBound) else { log("#10"); return }
         
         let newStartHardLineIndex = newStartLine.hardLineIndex
-
+        
         var newLinesBuffer = Array(repeating: [KLine](), count: lineRanges.count)
         let width = layoutRects.textRegionWidth - layoutRects.textEdgeInsets.right
         
@@ -646,9 +647,9 @@ final class KLines: CustomStringConvertible {
         
         let newLines = newLinesBuffer.flatMap { $0 }
         _lines.replaceSubrange(removeRange, with: newLines)
-                
+        
         guard let newLastLine = _lines.last else { log("#11"); return }
-
+        
         // 最後の文字が改行で、かつ最後のKLineが末尾に達していなければ空行を追加
         if skeleton.bytes.last == FuncChar.lf && newLastLine.range.upperBound < skeleton.bytes.count {
             let emptyLine = layoutManager.makeEmptyLine(index: skeleton.bytes.count, hardLineIndex: newLastLine.hardLineIndex + 1)
@@ -656,22 +657,37 @@ final class KLines: CustomStringConvertible {
         }
         
         //log("isValid: \(isValid)",from:self)
-
+        
         // mapも再構築
+        /*_hardLineIndexMap.removeAll()
+         for (i, line) in _lines.enumerated() where line.softLineIndex == 0 {
+         _hardLineIndexMap[line.hardLineIndex] = i
+         }*/
+        // newStartHardLineIndex: 挿入された文字列を含む行の最初の行のhardLineIndex
+        // lineRanges: 挿入された文字列を含む物理行のrange. lfを含まない。
+        // lineRanges.count: 挿入された文字列を含む物理行の行数。info.insertedLineCountに等しい。
+        //
+        /*
+        if let info = info {
+            _hardLineIndexMap.removeSubrange(newStartHardLineIndex..<newStartHardLineIndex + info.deletedNewlineCount)
+            
+        } else {
+            _hardLineIndexMap.removeAll()
+            _hardLineIndexMap = _lines.enumerated().filter { $0.element.softLineIndex == 0 }.map{ $0.offset }
+        }*/
         _hardLineIndexMap.removeAll()
-        for (i, line) in _lines.enumerated() where line.softLineIndex == 0 {
-            _hardLineIndexMap[line.hardLineIndex] = i
-        }
+        _hardLineIndexMap = _lines.enumerated().filter { $0.element.softLineIndex == 0 }.map{ $0.offset }
     }
     
     
     
     // ハード行の行番号hardLineIndexの行を取り出す。ソフトラップの場合は複数行になることがある。
     func lines(hardLineIndex: Int) -> [KLine]? {
-        guard let startIndex = _hardLineIndexMap[hardLineIndex] else {
+        /*guard let startIndex = _hardLineIndexMap[hardLineIndex] else {
             log("_hardLineIndexMap[\(hardLineIndex)] not found", from: self)
             return nil
-        }
+        }*/
+        let startIndex = _hardLineIndexMap[hardLineIndex]
 
         var lines: [KLine] = []
         for i in startIndex..<_lines.count {
@@ -688,10 +704,12 @@ final class KLines: CustomStringConvertible {
     
     // ハード行の行番号hardLineIndexの行に含まれるソフト行の数を返す。
     func countSoftLinesOf(hardLineIndex: Int) -> Int? {
-        guard let startIndex = _hardLineIndexMap[hardLineIndex] else {
+        /*guard let startIndex = _hardLineIndexMap[hardLineIndex] else {
             log("_hardLineIndexMap[\(hardLineIndex)] not found",from:self)
             return nil
-        }
+        }*/
+        let startIndex = _hardLineIndexMap[hardLineIndex]
+        
         var count = 0
         for i in startIndex..<_lines.count {
             let line = _lines[i]
@@ -763,10 +781,11 @@ final class KLines: CustomStringConvertible {
  
     // hardLineIndexを持つ行を返す。softLineIndexを指定することもできる。
     func lineArrayIndex(for hardLineIndex: Int, softLineIndex: Int = 0) -> Int? {
-        guard let lineIndex = _hardLineIndexMap[hardLineIndex] else {
+        /*guard let lineIndex = _hardLineIndexMap[hardLineIndex] else {
             log("lineIndex not found.", from: self)
             return nil
-        }
+        }*/
+        let lineIndex = _hardLineIndexMap[hardLineIndex]
 
         if softLineIndex == 0 {
             return lineIndex
@@ -808,7 +827,8 @@ final class KLines: CustomStringConvertible {
         _lines.removeAll()
         _lines.append(layoutManager.makeEmptyLine(index: 0, hardLineIndex: 0))
         _hardLineIndexMap.removeAll()
-        _hardLineIndexMap[0] = 0
+        //_hardLineIndexMap[0] = 0
+        _hardLineIndexMap = [0]
     }
     
     //MARK: - Static func.
