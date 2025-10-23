@@ -145,7 +145,7 @@ class KKeyAssign {
         }
         
         // no match
-        log("No match; sequence cleared (buffer was \(_storedKeyStrokes))")
+        //log("No match; sequence cleared (buffer was \(_storedKeyStrokes))")
         resetSequence()
         return (mode == .edit) ? .block : .passthrough
     }

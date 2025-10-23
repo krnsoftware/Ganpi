@@ -546,9 +546,8 @@ final class KLines: CustomStringConvertible {
         // storageが空だった場合は空行を追加するのみ。
         if textStorageRef.count == 0 { setLinesEmpty(); return }
         
-        var newRange = 0..<textStorageRef.count
-        //var startIndex = 0
-        var removeRange = 0..<_lines.count
+        var addedCharacterRange = 0..<textStorageRef.count
+        var removedSoftLineRange = 0..<_lines.count
         
         if let info = info {
             /// 削除前の range.lowerBound に属していた KLine を特定
@@ -561,10 +560,10 @@ final class KLines: CustomStringConvertible {
             guard let startHardLineArrayIndex = lineArrayIndex(for: startHardLineIndex) else { log("#04"); return }
             
             /// 削除対象のハード行数（改行 + 1）
-            let deleteHardLineCount = info.deletedNewlineCount + 1
+            let deletedHardLineCount = info.deletedNewlineCount + 1
             
             /// 削除対象の末尾ハード行の行番号
-            let lastHardLineIndex = startHardLineIndex + deleteHardLineCount - 1
+            let lastHardLineIndex = startHardLineIndex + deletedHardLineCount - 1
             
             /// 末尾ハード行の先頭 index を取得
             guard let lastHardLineStartIndex = lineArrayIndex(for: lastHardLineIndex) else { log("#05"); return }
@@ -577,7 +576,7 @@ final class KLines: CustomStringConvertible {
             
             /// 削除対象の範囲
             let endIndex = lastHardLineStartIndex + softCount
-            removeRange = startHardLineArrayIndex..<endIndex
+            removedSoftLineRange = startHardLineArrayIndex..<endIndex
             
             var lower = info.range.lowerBound
             var upper = info.range.lowerBound + info.insertedCount
@@ -598,10 +597,10 @@ final class KLines: CustomStringConvertible {
                 upper += 1
             }
             
-            newRange = lower..<upper
+            addedCharacterRange = lower..<upper
             
-            DispatchQueue.concurrentPerform(iterations: _lines.count - removeRange.upperBound) { i in
-                let line = _lines[removeRange.upperBound + i]
+            DispatchQueue.concurrentPerform(iterations: _lines.count - removedSoftLineRange.upperBound) { i in
+                let line = _lines[removedSoftLineRange.upperBound + i]
                 line.shiftRange(by: info.insertedCount - info.range.count)
                 line.shiftHardLineIndex(by: info.insertedNewlineCount - info.deletedNewlineCount)
             }
@@ -610,8 +609,8 @@ final class KLines: CustomStringConvertible {
         
         // その領域の文字列に含まれる行の領域の配列を得る。
         var lineRanges:[Range<Int>] = []
-        var start = newRange.lowerBound
-        for i in newRange {
+        var start = addedCharacterRange.lowerBound
+        for i in addedCharacterRange {
             //if characters[i] == newLineCharacter {
             if skeleton.bytes[i] == FuncChar.lf {
                 if start < i {
@@ -622,13 +621,13 @@ final class KLines: CustomStringConvertible {
                 start = i + 1
             }
         }
-        if start < newRange.upperBound {
-            lineRanges.append(start..<newRange.upperBound)
+        if start < addedCharacterRange.upperBound {
+            lineRanges.append(start..<addedCharacterRange.upperBound)
         }
         
         
         // 並列処理を導入する。15000行のデータで1200ms->460msに短縮。
-        guard let newStartLine = lineAt(characterIndex: newRange.lowerBound) else { log("#10"); return }
+        guard let newStartLine = lineAt(characterIndex: addedCharacterRange.lowerBound) else { log("#10"); return }
         
         let newStartHardLineIndex = newStartLine.hardLineIndex
         
@@ -646,7 +645,7 @@ final class KLines: CustomStringConvertible {
         }
         
         let newLines = newLinesBuffer.flatMap { $0 }
-        _lines.replaceSubrange(removeRange, with: newLines)
+        _lines.replaceSubrange(removedSoftLineRange, with: newLines)
         
         guard let newLastLine = _lines.last else { log("#11"); return }
         
@@ -656,27 +655,53 @@ final class KLines: CustomStringConvertible {
             _lines.append(emptyLine)
         }
         
-        //log("isValid: \(isValid)",from:self)
-        
-        // mapも再構築
-        /*_hardLineIndexMap.removeAll()
-         for (i, line) in _lines.enumerated() where line.softLineIndex == 0 {
-         _hardLineIndexMap[line.hardLineIndex] = i
-         }*/
-        // newStartHardLineIndex: 挿入された文字列を含む行の最初の行のhardLineIndex
-        // lineRanges: 挿入された文字列を含む物理行のrange. lfを含まない。
-        // lineRanges.count: 挿入された文字列を含む物理行の行数。info.insertedLineCountに等しい。
-        //
-        /*
+        // _hardLineIndexMapを再構築
+        // 差分で構築する。
         if let info = info {
-            _hardLineIndexMap.removeSubrange(newStartHardLineIndex..<newStartHardLineIndex + info.deletedNewlineCount)
-            
+            // 1) 置換される“ハード行”の範囲（連続）
+            let hardRemove = newStartHardLineIndex ..< (newStartHardLineIndex + info.deletedNewlineCount + 1)
+
+            // 2) 置換後の _lines から、挿入ブロックに対応する “先頭ソフト行” の配列添字だけを集める
+            let softInsertBase = removedSoftLineRange.lowerBound
+            let insertSoftEnd  = softInsertBase + newLines.count
+            var newHeads: [Int] = []
+            newHeads.reserveCapacity(info.insertedNewlineCount + 1)
+            var i = softInsertBase
+            while i < insertSoftEnd {
+                if _lines[i].softLineIndex == 0 { newHeads.append(i) }
+                i += 1
+            }
+
+            // 3) ハード行テーブルを置換（キーは配列添字なので rekey 不要）
+            _hardLineIndexMap.replaceSubrange(hardRemove, with: newHeads)
+
+            // 4) 置換ブロック“より後ろ”の要素は、soft側のズレ分だけ一括シフト
+            let deltaSoft = newLines.count - removedSoftLineRange.count
+            if deltaSoft != 0 {
+                var h = hardRemove.lowerBound + newHeads.count
+                while h < _hardLineIndexMap.count {
+                    _hardLineIndexMap[h] += deltaSoft
+                    h += 1
+                }
+            }
+
+            // 5) 末尾の空行が新規に増えたケースに対応（最後のheadを追加）
+            if let last = _lines.last,
+               last.softLineIndex == 0,
+               last.hardLineIndex == _hardLineIndexMap.count {
+                _hardLineIndexMap.append(_lines.count - 1)
+            }
+
+            // 6) 念のため過剰分を詰める（減った場合）
+            while !_hardLineIndexMap.isEmpty, _hardLineIndexMap.last! >= _lines.count {
+                _hardLineIndexMap.removeLast()
+            }
         } else {
-            _hardLineIndexMap.removeAll()
-            _hardLineIndexMap = _lines.enumerated().filter { $0.element.softLineIndex == 0 }.map{ $0.offset }
-        }*/
-        _hardLineIndexMap.removeAll()
-        _hardLineIndexMap = _lines.enumerated().filter { $0.element.softLineIndex == 0 }.map{ $0.offset }
+            // フル再構築（初回や全域再レイアウト時）
+            _hardLineIndexMap = _lines.enumerated()
+                .filter { $0.element.softLineIndex == 0 }
+                .map { $0.offset }
+        }
     }
     
     

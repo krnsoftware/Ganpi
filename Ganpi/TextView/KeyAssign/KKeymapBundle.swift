@@ -82,7 +82,7 @@ struct KKeymapLoader {
             let actions = parseActions(from: rightText)
 
             if keySeq.isEmpty || actions.isEmpty {
-                log("load(from:): Line \(lineNo): skipped (no valid keys or actions)")
+                //log("load(from:): Line \(lineNo): skipped (no valid keys or actions)")
                 continue
             }
 
@@ -93,7 +93,7 @@ struct KKeymapLoader {
             }
         }
 
-        log("load(from:): Loaded \(shortcutsNormal.count) normal and \(shortcutsEdit.count) edit shortcuts from INI file")
+        //log("load(from:): Loaded \(shortcutsNormal.count) normal and \(shortcutsEdit.count) edit shortcuts from INI file")
         return KKeymapBundle(normal: shortcutsNormal, edit: shortcutsEdit)
     }
 
