@@ -180,7 +180,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         get { _wordWrap }
         set {
             _wordWrap = newValue
-            _applyWordWrapToEnclosingScrollView()
+            applyWordWrapToEnclosingScrollView()
             
             _layoutManager.rebuildLayout()
             updateFrameSizeToFitContent()
@@ -329,7 +329,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         // scrollviewのscrollerの状態をセット
         DispatchQueue.main.async { [weak self] in
-            self?._applyWordWrapToEnclosingScrollView()
+            self?.applyWordWrapToEnclosingScrollView()
         }
         
         //_layoutManager.textView = self
@@ -1735,41 +1735,41 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     @objc func clearCaretContext(_ sender: Any?) { }
     
     // scrollviewの水平スクローラーのオンオフを設定に追従させる。
-    private func _applyWordWrapToEnclosingScrollView() {
-        guard let sv = self.enclosingScrollView else { return }
+    private func applyWordWrapToEnclosingScrollView() {
+        guard let scrollView = self.enclosingScrollView else { return }
 
         if _wordWrap {
-            if sv.hasHorizontalScroller { sv.hasHorizontalScroller = false }
+            if scrollView.hasHorizontalScroller { scrollView.hasHorizontalScroller = false }
         } else {
-            if !sv.hasHorizontalScroller { sv.hasHorizontalScroller = true }
+            if !scrollView.hasHorizontalScroller { scrollView.hasHorizontalScroller = true }
         }
 
-        sv.tile()
+        scrollView.tile()
     }
     
     // textviewの周囲にフォーカスリングを表示する必要があるか返す。
-    private func _shouldShowFocusBorder() -> Bool {
+    private func shouldShowFocusBorder() -> Bool {
         guard window?.isKeyWindow == true else { return false }
         guard window?.firstResponder === self else { return false }
         // 祖先にある NSSplitView を探す
-        var v: NSView? = self
-        while let s = v, !(s is NSSplitView) { v = s.superview }
-        if let sv = v as? NSSplitView { return sv.subviews.count > 1 }
+        var aView: NSView? = self
+        while let s = aView, !(s is NSSplitView) { aView = s.superview }
+        if let sv = aView as? NSSplitView { return sv.subviews.count > 1 }
         // SplitView不在（=1枚表示）は描かない
         return false
     }
     
     // textviewの周囲にフォーカスリングを表示する。
     @inline(__always)
-    private func _drawFocusBorderIfNeeded() {
-        guard _shouldShowFocusBorder() else { return }
+    private func drawFocusBorderIfNeeded() {
+        guard shouldShowFocusBorder() else { return }
         
-        let vr = self.visibleRect                    // ← スクロール中の可視領域（自座標系）
-        guard !vr.isEmpty else { return }
+        let vRect = self.visibleRect                    // ← スクロール中の可視領域（自座標系）
+        guard !vRect.isEmpty else { return }
         
         let inset: CGFloat = 0.5
-        let r    = vr.insetBy(dx: inset, dy: inset)
-        let path = NSBezierPath(roundedRect: r, xRadius: 2, yRadius: 2)
+        let innerRect = vRect.insetBy(dx: inset, dy: inset)
+        let path = NSBezierPath(roundedRect: innerRect, xRadius: 2, yRadius: 2)
         let accent = NSColor.controlAccentColor
         
         // --- ソフトグロー（外側ふわっと） ---
@@ -1784,7 +1784,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         path.lineWidth = 1.0
         
         // 可視領域の内側に収める（グローが外へはみ出さない）
-        NSBezierPath(rect: vr).addClip()
+        NSBezierPath(rect: vRect).addClip()
         path.stroke()
         NSGraphicsContext.restoreGraphicsState()
         
@@ -1798,46 +1798,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     
     //MARK: - Caret Movement
-    /*
-    private func moveCaretHorizontally(to direction: KTextEditDirection, extendSelection: Bool) {
-        if !wasHorizontalActionWithModifySelection && extendSelection {
-            _horizontalSelectionBase = selectionRange.lowerBound
-        }
-        
-        if extendSelection {
-            if _horizontalSelectionBase! == selectionRange.lowerBound {
-                let newBound = selectionRange.upperBound + direction.rawValue
-                
-                guard newBound <= _textStorageRef.count && newBound >= 0 else { return }
-                
-                selectionRange = min(newBound, _horizontalSelectionBase!)..<max(newBound, _horizontalSelectionBase!)
-            } else {
-                let newBound = selectionRange.lowerBound + direction.rawValue
-                
-                guard newBound <= _textStorageRef.count && newBound >= 0 else { return }
-                
-                selectionRange = min(newBound, _horizontalSelectionBase!)..<max(newBound, _horizontalSelectionBase!)
-            }
-        } else {
-            if direction == .forward {
-                if selectionRange.isEmpty {
-                    guard caretIndex < _textStorageRef.count else { return }
-                    caretIndex += 1
-                } else {
-                    caretIndex = selectionRange.upperBound
-                }
-            } else {
-                if selectionRange.isEmpty {
-                    guard caretIndex > 0 else { return }
-                    caretIndex -= 1
-                } else {
-                    caretIndex = selectionRange.lowerBound
-                }
-            }
-        }
-        
-        //updateCaretPosition()
-    }*/
     
     private func moveCaretVertically(to direction: KDirection, extendSelection: Bool) {
         /*
@@ -1857,8 +1817,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             _verticalSelectionBase = caretIndex
         }
         
-
-        //guard let verticalSelectionBase = _verticalSelectionBase else { log("_verticalSelectionBase is nil.",from:self); return }
         guard let currentLine = layoutManager.lines[currentLineIndex] else { log("currentLine is nil.",from:self); return }
         
         if _verticalCaretX == nil || !wasVerticalAction {
@@ -1872,7 +1830,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         if selectionRange.lowerBound < verticalSelectionBase {
             guard let currentLowerBoundLineIndex = layoutManager.lines.lineIndex(at: selectionRange.lowerBound) else { log("currentLowerBoundLine is nil.",from:self); return }
-            //if currentLowerBoundLineIndex > 0 { // when 0, can't move down.
             if currentLowerBoundLineIndex >= 0 {
                 let newLineIndex = currentLowerBoundLineIndex + direction.rawValue
                 if newLineIndex < 0 || newLineIndex > layoutManager.lines.count - 1 { log("<ok.newLineIndex is out of range.>",from:self); return }
