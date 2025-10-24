@@ -19,10 +19,11 @@ struct KKeyStroke: Equatable, Hashable {
 
     // MARK: - 内部設定
 
-    /// 許可する修飾キー集合（Command は除外）
-    private static let _allowedModifiers: NSEvent.ModifierFlags = [.control, .option, .shift]
+    /// 許可する修飾キー集合
+    /// commandを含むが、key assignとしてはcommandは無視される仕様。これはユーザーメニュー構築にも使用するため。
+    private static let _allowedModifiers: NSEvent.ModifierFlags = [.control, .option, .shift, .command]
 
-    /// 1文字シンボル → keyCode（ANSI US を前提。将来差し替え可）
+    /// 1文字シンボル → keyCode（ANSI US を前提）
     private static let _ansiUSCharToKC: [Character: UInt16] = [
         "a": KC.a, "b": KC.b, "c": KC.c, "d": KC.d, "e": KC.e, "f": KC.f, "g": KC.g, "h": KC.h,
         "i": KC.i, "j": KC.j, "k": KC.k, "l": KC.l, "m": KC.m, "n": KC.n, "o": KC.o, "p": KC.p,
@@ -139,7 +140,7 @@ struct KKeyStroke: Equatable, Hashable {
             return (.init(), lower)
         }
 
-        // 区切りは '+' 推奨（互換で '-' も splitter に含める）
+        // 区切りは '+'
         let tokens = lower
             .replacingOccurrences(of: " ", with: "")
             .split(whereSeparator: { $0 == "+" })
@@ -158,6 +159,8 @@ struct KKeyStroke: Equatable, Hashable {
                 mods.insert(.option)
             case "shift":
                 mods.insert(.shift)
+            case "command", "cmd":
+                mods.insert(.command)
             default:
                 if core == nil {
                     core = t
