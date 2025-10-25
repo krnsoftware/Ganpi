@@ -521,11 +521,11 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
             let vc = KJumpPopoverViewController()
             vc.onConfirm = { [weak self] spec in
                 guard let self = self else { return }
-                guard let activeTextView = activeTextView() else { NSSound.beep(); return }
+                guard let activeTextView = activeTextView() else { log("#01"); NSSound.beep(); return }
 
                 // spec を KTextView のパーサへ
                 guard let selection = activeTextView.selectString(with: spec) else {
-                    NSSound.beep()
+                    log("#02"); NSSound.beep()
                     return
                 }
 
@@ -861,7 +861,7 @@ final class KJumpPopoverViewController: NSViewController {
 
     private func confirm() {
         let spec = _textField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !spec.isEmpty else { NSSound.beep(); return }
+        guard !spec.isEmpty else { log("no text."); return }
         onConfirm?(spec)
     }
 }
@@ -914,7 +914,7 @@ final class KTypographyPopoverViewController: NSViewController {
         } else if let v = Double(s) {
             onChange?(v)
         } else {
-            NSSound.beep()
+            log("no number.")
         }
     }
 }
