@@ -184,6 +184,8 @@ extension KKeyCode {
         "<kp4>": KC.keypad4, "<kp5>": KC.keypad5, "<kp6>": KC.keypad6, "<kp7>": KC.keypad7,
         "<kp8>": KC.keypad8, "<kp9>": KC.keypad9,
         "<kp.>": KC.keypadDecimal, "<kp+>": KC.keypadPlus, "<kp->": KC.keypadMinus,
-        "<kp*>": KC.keypadMultiply, "<kp/>": KC.keypadDivide, "<kp=>": KC.keypadEquals
+        "<kp*>": KC.keypadMultiply, "<kp/>": KC.keypadDivide, "<kp=>": KC.keypadEquals,
+        
+        "<semicolon>": KC.semicolon
     ]
 }

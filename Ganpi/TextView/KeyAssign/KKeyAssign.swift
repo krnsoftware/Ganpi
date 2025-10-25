@@ -170,7 +170,9 @@ class KKeyAssign {
         for a in actions {
             switch a {
             case .selector(let name):
-                owner.doCommand(by: Selector(name + ":"))
+                let selector = Selector(name + ":")
+                //owner.doCommand(by: Selector(name + ":"))
+                _ = NSApp.sendAction(selector, to: nil, from: self)
             case .command(let cmd):
                 switch cmd {
                 case .load(let path):
