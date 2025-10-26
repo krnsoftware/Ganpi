@@ -734,6 +734,10 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         //print(selector)
     }
     
+    override func cancelOperation(_ sender:Any?) {
+        // ctrl+.をpass throughするための空メソッド。
+    }
+    
     // MARK: - Mouse Interaction (NSView methods)
     
     override func mouseDown(with event: NSEvent) {

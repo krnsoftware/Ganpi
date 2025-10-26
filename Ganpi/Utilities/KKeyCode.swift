@@ -186,6 +186,6 @@ extension KKeyCode {
         "<kp.>": KC.keypadDecimal, "<kp+>": KC.keypadPlus, "<kp->": KC.keypadMinus,
         "<kp*>": KC.keypadMultiply, "<kp/>": KC.keypadDivide, "<kp=>": KC.keypadEquals,
         
-        "<semicolon>": KC.semicolon
+        "<semicolon>": KC.semicolon, "<comma>": KC.comma
     ]
 }
