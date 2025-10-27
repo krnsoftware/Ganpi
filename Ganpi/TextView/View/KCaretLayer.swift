@@ -31,7 +31,7 @@ final class KCaretLayer: CALayer {
     var secondaryColor: CGColor = NSColor.systemGreen.cgColor
 
     /// Iタイプ用の線幅（参考値。矩形側に幅を反映済みなら未使用）
-    var caretWidth: CGFloat = 2.0
+    var caretWidth: CGFloat = 1.5
     
     
 
