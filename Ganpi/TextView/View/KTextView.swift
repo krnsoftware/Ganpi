@@ -39,6 +39,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     // フォーカスリングの表示に関するプロパティ
     private weak var _owningContainer: KTextViewContainerView?
     
+    private var _hasKeyboardFocus = false
+    
     // 前回のcontentview.boundsを記録しておくためのプロパティ
     private var _prevContentViewBounds: CGRect = .zero
     
@@ -124,7 +126,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             _ = currentLineIndex
 
             //_caretView.isHidden = !selectionRange.isEmpty
-            _caretLayer?.isHidden = !selectionRange.isEmpty
+            //_caretLayer?.isHidden = !selectionRange.isEmpty
+            updateCaretActiveState()
             updateCaretPosition()
             sendStatusBarUpdateAction()
             
@@ -362,6 +365,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         window?.makeFirstResponder(self)  // 念のため明示的に指定
         
+        
         // キャレットの位置を再計算して表示しておく。
         updateCaretPosition()
         startCaretBlinkTimer()
@@ -397,8 +401,16 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
     }
     
+    //test
+    private var _needsInitialReload = true
+    
     override func viewWillDraw() {
         super.viewWillDraw()
+        
+        if _needsInitialReload {
+            layoutManager.rebuildLayout()
+            _needsInitialReload = false
+        }
         
         // ソフトラップの場合、visibleRectに合わせて行の横幅を変更する必要があるが、
         // scrollview.clipViewでの変更がないため通知含めvisibleRectの変更を知るすべがない。
@@ -416,24 +428,25 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     
     override func becomeFirstResponder() -> Bool {
-        //print("\(#function)")
-        let ok = super.becomeFirstResponder()
-        //_caretView.isHidden = !selectionRange.isEmpty
+        let accepted = super.becomeFirstResponder()
         containerView?.setActiveEditor(true)
         sendStatusBarUpdateAction()
-        
+        _hasKeyboardFocus = accepted
+        log("_hasKeyboardFocus: \(_hasKeyboardFocus)")
+        updateCaretActiveState()
         needsDisplay = true
-        return ok
+        return accepted
     }
     
     override func resignFirstResponder() -> Bool {
-        //print("\(#function)")
-        let ok = super.resignFirstResponder()
+        let accepted = super.resignFirstResponder()
         endYankCycle()
-        //_caretView.isHidden = true
         containerView?.setActiveEditor(false)
+        _hasKeyboardFocus = !accepted
+        log("_hasKeyboardFocus: \(_hasKeyboardFocus)")
+        updateCaretActiveState()
         needsDisplay = true
-        return ok
+        return accepted
     }
     
     //testing.
@@ -515,20 +528,32 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         //startCaretBlinkTimer()
         _caretLayer?.stopBlinking()
         // 入力直後は点灯のままにして視認性を上げる
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
             self?._caretLayer?.startBlinking()
+        }
+    }
+    
+    private func updateCaretActiveState() {
+        guard let caretLayer = _caretLayer else { log("#01"); return }
+        // 表示条件を一本化
+        let shouldShow =
+            (window?.isKeyWindow == true) &&
+            _hasKeyboardFocus &&
+            selectionRange.isEmpty
+
+        if shouldShow {
+            caretLayer.isHidden = false
+            caretLayer.removeAnimation(forKey: "blink")   // 重複回避
+            caretLayer.opacity = 1.0
+            caretLayer.startBlinking(duration: 1.0)       // 標準テンポ
+        } else {
+            caretLayer.stopBlinking()
+            caretLayer.isHidden = true
         }
     }
     
     private func scrollCaretToVisible() {
         scrollSelectionToVisible()
-        /*
-        guard let scrollView = self.enclosingScrollView else { return }
-        DispatchQueue.main.async {
-            let caretRect = self._caretView.frame.insetBy(dx: -10, dy: -10)
-            scrollView.contentView.scrollToVisible(caretRect)
-        }
-        */
     }
     
     func scrollSelectionToVisible() {
@@ -728,7 +753,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             return
         }
         
-        super.setFrameSize(NSSize(width: rects.textRegion.rect.width, height: rects.textRegion.rect.height))
+        //super.setFrameSize(NSSize(width: rects.textRegion.rect.width, height: rects.textRegion.rect.height))
+        super.setFrameSize(newSize)
         
         if let L = _caretLayer, L.superlayer != nil {
             CATransaction.begin()
@@ -1315,13 +1341,15 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         //_caretView.isHidden = false
         //_caretView.isHidden = (window?.firstResponder !== self)
         //_caretView.isHidden = (window?.firstResponder !== self) || !selectionRange.isEmpty
-        _caretLayer?.isHidden = (window?.firstResponder !== self) || !selectionRange.isEmpty
+        //_caretLayer?.isHidden = (window?.firstResponder !== self) || !selectionRange.isEmpty
+        updateCaretActiveState()
     }
 
     @objc private func windowResignedKey(_ notification: Notification) {
         // updateActiveState()
         //_caretView.isHidden = true
-        _caretLayer?.isHidden = true
+        //_caretLayer?.isHidden = true
+        updateCaretActiveState()
     }
 
     @objc private func clipViewBoundsDidChange(_ notification: Notification) {
