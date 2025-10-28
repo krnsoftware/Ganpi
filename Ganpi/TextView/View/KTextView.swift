@@ -231,42 +231,31 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     // 今回のセレクタが垂直方向にキャレット選択範囲を動かすものであるか返す。
     private var isVerticalAction: Bool {
         guard let sel = _currentActionSelector else { return false }
-        return sel == #selector(moveUp(_:)) ||
-        sel == #selector(moveDown(_:)) ||
-        sel == #selector(moveUpAndModifySelection(_:)) ||
-        sel == #selector(moveDownAndModifySelection(_:))
+        return sel.isVerticalAction
     }
     
     // 前回のセレクタが垂直方向にキャレット・選択範囲を動かすものだったか返す。
     private var wasVerticalAction: Bool {
         guard let sel = _lastActionSelector else { return false }
-        return sel == #selector(moveUp(_:)) ||
-        sel == #selector(moveDown(_:)) ||
-        sel == #selector(moveUpAndModifySelection(_:)) ||
-        sel == #selector(moveDownAndModifySelection(_:))
+        return sel.isVerticalAction
     }
     
     // 前回のセレクタが垂直方向の選択範囲を動かすものだったか返す。
     private var wasVerticalActionWithModifySelection: Bool {
         guard let sel = _lastActionSelector else { return false }
-        return sel == #selector(moveUpAndModifySelection(_:)) ||
-        sel == #selector(moveDownAndModifySelection(_:))
+        return sel.isVerticalActionWithModifierSelection
     }
     
     // 前回のセレクタが水平方向に選択範囲を動かすものだったか返す。
     private var wasHorizontalActionWithModifySelection: Bool {
-        guard let sel = _lastActionSelector else { return false }
-        return sel == #selector(moveLeftAndModifySelection(_:)) ||
-        sel == #selector(moveRightAndModifySelection(_:))
+        guard let sel = _lastActionSelector else { log("#01"); return false }
+        return sel.isHorizontalActionWithModifierSelection
     }
     
     // 今回のセレクタがYankに属するものか返す。
-    private var isYankFamilySelector: Bool {
+    private var isYankFamilyAction: Bool {
         guard let sel = _currentActionSelector else { return false }
-        return sel == #selector(yank(_:)) ||
-        sel == #selector(yankPop(_:)) ||
-        sel == #selector(yankPopReverse(_:)) ||
-        sel == #selector(paste(_:))
+        return sel.isYankFamilyAction
     }
     
     override var acceptsFirstResponder: Bool { true }
@@ -324,7 +313,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         //addSubview(_caretView)
         wantsLayer = true
         
-        // ★ レイヤはまだ window 未決定なので生成だけしておく
+        // レイヤはまだ window 未決定なので生成だけしておく
         if _caretLayer == nil { _caretLayer = KCaretLayer() }
         
         _layoutManager.textView = self
@@ -515,12 +504,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         restartCaretBlinkTimer()
         
     }
-    
-    /*
-    private var doesCaretStayRight:Bool {
-        guard let lineIndex = layoutManager.lines.lineIndex(at: caretIndex) else { log("lineIndex is nil.", from:self); return false }
-        return layoutManager.lines.isBoundaryBetweenSoftwareLines(index: caretIndex) && _lastCaretIndex < caretIndex && lineIndex > 0
-    }*/
     
     
     private func startCaretBlinkTimer() {
@@ -759,25 +742,15 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     
     override func setFrameSize(_ newSize: NSSize) {
-        guard let rects = _layoutManager.makeLayoutRects() else {
-            print("\(#function) error")
-            return
-        }
-        //log("rects.textRegionWidth:\(rects.textRegionWidth)")
+        guard let rects = _layoutManager.makeLayoutRects() else { log("#01"); return }
         
         // これを単にnewSizeにすると、wordwrap==falseの場合にtextregionの横幅がどんどん増えてしまう。
-        //test
-        //let width = rects.textRegionWidth > 0 ? rects.textRegionWidth : newSize.width
-        //let height = rects.textRegion.rect.height > 0 ? rects.textRegion.rect.height : newSize.height
-        //log("newSize:\(newSize)")
-        //super.setFrameSize(NSSize(width: width, height: height))
         super.setFrameSize(NSSize(width: rects.textRegion.rect.width, height: rects.textRegion.rect.height))
-        //super.setFrameSize(newSize)
         
-        if let L = _caretLayer, L.superlayer != nil {
+        if let caretLayer = _caretLayer, caretLayer.superlayer != nil {
             CATransaction.begin()
             CATransaction.setDisableActions(true)
-            L.frame = rects.textRegion.rect
+            caretLayer.frame = rects.textRegion.rect
             CATransaction.commit()
         }
     }
@@ -823,12 +796,19 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     override func doCommand(by selector: Selector) {
         _currentActionSelector = selector
         
-        if !isYankFamilySelector {
+        if !isYankFamilyAction {
             KClipBoardBuffer.shared.endCycle()
             _yankSelection = nil
         }
         
-        super.doCommand(by: selector)
+        if responds(to: selector){
+            perform(selector, with: nil)
+            return
+        }
+        
+        // doCommandは親viewまでしかactionが届かない。
+        // TextView内で消費しない場合、sendActionで投げ直してwindow/document/application delegateまで通す。
+        NSApp.sendAction(selector, to: nil, from: self)
         //print(selector)
     }
     
@@ -926,10 +906,9 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             let isLastLine = hardLineRange.upperBound == _textStorageRef.count
             selectionRange = hardLineRange.lowerBound..<hardLineRange.upperBound + (isLastLine ? 0 : 1)
             _horizontalSelectionBase = hardLineRange.lowerBound
-            log("hardLineRange:\(hardLineRange), isLastLine: \(isLastLine)",from:self)
-            log("  selectionRange: \(selectionRange)",from:self)
+            //log("hardLineRange:\(hardLineRange), isLastLine: \(isLastLine)",from:self)
+            //log("  selectionRange: \(selectionRange)",from:self)
             
-            //_horizontalSelectionBase = lineInfo.range.lowerBound
         case .outside:
             break
         }
@@ -2063,11 +2042,13 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         // 文字単位の場合のみ、選択範囲は起点を中心に拡縮する。他は両端から延長する方向。
         if kind == .character {
             if !wasHorizontalActionWithModifySelection && extendSelection {
+                //log("horizontalselectionbase.set.")
                 _horizontalSelectionBase = selection.lowerBound
             }
             
             if extendSelection, let base = _horizontalSelectionBase {
                 let newBound = direction.rawValue + (base == selection.lowerBound ? selection.upperBound : selection.lowerBound)
+                //log("base:\(base), lowerBound:\(selection.lowerBound), upperBound:\(selection.upperBound)")
                 
                 guard newBound <= count && newBound >= 0 else { log("character: out of range",from:self); return false }
                 newRange = min(newBound, base)..<max(newBound, base)

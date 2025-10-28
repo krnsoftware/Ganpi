@@ -260,7 +260,13 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         super.viewDidAppear()
         installContainersOnce()
         constructViews()
+        
     }
+    
+    // textviewでdoCommand()したactionがviewcontrollerで止まるためpass through用に設置。
+    /*override func doCommand(by selector: Selector) {
+        NSApp.sendAction(selector, to: nil, from: self)
+    }*/
 
     // MARK: - One-time scaffolding (upper content / lower status bar)
 
