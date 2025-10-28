@@ -338,6 +338,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         // scrollviewのscrollerの状態をセット
         DispatchQueue.main.async { [weak self] in
             self?.applyWordWrapToEnclosingScrollView()
+            //log("frame:\(self?.frame)")
         }
         
         // KCaretLayer の生成（冪等）
@@ -404,13 +405,23 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     //test
     private var _needsInitialReload = true
     
-    override func viewWillDraw() {
-        super.viewWillDraw()
-        
+    override func layout() {
         if _needsInitialReload {
             layoutManager.rebuildLayout()
             _needsInitialReload = false
         }
+    }
+    
+    //test
+    //private var _needsInitialReload = true
+    
+    override func viewWillDraw() {
+        super.viewWillDraw()
+        
+        /*if _needsInitialReload {
+            layoutManager.rebuildLayout()
+            _needsInitialReload = false
+        }*/
         
         // ソフトラップの場合、visibleRectに合わせて行の横幅を変更する必要があるが、
         // scrollview.clipViewでの変更がないため通知含めvisibleRectの変更を知るすべがない。
@@ -432,7 +443,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         containerView?.setActiveEditor(true)
         sendStatusBarUpdateAction()
         _hasKeyboardFocus = accepted
-        log("_hasKeyboardFocus: \(_hasKeyboardFocus)")
+        //log("_hasKeyboardFocus: \(_hasKeyboardFocus)")
         updateCaretActiveState()
         needsDisplay = true
         return accepted
@@ -443,7 +454,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         endYankCycle()
         containerView?.setActiveEditor(false)
         _hasKeyboardFocus = !accepted
-        log("_hasKeyboardFocus: \(_hasKeyboardFocus)")
+        //log("_hasKeyboardFocus: \(_hasKeyboardFocus)")
         updateCaretActiveState()
         needsDisplay = true
         return accepted
@@ -752,9 +763,16 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             print("\(#function) error")
             return
         }
+        //log("rects.textRegionWidth:\(rects.textRegionWidth)")
         
-        //super.setFrameSize(NSSize(width: rects.textRegion.rect.width, height: rects.textRegion.rect.height))
-        super.setFrameSize(newSize)
+        // これを単にnewSizeにすると、wordwrap==falseの場合にtextregionの横幅がどんどん増えてしまう。
+        //test
+        //let width = rects.textRegionWidth > 0 ? rects.textRegionWidth : newSize.width
+        //let height = rects.textRegion.rect.height > 0 ? rects.textRegion.rect.height : newSize.height
+        //log("newSize:\(newSize)")
+        //super.setFrameSize(NSSize(width: width, height: height))
+        super.setFrameSize(NSSize(width: rects.textRegion.rect.width, height: rects.textRegion.rect.height))
+        //super.setFrameSize(newSize)
         
         if let L = _caretLayer, L.superlayer != nil {
             CATransaction.begin()
