@@ -26,20 +26,17 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     // 外部インスタンスの参照
     private var _textStorageRef: KTextStorageProtocol// = KTextStorage()
     private var _layoutManager: KLayoutManager
-    //private let _caretView = KCaretView()
-    private var _caretLayer: KCaretLayer?
+    private let _caretView = KCaretView()
     private var _containerView: KTextViewContainerView?
     
     // 選択範囲
     var _selectionRange: Range<Int> = 0..<0
     
     // キャレットの表示に関するプロパティ
-    //private var _caretBlinkTimer: Timer?
+    private var _caretBlinkTimer: Timer?
     
     // フォーカスリングの表示に関するプロパティ
     private weak var _owningContainer: KTextViewContainerView?
-    
-    private var _hasKeyboardFocus = false
     
     // 前回のcontentview.boundsを記録しておくためのプロパティ
     private var _prevContentViewBounds: CGRect = .zero
@@ -125,9 +122,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             
             _ = currentLineIndex
 
-            //_caretView.isHidden = !selectionRange.isEmpty
-            //_caretLayer?.isHidden = !selectionRange.isEmpty
-            updateCaretActiveState()
+            _caretView.isHidden = !selectionRange.isEmpty
             updateCaretPosition()
             sendStatusBarUpdateAction()
             
@@ -231,31 +226,42 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     // 今回のセレクタが垂直方向にキャレット選択範囲を動かすものであるか返す。
     private var isVerticalAction: Bool {
         guard let sel = _currentActionSelector else { return false }
-        return sel.isVerticalAction
+        return sel == #selector(moveUp(_:)) ||
+        sel == #selector(moveDown(_:)) ||
+        sel == #selector(moveUpAndModifySelection(_:)) ||
+        sel == #selector(moveDownAndModifySelection(_:))
     }
     
     // 前回のセレクタが垂直方向にキャレット・選択範囲を動かすものだったか返す。
     private var wasVerticalAction: Bool {
         guard let sel = _lastActionSelector else { return false }
-        return sel.isVerticalAction
+        return sel == #selector(moveUp(_:)) ||
+        sel == #selector(moveDown(_:)) ||
+        sel == #selector(moveUpAndModifySelection(_:)) ||
+        sel == #selector(moveDownAndModifySelection(_:))
     }
     
     // 前回のセレクタが垂直方向の選択範囲を動かすものだったか返す。
     private var wasVerticalActionWithModifySelection: Bool {
         guard let sel = _lastActionSelector else { return false }
-        return sel.isVerticalActionWithModifierSelection
+        return sel == #selector(moveUpAndModifySelection(_:)) ||
+        sel == #selector(moveDownAndModifySelection(_:))
     }
     
     // 前回のセレクタが水平方向に選択範囲を動かすものだったか返す。
     private var wasHorizontalActionWithModifySelection: Bool {
-        guard let sel = _lastActionSelector else { log("#01"); return false }
-        return sel.isHorizontalActionWithModifierSelection
+        guard let sel = _lastActionSelector else { return false }
+        return sel == #selector(moveLeftAndModifySelection(_:)) ||
+        sel == #selector(moveRightAndModifySelection(_:))
     }
     
     // 今回のセレクタがYankに属するものか返す。
-    private var isYankFamilyAction: Bool {
+    private var isYankFamilySelector: Bool {
         guard let sel = _currentActionSelector else { return false }
-        return sel.isYankFamilyAction
+        return sel == #selector(yank(_:)) ||
+        sel == #selector(yankPop(_:)) ||
+        sel == #selector(yankPopReverse(_:)) ||
+        sel == #selector(paste(_:))
     }
     
     override var acceptsFirstResponder: Bool { true }
@@ -310,11 +316,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     }
     
     private func commonInit() {
-        //addSubview(_caretView)
+        addSubview(_caretView)
         wantsLayer = true
-        
-        // レイヤはまだ window 未決定なので生成だけしておく
-        if _caretLayer == nil { _caretLayer = KCaretLayer() }
         
         _layoutManager.textView = self
         
@@ -327,41 +330,11 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         // scrollviewのscrollerの状態をセット
         DispatchQueue.main.async { [weak self] in
             self?.applyWordWrapToEnclosingScrollView()
-            //log("frame:\(self?.frame)")
         }
         
-        /*
-        // KCaretLayer の生成（冪等）
-        if _caretLayer == nil { _caretLayer = KCaretLayer() }
-        guard let base = layer, let L = _caretLayer else { return }
-        
-        // ビュー座標系に合わせる（上が0のとき true になる）
-        L.isGeometryFlipped = false
-        
-        // Retina スケール（window 決定後に設定）
-        L.contentsScale = window?.backingScaleFactor
-        ?? NSScreen.main?.backingScaleFactor
-        ?? 2.0
-        
-        // まだ未追加なら追加
-        if L.superlayer !== base { base.addSublayer(L) }
-        
-        // 初期フレームはビュー全体に合わせる（暗黙アニメ無効）
-        if let rects = layoutManager.makeLayoutRects() {
-            CATransaction.begin()
-            CATransaction.setDisableActions(true)
-            L.frame = rects.textRegion.rect
-            CATransaction.commit()
-        }*/
-        
-        if _caretLayer == nil { _caretLayer = KCaretLayer() }
-        if let base = layer, let L = _caretLayer, L.superlayer !== base { base.addSublayer(L) }
-        syncCaretLayerFrame()
-        updateCaretPosition()
-        updateCaretActiveState()
+        //_layoutManager.textView = self
         
         window?.makeFirstResponder(self)  // 念のため明示的に指定
-        
         
         // キャレットの位置を再計算して表示しておく。
         updateCaretPosition()
@@ -398,26 +371,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
     }
     
-    //test
-    private var _needsInitialReload = true
-    
-    override func layout() {
-        if _needsInitialReload {
-            layoutManager.rebuildLayout()
-            _needsInitialReload = false
-        }
-    }
-    
-    //test
-    //private var _needsInitialReload = true
-    
     override func viewWillDraw() {
         super.viewWillDraw()
-        
-        /*if _needsInitialReload {
-            layoutManager.rebuildLayout()
-            _needsInitialReload = false
-        }*/
         
         // ソフトラップの場合、visibleRectに合わせて行の横幅を変更する必要があるが、
         // scrollview.clipViewでの変更がないため通知含めvisibleRectの変更を知るすべがない。
@@ -435,25 +390,24 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     
     override func becomeFirstResponder() -> Bool {
-        let accepted = super.becomeFirstResponder()
+        //print("\(#function)")
+        let ok = super.becomeFirstResponder()
+        _caretView.isHidden = !selectionRange.isEmpty
         containerView?.setActiveEditor(true)
         sendStatusBarUpdateAction()
-        _hasKeyboardFocus = accepted
-        //log("_hasKeyboardFocus: \(_hasKeyboardFocus)")
-        updateCaretActiveState()
+        
         needsDisplay = true
-        return accepted
+        return ok
     }
     
     override func resignFirstResponder() -> Bool {
-        let accepted = super.resignFirstResponder()
+        //print("\(#function)")
+        let ok = super.resignFirstResponder()
         endYankCycle()
+        _caretView.isHidden = true
         containerView?.setActiveEditor(false)
-        _hasKeyboardFocus = !accepted
-        //log("_hasKeyboardFocus: \(_hasKeyboardFocus)")
-        updateCaretActiveState()
         needsDisplay = true
-        return accepted
+        return ok
     }
     
     //testing.
@@ -471,7 +425,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     }
     
     deinit {
-        //_caretBlinkTimer?.invalidate()
+        _caretBlinkTimer?.invalidate()
         
         NotificationCenter.default.removeObserver(self)
     }
@@ -479,109 +433,55 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     // MARK: - Caret (KTextView methods)
     
-    // 再入防止
     private func updateCaretPosition() {
-        guard let rects = layoutManager.makeLayoutRects(),
-              let caretLayer = _caretLayer else { return }
-
-        // 1) 文書座標（スクロール判定用）
-        let pos = rects.characterPosition(lineIndex: currentLineIndex, characterIndex: caretIndex)
-        let docRect = CGRect(x: pos.x, y: pos.y,
-                             width: caretLayer.caretWidth, height: layoutManager.fontHeight)
-
-        // 2) 必要なら即スクロール（アクション側は触らない）
-        scrollDocumentRectImmediately(docRect)
-
-        // 3) 可視領域を取り直して、描画用に変換（可視ローカル）
-        let clip = enclosingScrollView?.contentView.bounds ?? .zero
-        let drawRect = CGRect(x: docRect.origin.x - clip.origin.x,
-                              y: docRect.origin.y - clip.origin.y,
-                              width: docRect.width, height: docRect.height)
-
-        // 4) レイヤ更新（同期描画はしない）
-        caretLayer.stopBlinking()
-        CATransaction.begin(); CATransaction.setDisableActions(true)
-        caretLayer.caretRectsPrimaryFirst = [drawRect]
-        caretLayer.setNeedsDisplay()
-        CATransaction.commit()
-
+        /*
+        let caretPosition = characterPosition(at: caretIndex)
+        _caretView.updateFrame(x: caretPosition.x, y: caretPosition.y, height: _layoutManager.lineHeight)
+         */
+        guard let layoutRects = layoutManager.makeLayoutRects() else { log("layoutRects is nil.", from:self); return }
+        //let lines = layoutManager.lines
+        //guard let lineIndex = lines.lineIndex(at: caretIndex) else { log("lineIndex is nil.", from:self); return }
+        //let caretPosition:CGPoint = layoutRects.characterPosition(lineIndex: lineIndex, characterIndex: caretIndex)
+        let caretPosition:CGPoint = layoutRects.characterPosition(lineIndex: currentLineIndex, characterIndex: caretIndex)
+        
+        
+        //_caretView.updateFrame(x: caretPosition.x, y: caretPosition.y, height: layoutManager.lineHeight)
+        _caretView.updateFrame(x: caretPosition.x, y: caretPosition.y, height: layoutManager.fontHeight)
+        
+        _caretView.alphaValue = 1.0
         restartCaretBlinkTimer()
+        
     }
+    
+    /*
+    private var doesCaretStayRight:Bool {
+        guard let lineIndex = layoutManager.lines.lineIndex(at: caretIndex) else { log("lineIndex is nil.", from:self); return false }
+        return layoutManager.lines.isBoundaryBetweenSoftwareLines(index: caretIndex) && _lastCaretIndex < caretIndex && lineIndex > 0
+    }*/
     
     
     private func startCaretBlinkTimer() {
-        /*
         _caretBlinkTimer?.invalidate()
         _caretBlinkTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             guard let self = self else { return }
-            //self._caretView.alphaValue = (self._caretView.alphaValue < 0.5) ? 1.0 : 0.0
+            self._caretView.alphaValue = (self._caretView.alphaValue < 0.5) ? 1.0 : 0.0
         }
-         */
-        _caretLayer?.startBlinking()
     }
     
     private func restartCaretBlinkTimer() {
-        //_caretBlinkTimer?.invalidate()
-        //startCaretBlinkTimer()
-        _caretLayer?.stopBlinking()
-        // 入力直後は点灯のままにして視認性を上げる
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
-            self?._caretLayer?.startBlinking()
-        }
-    }
-    
-    private func updateCaretActiveState() {
-        guard let caretLayer = _caretLayer else { log("#01"); return }
-        // 表示条件を一本化
-        let shouldShow =
-            (window?.isKeyWindow == true) &&
-            _hasKeyboardFocus &&
-            selectionRange.isEmpty
-
-        if shouldShow {
-            caretLayer.isHidden = false
-            caretLayer.removeAnimation(forKey: "blink")   // 重複回避
-            caretLayer.opacity = 1.0
-            caretLayer.startBlinking(duration: 1.0)       // 標準テンポ
-        } else {
-            caretLayer.stopBlinking()
-            caretLayer.isHidden = true
-        }
-    }
-    
-    // 可視領域に caret layer を合わせる（暗黙アニメ無効）
-    private func syncCaretLayerFrame() {
-        guard let caretLayer = _caretLayer else { return }
-        let target = enclosingScrollView?.contentView.bounds ?? bounds
-        CATransaction.begin(); CATransaction.setDisableActions(true)
-        caretLayer.frame = target
-        CATransaction.commit()
-    }
-    
-    private func scrollDocumentRectImmediately(_ rect: CGRect) {
-        guard let scrollView = enclosingScrollView,
-              let clipView = scrollView.contentView as? NSClipView else { return }
-
-        // まだ見えていれば何もしない（端の一行だけパディング）
-        let padY = layoutManager.fontHeight * 0.5
-        if clipView.bounds.insetBy(dx: 0, dy: padY).contains(rect) { return }
-
-        // 目標原点を計算（最小の移動量に抑える）
-        var target = clipView.bounds.origin
-        if rect.maxY > clipView.bounds.maxY - padY {
-            target.y = rect.maxY - padY - clipView.bounds.height
-        } else if rect.minY < clipView.bounds.minY + padY {
-            target.y = rect.minY - padY
-        }
-        target.y = max(0, target.y)
-
-        // 同期スクロール（アニメなし）
-        clipView.scroll(to: target)
-        scrollView.reflectScrolledClipView(clipView)
+        _caretBlinkTimer?.invalidate()
+        startCaretBlinkTimer()
     }
     
     private func scrollCaretToVisible() {
         scrollSelectionToVisible()
+        /*
+        guard let scrollView = self.enclosingScrollView else { return }
+        DispatchQueue.main.async {
+            let caretRect = self._caretView.frame.insetBy(dx: -10, dy: -10)
+            scrollView.contentView.scrollToVisible(caretRect)
+        }
+        */
     }
     
     func scrollSelectionToVisible() {
@@ -776,20 +676,12 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     
     override func setFrameSize(_ newSize: NSSize) {
-        guard let rects = _layoutManager.makeLayoutRects() else { log("#01"); return }
+        guard let rects = _layoutManager.makeLayoutRects() else {
+            print("\(#function) error")
+            return
+        }
         
-        // これを単にnewSizeにすると、wordwrap==falseの場合にtextregionの横幅がどんどん増えてしまう。
         super.setFrameSize(NSSize(width: rects.textRegion.rect.width, height: rects.textRegion.rect.height))
-        
-        /*
-        if let caretLayer = _caretLayer, caretLayer.superlayer != nil {
-            CATransaction.begin()
-            CATransaction.setDisableActions(true)
-            caretLayer.frame = rects.textRegion.rect
-            CATransaction.commit()
-        }*/
-        syncCaretLayerFrame()
-        updateCaretPosition()
     }
     
     // MARK: - Keyboard Input (NSResponder methods)
@@ -833,19 +725,12 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     override func doCommand(by selector: Selector) {
         _currentActionSelector = selector
         
-        if !isYankFamilyAction {
+        if !isYankFamilySelector {
             KClipBoardBuffer.shared.endCycle()
             _yankSelection = nil
         }
         
-        if responds(to: selector){
-            perform(selector, with: nil)
-            return
-        }
-        
-        // doCommandは親viewまでしかactionが届かない。
-        // TextView内で消費しない場合、sendActionで投げ直してwindow/document/application delegateまで通す。
-        NSApp.sendAction(selector, to: nil, from: self)
+        super.doCommand(by: selector)
         //print(selector)
     }
     
@@ -943,9 +828,10 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             let isLastLine = hardLineRange.upperBound == _textStorageRef.count
             selectionRange = hardLineRange.lowerBound..<hardLineRange.upperBound + (isLastLine ? 0 : 1)
             _horizontalSelectionBase = hardLineRange.lowerBound
-            //log("hardLineRange:\(hardLineRange), isLastLine: \(isLastLine)",from:self)
-            //log("  selectionRange: \(selectionRange)",from:self)
+            log("hardLineRange:\(hardLineRange), isLastLine: \(isLastLine)",from:self)
+            log("  selectionRange: \(selectionRange)",from:self)
             
+            //_horizontalSelectionBase = lineInfo.range.lowerBound
         case .outside:
             break
         }
@@ -1210,13 +1096,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     // ドロップ用のキャレット位置へ移動（通常の updateCaretPosition を使わない）
     private func moveDropCaret(to index: Int) {
         let point = characterPosition(at: index)
-        //_caretView.updateFrame(x: point.x, y: point.y, height: _layoutManager.lineHeight)
-        //_caretView.isHidden = false
-        guard let caretLayer = _caretLayer else { log("#01"); return }
-        let rect = CGRect(x: point.x, y: point.y, width: caretLayer.caretWidth, height: _layoutManager.lineHeight)
-        caretLayer.caretRectsPrimaryFirst = [rect]
-        caretLayer.isHidden = false
-        
+        _caretView.updateFrame(x: point.x, y: point.y, height: _layoutManager.lineHeight)
+        _caretView.isHidden = false
         
         guard let scrollView = self.enclosingScrollView else { return }
         DispatchQueue.main.async {
@@ -1226,8 +1107,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     // ドロップ候補がなくなった場合にキャレットを非表示に
     private func hideDropCaret() {
-        //_caretView.isHidden = true
-        _caretLayer?.isHidden = true
+        _caretView.isHidden = true
     }
     
     
@@ -1374,33 +1254,17 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         // updateActiveState()
         //_caretView.isHidden = false
         //_caretView.isHidden = (window?.firstResponder !== self)
-        //_caretView.isHidden = (window?.firstResponder !== self) || !selectionRange.isEmpty
-        //_caretLayer?.isHidden = (window?.firstResponder !== self) || !selectionRange.isEmpty
-        updateCaretActiveState()
+        _caretView.isHidden = (window?.firstResponder !== self) || !selectionRange.isEmpty
     }
 
     @objc private func windowResignedKey(_ notification: Notification) {
         // updateActiveState()
-        //_caretView.isHidden = true
-        //_caretLayer?.isHidden = true
-        updateCaretActiveState()
+        _caretView.isHidden = true
     }
-    
-    //test
-    private var _pendingClipUpdate = false
 
     @objc private func clipViewBoundsDidChange(_ notification: Notification) {
         guard let contentBounds = enclosingScrollView?.contentView.bounds
         else { log("cvBounds==nil", from: self); return }
-        
-        guard !_pendingClipUpdate else { return }
-        _pendingClipUpdate = true
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            self.syncCaretLayerFrame()
-            self.updateCaretPosition()
-            self._pendingClipUpdate = false
-        }
         
         if contentBounds.origin.x != _prevContentViewBounds.origin.x {
             if let layoutRects = _layoutManager.makeLayoutRects(),
@@ -1409,8 +1273,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 let currentX = pos.x - layoutRects.horizontalInsets - contentView.bounds.minX
 
                 // 選択が空のときだけ表示可。行番号領域に隠れたら消す。
-                //_caretView.isHidden = !selectionRange.isEmpty || (currentX < 0)
-                _caretLayer?.isHidden = !selectionRange.isEmpty || (currentX < 0)
+                _caretView.isHidden = !selectionRange.isEmpty || (currentX < 0)
             }
 
         }
@@ -1529,8 +1392,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         _markedText = attrString
         _replacementRange = range
         
-        //_caretView.isHidden = true
-        _caretLayer?.isHidden = true
+        _caretView.isHidden = true
         
         needsDisplay = true
         
@@ -1541,8 +1403,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         _markedTextRange = nil
         _markedText = NSAttributedString()
         
-        //_caretView.isHidden = false
-        _caretLayer?.isHidden = false
+        _caretView.isHidden = false
         
         needsDisplay = true
     }
@@ -2091,14 +1952,11 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         // 文字単位の場合のみ、選択範囲は起点を中心に拡縮する。他は両端から延長する方向。
         if kind == .character {
             if !wasHorizontalActionWithModifySelection && extendSelection {
-                //log("horizontalselectionbase.set.")
                 _horizontalSelectionBase = selection.lowerBound
             }
             
             if extendSelection, let base = _horizontalSelectionBase {
                 let newBound = direction.rawValue + (base == selection.lowerBound ? selection.upperBound : selection.lowerBound)
-                //log("base:\(base), lowerBound:\(selection.lowerBound), upperBound:\(selection.upperBound)")
-                
                 guard newBound <= count && newBound >= 0 else { log("character: out of range",from:self); return false }
                 newRange = min(newBound, base)..<max(newBound, base)
             } else {
