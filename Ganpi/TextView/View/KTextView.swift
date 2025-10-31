@@ -909,18 +909,16 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 pasteboardItem.setString(str, forType: .string)
                 
                 let draggingItem = NSDraggingItem(pasteboardWriter: pasteboardItem)
-                let imageSize = NSSize(width: 120, height: 30)
-                let image = NSImage(size: imageSize)
-                let imageOrigin = CGPoint(x: location.x - imageSize.width / 2, y: location.y - imageSize.height / 2)
+                let dragImage = dragImage(for: str)
+                let imageSize = dragImage.size
+                let isDraggingDownward = location.y - dragStartPoint.y > 0
                 
-                // とりあえずの処置として、draggingItemには赤い矩形を設定しておく。
-                image.lockFocus()
-                NSColor.red.set()
-                NSBezierPath(rect: NSRect(origin: .zero, size: image.size)).fill()
-                image.unlockFocus()
+                // 上にドラッグした場合は下に、下にドラッグした場合は上にイメージを表示する。
+                let originX = location.x - imageSize.width / 2
+                let originY = location.y - imageSize.height / 2  +  (isDraggingDownward ? -imageSize.height : imageSize.height)
+                let imageOrigin = CGPoint(x: originX, y: originY)
                 
-                draggingItem.setDraggingFrame(NSRect(origin: imageOrigin, size: image.size), contents: image)
-                //log("DRAGGING.", from:self)
+                draggingItem.setDraggingFrame(NSRect(origin: imageOrigin, size: dragImage.size), contents: dragImage)
                 beginDraggingSession(with: [draggingItem], event: event, source: self)
                 _singleClickPending = false
             }
@@ -996,6 +994,72 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         updateCaretPosition()
         scrollCaretToVisible()
     }
+    
+    // MARK: - Drag image generation (enhanced visual)
+
+    private func dragImage(for string: String) -> NSImage {
+        let preview = String(string.prefix(20))
+        let font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
+        let padding: CGFloat = 8
+        let textSize = preview.size(withAttributes: [.font: font])
+        let extraMargin: CGFloat = 30
+
+        let cardWidth = textSize.width + padding * 2
+        let cardHeight = textSize.height + padding * 2
+        let iconWidth = cardWidth + extraMargin
+        let iconHeight = cardHeight + extraMargin
+
+        //let scale = NSScreen.main?.backingScaleFactor ?? 2.0
+        let image = NSImage(size: NSSize(width: iconWidth, height: iconHeight))
+        image.lockFocusFlipped(false)
+
+        if let ctx = NSGraphicsContext.current {
+            ctx.shouldAntialias = true
+            ctx.cgContext.interpolationQuality = .none
+        }
+
+        // 背景
+        NSColor.clear.setFill()
+        NSRect(origin: .zero, size: image.size).fill()
+
+        // カード背景
+        let cardRect = NSRect(
+            x: extraMargin / 2,
+            y: extraMargin / 2,
+            width: cardWidth,
+            height: cardHeight
+        )
+        let path = NSBezierPath(roundedRect: cardRect, xRadius: 2, yRadius: 2)
+        NSColor.white.setFill()
+        path.fill()
+
+        NSColor(calibratedWhite: 0.4, alpha: 1.0).setStroke()
+        path.lineWidth = 0.8
+        path.stroke()
+
+        // テキスト矩形をカード内で中央寄せ
+        let verticalOffset = (cardHeight - textSize.height) / 2
+        let textRect = NSRect(
+            x: floor(cardRect.minX + padding),
+            y: floor(cardRect.minY + verticalOffset),
+            width: textSize.width,
+            height: textSize.height
+        )
+
+        preview.draw(in: textRect, withAttributes: [
+            .font: font,
+            .foregroundColor: NSColor.black
+        ])
+
+
+        image.unlockFocus()
+        return image
+    }
+
+
+
+
+
     
     // MARK: - DraggingSource methods
     
