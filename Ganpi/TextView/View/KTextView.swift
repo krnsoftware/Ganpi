@@ -52,7 +52,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     }
     // キャレット位置に於ける現在の行。
     private var _currentLineIndex: Int?
-    
+        
     // yank関連
     private var _yankSelection: Range<Int>?
     private var _isApplyingYank: Bool = false
@@ -388,24 +388,25 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     
     override func becomeFirstResponder() -> Bool {
-        //print("\(#function)")
-        let ok = super.becomeFirstResponder()
+        let accepted = super.becomeFirstResponder()
         _caretView.isHidden = !selectionRange.isEmpty
+        
         containerView?.setActiveEditor(true)
         sendStatusBarUpdateAction()
         
         needsDisplay = true
-        return ok
+        return accepted
     }
     
     override func resignFirstResponder() -> Bool {
         //print("\(#function)")
-        let ok = super.resignFirstResponder()
+        let accepted = super.resignFirstResponder()
         endYankCycle()
         _caretView.isHidden = true
         containerView?.setActiveEditor(false)
+        
         needsDisplay = true
-        return ok
+        return accepted
     }
     
     //testing.
@@ -451,11 +452,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
     }
     
-    /*
-    private var doesCaretStayRight:Bool {
-        guard let lineIndex = layoutManager.lines.lineIndex(at: caretIndex) else { log("lineIndex is nil.", from:self); return false }
-        return layoutManager.lines.isBoundaryBetweenSoftwareLines(index: caretIndex) && _lastCaretIndex < caretIndex && lineIndex > 0
-    }*/
     
     
     private func startCaretBlinkTimer() {
@@ -736,7 +732,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         // doCommandは親viewまでしかactionが届かない。
         // TextView内で消費しない場合、sendActionで投げ直してwindow/document/application delegateまで通す。
         NSApp.sendAction(selector, to: nil, from: self)
-        //print(selector)
     }
     
     override func cancelOperation(_ sender:Any?) {
@@ -909,7 +904,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 pasteboardItem.setString(str, forType: .string)
                 
                 let draggingItem = NSDraggingItem(pasteboardWriter: pasteboardItem)
-                let dragImage = dragImage(for: str)
+                let dragImage = dragImage()
                 let imageSize = dragImage.size
                 let isDraggingDownward = location.y - dragStartPoint.y > 0
                 
@@ -994,67 +989,55 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         updateCaretPosition()
         scrollCaretToVisible()
     }
-    
-    // MARK: - Drag image generation (enhanced visual)
 
-    private func dragImage(for string: String) -> NSImage {
-        let preview = String(string.prefix(20))
-        let font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
-        let padding: CGFloat = 8
-        let textSize = preview.size(withAttributes: [.font: font])
-        let extraMargin: CGFloat = 30
-
-        let cardWidth = textSize.width + padding * 2
-        let cardHeight = textSize.height + padding * 2
-        let iconWidth = cardWidth + extraMargin
-        let iconHeight = cardHeight + extraMargin
-
-        //let scale = NSScreen.main?.backingScaleFactor ?? 2.0
-        let image = NSImage(size: NSSize(width: iconWidth, height: iconHeight))
-        image.lockFocusFlipped(false)
-
-        if let ctx = NSGraphicsContext.current {
-            ctx.shouldAntialias = true
-            ctx.cgContext.interpolationQuality = .none
-        }
-
-        // 背景
+    // ドラッグ&ドロップ時に使用するアイコンを生成する。
+    // 色々試したけどこれが一番見やすい。
+    private func dragImage() -> NSImage {
+        let cardSize = NSSize(width: 48, height: 48)
+        let extraMargin: CGFloat = 36  // 周囲の透明枠
+        let fullSize = NSSize(width: cardSize.width + extraMargin,
+                              height: cardSize.height + extraMargin)
+        
+        let image = NSImage(size: fullSize)
+        image.lockFocus()
+        
+        // 背景を完全透明
         NSColor.clear.setFill()
-        NSRect(origin: .zero, size: image.size).fill()
-
-        // カード背景
+        NSRect(origin: .zero, size: fullSize).fill()
+        
+        // 中央に白いカード
         let cardRect = NSRect(
-            x: extraMargin / 2,
-            y: extraMargin / 2,
-            width: cardWidth,
-            height: cardHeight
+            x: (fullSize.width - cardSize.width) / 2,
+            y: (fullSize.height - cardSize.height) / 2,
+            width: cardSize.width,
+            height: cardSize.height
         )
-        let path = NSBezierPath(roundedRect: cardRect, xRadius: 2, yRadius: 2)
-        NSColor.white.setFill()
+        let path = NSBezierPath(roundedRect: cardRect, xRadius: 6, yRadius: 6)
+        NSColor(calibratedWhite: 0.97, alpha: 1.0).setFill()
         path.fill()
-
-        NSColor(calibratedWhite: 0.4, alpha: 1.0).setStroke()
-        path.lineWidth = 0.8
+        
+        // 枠線を明瞭に
+        NSColor(calibratedWhite: 0.55, alpha: 1.0).setStroke()
+        path.lineWidth = 1
         path.stroke()
-
-        // テキスト矩形をカード内で中央寄せ
-        let verticalOffset = (cardHeight - textSize.height) / 2
-        let textRect = NSRect(
-            x: floor(cardRect.minX + padding),
-            y: floor(cardRect.minY + verticalOffset),
-            width: textSize.width,
-            height: textSize.height
-        )
-
-        preview.draw(in: textRect, withAttributes: [
-            .font: font,
-            .foregroundColor: NSColor.black
-        ])
-
-
+        
+        // アイコンを中央に描画
+        if let symbol = NSImage(systemSymbolName: "text.alignleft", accessibilityDescription: nil) {
+            let inset: CGFloat = 12
+            let symbolRect = NSRect(
+                x: cardRect.minX + inset,
+                y: cardRect.minY + inset,
+                width: cardRect.width - inset * 2,
+                height: cardRect.height - inset * 2
+            )
+            symbol.draw(in: symbolRect, from: .zero, operation: .sourceOver, fraction: 0.85)
+        }
+        
         image.unlockFocus()
         return image
     }
+
+
 
 
 
