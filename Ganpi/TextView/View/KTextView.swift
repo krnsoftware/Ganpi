@@ -1743,6 +1743,38 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     // mouseDown()などのセレクター履歴を残すためのダミー。
     @objc func clearCaretContext(_ sender: Any?) { }
     
+    
+    // キーボードショートカットやメニューから機能を実行するためのメソッド。
+    @objc func performUserActions(_ sender: Any?) {
+        let actions: [KAction]?
+
+        if let menuItem = sender as? NSMenuItem {
+            actions = menuItem.representedObject as? [KAction]
+        } else if let actionsArg = sender as? [KAction] {
+            actions = actionsArg
+        } else {
+            actions = nil
+        }
+
+        guard let actions else { log("#01"); return }
+
+        for action in actions {
+            switch action {
+            case .selector(let name):
+                doCommand(by: Selector(name + ":"))
+            case .command(let cmd):
+                switch cmd {
+                case .load(let path):
+                    log("load[\(path)] (stub)")
+                case .execute(let path):
+                    log("execute[\(path)] (stub)")
+                }
+            }
+        }
+    }
+
+
+    
     // scrollviewの水平スクローラーのオンオフを設定に追従させる。
     private func applyWordWrapToEnclosingScrollView() {
         guard let scrollView = self.enclosingScrollView else { return }

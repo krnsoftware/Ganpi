@@ -167,6 +167,9 @@ class KKeyAssign {
             log("No owner to receive actions")
             return
         }
+        
+        owner.perform(#selector(KTextView.performUserActions(_:)), with: actions)
+        /*
         for a in actions {
             switch a {
             case .selector(let name):
@@ -181,7 +184,8 @@ class KKeyAssign {
                     log("execute[\(path)] (stub)")
                 }
             }
-        }
+        }*/
+        
     }
     
     
