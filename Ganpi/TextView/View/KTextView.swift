@@ -389,12 +389,11 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     override func becomeFirstResponder() -> Bool {
         let accepted = super.becomeFirstResponder()
-        _caretView.isHidden = !selectionRange.isEmpty
-        
         containerView?.setActiveEditor(true)
-        sendStatusBarUpdateAction()
         
-        needsDisplay = true
+        _haskeyBoardFocus = true
+        sendStatusBarUpdateAction()
+        updateCaretActiveStatus()
         return accepted
     }
     
@@ -402,14 +401,34 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         //print("\(#function)")
         let accepted = super.resignFirstResponder()
         endYankCycle()
-        _caretView.isHidden = true
         containerView?.setActiveEditor(false)
         
-        needsDisplay = true
+        _haskeyBoardFocus = false
+        updateCaretActiveStatus()
         return accepted
     }
     
-    //testing.
+    //test.
+    // window?.firstResopnder === self はresignFirstResponder()の関数内ではtrueのため、
+    // 同関数がfalseを返す可能性は無視して同関数が呼ばれた時点でfocusが外れたとみなす。
+    private var _haskeyBoardFocus :Bool = false
+    
+    func updateCaretActiveStatus() {
+        let shouldShow = (window?.isKeyWindow == true) &&
+                //window?.firstResponder === self &&
+                _haskeyBoardFocus &&
+                selectionRange.isEmpty
+
+        if shouldShow {
+            _caretView.isHidden = false
+            _caretView.alphaValue = 1.0
+            restartCaretBlinkTimer()
+        } else {
+            _caretView.isHidden = true
+        }
+        needsDisplay = true
+    }
+
     override func hitTest(_ point: NSPoint) -> NSView? {
         let localPoint = convert(point, from: superview)
         let width = frame.size.width
@@ -1306,12 +1325,14 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         // updateActiveState()
         //_caretView.isHidden = false
         //_caretView.isHidden = (window?.firstResponder !== self)
-        _caretView.isHidden = (window?.firstResponder !== self) || !selectionRange.isEmpty
+        //_caretView.isHidden = (window?.firstResponder !== self) || !selectionRange.isEmpty
+        updateCaretActiveStatus()
     }
 
     @objc private func windowResignedKey(_ notification: Notification) {
         // updateActiveState()
-        _caretView.isHidden = true
+        //_caretView.isHidden = true
+        updateCaretActiveStatus()
     }
 
     @objc private func clipViewBoundsDidChange(_ notification: Notification) {
@@ -1634,7 +1655,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         _latestClickedCharacterIndex = nil
         _dragStartPoint = nil
         _prepareDraggingText = false
-        //log("done.",from:self)
+        updateCaretActiveStatus()
     }
     
     private func sendStatusBarUpdateAction() {
