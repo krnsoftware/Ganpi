@@ -200,21 +200,25 @@ final class KSyntaxParserIni: KSyntaxParserProtocol {
         }
 
         // ---- セクション行 ----
-        if p[i] == 0x5B { // '['
-            // 右括弧を探す（不正でも [〜 行末 をセクション色で塗る）
+        // 行頭（空白を除く）で始まる '[' のみを対象とし、対応する ']' が存在する場合のみカラーリング
+        if i == start && p[i] == 0x5B { // '['
             var j = i + 1
-            while j < end, p[j] != 0x5D { j += 1 } // ']'
-            let sectionEnd = (j < end) ? (j + 1) : end
-            appendSpan(i, sectionEnd, _colorSection, into: &out)
+            while j < end, p[j] != 0x5D { j += 1 } // 対応する ']'
+            if j < end {
+                let sectionEnd = j + 1
+                appendSpan(i, sectionEnd, _colorSection, into: &out)
 
-            // セクション後ろに行内コメントが来る場合
-            var k = sectionEnd
-            while k < end, isSpace(p[k]) { k += 1 }
-            if k < end, (p[k] == 0x3B || p[k] == 0x23) {
-                appendSpan(k, end, _colorComment, into: &out)
+                // セクション後にコメントがある場合のみ処理
+                var k = sectionEnd
+                while k < end, isSpace(p[k]) { k += 1 }
+                if k < end, (p[k] == 0x3B || p[k] == 0x23) {
+                    appendSpan(k, end, _colorComment, into: &out)
+                }
+                return
             }
-            return
+            // 対応する ']' がない場合はセクション扱いせず、後続へ
         }
+
 
         // ---- キー = 値 ----
         // 最初に現れた '=' または ':' を区切りとみなす
@@ -226,10 +230,12 @@ final class KSyntaxParserIni: KSyntaxParserProtocol {
                 sep = j
                 break
             }
+            /*
             if c == 0x3B || c == 0x23 { // ';' or '#': 行頭からここまでに区切りが無ければコメント行扱い
                 appendSpan(j, end, _colorComment, into: &out)
                 return
             }
+             */
             j += 1
         }
 
@@ -256,7 +262,7 @@ final class KSyntaxParserIni: KSyntaxParserProtocol {
         while k < end, isSpace(p[k]) { k += 1 }
         if k >= end { return }
 
-        // クォート外で ';' / '#' が現れたら行内コメント開始
+        // クォート外で ';' / '#' が現れたら行内コメント開始->commentは無視することに。
         var inSingle = false
         var inDouble = false
         var valStart = k
@@ -282,10 +288,10 @@ final class KSyntaxParserIni: KSyntaxParserProtocol {
             // クォート外
             if c == 0x27 { inSingle = true; x += 1; continue } // '
             if c == 0x22 { inDouble = true; x += 1; continue } // "
-            if c == 0x3B || c == 0x23 { // ';' or '#'
+            /*if c == 0x3B || c == 0x23 { // ';' or '#'
                 commentStart = x
                 break
-            }
+            }*/
             x += 1
         }
 
