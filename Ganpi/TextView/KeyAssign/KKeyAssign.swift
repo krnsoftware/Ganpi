@@ -9,9 +9,10 @@
 
 import Cocoa
 
+// Ganpi edit modes.
 enum KEditMode {
-    case normal
-    case edit
+    case normal  // insert characters and functions.
+    case edit    // functional key sequence only.
 }
 
 // MARK: - Actions (strict & type-safe)
@@ -36,7 +37,7 @@ struct KShortCut {
 class KKeyAssign {
     
     enum KStatusCode {
-        case passthrough   // let system/Responder handle it
+        case passthrough   // let system/responder handle it
         case preserve      // waiting for further keystrokes (prefix-only)
         case execute       // run actions
         case block         // block in edit mode
@@ -89,12 +90,8 @@ class KKeyAssign {
         _pendingOwnerID = nil
     }
     
-    // MARK: - Matching (strict, no timer)
-    //
-    // - Exact match -> execute
-    // - Prefix-only  -> preserve (no timeout; wait indefinitely)
-    // - No match     -> passthrough (normal) / block (edit)
-    //
+    // MARK: - Matching
+    
     func estimateKeyStroke(_ key: KKeyStroke, requester: NSResponder, mode: KEditMode = .normal) -> KStatusCode {
         // owner change -> drop pending
         if let owner = _pendingOwner, let oid = _pendingOwnerID,
@@ -108,46 +105,28 @@ class KKeyAssign {
         
         // append
         _storedKeyStrokes.append(key)
-        let table = shortcuts
         
-        var hasExact = false
-        var hasPrefixOnly = false
-        var exactShortcut: KShortCut? = nil
+        var hasPrefix = false
         
-        outer: for sc in table {
-            if sc.keys.count < _storedKeyStrokes.count { continue }
-            for i in 0..<_storedKeyStrokes.count {
-                if _storedKeyStrokes[i] != sc.keys[i] { continue outer }
-            }
-            if sc.keys.count == _storedKeyStrokes.count {
-                hasExact = true
-                exactShortcut = sc
-            } else {
-                hasPrefixOnly = true
+        for shortcut in shortcuts {
+            if shortcut.keys.starts(with: _storedKeyStrokes) {
+                if shortcut.keys.count == _storedKeyStrokes.count {
+                    executeActions(shortcut.actions)
+                    resetSequence()
+                    return .execute
+                } else {
+                    hasPrefix = true
+                }
             }
         }
         
-        if hasExact && !hasPrefixOnly {
-            // exact only -> execute now
-            executeActions(exactShortcut!.actions)
-            resetSequence()
-            return .execute
-        }
-        if hasExact && hasPrefixOnly {
-            // exact & longer candidates -> preserve (no timer; spec keeps waiting)
-            log("Preserve (exact & longer candidates) buffer=\(_storedKeyStrokes)")
-            return .preserve
-        }
-        if !hasExact && hasPrefixOnly {
-            // prefix only -> preserve (no timer)
-            log("Preserve (prefix only) buffer=\(_storedKeyStrokes)")
+        if hasPrefix {
             return .preserve
         }
         
-        // no match
-        //log("No match; sequence cleared (buffer was \(_storedKeyStrokes))")
-        resetSequence()
-        return (mode == .edit) ? .block : .passthrough
+       resetSequence()
+       return (mode == .edit) ? .block : .passthrough
+        
     }
     
     // MARK: - Helpers
@@ -167,25 +146,7 @@ class KKeyAssign {
             log("No owner to receive actions")
             return
         }
-        
         owner.perform(#selector(KTextView.performUserActions(_:)), with: actions)
-        /*
-        for a in actions {
-            switch a {
-            case .selector(let name):
-                //let selector = Selector(name + ":")
-                owner.doCommand(by: Selector(name + ":"))
-                //_ = NSApp.sendAction(selector, to: nil, from: self)
-            case .command(let cmd):
-                switch cmd {
-                case .load(let path):
-                    log("load[\(path)] (stub)")
-                case .execute(let path):
-                    log("execute[\(path)] (stub)")
-                }
-            }
-        }*/
-        
     }
     
     
