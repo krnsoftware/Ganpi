@@ -208,6 +208,16 @@ class Document: NSDocument {
         return super.validateUserInterfaceItem(item)
     }
     
+    // ドキュメントを保存せずに閉じるアクション。
+    @IBAction func performCloseWithoutStore(_ sender: Any?) {
+        if let autosaveURL = autosavedContentsFileURL {
+            try? FileManager.default.removeItem(at: autosaveURL)
+            autosavedContentsFileURL = nil
+        }
+        updateChangeCount(.changeCleared)
+        close()
+    }
+    
 }
 
 

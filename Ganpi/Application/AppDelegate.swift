@@ -43,6 +43,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         KLogPanel.shared.show()
     }
     
+    // 全てのDocumentを保存せずに閉じてアプリケーションを終了する。
+    @IBAction func terminateWithoutStore(_ sender: Any?) {
+        for doc in NSDocumentController.shared.documents {
+            if let kdoc = doc as? Document {
+                kdoc.performCloseWithoutStore(self)
+            }
+        }
+        NSApp.terminate(self)
+    }
+    
     // MARK: - Dock menu
 
     @objc(applicationDockMenu:)
