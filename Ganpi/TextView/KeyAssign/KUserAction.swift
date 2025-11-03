@@ -10,6 +10,8 @@
 
 // キーアサイン・ユーザ定義メニュー・アクションレコーディングなどに使用される「アクション」の定義。
 
+import Foundation
+
 // 保存されるアクション。セレクタ(IBAction)とコマンドに分けられる。
 enum KUserAction {
     case selector(String)        // e.g. "moveRight" (no trailing ":")
@@ -56,7 +58,8 @@ enum KUserCommand {
         case .load(let command): log(".load: \(command)")
             let result = estimateCommand(command)
             options = result.options
-            resultString = "under construction..."
+            guard let content = readFromApplicationSupport(result.command) else { log("#01"); return nil }
+            resultString = content
         case .execute(let command): log(".execute: \(command)")
             let result = estimateCommand(command)
             options = result.options
@@ -118,6 +121,41 @@ enum KUserCommand {
         }
 
         return (payload, KCommandOptions(caret: caret, target: target))
+    }
+
+    // MARK: - ファイル読み込み補助
+
+    /// Application Support/Ganpi 以下から相対パスでファイルを読み込む。
+    private func readFromApplicationSupport(_ relativePath: String) -> String? {
+        guard !relativePath.hasPrefix("/") else {
+            log("Absolute path not allowed in load command: \(relativePath)")
+            return nil
+        }
+
+        let fm = FileManager.default
+        guard let base = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            log("Failed to resolve Application Support directory")
+            return nil
+        }
+
+        let appDir = base.appendingPathComponent("Ganpi", isDirectory: true)
+        do {
+            try fm.createDirectory(at: appDir, withIntermediateDirectories: true)
+        } catch {
+            log("Failed to create Ganpi directory: \(error)")
+            return nil
+        }
+
+        let fileURL = appDir.appendingPathComponent(relativePath)
+        do {
+            let data = try Data(contentsOf: fileURL)
+            guard let string = String(data: data, encoding: .utf8) else { log("#01"); return nil }
+            let (convertedString, _) = string.normalizeNewlinesAndDetect()
+            return convertedString
+        } catch {
+            log("File not found or unreadable: \(relativePath)")
+            return nil
+        }
     }
 
 
