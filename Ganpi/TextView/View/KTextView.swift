@@ -1831,14 +1831,28 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             case .selector(let name):
                 doCommand(by: Selector(name + ":"))
             case .command(let cmd):
+                guard let result = cmd.execute(for: textStorage, in: selectionRange) else { log("#01"); return }
+                let string = result.string
+                let stringCount = string.count
+                let targetRange = result.options.target == .selection ? selectionRange : 0..<textStorage.count
+                _textStorageRef.replaceString(in: targetRange, with: string)
+                switch result.options.caret {
+                case .left: caretIndex = targetRange.lowerBound
+                case .right: caretIndex = targetRange.lowerBound + stringCount
+                case .select: selectionRange = targetRange.lowerBound..<targetRange.lowerBound + stringCount
+                    
+                }
+                /*
                 switch cmd {
                 case .insert(_):
-                    cmd.execute(for: textStorage, in: selectionRange)
+                    let result = cmd.execute(for: textStorage, in: selectionRange)
+                    
                 case .load(let path):
                     log("load[\(path)] (stub)")
                 case .execute(let path):
                     log("execute[\(path)] (stub)")
-                }
+                }*/
+                
             }
         }
     }

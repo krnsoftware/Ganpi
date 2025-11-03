@@ -45,15 +45,25 @@ enum KUserCommand {
     
     // 与えられたstorageと、現在の選択範囲rangeについて処理。allであればrangeは単に無視される。
     func execute(for storage:KTextStorageReadable, in range:Range<Int>) -> KCommandResult? {
+        let options: KCommandOptions
+        let resultString: String
         switch self {
         case .insert(let command):
             let result = estimateCommand(command)
+            options = result.options
             log(".insert: command:\(result.command), options:\(result.options)")
+            resultString = result.command
         case .load(let command): log(".load: \(command)")
+            let result = estimateCommand(command)
+            options = result.options
+            resultString = "under construction..."
         case .execute(let command): log(".execute: \(command)")
+            let result = estimateCommand(command)
+            options = result.options
+            resultString = "under construction..."
         }
         
-        return nil
+        return .init(string: resultString, options: options)
     }
     
     private func estimateCommand(_ text: String)
@@ -63,14 +73,9 @@ enum KUserCommand {
         var target: KTextEditingTarget = .selection
         var payload = ""
 
-        // --- "command[...]" の中身を抽出 ---
-        guard let open = text.firstIndex(of: "["),
-              let close = text.lastIndex(of: "]"),
-              close > open else {
-            return (text, KCommandOptions())
-        }
+        // すでに "caret:left, target:all - \"Hello\\nWorld\"" の形で渡る前提
+        let inside = text.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        let inside = text[text.index(after: open)..<close]
         // --- options部とpayload部を "-" で分離 ---
         let parts = inside.split(separator: "-", maxSplits: 1)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -96,8 +101,7 @@ enum KUserCommand {
                     case "selection": target = .selection
                     default: break
                     }
-                default:
-                    break
+                default: break
                 }
             }
         }
@@ -115,6 +119,7 @@ enum KUserCommand {
 
         return (payload, KCommandOptions(caret: caret, target: target))
     }
+
 
     
 }
