@@ -435,3 +435,68 @@ extension StringProtocol {
     }
 
 }
+
+//MARK: - C string escape/unescape property
+
+extension String {
+
+    // 擬似C文字列のエスケープ表現を返す
+    var cEscaped: String {
+        var result = ""
+        result.reserveCapacity(count)
+
+        for c in self {
+            switch c {
+            case "\\": result.append("\\\\")
+            case "\"": result.append("\\\"")
+            case "\'": result.append("\\\'")
+            case "\n": result.append("\\n")
+            case "\r": result.append("\\r")
+            case "\t": result.append("\\t")
+            case "\0": result.append("\\0")
+            case "\u{08}": result.append("\\b") // backspace
+            case "\u{0C}": result.append("\\f") // formfeed
+            case "\u{0B}": result.append("\\v") // vertical tab
+            default:
+                result.append(c)
+            }
+        }
+        return result
+    }
+
+    // 擬似C文字列をアンエスケープして実文字列に戻す
+    var cUnescaped: String {
+        var result = ""
+        var escaping = false
+
+        for c in self {
+            if escaping {
+                switch c {
+                case "n": result.append("\n")
+                case "r": result.append("\r")
+                case "t": result.append("\t")
+                case "0": result.append("\0")
+                case "b": result.append("\u{08}")
+                case "f": result.append("\u{0C}")
+                case "v": result.append("\u{0B}")
+                case "\\": result.append("\\")
+                case "\"": result.append("\"")
+                case "\'": result.append("\'")
+                default:
+                    // 未定義シーケンスは "\" + c として残す
+                    result.append("\\")
+                    result.append(c)
+                }
+                escaping = false
+            } else if c == "\\" {
+                escaping = true
+            } else {
+                result.append(c)
+            }
+        }
+
+        // 最後が '\' で終わった場合はそのまま残す
+        if escaping { result.append("\\") }
+        return result
+    }
+}

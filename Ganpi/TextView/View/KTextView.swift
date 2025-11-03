@@ -1814,11 +1814,11 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     // キーボードショートカットやメニューから機能を実行するためのメソッド。
     @objc func performUserActions(_ sender: Any?) {
-        let actions: [KAction]?
+        let actions: [KUserAction]?
 
         if let menuItem = sender as? NSMenuItem {
-            actions = menuItem.representedObject as? [KAction]
-        } else if let actionsArg = sender as? [KAction] {
+            actions = menuItem.representedObject as? [KUserAction]
+        } else if let actionsArg = sender as? [KUserAction] {
             actions = actionsArg
         } else {
             actions = nil

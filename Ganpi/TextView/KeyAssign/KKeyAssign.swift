@@ -19,7 +19,7 @@ enum KEditMode {
 
 struct KShortCut {
     var keys: [KKeyStroke]
-    var actions: [KAction]
+    var actions: [KUserAction]
 }
 
 // MARK: - Key Assign Core
@@ -131,7 +131,7 @@ class KKeyAssign {
         _storedKeyStrokes.removeAll()
     }
     
-    private func executeActions(_ actions: [KAction]) {
+    private func executeActions(_ actions: [KUserAction]) {
         guard let owner = _pendingOwner else {
             log("No owner to receive actions")
             return

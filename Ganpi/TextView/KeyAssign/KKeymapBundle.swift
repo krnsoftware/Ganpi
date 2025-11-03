@@ -98,13 +98,13 @@ struct KKeymapLoader {
     }
 
     // MARK: - Parse right-hand actions into [KAction]
-    private static func parseActions(from rightSide: String) -> [KAction] {
+    private static func parseActions(from rightSide: String) -> [KUserAction] {
         let tokens = rightSide
             .split(whereSeparator: { $0 == "," || $0 == "\t" || $0 == " " })
             .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
 
-        var result: [KAction] = []
+        var result: [KUserAction] = []
 
         for tok in tokens {
             if let open = tok.firstIndex(of: "["), let close = tok.lastIndex(of: "]"), close > open {
