@@ -23,6 +23,13 @@ extension Selector {
         self == #selector(KTextView.moveDownAndModifySelection(_:))
     }
     
+    var isHorizontalActino: Bool {
+        return self == #selector(KTextView.moveLeft(_:)) ||
+        self == #selector(KTextView.moveRight(_:)) ||
+        self == #selector(KTextView.moveLeftAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveRightAndModifySelection(_:))
+    }
+    
     var isHorizontalActionWithModifierSelection: Bool {
         return self == #selector(KTextView.moveLeftAndModifySelection(_:)) ||
         self == #selector(KTextView.moveRightAndModifySelection(_:))
@@ -35,8 +42,57 @@ extension Selector {
         self == #selector(KTextView.paste(_:))
     }
     
-    // 上記のselectorに含まれているか否かを返す。
-    var isTargetSelector: Bool {
-        return self.isVerticalAction || self.isHorizontalActionWithModifierSelection || self.isYankFamilyAction
+    var isDeleteAction: Bool {
+        return self == #selector(KTextView.deleteBackward(_:)) ||
+        self == #selector(KTextView.deleteForward(_:)) ||
+        self == #selector(KTextView.deleteWordBackward(_:)) ||
+        self == #selector(KTextView.deleteWordForward(_:)) ||
+        self == #selector(KTextView.deleteToBeginningOfLine(_:)) ||
+        self == #selector(KTextView.deleteToEndOfLine(_:)) ||
+        self == #selector(KTextView.deleteToBeginningOfParagraph(_:)) ||
+        self == #selector(KTextView.deleteToEndOfParagraph(_:))
+    }
+    
+    var isModifySelectionAction: Bool {
+        return self == #selector(KTextView.moveUpAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveDownAndModifySelection(_:)) ||
+        self == #selector(KTextView.pageUpAndModifySelection(_:)) ||
+        self == #selector(KTextView.pageDownAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveLeftAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveRightAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveWordLeftAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveWordRightAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveToBeginningOfLineAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveToEndOfLineAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveToBeginningOfParagraphAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveToEndOfParagraphAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveToBeginningOfDocumentAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveToEndOfDocumentAndModifySelection(_:)) ||
+        self == #selector(KTextView.selectWord(_:)) ||
+        self == #selector(KTextView.selectLine(_:)) ||
+        self == #selector(KTextView.selectParagraph(_:)) ||
+        self == #selector(KTextView.selectParagraph(_:))
+    }
+    
+    var isCopyPasteAction: Bool {
+        return self == #selector(KTextView.yank(_:)) ||
+        self == #selector(KTextView.cut(_:)) ||
+        self == #selector(KTextView.copy(_:)) ||
+        self == #selector(KTextView.paste(_:)) ||
+        self == #selector(KTextView.selectAll(_:))
+    }
+    
+    var isCapitalizeAction: Bool {
+        return self == #selector(KTextView.transpose(_:)) ||
+        self == #selector(KTextView.capitalizeWord(_:)) ||
+        self == #selector(KTextView.lowercaseWord(_:)) ||
+        self == #selector(KTextView.uppercaseWord(_:))
+    }
+    
+    var isRecordingTargetAction: Bool {
+        return self.isDeleteAction ||
+        self.isModifySelectionAction ||
+        self.isCopyPasteAction ||
+        self.isCapitalizeAction
     }
 }
