@@ -63,7 +63,9 @@ enum KUserCommand {
         case .execute(let command): log(".execute: \(command)")
             let result = estimateCommand(command)
             options = result.options
-            resultString = "under construction..."
+            let targetRange = options.target == .selection ? range : 0..<storage.count
+            guard let content = readFromStream(from:result.command, string:storage.string(in: targetRange)) else { log("#02"); return nil }
+            resultString = content
         }
         
         return .init(string: resultString, options: options)
@@ -138,7 +140,7 @@ enum KUserCommand {
             return nil
         }
 
-        let appDir = base.appendingPathComponent("Ganpi", isDirectory: true)
+        let appDir = base.appendingPathComponent("Ganpi/snippets", isDirectory: true)
         do {
             try fm.createDirectory(at: appDir, withIntermediateDirectories: true)
         } catch {
@@ -158,6 +160,70 @@ enum KUserCommand {
         }
     }
 
+    
+    /// Application Support/Ganpi/scripts 以下の外部コマンドを実行し、
+    /// UTF-8/LF 文字列を標準入出力でやり取りする。
+    /// - Parameter relativePath: scripts/ 以下の相対パス
+    /// - Returns: コマンドの標準出力 (UTF-8/LF) 。失敗時は nil。
+    private func readFromStream(from relativePath: String, string: String) -> String? {
+        // --- パス安全性チェック ---
+        guard !relativePath.hasPrefix("/") else {
+            log("Absolute path not allowed in execute command: \(relativePath)")
+            return nil
+        }
+
+        let fm = FileManager.default
+        guard let base = fm.urls(for: .applicationSupportDirectory,
+                                 in: .userDomainMask).first else {
+            log("Failed to resolve Application Support directory")
+            return nil
+        }
+
+        // --- ~/Library/Application Support/Ganpi/scripts/... ---
+        let scriptsDir = base.appendingPathComponent("Ganpi/scripts", isDirectory: true)
+        let fileURL = scriptsDir.appendingPathComponent(relativePath)
+
+        // --- ファイルの存在確認 ---
+        guard fm.isExecutableFile(atPath: fileURL.path) else {
+            log("Script not found or not executable: \(fileURL.path)")
+            return nil
+        }
+
+        // --- 外部プロセス実行 ---
+        let process = Process()
+        process.executableURL = fileURL
+
+        let inputPipe = Pipe()
+        let outputPipe = Pipe()
+        process.standardInput = inputPipe
+        process.standardOutput = outputPipe
+        process.standardError = Pipe()
+
+        do {
+            try process.run()
+        } catch {
+            log("Failed to launch process: \(error)")
+            return nil
+        }
+
+        // --- 入力をUTF-8で送る ---
+        if let data = string.data(using: .utf8) {
+            inputPipe.fileHandleForWriting.write(data)
+        }
+        inputPipe.fileHandleForWriting.closeFile()
+
+        // --- 出力をUTF-8で受け取る ---
+        let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+
+        guard let output = String(data: outputData, encoding: .utf8) else {
+            log("Failed to decode command output (non-UTF8)")
+            return nil
+        }
+        
+        let (normalizedString, _) = output.normalizeNewlinesAndDetect()
+        return normalizedString
+    }
 
     
 }
