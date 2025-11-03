@@ -11,6 +11,7 @@
 // キーアサイン・ユーザ定義メニュー・アクションレコーディングなどに使用される「アクション」の定義。
 
 import Foundation
+import Darwin
 
 // 保存されるアクション。セレクタ(IBAction)とコマンドに分けられる。
 enum KUserAction {
@@ -165,6 +166,7 @@ enum KUserCommand {
     /// UTF-8/LF 文字列を標準入出力でやり取りする。
     /// - Parameter relativePath: scripts/ 以下の相対パス
     /// - Returns: コマンドの標準出力 (UTF-8/LF) 。失敗時は nil。
+    /*
     private func readFromStream(from relativePath: String, string: String) -> String? {
         // --- パス安全性チェック ---
         guard !relativePath.hasPrefix("/") else {
@@ -224,6 +226,63 @@ enum KUserCommand {
         let (normalizedString, _) = output.normalizeNewlinesAndDetect()
         return normalizedString
     }
-
+    }*/
     
+
+    private func readFromStream(from relativePath: String, string: String) -> String? {
+        let fm = FileManager.default
+        guard let base = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { log("#01"); return nil }
+
+        let scriptsDir = base.appendingPathComponent("Ganpi/scripts", isDirectory: true)
+        let fileURL = scriptsDir.appendingPathComponent(relativePath)
+        guard fm.isExecutableFile(atPath: fileURL.path) else { log("#02"); return nil }
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/bash")
+        process.arguments = [fileURL.path]
+
+        let inputPipe = Pipe()
+        let outputPipe = Pipe()
+        process.standardInput = inputPipe
+        process.standardOutput = outputPipe
+        process.standardError = outputPipe
+
+        try? process.run()
+
+        // 入力
+        if let data = string.data(using: .utf8) {
+            inputPipe.fileHandleForWriting.write(data)
+        }
+        inputPipe.fileHandleForWriting.closeFile()
+
+        // 非同期読み込み
+        var resultData = Data()
+        let group = DispatchGroup()
+        group.enter()
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            while process.isRunning {
+                let chunk = outputPipe.fileHandleForReading.availableData
+                if chunk.isEmpty { break }
+                resultData.append(chunk)
+            }
+            group.leave()
+        }
+
+        // タイムアウトでdetach（killしない）
+        let waitResult = group.wait(timeout: .now() + 5)
+        if waitResult == .timedOut {
+            KLog.shared.log(id: "execute", message: "Process did not finish in time: \(relativePath)")
+            return nil
+        }
+
+        guard let result = String(data: resultData, encoding: .utf8) else { log("#03"); return nil }
+        let (convertedString, _) = result.normalizeNewlinesAndDetect()
+        return convertedString
+    }
+
+
+
+
+
 }
