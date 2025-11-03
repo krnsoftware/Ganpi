@@ -46,7 +46,9 @@ enum KUserCommand {
     // 与えられたstorageと、現在の選択範囲rangeについて処理。allであればrangeは単に無視される。
     func execute(for storage:KTextStorageReadable, in range:Range<Int>) -> KCommandResult? {
         switch self {
-        case .insert(let command): log(".insert: \(command)")
+        case .insert(let command):
+            let result = estimateCommand(command)
+            log(".insert: command:\(result.command), options:\(result.options)")
         case .load(let command): log(".load: \(command)")
         case .execute(let command): log(".execute: \(command)")
         }
@@ -54,9 +56,65 @@ enum KUserCommand {
         return nil
     }
     
-    private func estimateCommand(_ command:String) -> (command: String, options: KCommandOptions){
-        
-        return ("",.init())
+    private func estimateCommand(_ text: String)
+        -> (command: String, options: KCommandOptions) {
+
+        var caret: KPostProcessingCaretPosition = .right
+        var target: KTextEditingTarget = .selection
+        var payload = ""
+
+        // --- "command[...]" の中身を抽出 ---
+        guard let open = text.firstIndex(of: "["),
+              let close = text.lastIndex(of: "]"),
+              close > open else {
+            return (text, KCommandOptions())
+        }
+
+        let inside = text[text.index(after: open)..<close]
+        // --- options部とpayload部を "-" で分離 ---
+        let parts = inside.split(separator: "-", maxSplits: 1)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+        // --- 左側: options部 ---
+        if let optPart = parts.first {
+            for fragment in optPart.split(separator: ",") {
+                let kv = fragment.split(separator: ":", maxSplits: 1)
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                guard kv.count == 2 else { continue }
+
+                switch kv[0].lowercased() {
+                case "caret":
+                    switch kv[1].lowercased() {
+                    case "left": caret = .left
+                    case "right": caret = .right
+                    case "select": caret = .select
+                    default: break
+                    }
+                case "target":
+                    switch kv[1].lowercased() {
+                    case "all": target = .all
+                    case "selection": target = .selection
+                    default: break
+                    }
+                default:
+                    break
+                }
+            }
+        }
+
+        // --- 右側: payload部 ("..."の中身を抽出) ---
+        if parts.count > 1 {
+            let rhs = parts[1]
+            if let start = rhs.firstIndex(of: "\""),
+               let end = rhs.lastIndex(of: "\""),
+               end > start {
+                let raw = rhs[rhs.index(after: start)..<end]
+                payload = String(raw).cUnescaped
+            }
+        }
+
+        return (payload, KCommandOptions(caret: caret, target: target))
     }
+
     
 }

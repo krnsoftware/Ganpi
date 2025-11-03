@@ -99,26 +99,54 @@ struct KKeymapLoader {
 
     // MARK: - Parse right-hand actions into [KAction]
     private static func parseActions(from rightSide: String) -> [KUserAction] {
-        let tokens = rightSide
-            .split(whereSeparator: { $0 == "," || $0 == "\t" || $0 == " " })
-            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
+        var tokens: [String] = []
+        var current = ""
+        var bracketDepth = 0
+        var inQuotes = false
+
+        for c in rightSide {
+            if c == "\"" {
+                inQuotes.toggle()
+                current.append(c)
+                continue
+            }
+            if !inQuotes {
+                switch c {
+                case "[":
+                    bracketDepth += 1
+                case "]":
+                    bracketDepth = max(bracketDepth - 1, 0)
+                case ",":
+                    if bracketDepth == 0 {
+                        // トップレベルのカンマで区切る
+                        tokens.append(current.trimmingCharacters(in: .whitespacesAndNewlines))
+                        current = ""
+                        continue
+                    }
+                case "\t", " ":
+                    if bracketDepth == 0 && current.last == " " {
+                        // 連続空白を無視
+                        continue
+                    }
+                default: break
+                }
+            }
+            current.append(c)
+        }
+        if !current.isEmpty {
+            tokens.append(current.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
 
         var result: [KUserAction] = []
-
         for tok in tokens {
             if let open = tok.firstIndex(of: "["), let close = tok.lastIndex(of: "]"), close > open {
                 let head = String(tok[..<open]).lowercased()
                 let body = String(tok[tok.index(after: open)..<close])
                 switch head {
-                case "insert":
-                    result.append(.command(.insert(body)))
-                case "execute":
-                    result.append(.command(.execute(body)))
-                case "load", "":
-                    result.append(.command(.load(body))) // "[path]" is shorthand of "load[path]"
-                default:
-                    log("Unknown command '\(head)' ignored")
+                case "insert": result.append(.command(.insert(body)))
+                case "execute": result.append(.command(.execute(body)))
+                case "load", "": result.append(.command(.load(body)))
+                default: log("Unknown command '\(head)' ignored")
                 }
             } else {
                 result.append(.selector(tok.hasSuffix(":") ? String(tok.dropLast()) : tok))
@@ -126,4 +154,5 @@ struct KKeymapLoader {
         }
         return result
     }
+
 }

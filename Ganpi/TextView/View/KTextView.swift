@@ -1832,6 +1832,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 doCommand(by: Selector(name + ":"))
             case .command(let cmd):
                 switch cmd {
+                case .insert(_):
+                    cmd.execute(for: textStorage, in: selectionRange)
                 case .load(let path):
                     log("load[\(path)] (stub)")
                 case .execute(let path):
