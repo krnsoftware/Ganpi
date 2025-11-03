@@ -17,16 +17,6 @@ enum KEditMode {
 
 // MARK: - Actions (strict & type-safe)
 
-enum KAction {
-    case selector(String)        // e.g. "moveRight" (no trailing ":")
-    case command(KCommand)       // e.g. .execute("/usr/bin/sort")
-}
-
-enum KCommand {
-    case load(String)            // load[PATH] or [PATH]
-    case execute(String)         // execute[PATH]
-}
-
 struct KShortCut {
     var keys: [KKeyStroke]
     var actions: [KAction]

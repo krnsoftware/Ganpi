@@ -111,6 +111,8 @@ struct KKeymapLoader {
                 let head = String(tok[..<open]).lowercased()
                 let body = String(tok[tok.index(after: open)..<close])
                 switch head {
+                case "insert":
+                    result.append(.command(.insert(body)))
                 case "execute":
                     result.append(.command(.execute(body)))
                 case "load", "":
