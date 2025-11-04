@@ -438,7 +438,7 @@ extension StringProtocol {
 
 //MARK: - C string escape/unescape property
 
-extension String {
+extension StringProtocol {
 
     // 擬似C文字列のエスケープ表現を返す
     var cEscaped: String {

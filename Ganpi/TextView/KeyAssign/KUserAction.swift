@@ -31,14 +31,12 @@ struct KCommandResult {
 }
 
 struct KCommandOptions {
-    let caret: KPostProcessingCaretPosition
-    let target: KTextEditingTarget
-    
-    init(caret: KPostProcessingCaretPosition = .right, target: KTextEditingTarget = .selection){
-        self.caret = caret
-        self.target = target
-    }
+    var caret: KPostProcessingCaretPosition = .right
+    var target: KTextEditingTarget = .selection
+    var timeout: Float = 5.0
+    var extras: [String: String] = [:]
 }
+
 
 // コマンドの種類。それぞれ内容はテキストとして渡される。内容は実行の時点で解釈される。
 enum KUserCommand {
@@ -72,59 +70,138 @@ enum KUserCommand {
         return .init(string: resultString, options: options)
     }
     
-    private func estimateCommand(_ text: String)
-        -> (command: String, options: KCommandOptions) {
+    private func estimateCommand(_ command: String) -> (command: String, options: KCommandOptions) {
+        var opts = KCommandOptions()
+        var optText = ""
+        var payloadText = ""
 
-        var caret: KPostProcessingCaretPosition = .right
-        var target: KTextEditingTarget = .selection
-        var payload = ""
+        // [] 内の文字を抽出
+        let trimmed = command.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            return ("", opts)
+        }
 
-        // すでに "caret:left, target:all - \"Hello\\nWorld\"" の形で渡る前提
-        let inside = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        // 区切り '-' の探索（クォート外で ':' を左に含む最初の '-'）
+        var inQuote = false
+        var escape = false
+        var splitIndex: String.Index? = nil
+        var hasColon = false
 
-        // --- options部とpayload部を "-" で分離 ---
-        let parts = inside.split(separator: "-", maxSplits: 1)
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        for i in trimmed.indices {
+            let c = trimmed[i]
+            if escape {
+                escape = false
+                continue
+            }
+            switch c {
+            case "\\":
+                escape = true
+            case "\"":
+                inQuote.toggle()
+            case ":":
+                if !inQuote { hasColon = true }
+            case "-":
+                if !inQuote && hasColon {
+                    splitIndex = i
+                    break
+                }
+            default:
+                break
+            }
+        }
 
-        // --- 左側: options部 ---
-        if let optPart = parts.first {
-            for fragment in optPart.split(separator: ",") {
-                let kv = fragment.split(separator: ":", maxSplits: 1)
-                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                guard kv.count == 2 else { continue }
+        if let idx = splitIndex {
+            optText = String(trimmed[..<idx]).trimmingCharacters(in: .whitespaces)
+            payloadText = String(trimmed[trimmed.index(after: idx)...]).trimmingCharacters(in: .whitespaces)
+        } else {
+            payloadText = trimmed
+        }
 
-                switch kv[0].lowercased() {
+        // オプション解析
+        if !optText.isEmpty {
+            var key = ""
+            var value = ""
+            var inQuoteOpt = false
+            var escapeOpt = false
+            var buffer = ""
+            var parsingValue = false
+
+            func commitOption() {
+                let k = key.trimmingCharacters(in: .whitespaces)
+                let v = value.trimmingCharacters(in: .whitespaces)
+                guard !k.isEmpty, !v.isEmpty else { return }
+
+                switch k.lowercased() {
                 case "caret":
-                    switch kv[1].lowercased() {
-                    case "left": caret = .left
-                    case "right": caret = .right
-                    case "select": caret = .select
+                    switch v.lowercased() {
+                    case "left":   opts.caret = .left
+                    case "right":  opts.caret = .right
+                    case "select": opts.caret = .select
                     default: break
                     }
+
                 case "target":
-                    switch kv[1].lowercased() {
-                    case "all": target = .all
-                    case "selection": target = .selection
+                    switch v.lowercased() {
+                    case "all":        opts.target = .all
+                    case "selection":  opts.target = .selection
                     default: break
                     }
-                default: break
+
+                case "timeout":
+                    if let f = Float(v) { opts.timeout = f }
+
+                default:
+                    opts.extras[k] = v
+                }
+
+            }
+
+            for c in optText {
+                if escapeOpt {
+                    buffer.append(c)
+                    escapeOpt = false
+                    continue
+                }
+                switch c {
+                case "\\":
+                    escapeOpt = true
+                case "\"":
+                    inQuoteOpt.toggle()
+                case ":" where !inQuoteOpt && !parsingValue:
+                    key = buffer
+                    buffer = ""
+                    parsingValue = true
+                case "," where !inQuoteOpt:
+                    value = buffer
+                    commitOption()
+                    key = ""
+                    value = ""
+                    buffer = ""
+                    parsingValue = false
+                default:
+                    buffer.append(c)
                 }
             }
-        }
 
-        // --- 右側: payload部 ("..."の中身を抽出) ---
-        if parts.count > 1 {
-            let rhs = parts[1]
-            if let start = rhs.firstIndex(of: "\""),
-               let end = rhs.lastIndex(of: "\""),
-               end > start {
-                let raw = rhs[rhs.index(after: start)..<end]
-                payload = String(raw).cUnescaped
+            // 最後の要素を登録
+            if parsingValue {
+                value = buffer
+                commitOption()
             }
         }
 
-        return (payload, KCommandOptions(caret: caret, target: target))
+        // 後節（payload）解析
+        let payload: String
+        if payloadText.hasPrefix("\"") && payloadText.hasSuffix("\"") && payloadText.count >= 2 {
+            let inner = payloadText.dropFirst().dropLast()
+            payload = inner.cUnescaped
+        } else {
+            payload = payloadText
+        }
+
+        return (payload, opts)
     }
+
 
     // MARK: - ファイル読み込み補助
 
