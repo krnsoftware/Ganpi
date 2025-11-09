@@ -2106,104 +2106,84 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         return true
     }
     
+    /*
     enum KPageVerticalMoveKind {
         case page
         case line
+    }*/
+    enum KPageVerticalMoveKind {
+        case fullPage
+        case halfPage
     }
     
     
-    // KTextView.swift / class KTextView 内
-    private func moveSelectionVertically(for kind: KPageVerticalMoveKind, to direction: KDirection, extendSelection: Bool) {
-        guard let scrollView = enclosingScrollView else { log("enclosingScrollView is nil", from: self); return }
+    // 縦方向のキャレット移動のうちページ単位で動作するもの。移動を半分にもできる。
+    // キャレットはNSTextViewの挙動のようにキャレットのページ内での位置を再現しない。
+    // .forwardの場合には左端最上段、.backwardの場合は左端最下段に表示される。
+    private func moveSelectionVertically(for kind: KPageVerticalMoveKind, to direction: KDirection) {
+        guard let scrollView = enclosingScrollView else {
+            log("enclosingScrollView is nil", from: self)
+            return
+        }
         let clipView = scrollView.contentView
+        guard let layoutRects = layoutManager.makeLayoutRects() else {
+            log("layoutRects is nil", from: self)
+            return
+        }
 
-        guard let layoutRects = layoutManager.makeLayoutRects() else { log("layoutRects is nil", from: self); return }
         let topInset = layoutRects.textEdgeInsets.top
         let lineHeight = layoutManager.lineHeight
         let pageHeight = clipView.bounds.height
         let clipOrigin = clipView.bounds.origin
 
-        // ---- moveCaretVertically と同じ思想でX/選択基準を確立 ----
-        if !wasVerticalActionWithModifySelection && extendSelection {
-            _verticalSelectionBase = selectionRange.lowerBound
-        }
-        if _verticalSelectionBase == nil {
-            _verticalSelectionBase = caretIndex
-        }
+        // 現在の先頭行インデックスを整数で取得（誤差排除）
+        let firstVisibleLineIndex = Int(floor((clipOrigin.y - topInset) / lineHeight))
+        let visibleLineCount = Int(floor(pageHeight / lineHeight))
 
-        guard let currentLine = layoutManager.lines[currentLineIndex] else { log("currentLine is nil.", from: self); return }
-
-        if _verticalCaretX == nil || !wasVerticalAction {
-            let indexInLine = caretIndex - currentLine.range.lowerBound
-            _verticalCaretX = currentLine.characterOffset(at: indexInLine)
-        }
-
-        guard let verticalCaretX = _verticalCaretX else { log("_verticalCaretX is nil.", from: self); return }
-        guard let verticalSelectionBase = _verticalSelectionBase else { log("_verticalSelectionBase is nil.", from: self); return }
-
-        var newCharacterIndex = caretIndex
-
+        // ---- 移動量（行数）を算出 ----
+        let moveLines: Int
         switch kind {
-            
-            // ---- 1行単位の上下移動 ----
-        case .line:
-            let newLineIndex = currentLineIndex + direction.rawValue
-            if newLineIndex < 0 || newLineIndex > layoutManager.lines.count - 1 {
-                log("<ok.newLineIndex is out of range.>", from: self)
-                return
-            }
-            guard let newLine = layoutManager.lines[newLineIndex] else { return }
-            let indexInLine = newLine.characterIndex(for: verticalCaretX)
-            _currentLineIndex = newLineIndex
-            newCharacterIndex = indexInLine + newLine.range.lowerBound
-            
-            // ---- ページ単位の上下移動 ----
-        case .page:
-            // 現在ページの先頭行インデックス（浮動誤差除去＋1行補正）
-            var firstVisibleLineIndex = Int(round((clipOrigin.y - topInset) / lineHeight))
-            if direction == .backward { firstVisibleLineIndex += 1 }  // 上方向時の補正
-            
-            // キャレットのページ内相対行オフセット
-            let caretRelativeLineOffset = currentLineIndex - firstVisibleLineIndex
-            
-            // ページあたりの行数（整数化）
-            let visibleLineCount = Int(floor(pageHeight / lineHeight))
-            let offsetLines = direction == .forward ? visibleLineCount : -visibleLineCount
-            
-            // 新ページ先頭行
-            var newFirstVisibleLineIndex = firstVisibleLineIndex + offsetLines
-            newFirstVisibleLineIndex = max(0, min(layoutManager.lines.count - 1, newFirstVisibleLineIndex))
-            
-            // 新しいスクロール位置（行単位で揃える）
-            let newY = CGFloat(newFirstVisibleLineIndex) * lineHeight + topInset
-            clipView.scroll(to: CGPoint(x: clipOrigin.x, y: newY))
-            scrollView.reflectScrolledClipView(clipView)
-            
-            // キャレットはページ内相対位置を維持
-            var newLineIndex = newFirstVisibleLineIndex + caretRelativeLineOffset
-            newLineIndex = max(0, min(layoutManager.lines.count - 1, newLineIndex))
-            guard let newLine = layoutManager.lines[newLineIndex] else { return }
-            
-            let indexInLine = newLine.characterIndex(for: verticalCaretX)
-            newCharacterIndex = newLine.range.lowerBound + indexInLine
+        case .fullPage:
+            moveLines = visibleLineCount
+        case .halfPage:
+            moveLines = visibleLineCount / 2
         }
 
-        // ---- 選択またはキャレット更新 ----
-        if extendSelection {
-            let lower = min(verticalSelectionBase, newCharacterIndex)
-            let upper = max(verticalSelectionBase, newCharacterIndex)
-            selectionRange = lower..<upper
-        } else {
-            caretIndex = newCharacterIndex
+        let offsetLines = direction == .forward ? moveLines : -moveLines
+        var newFirstVisibleLineIndex = firstVisibleLineIndex + offsetLines
+        newFirstVisibleLineIndex = max(0, min(layoutManager.lines.count - 1, newFirstVisibleLineIndex))
+
+        // ---- スクロール位置を整数行単位で決定 ----
+        let newY = CGFloat(newFirstVisibleLineIndex) * lineHeight + topInset
+        clipView.scroll(to: CGPoint(x: clipOrigin.x, y: newY))
+        scrollView.reflectScrolledClipView(clipView)
+
+        // ---- キャレット位置の決定 ----
+        let targetLineIndex: Int
+        switch direction {
+        case .forward:
+            targetLineIndex = newFirstVisibleLineIndex
+        case .backward:
+            targetLineIndex = min(layoutManager.lines.count - 1,
+                                  newFirstVisibleLineIndex + visibleLineCount - 1)
         }
 
-        //scrollCaretToVisible()
+        guard let line = layoutManager.lines[targetLineIndex] else {
+            log("target line out of range", from: self)
+            return
+        }
+
+        // キャレットを左端に固定
+        caretIndex = line.range.lowerBound
+
     }
+
 
 
 
     
     // ページスクロール専用のメソッド。キャレット移動なし。
+    // line毎のスクロールを廃止。代りにハーフページ移動を導入。テスト未。
     private func scrollVertically(for kind:KPageVerticalMoveKind, to direction:KDirection) {
         guard let scrollView = enclosingScrollView else { log("enclosingScrollView is nil",from: self); return }
         guard let documentBounds = scrollView.documentView?.bounds else { log("documentView is nil",from: self); return }
@@ -2219,13 +2199,19 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         switch direction {
         case .forward:
             switch kind {
+                /*
             case .page: y = min(documentBounds.height - clipView.bounds.height, clipViewOrigin.y + pageHeight - overLapHeight)
-            case .line: y = min(documentBounds.height - clipView.bounds.height, clipViewOrigin.y + lineHeight)
+            case .line: y = min(documentBounds.height - clipView.bounds.height, clipViewOrigin.y + lineHeight)*/
+            case .fullPage: y = min(documentBounds.height - clipView.bounds.height, clipViewOrigin.y + pageHeight - overLapHeight)
+            case .halfPage: y = min(documentBounds.height - clipView.bounds.height, clipViewOrigin.y + pageHeight / 2 - overLapHeight)
             }
         case .backward:
             switch kind {
+                /*
             case .page: y = max(0, clipViewOrigin.y - pageHeight + overLapHeight)
-            case .line: y = max(0, clipViewOrigin.y - lineHeight)
+            case .line: y = max(0, clipViewOrigin.y - lineHeight)*/
+            case .fullPage: y = max(0, clipViewOrigin.y - pageHeight + overLapHeight)
+            case .halfPage: y = max(0, clipViewOrigin.y - pageHeight / 2 + overLapHeight)
             }
         }
         // サブピクセル丸め
@@ -2268,13 +2254,24 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     // Page.
     @IBAction override func pageUp(_ sender: Any?) {
-        moveSelectionVertically(for: .page, to: .backward, extendSelection: false)
+        //moveSelectionVertically(for: .page, to: .backward, extendSelection: false)
+        moveSelectionVertically(for: .fullPage, to: .backward)
     }
     
     @IBAction override func pageDown(_ sender: Any?) {
-        moveSelectionVertically(for: .page, to: .forward, extendSelection: false)
+        //moveSelectionVertically(for: .page, to: .forward, extendSelection: false)
+        moveSelectionVertically(for: .fullPage, to: .forward)
     }
     
+    @IBAction func pageUpHalf(_ sender: Any?) {
+        moveSelectionVertically(for: .halfPage, to: .backward)
+    }
+    
+    @IBAction func pageDownHalf(_ sender: Any?) {
+        moveSelectionVertically(for: .halfPage, to: .forward)
+    }
+    
+    /*
     @IBAction override func pageUpAndModifySelection(_ sender: Any?) {
         moveSelectionVertically(for: .page, to: .backward, extendSelection: true)
     }
@@ -2282,6 +2279,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     @IBAction override func pageDownAndModifySelection(_ sender: Any?) {
         moveSelectionVertically(for: .page, to: .forward, extendSelection: true)
     }
+    */
     
     // MARK: - Horizontal Movement
     
@@ -2442,19 +2440,21 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     //MARK: - Scrolling.
 
     @IBAction override func scrollPageUp(_ sender: Any?) {
-        scrollVertically(for: .page, to: .backward)
+        //scrollVertically(for: .page, to: .backward)
+        scrollVertically(for: .fullPage, to: .backward)
     }
     
     @IBAction override func scrollPageDown(_ sender: Any?) {
-        scrollVertically(for: .page, to: .forward)
+        //scrollVertically(for: .page, to: .forward)
+        scrollVertically(for: .fullPage, to: .forward)
     }
     
     @IBAction override func scrollLineUp(_ sender: Any?) {
-        scrollVertically(for: .line, to: .backward)
+        //scrollVertically(for: .line, to: .backward)
     }
     
     @IBAction override func scrollLineDown(_ sender: Any?) {
-        scrollVertically(for: .line, to: .forward)
+        //scrollVertically(for: .line, to: .forward)
     }
     
     @IBAction override func centerSelectionInVisibleArea(_ sender: Any?) {
