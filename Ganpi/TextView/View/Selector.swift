@@ -15,12 +15,18 @@ extension Selector {
         return self == #selector(KTextView.moveUp(_:)) ||
         self == #selector(KTextView.moveDown(_:)) ||
         self == #selector(KTextView.moveUpAndModifySelection(_:)) ||
-        self == #selector(KTextView.moveDownAndModifySelection(_:))
+        self == #selector(KTextView.moveDownAndModifySelection(_:)) ||
+        self == #selector(KTextView.pageUp(_:)) ||
+        self == #selector(KTextView.pageDown(_:)) ||
+        self == #selector(KTextView.pageUpAndModifySelection(_:)) ||
+        self == #selector(KTextView.pageDownAndModifySelection(_:))
     }
     
     var isVerticalActionWithModifierSelection: Bool {
         return self == #selector(KTextView.moveUpAndModifySelection(_:)) ||
-        self == #selector(KTextView.moveDownAndModifySelection(_:))
+        self == #selector(KTextView.moveDownAndModifySelection(_:)) ||
+        self == #selector(KTextView.pageUpAndModifySelection(_:)) ||
+        self == #selector(KTextView.pageDownAndModifySelection(_:)) 
     }
     
     var isHorizontalActino: Bool {

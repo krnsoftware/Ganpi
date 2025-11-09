@@ -1083,6 +1083,7 @@ extension KTextView {
         if let nextSpan = span.nextSpan(contains: selectionRange, includeBrackets: includeBrackets, direction: direction) {
             let newSelection = includeBrackets ? nextSpan.outerRange : nextSpan.innerRange
             selectionRange = newSelection
+            scrollCaretToVisible()
         }
     }
 }

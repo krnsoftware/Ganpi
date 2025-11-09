@@ -486,15 +486,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         startCaretBlinkTimer()
     }
     
-    private func scrollCaretToVisible() {
+    func scrollCaretToVisible() {
         scrollSelectionToVisible()
-        /*
-        guard let scrollView = self.enclosingScrollView else { return }
-        DispatchQueue.main.async {
-            let caretRect = self._caretView.frame.insetBy(dx: -10, dy: -10)
-            scrollView.contentView.scrollToVisible(caretRect)
-        }
-        */
     }
     
     func scrollSelectionToVisible() {
@@ -2118,38 +2111,97 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         case line
     }
     
-    private func moveSelectionVertically(for kind:KPageVerticalMoveKind, to direction:KDirection, caretMovement:Bool, extendSelection: Bool) {
-        
-        guard let scrollView = enclosingScrollView else { log("enclosingScrollView is nil",from: self); return }
+    
+    // KTextView.swift / class KTextView 内
+    private func moveSelectionVertically(for kind: KPageVerticalMoveKind, to direction: KDirection, extendSelection: Bool) {
+        guard let scrollView = enclosingScrollView else { log("enclosingScrollView is nil", from: self); return }
         let clipView = scrollView.contentView
+
+        guard let layoutRects = layoutManager.makeLayoutRects() else { log("layoutRects is nil", from: self); return }
+        let topInset = layoutRects.textEdgeInsets.top
         let lineHeight = layoutManager.lineHeight
         let pageHeight = clipView.bounds.height
-        let clipViewOrigin = clipView.bounds.origin
-        log("clipView.bounds: \(clipView.bounds), frame: \(frame)",from:self)
-        
-        guard let layoutRects = layoutManager.makeLayoutRects() else { log("layoutRects is nil",from: self); return }
-        let topInset = layoutRects.textEdgeInsets.top
-        
-        switch kind {
-        case .page:
-            switch direction {
-            case .forward:
-                let y = min(frame.height - clipView.bounds.height, clipViewOrigin.y + pageHeight - lineHeight)
-                let point = CGPoint(x: clipViewOrigin.x, y: y)
-                clipView.scroll(to: point)
-                scrollView.reflectScrolledClipView(clipView)
-                let lineNumber = Int((clipView.bounds.origin.y - topInset) / lineHeight)
-                if let line = layoutManager.lines[lineNumber] {
-                    selectionRange = line.range.lowerBound..<line.range.lowerBound
-                }
-                break
-            case .backward:
-                break
-            }
-        case .line:
-            break
+        let clipOrigin = clipView.bounds.origin
+
+        // ---- moveCaretVertically と同じ思想でX/選択基準を確立 ----
+        if !wasVerticalActionWithModifySelection && extendSelection {
+            _verticalSelectionBase = selectionRange.lowerBound
         }
+        if _verticalSelectionBase == nil {
+            _verticalSelectionBase = caretIndex
+        }
+
+        guard let currentLine = layoutManager.lines[currentLineIndex] else { log("currentLine is nil.", from: self); return }
+
+        if _verticalCaretX == nil || !wasVerticalAction {
+            let indexInLine = caretIndex - currentLine.range.lowerBound
+            _verticalCaretX = currentLine.characterOffset(at: indexInLine)
+        }
+
+        guard let verticalCaretX = _verticalCaretX else { log("_verticalCaretX is nil.", from: self); return }
+        guard let verticalSelectionBase = _verticalSelectionBase else { log("_verticalSelectionBase is nil.", from: self); return }
+
+        var newCharacterIndex = caretIndex
+
+        switch kind {
+            
+            // ---- 1行単位の上下移動 ----
+        case .line:
+            let newLineIndex = currentLineIndex + direction.rawValue
+            if newLineIndex < 0 || newLineIndex > layoutManager.lines.count - 1 {
+                log("<ok.newLineIndex is out of range.>", from: self)
+                return
+            }
+            guard let newLine = layoutManager.lines[newLineIndex] else { return }
+            let indexInLine = newLine.characterIndex(for: verticalCaretX)
+            _currentLineIndex = newLineIndex
+            newCharacterIndex = indexInLine + newLine.range.lowerBound
+            
+            // ---- ページ単位の上下移動 ----
+        case .page:
+            // 現在ページの先頭行インデックス（浮動誤差除去＋1行補正）
+            var firstVisibleLineIndex = Int(round((clipOrigin.y - topInset) / lineHeight))
+            if direction == .backward { firstVisibleLineIndex += 1 }  // 上方向時の補正
+            
+            // キャレットのページ内相対行オフセット
+            let caretRelativeLineOffset = currentLineIndex - firstVisibleLineIndex
+            
+            // ページあたりの行数（整数化）
+            let visibleLineCount = Int(floor(pageHeight / lineHeight))
+            let offsetLines = direction == .forward ? visibleLineCount : -visibleLineCount
+            
+            // 新ページ先頭行
+            var newFirstVisibleLineIndex = firstVisibleLineIndex + offsetLines
+            newFirstVisibleLineIndex = max(0, min(layoutManager.lines.count - 1, newFirstVisibleLineIndex))
+            
+            // 新しいスクロール位置（行単位で揃える）
+            let newY = CGFloat(newFirstVisibleLineIndex) * lineHeight + topInset
+            clipView.scroll(to: CGPoint(x: clipOrigin.x, y: newY))
+            scrollView.reflectScrolledClipView(clipView)
+            
+            // キャレットはページ内相対位置を維持
+            var newLineIndex = newFirstVisibleLineIndex + caretRelativeLineOffset
+            newLineIndex = max(0, min(layoutManager.lines.count - 1, newLineIndex))
+            guard let newLine = layoutManager.lines[newLineIndex] else { return }
+            
+            let indexInLine = newLine.characterIndex(for: verticalCaretX)
+            newCharacterIndex = newLine.range.lowerBound + indexInLine
+        }
+
+        // ---- 選択またはキャレット更新 ----
+        if extendSelection {
+            let lower = min(verticalSelectionBase, newCharacterIndex)
+            let upper = max(verticalSelectionBase, newCharacterIndex)
+            selectionRange = lower..<upper
+        } else {
+            caretIndex = newCharacterIndex
+        }
+
+        //scrollCaretToVisible()
     }
+
+
+
     
     // ページスクロール専用のメソッド。キャレット移動なし。
     private func scrollVertically(for kind:KPageVerticalMoveKind, to direction:KDirection) {
@@ -2216,19 +2268,19 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     // Page.
     @IBAction override func pageUp(_ sender: Any?) {
-        
+        moveSelectionVertically(for: .page, to: .backward, extendSelection: false)
     }
     
     @IBAction override func pageDown(_ sender: Any?) {
-        
+        moveSelectionVertically(for: .page, to: .forward, extendSelection: false)
     }
     
     @IBAction override func pageUpAndModifySelection(_ sender: Any?) {
-        
+        moveSelectionVertically(for: .page, to: .backward, extendSelection: true)
     }
     
     @IBAction override func pageDownAndModifySelection(_ sender: Any?) {
-        
+        moveSelectionVertically(for: .page, to: .forward, extendSelection: true)
     }
     
     // MARK: - Horizontal Movement
