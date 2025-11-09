@@ -1055,168 +1055,34 @@ extension KTextView {
     // MARK: - Bracket Pair Selection
     
     @IBAction func selectInnerPair(_ sender: Any?) {
-        selectEnclosingPair(includeBrackets: false, preferRightFirst: false)
+        selectEnclosingPair(includeBrackets: false, direction: .forward)
     }
     
     @IBAction func selectInnerPairReverse(_ sender: Any?) {
-        selectEnclosingPair(includeBrackets: false, preferRightFirst: true)
+        selectEnclosingPair(includeBrackets: false, direction: .backward)
     }
     
     @IBAction func selectOuterPair(_ sender: Any?) {
-        selectEnclosingPair(includeBrackets: true, preferRightFirst: false)
+        selectEnclosingPair(includeBrackets: true, direction: .forward)
     }
     
     @IBAction func selectOuterPairReverse(_ sender: Any?) {
-        selectEnclosingPair(includeBrackets: true, preferRightFirst: true)
+        selectEnclosingPair(includeBrackets: true, direction: .backward)
     }
     
     
-    
-    private func selectEnclosingPair(includeBrackets: Bool, preferRightFirst: Bool) {
-        // --- 行単位で解析 ---
+    func selectEnclosingPair(includeBrackets: Bool, direction: KDirection) {
         guard let lineRange = textStorage.lineRange(at: selectionRange.upperBound) else {
-            log("#01 no lineRange"); return
+            log("lineRange:nil"); return
         }
-        
         let slice = textStorage.skeletonString.bytes(in: lineRange)
-        if slice.isEmpty { log("#02 empty line slice"); return }
+        guard !slice.isEmpty else { log("slice:empty"); return }
         
-        // ※ Ganpi の bytes(in:) は absolute index の ArraySlice を返す前提
-        let root = KPairSpan.build(from: slice)
+        let span = KPairSpan(storage: textStorage, range: lineRange)
         
-        // --- ユーティリティ（ローカル） ---
-        func innerRange(of s: KPairSpan) -> Range<Int> {
-            let o = s.range.lowerBound, c = s.range.upperBound
-            if o + 1 <= c - 1 {
-                return (o + 1)..<(c - 1)
-            } else {
-                // 空の場合は中に caret のみ
-                let p = min(max(o + 1, 0), textStorage.count)
-                return p..<p
-            }
+        if let nextSpan = span.nextSpan(contains: selectionRange, includeBrackets: includeBrackets, direction: direction) {
+            let newSelection = includeBrackets ? nextSpan.outerRange : nextSpan.innerRange
+            selectionRange = newSelection
         }
-        func outerRange(of s: KPairSpan) -> Range<Int> { s.range }
-        func desiredRange(for s: KPairSpan) -> Range<Int> {
-            includeBrackets ? outerRange(of: s) : innerRange(of: s)
-        }
-        
-        // --- 1) selectionRange と一致するスパンがあれば、それを起点に移動 ---
-        let flat = root.flattenPreorder()
-        if let curIndex = flat.firstIndex(where: { desiredRange(for: $0) == selectionRange }) {
-            let cur = flat[curIndex]
-            
-            // 1) 子スパンへ潜る（方向優先）
-            let kids = cur.directChildren()
-            if !kids.isEmpty {
-                let next = preferRightFirst ? kids.first! : kids.last!
-                let rng = desiredRange(for: next)
-                guard rng.lowerBound >= 0, rng.upperBound <= textStorage.count else { log("#04 child OOB"); return }
-                selectionRange = rng
-                return
-            }
-            
-            // 2) 兄弟へ（親を特定し、左／右の兄弟へ）
-            if let (parent, idx) = root.findParent(of: cur) {
-                let sibs = parent.directChildren()
-                if preferRightFirst {
-                    if idx > 0 {
-                        let prev = sibs[idx - 1]
-                        let rng = desiredRange(for: prev)
-                        guard rng.upperBound <= textStorage.count else { log("#04 sibling-L OOB"); return }
-                        selectionRange = rng
-                        return
-                    }
-                } else {
-                    if idx + 1 < sibs.count {
-                        let next = sibs[idx + 1]
-                        let rng = desiredRange(for: next)
-                        guard rng.upperBound <= textStorage.count else { log("#04 sibling-R OOB"); return }
-                        selectionRange = rng
-                        return
-                    }
-                }
-                
-                // 3) 叔父方向へ（親を“現在”として上へ繰り返す）
-                var node = parent
-                while let up = root.findParent(of: node) {
-                    let (pp, pidx) = up
-                    let psibs = pp.directChildren()
-                    if preferRightFirst {
-                        if pidx > 0 {
-                            let prev = psibs[pidx - 1]
-                            let rng = desiredRange(for: prev)
-                            guard rng.upperBound <= textStorage.count else { log("#04 uncle-L OOB"); return }
-                            selectionRange = rng
-                            return
-                        }
-                    } else {
-                        if pidx + 1 < psibs.count {
-                            let next = psibs[pidx + 1]
-                            let rng = desiredRange(for: next)
-                            guard rng.upperBound <= textStorage.count else { log("#04 uncle-R OOB"); return }
-                            selectionRange = rng
-                            return
-                        }
-                    }
-                    node = pp
-                }
-            }
-            
-            // 4) 最終フォールバック：行全体で前後スパン
-            if preferRightFirst {
-                if let prev = root.prevSpan(endingAtOrBefore: cur.range.lowerBound) {
-                    let rng = desiredRange(for: prev)
-                    guard rng.upperBound <= textStorage.count else { log("#04 fallback-L OOB"); return }
-                    selectionRange = rng
-                }
-            } else {
-                if let next = root.nextSpan(startingAtOrAfter: cur.range.upperBound) {
-                    let rng = desiredRange(for: next)
-                    guard rng.upperBound <= textStorage.count else { log("#04 fallback-R OOB"); return }
-                    selectionRange = rng
-                }
-            }
-            return
-        }
-        
-        // --- 2) 初回または一致が無い場合：caret 基準でターゲットを決定 ---
-        let caretIndex = selectionRange.upperBound
-        
-        // caret の直前（左優先時）をまず試す
-        let probe1 = (preferRightFirst && caretIndex > lineRange.lowerBound)
-        ? (caretIndex - 1) : caretIndex
-        var target = root.span(containing: probe1)
-        
-        if target == nil {
-            let probe2 = (probe1 == caretIndex && caretIndex > lineRange.lowerBound)
-            ? (caretIndex - 1) : caretIndex
-            if probe2 != probe1 {
-                target = root.span(containing: probe2)
-            }
-        }
-        
-        // 含まれない場合は方向優先で近傍ペアへ
-        if target == nil {
-            if preferRightFirst {
-                target = root.prevSpan(endingAtOrBefore: caretIndex)
-                ?? root.nextSpan(startingAtOrAfter: caretIndex)
-            } else {
-                target = root.nextSpan(startingAtOrAfter: caretIndex)
-                ?? root.prevSpan(endingAtOrBefore: caretIndex)
-            }
-        }
-        
-        guard let span = target else {
-            log("#03 no span for index=\(caretIndex)")
-            return
-        }
-        
-        // 最初の選択範囲を決定
-        let result = desiredRange(for: span)
-        guard result.lowerBound >= 0, result.upperBound <= textStorage.count else {
-            log("#04 out of bounds (final)")
-            return
-        }
-        selectionRange = result
     }
 }

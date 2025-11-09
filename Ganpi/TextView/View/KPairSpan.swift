@@ -7,163 +7,167 @@
 //  with architectural assistance by Sebastian, his loyal AI butler.
 //  All rights reserved.
 //
-//
-//
-//  KPairSpan.swift
-//  Ganpi
-//
-//  行スライス（※絶対インデックス前提）から、括弧／クオートのスパン木を
-//  単一走査・非再帰で構築する。範囲は常に外側レンジ [open, close) を保持。
-//  - クオート内の括弧は無視
-//  - 子→兄弟→叔父…の探索を補助するユーティリティを提供
-//
 
 import Foundation
 
-struct KPairSpan {
-    /// 文書全体に対する絶対範囲（右端は非包含）
-    let range: Range<Int>
-    /// 直下の子スパン（外側レンジで保持）
-    var spans: [KPairSpan] = []
 
-    // MARK: 構築（非再帰・単一走査・絶対座標）
+// KPairSpan.swift
 
-    /// 行スライス（※ absolute index の ArraySlice<UInt8> 前提）から構築
-    static func build(from slice: ArraySlice<UInt8>) -> KPairSpan {
+final class KPairSpan: CustomStringConvertible {
+    var range: Range<Int>
+    weak var parent: KPairSpan?
+    weak var storage: KTextStorageReadable?
+    var children: [KPairSpan] = []
+    let bracketChar: UInt8
+
+    var description: String {
+        var str = "ch:\(Character(UnicodeScalar(bracketChar))), range:\(range)"
+        for child in children {
+            str += "\n  " + child.description.replacingOccurrences(of: "\n", with: "\n  ")
+        }
+        return str
+    }
+
+    init(bracketChar: UInt8, range: Range<Int>, parent: KPairSpan) {
+        self.range = range
+        self.parent = parent
+        self.bracketChar = bracketChar
+    }
+
+    init(storage: KTextStorageReadable, range: Range<Int>, parent: KPairSpan? = nil) {
+        self.range = range
+        self.storage = storage
+        self.parent = parent
+        self.bracketChar = 0
+
+        let bytes = storage.skeletonString.bytes
         let pairs: [UInt8: UInt8] = [
             FC.leftParen:   FC.rightParen,
             FC.leftBracket: FC.rightBracket,
-            FC.leftBrace:   FC.rightBrace,
-            FC.lt:          FC.gt
+            FC.leftBrace:   FC.rightBrace
         ]
         let quotes: Set<UInt8> = [FC.doubleQuote, FC.singleQuote, FC.backtick]
 
-        struct Builder {
-            let open: Int          // 絶対開始位置
-            let char: UInt8        // 開いた文字（root は 0）
-            var children: [KPairSpan] = []
-        }
-
-        var i = slice.startIndex
-        let end = slice.endIndex
-
-        // ルート（行全体、absolute）
-        var stack: [Builder] = [Builder(open: slice.startIndex, char: 0, children: [])]
-
-        // クオート状態（absolute）
-        var inQuote: UInt8? = nil
-        var inQuoteStartAbs: Int = 0
+        var stack: [KPairSpan] = [self]
+        var i = range.lowerBound
+        let end = range.upperBound
 
         while i < end {
-            let c = slice[i]
+            let c = bytes[i]
 
             // --- クオート処理 ---
             if quotes.contains(c) {
-                let escaped = (i > slice.startIndex && slice[i - 1] == FC.backSlash)
-                if !escaped {
-                    if let q = inQuote, q == c {
-                        // クオート閉じ → 外側レンジでノード化（absolute）
-                        let node = KPairSpan(range: inQuoteStartAbs..<(i + 1), spans: [])
-                        stack[stack.count - 1].children.append(node)
-                        inQuote = nil
-                    } else if inQuote == nil {
-                        inQuote = c
-                        inQuoteStartAbs = i
-                    }
-                }
+                let start = i
                 i += 1
-                continue
-            }
-
-            // クオート内はスキップ
-            if inQuote != nil {
+                while i < end {
+                    let d = bytes[i]
+                    if d == FC.backSlash { i += 2; continue }
+                    if d == c { break }
+                    i += 1
+                }
+                if i < end {
+                    let span = KPairSpan(bracketChar: c, range: start..<i + 1, parent: stack.last!)
+                    stack.last!.children.append(span)
+                }
                 i += 1
                 continue
             }
 
             // --- 開き括弧 ---
             if let _ = pairs[c] {
-                stack.append(Builder(open: i, char: c, children: []))
+                let newSpan = KPairSpan(bracketChar: c, range: i..<end, parent: stack.last!)
+                stack.last!.children.append(newSpan)
+                stack.append(newSpan)
                 i += 1
                 continue
             }
 
             // --- 閉じ括弧 ---
-            if let last = stack.last,
-               last.char != 0,
-               let expected = pairs[last.char],
-               expected == c
-            {
-                let done = stack.removeLast()
-                let node = KPairSpan(range: done.open..<(i + 1), spans: done.children)
-                stack[stack.count - 1].children.append(node)
+            if let top = stack.last, let open = pairs.first(where: { $0.value == c })?.key {
+                if top.bracketChar == open {
+                    top.range = top.range.lowerBound..<i + 1
+                    stack.removeLast()
+                }
                 i += 1
                 continue
             }
 
             i += 1
         }
-
-        // 未閉じは捨てる（root の children のみ採用）
-        return KPairSpan(
-            range: slice.startIndex..<slice.endIndex,
-            spans: stack[0].children.sorted { $0.range.lowerBound < $1.range.lowerBound }
-        )
     }
+    
+    var outerRange:Range<Int> { range }
+    
+    var innerRange:Range<Int> { range.lowerBound + 1..<range.upperBound - 1 }
+    
+    var flatSpans:[KPairSpan] {
+        var spans:[KPairSpan] = []
+        if bracketChar != 0 { spans += [self] }
+        for child in children {
+            spans += child.flatSpans
+        }
+        return spans
+    }
+    
+    func fit(for selection:Range<Int>) -> Bool {
+        selection == outerRange || selection == innerRange
+    }
+    
+    func span(contains selection:Range<Int>) -> KPairSpan? {
+        for child in children {
+            if let span = child.span(contains: selection) {
+                return span
+            }
+        }
+        // Range<Int>.contains(_ other:Range<Int>)はother.isEmpty==trueで常にtrueを返す。
+        let isContained = selection.isEmpty ? range.contains(selection.lowerBound) : range.contains(selection)
+        if bracketChar != 0 && isContained {
+            return self
+        }
+        
+        return nil
+    }
+    
+    
+    
+    func nextSpan(contains selection: Range<Int>, includeBrackets: Bool, direction: KDirection) -> KPairSpan? {
+        var allSpans = flatSpans
+        if direction == .backward { allSpans = allSpans.reversed() }
+        
+        if let selected = span(contains: selection) {
+            let isInner = selection == selected.innerRange
+            let isOuter = selection == selected.outerRange
+            let isFit = isInner || isOuter
 
-    // MARK: 探索ユーティリティ
-
-    /// 指定 index を含む最小（最内）スパンを検索（探索時は upperBound も含める）
-    func span(containing index: Int) -> KPairSpan? {
-        for s in spans {
-            if s.range.contains(index) || index == s.range.upperBound {
-                return s.span(containing: index) ?? s
+            // span内部だが一致しないか、またはinnerに一致しつつouter要求またはその逆の場合はそのspanを返す。
+            if !isFit || (isOuter && !includeBrackets) || (isInner && includeBrackets) {
+                return selected
+                
+            } else {
+                // outer→outer または inner→inner の場合は次へ
+                if let i = allSpans.firstIndex(where: { $0 === selected }), i < allSpans.count - 1 {
+                    return allSpans[allSpans.index(after: i)]
+                }
+            }
+        } else {
+            // spanの外の場合
+            for span in allSpans {
+                if direction == .forward {
+                    if span.range.lowerBound > selection.lowerBound {
+                        return span
+                    }
+                } else {
+                    if span.range.upperBound < selection.upperBound {
+                        return span
+                    }
+                }
             }
         }
         return nil
     }
 
-    /// 直下の子を開始位置昇順で返す
-    func directChildren() -> [KPairSpan] {
-        spans.sorted { $0.range.lowerBound < $1.range.lowerBound }
-    }
-
-    /// 行内の全スパンを「左→右の深さ優先順」でフラット化（root 自身は含めない）
-    func flattenPreorder() -> [KPairSpan] {
-        var out: [KPairSpan] = []
-        func walk(_ n: KPairSpan) {
-            out.append(n)
-            for c in n.spans.sorted(by: { $0.range.lowerBound < $1.range.lowerBound }) {
-                walk(c)
-            }
-        }
-        for c in directChildren() { walk(c) }
-        return out
-    }
-
-    /// 右方向：index 以降で「最初に始まる」スパン（absolute）
-    func nextSpan(startingAtOrAfter index: Int) -> KPairSpan? {
-        flattenPreorder()
-            .filter { $0.range.lowerBound >= index }
-            .min { $0.range.lowerBound < $1.range.lowerBound }
-    }
-
-    /// 左方向：index 以前で「最後に終わる」スパン（absolute）
-    func prevSpan(endingAtOrBefore index: Int) -> KPairSpan? {
-        flattenPreorder()
-            .filter { $0.range.upperBound <= index }
-            .max { $0.range.upperBound < $1.range.upperBound }
-    }
-
-    /// needle（子孫）を直接ぶら下げている親と、その子インデックスを探す
-    func findParent(of needle: KPairSpan) -> (parent: KPairSpan, index: Int)? {
-        func walk(_ node: KPairSpan) -> (KPairSpan, Int)? {
-            for (i, c) in node.spans.enumerated() {
-                if c.range == needle.range { return (node, i) }
-                if let hit = walk(c) { return hit }
-            }
-            return nil
-        }
-        return walk(self)
-    }
+    
 }
+
+
+
