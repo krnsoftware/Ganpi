@@ -63,6 +63,9 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     // completion.
     private lazy var _completion: KCompletionController = .init(textView: self)
     
+    // スクロール関連
+    private var _isSmoothScrollEnabled = true
+    
     // マウスによる領域選択に関するプロパティ
     private var _latestClickedCharacterIndex: Int?
     private var _mouseSelectionMode: KMouseSelectionMode = .character
@@ -1914,6 +1917,26 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         NSGraphicsContext.restoreGraphicsState()
     }
     
+    private func scrollClipView(to point: CGPoint) {
+        guard let clipView = enclosingScrollView?.contentView else { return }
+
+        if _isSmoothScrollEnabled {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.2
+                context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                clipView.animator().setBoundsOrigin(point)
+            }
+        } else {
+            clipView.setBoundsOrigin(point)
+        }
+
+        enclosingScrollView?.reflectScrolledClipView(clipView)
+    }
+
+
+    
+    
+    
     
     //MARK: - Caret Movement
     
@@ -2155,7 +2178,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
 
         // ---- スクロール位置を整数行単位で決定 ----
         let newY = CGFloat(newFirstVisibleLineIndex) * lineHeight + topInset
-        clipView.scroll(to: CGPoint(x: clipOrigin.x, y: newY))
+        //clipView.scroll(to: CGPoint(x: clipOrigin.x, y: newY))
+        scrollClipView(to: CGPoint(x: clipOrigin.x, y: newY))
         scrollView.reflectScrolledClipView(clipView)
 
         // ---- キャレット位置の決定 ----
@@ -2218,7 +2242,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         y = y.rounded(.toNearestOrAwayFromZero)
         
         let point = CGPoint(x: clipViewOrigin.x, y: y)
-        clipView.scroll(to: point)
+        //clipView.scroll(to: point)
+        scrollClipView(to: point)
         scrollView.reflectScrolledClipView(clipView)
     }
     
@@ -2484,7 +2509,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         let maxY = max(0, documentBounds.height - visibleSize.height)
         let targetY = max(0, min(rawY, maxY))
 
-        clipView.scroll(to: NSPoint(x: targetX, y: targetY))
+        //clipView.scroll(to: NSPoint(x: targetX, y: targetY))
+        scrollClipView(to: NSPoint(x: targetX, y: targetY))
         scrollView.reflectScrolledClipView(clipView)
     }
     
