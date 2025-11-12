@@ -1086,4 +1086,27 @@ extension KTextView {
             scrollCaretToVisible()
         }
     }
+    
+    // MARK: - Grid View
+    
+    @IBAction func performGridJump(_ sender: Any?) {
+        let grid = KGridView(delegate: self)
+        addSubview(grid)
+        window?.makeFirstResponder(grid)
+    }
+    
+    func selectGridCharacter(at point: CGPoint) {
+        guard let layoutRects = layoutManager.makeLayoutRects() else { log("#01"); return }
+        
+        switch layoutRects.regionType(for: point) {
+        case .text(index: let index, lineIndex: let lineIndex):
+            caretIndex = index
+            
+            
+        default:
+            log("..")
+        }
+        log("point:\(point)")
+        window?.makeFirstResponder(self)
+    }
 }

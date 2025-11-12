@@ -778,8 +778,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         let location = convert(event.locationInWindow, from: nil)
         
-        
-        switch layoutRects.regionType(for: location, layoutManagerRef: _layoutManager, textStorageRef: _textStorageRef){
+        switch layoutRects.regionType(for: location){
         case .text(let index, let lineIndex):
             _latestClickedCharacterIndex = index
             _singleClickPending = false
@@ -868,7 +867,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         if _singleClickPending {
             let location = convert(event.locationInWindow, from: nil)
             if let layoutRect = _layoutManager.makeLayoutRects() {
-                switch layoutRect.regionType(for: location, layoutManagerRef: _layoutManager, textStorageRef: _textStorageRef) {
+                switch layoutRect.regionType(for: location) {
                 case .text(let index, _):
                     caretIndex = index
                     updateCaretPosition()
@@ -935,7 +934,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             return
         }
         
-        switch layoutRects.regionType(for: location, layoutManagerRef: _layoutManager, textStorageRef: _textStorageRef){
+        switch layoutRects.regionType(for: location){
         case .text(let index, _):
             guard let anchor = _latestClickedCharacterIndex else { log("_latestClickedCharacterIndex is nil", from:self); return }
             
@@ -1101,7 +1100,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         let locationInView = convert(sender.draggingLocation, from: nil)
         guard let layoutRects = _layoutManager.makeLayoutRects() else { log("layoutRects is nil", from: self); return false }
         
-        switch layoutRects.regionType(for: locationInView, layoutManagerRef: _layoutManager, textStorageRef: _textStorageRef) {
+        switch layoutRects.regionType(for: locationInView) {
         case .text(let index, _):
             let isSenderMyself = sender.draggingSource as AnyObject? === self
             let isOptionKeyPressed = NSEvent.modifierFlags.contains(.option)
@@ -1147,7 +1146,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         // 該当位置の文字インデックスを取得
         guard let layoutRects = _layoutManager.makeLayoutRects() else { log("layoutRects is nil", from: self); return []}
-        switch layoutRects.regionType(for: locationInView, layoutManagerRef: _layoutManager, textStorageRef: _textStorageRef) {
+        switch layoutRects.regionType(for: locationInView) {
         case .text(let index, _):
             // キャレットを一時的に移動（選択範囲は変更しない）
             moveDropCaret(to: index)

@@ -37,7 +37,7 @@ class KKeyAssign {
     
     // Tables
     private var _normalmodeShortcuts: [KShortCut] = []
-    private var _editmodeShortCuts:   [KShortCut] = []
+    private var _editmodeShortcuts:   [KShortCut] = []
     
     // Sequence buffer & mode/owner
     private var _storedKeyStrokes: [KKeyStroke] = []
@@ -55,7 +55,7 @@ class KKeyAssign {
     }
     
     var shortcuts: [KShortCut] {
-        mode == .normal ? _normalmodeShortcuts : _editmodeShortCuts
+        mode == .normal ? _normalmodeShortcuts : _editmodeShortcuts
     }
     
     var hasStoredKeyStrokes: Bool { !_storedKeyStrokes.isEmpty }
@@ -70,7 +70,7 @@ class KKeyAssign {
     func setShortcuts(with shortcuts:[KShortCut], for mode:KEditMode = .normal) {
         switch mode {
         case .normal: _normalmodeShortcuts = shortcuts
-        case .edit:   _editmodeShortCuts   = shortcuts
+        case .edit:   _editmodeShortcuts   = shortcuts
         }
     }
     

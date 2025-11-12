@@ -97,12 +97,11 @@ struct KLayoutRects {
         case outside
     }
 
-    func regionType(for point: CGPoint,
-                    layoutManagerRef: KLayoutManagerReadable,
-                    textStorageRef: KTextStorageReadable) -> RegionType {
+    
+    func regionType(for point: CGPoint) -> RegionType {
         
-        let lineHeight = layoutManagerRef.lineHeight
-        let lines = layoutManagerRef.lines
+        let lineHeight = _layoutManagerRef.lineHeight
+        let lines = _layoutManagerRef.lines
         let lineCount = lines.count
 
         // LineNumberRegionの場合
@@ -138,7 +137,8 @@ struct KLayoutRects {
                 if relativePoint.y < textEdgeInsets.top {
                     return .text(index: 0, lineIndex: 0)
                 } else if relativePoint.y >= (CGFloat(lineCount) * lineHeight - textEdgeInsets.bottom) {
-                    return .text(index: textStorageRef.count, lineIndex: lines.count - 1)
+                    //return .text(index: textStorageRef.count, lineIndex: lines.count - 1)
+                    return .text(index: _textStorageRef.count, lineIndex: lines.count - 1)
                 }
                 
             }
