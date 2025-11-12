@@ -7,6 +7,9 @@
 //  with architectural assistance by Sebastian, his loyal AI butler.
 //  All rights reserved.
 //
+
+// KTextViewの表示されている文字列をグリッドで区切り、2回のキー入力で目的の位置にキャレットをジャンプする機構。
+
 import AppKit
 
 final class KGridView: NSView {

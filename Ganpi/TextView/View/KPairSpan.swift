@@ -8,10 +8,9 @@
 //  All rights reserved.
 //
 
+// テキストの特定の範囲において、ペアとなる括弧、クオートについてそれらの外側・内側を選択するためのクラス。
+
 import Foundation
-
-
-// KPairSpan.swift
 
 final class KPairSpan: CustomStringConvertible {
     var range: Range<Int>

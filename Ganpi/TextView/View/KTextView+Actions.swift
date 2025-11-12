@@ -1089,6 +1089,8 @@ extension KTextView {
     
     // MARK: - Grid View
     
+    // KTextViewで表示されているテキスト部分をグリッドで区切り、キー操作でユーザの望む位置にキャレットを移動する。
+    
     @IBAction func performGridJump(_ sender: Any?) {
         let grid = KGridView(delegate: self)
         addSubview(grid)
@@ -1098,15 +1100,42 @@ extension KTextView {
     func selectGridCharacter(at point: CGPoint) {
         guard let layoutRects = layoutManager.makeLayoutRects() else { log("#01"); return }
         
-        switch layoutRects.regionType(for: point) {
-        case .text(index: let index, lineIndex: let lineIndex):
-            caretIndex = index
-            
-            
-        default:
-            log("..")
+        // 行末より後の空間を選択しないように上下の行と比較して位置を決定する。
+        // layoutRects.regionType()は利用しない。
+        let top = layoutRects.textEdgeInsets.top
+        let lineHeight = layoutManager.lineHeight
+        let x = point.x - layoutRects.horizontalInsets
+        let lineNum = Int((point.y - top) / lineHeight)
+        guard let line = layoutManager.lines[lineNum] else { log("line:nil"); return}
+        var index = line.characterIndex(for: x) + line.range.lowerBound
+        var xDelta = x - line.characterOffsets.last!
+        
+        // 選択された位置(枠のセンター)がその行の終端より右の場合、上下の行のより選択位置に近いものを採用する。
+        // より厳密に位置決めをするなら、
+        // 1. xDeltaが両方0以下ならpoint.yに近い行を採用
+        // 2. xDeltaが片方0以下ならそれを採用
+        // 3. xDeltaが両方0超過ならよりxDeltaの小さい方を採用
+        // とすればよいが、使用感的には現状でも大きな問題はない様子。
+        if xDelta > 0 {
+            if lineNum > 0, let prevLine = layoutManager.lines[lineNum - 1] {
+                let relIndex = prevLine.characterIndex(for: x) + prevLine.range.lowerBound
+                let relXDelta = x - prevLine.characterOffsets.last!
+                if relXDelta < xDelta {
+                    xDelta = relXDelta
+                    index = relIndex
+                }
+            }
+            if lineNum + 1 < layoutManager.lines.count, let nextLine = layoutManager.lines[lineNum + 1] {
+                let relIndex = nextLine.characterIndex(for: x) + nextLine.range.lowerBound
+                let relXDelta = x - nextLine.characterOffsets.last!
+                if relXDelta < xDelta {
+                    xDelta = relXDelta
+                    index = relIndex
+                }
+            }
         }
-        log("point:\(point)")
+        caretIndex = index
+        
         window?.makeFirstResponder(self)
     }
 }
