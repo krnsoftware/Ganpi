@@ -132,9 +132,18 @@ final class KGridView: NSView {
 
     // MARK: - 閉鎖
     private func closeView() {
-        _delegate = nil
+        // viewの除去
         removeFromSuperview()
+
+        // delegateを保持したまま、イベントループの次のターンでフォーカスを戻す
+        if let delegate = _delegate {
+            DispatchQueue.main.async {
+                delegate.window?.makeFirstResponder(delegate)
+            }
+        }
+        _delegate = nil
     }
+
 
     override func resignFirstResponder() -> Bool {
         closeView()
