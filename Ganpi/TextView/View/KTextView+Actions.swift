@@ -1135,7 +1135,5 @@ extension KTextView {
             }
         }
         caretIndex = index
-        
-        window?.makeFirstResponder(self)
     }
 }
