@@ -113,8 +113,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     var selectionRange: Range<Int> {
         get { _selectionRange }
         set {
-            //_lastCaretIndex = _selectionRange.upperBound
-            
             _selectionRange = newValue
             
             endYankCycle()
@@ -125,9 +123,10 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             
             _ = currentLineIndex
 
-            _caretView.isHidden = !selectionRange.isEmpty
+            //_caretView.isHidden = !selectionRange.isEmpty
             updateCaretPosition()
             sendStatusBarUpdateAction()
+            updateCaretActiveStatus()
             
             needsDisplay = true
         }
@@ -1317,16 +1316,10 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     // MARK: - Notifications
 
     @objc private func windowBecameKey(_ notification: Notification) {
-        // updateActiveState()
-        //_caretView.isHidden = false
-        //_caretView.isHidden = (window?.firstResponder !== self)
-        //_caretView.isHidden = (window?.firstResponder !== self) || !selectionRange.isEmpty
         updateCaretActiveStatus()
     }
 
     @objc private func windowResignedKey(_ notification: Notification) {
-        // updateActiveState()
-        //_caretView.isHidden = true
         updateCaretActiveStatus()
     }
 
@@ -1498,8 +1491,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     func firstRect(forCharacterRange range: NSRange, actualRange: NSRangePointer?) -> NSRect {
         
         if let replacementRange = _replacementRange {
-            log("replacementRange: \(replacementRange), range: \(range)")
-            //guard var point = _layoutManager.lines.pointForFirstRect(for: range.lowerBound) else { log("pointForFirstRect(for:) failed.",from:self); return .zero }
+            //log("replacementRange: \(replacementRange), range: \(range)")
             guard var point = _layoutManager.lines.pointForFirstRect(for: replacementRange.lowerBound) else { log("pointForFirstRect(for:) failed.",from:self); return .zero }
 
             
@@ -1533,30 +1525,37 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 info.range.upperBound == selectionRange.lowerBound /*1文字削除*/ {
                 // このtextviewによる編集。
                 caretIndex = info.range.lowerBound + info.insertedCount
-                //print("自viewによる編集")
+                
             } else {
-                // 他のtextviewやapplescriptなどによる編集。動作検証は未。
-                print("外部による編集")
-                if !(selectionRange.upperBound < info.range.lowerBound || selectionRange.lowerBound > info.range.upperBound) {
-                    print("選択範囲が外部により変更された部位に重なっている。")
-                    caretIndex = info.range.lowerBound + info.insertedCount // 暫定的に挿入部の後端に置く。
+                // 他のtextviewやAppleScriptなどによる編集。
+                //log("the text was edited by another object.",from:self)
+                //現在の選択範囲が挿入された範囲に対して、
+                //1. 前方にある場合: 選択範囲は不変
+                //2. 後方にある場合: 選択範囲は挿入された文字列の増減の分だけシフト
+                //3. 挿入部分を完全に包含する場合: 選択部分の終端を文字列の増減分だけシフト
+                //4. 前後に重なっている場合: 挿入部分の末尾にcaretを移動
+                let delta = info.insertedCount - info.range.count
+                if selectionRange.upperBound < info.range.lowerBound {
+                    // no arrangement of selection
+                } else if selectionRange.lowerBound > info.range.upperBound {
+                    selectionRange = selectionRange.lowerBound + delta..<selectionRange.upperBound + delta
+                } else if selectionRange.lowerBound <= info.range.lowerBound && selectionRange.upperBound >= info.range.upperBound {
+                    selectionRange = selectionRange.lowerBound..<selectionRange.upperBound + delta
                 } else {
-                    caretIndex = info.range.lowerBound + info.insertedCount
+                    caretIndex = selectionRange.upperBound + delta
                 }
             }
-            
-            //sendStatusBarUpdateAction()
             sendEditedToDocument()
+            updateFrameSizeToFitContent()
             
         case let .colorChanged(range):
-            print("カラー変更: range = \(range)")
-            
+            //log("カラー変更: range = \(range)",from:self)
+            updateFrameSizeToFitContent()
+            updateCaretPosition()
+            scrollCaretToVisible()
+            needsDisplay = true
         }
         
-        updateFrameSizeToFitContent()        
-        updateCaretPosition()
-        scrollCaretToVisible()
-        needsDisplay = true
     }
 
     // 別のKTextViewインスタンスから下記の設定を複製する。
