@@ -46,13 +46,34 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
                         
         ]
     
+    // メニュー表示用の文字列
+    var string: String {
+        switch self {
+        case .plain: return "Plain"
+        case .ruby: return "Ruby"
+        case .html: return "HTML"
+        case .ini: return "INI"
+        }
+    }
+    
+    // 設定ファイルに記述された文字列を変換する。
+    static func fromSetting(_ raw: String) -> KSyntaxType {
+        switch raw.lowercased() {
+        case "plain": return .plain
+        case "ruby": return .ruby
+        case "html": return .html
+        case "ini": return .ini
+        default: return .plain
+        }
+    }
+    
     // KSyntaxType.plain.makeParser(storage:self)...といった形で生成する。
     func makeParser(storage:KTextStorageReadable) -> KSyntaxParserProtocol {
         switch self {
         case .plain: return KSyntaxParserPlain(storage: storage)
         case .ruby: return KSyntaxParserRuby(storage: storage)
         case .ini: return KSyntaxParserIni(storage: storage)
-        default: return KSyntaxParserPlain(storage: storage) // 暫定。
+        default: return KSyntaxParserPlain(storage: storage)
         }
     }
     
@@ -73,14 +94,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         return .plain
     }
     
-    var string: String {
-        switch self {
-        case .plain: return "Plain"
-        case .ruby: return "Ruby"
-        case .html: return "HTML"
-        case .ini: return "INI"
-        }
-    }
+    
     
     var description: String {
         return "KSyntaxType: \(self.string)"

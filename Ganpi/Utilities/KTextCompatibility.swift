@@ -8,13 +8,13 @@
 //  All rights reserved.
 //
 
-enum KTextEncoding: CaseIterable, CustomStringConvertible {
-    case utf8
-    case utf16
-    case utf32
-    case jis
-    case sjis
-    case euc
+enum KTextEncoding: String, CaseIterable, CustomStringConvertible {
+    case utf8  = "utf8"
+    case utf16 = "utf16"
+    case utf32 = "utf32"
+    case jis   = "jis"
+    case sjis  = "sjis"
+    case euc   = "euc"
     
     static func normalized(from code: String.Encoding) -> KTextEncoding? {
         switch code {
@@ -28,14 +28,18 @@ enum KTextEncoding: CaseIterable, CustomStringConvertible {
         }
     }
     
+    static func fromSetting(_ raw: String) -> KTextEncoding {
+        return KTextEncoding(rawValue: raw) ?? .utf8
+    }
+    
     func stringEncoding() -> String.Encoding {
         switch self {
-        case .utf8: return .utf8
+        case .utf8:  return .utf8
         case .utf16: return .utf16
         case .utf32: return .utf32
-        case .jis: return .iso2022JP
-        case .sjis: return .shiftJIS
-        case .euc: return .japaneseEUC
+        case .jis:   return .iso2022JP
+        case .sjis:  return .shiftJIS
+        case .euc:   return .japaneseEUC
         }
     }
 
@@ -46,12 +50,12 @@ enum KTextEncoding: CaseIterable, CustomStringConvertible {
     
     var string: String {
         switch self {
-        case .utf8: return "UTF-8"
+        case .utf8:  return "UTF-8"
         case .utf16: return "UTF-16"
         case .utf32: return "UTF-32"
-        case .jis: return "JIS"
-        case .sjis: return "SJIS"
-        case .euc: return "EUC"
+        case .jis:   return "JIS"
+        case .sjis:  return "SJIS"
+        case .euc:   return "EUC"
         }
     }
     
@@ -63,9 +67,14 @@ extension String {
         case cr = "\r"
         case crlf = "\r\n"
         
+        static func fromSetting(_ raw: String) -> ReturnCharacter {
+            return ReturnCharacter(rawValue: raw) ?? .lf
+        }
+        
         var description: String {
             return "KNewlineCharacter: \(self.string)"
         }
+        
         
         var string: String {
             switch self {

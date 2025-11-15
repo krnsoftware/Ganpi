@@ -13,6 +13,44 @@ import Cocoa
 enum KEditMode {
     case normal  // insert characters and functions.
     case edit    // functional key sequence only.
+    
+    static func fromSetting(_ raw: String) -> KEditMode {
+        switch raw.lowercased() {
+        case "normal": return .normal
+        case "edit": return .edit
+        default: return .normal
+        }
+    }
+}
+
+enum KKeyAssignKind {
+    case ganpi
+    case emacs
+    case vi
+    case system
+    case user
+    
+    var fileName: String? {
+        switch self {
+        case .ganpi: return "keymap_ganpi"
+        case .emacs: return "keymap_emacs"
+        case .vi:    return "keymap_vi"
+        case .system: return nil
+        case .user:   return nil
+        }
+    }
+    
+    static func fromSetting(_ raw: String) -> KKeyAssignKind {
+        switch raw.lowercased() {
+        case "ganpi": return .ganpi
+        case "emacs": return .emacs
+        case "vi":    return .vi
+        case "system": return .system
+        case "user":   return .user
+        default:       return .ganpi
+        }
+    }
+
 }
 
 // MARK: - Actions (strict & type-safe)
