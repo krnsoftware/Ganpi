@@ -1136,4 +1136,14 @@ extension KTextView {
         }
         caretIndex = index
     }
+    
+    
+    //MARK: - Test function
+    
+    @IBAction func testFunction(_ sender:Any?) {
+        if let url = Bundle.main.url(forResource: "default", withExtension: "ini") {
+            let dic = KPrefLoader.load(from: url)
+            log("dic: \(dic)")
+        }
+    }
 }
