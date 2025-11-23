@@ -28,8 +28,8 @@ enum KTextEncoding: String, CaseIterable, CustomStringConvertible {
         }
     }
     
-    static func fromSetting(_ raw: String) -> KTextEncoding {
-        return KTextEncoding(rawValue: raw) ?? .utf8
+    static func fromSetting(_ raw: String) -> KTextEncoding? {
+        return KTextEncoding(rawValue: raw)
     }
     
     func stringEncoding() -> String.Encoding {
@@ -67,8 +67,8 @@ extension String {
         case cr = "\r"
         case crlf = "\r\n"
         
-        static func fromSetting(_ raw: String) -> ReturnCharacter {
-            return ReturnCharacter(rawValue: raw) ?? .lf
+        static func fromSetting(_ raw: String) -> ReturnCharacter? {
+            return ReturnCharacter(rawValue: raw)
         }
         
         var description: String {

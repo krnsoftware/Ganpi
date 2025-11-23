@@ -7,129 +7,258 @@
 //  with architectural assistance by Sebastian, his loyal AI butler.
 //  All rights reserved.
 //
+//
+//  KPrefKey.swift
+//  Ganpi
+//
+
+// Ganpi Preferences – Key Definitions (Logical Keys)
+
+enum KPrefKey {
+
+    // ============================
+    // system
+    // ============================
+
+    case systemAutoDetectionNewline
+    case systemAutoDetectionCharacterCode
+    case systemAutoDetectionFileType
+    case systemAppearanceMode     // enumerated
 
 
+    // ============================
+    // document
+    // ============================
 
-import Foundation
+    case documentSizeHeight
+    case documentSizeWidth
 
-enum KPrefKey: String, CaseIterable {
+    case documentNewline
+    case documentCharacterCode
+    case documentFileType
 
-    // ---------------------------------------------------------
-    // [system]
-    // ---------------------------------------------------------
-    case systemAutoDetectNewline     = "system.auto_detection.newline"
-    case systemAutoDetectCharCode    = "system.auto_detection.character_code"
-    case systemAutoDetectFileType    = "system.auto_detection.file_type"
-    case systemAppearance            = "system.appearance"
+    case documentShowLineNumber
+    case documentRejectFontChange
 
-    // ---------------------------------------------------------
-    // [document]
-    // ---------------------------------------------------------
-    case documentSizeHeight          = "document.size.height"
-    case documentSizeWidth           = "document.size.width"
-    case documentNewline             = "document.newline"
-    case documentCharCode            = "document.character_code"
-    case documentFileType            = "document.file_type"
-    case documentShowLineNumber      = "document.show_line_number"
-    case documentSyntaxMenu          = "document.syntax_menu"
-    case documentRejectFontChange    = "document.reject_font_change"
 
-    // ---------------------------------------------------------
-    // [editor]
-    // ---------------------------------------------------------
-    case editorKeyAssign             = "editor.key_assign"
-    case editorUseEditMode           = "editor.use_edit_mode"
-    case editorEditMode              = "editor.edit_mode"
-    case editorUseYankPop            = "editor.use_yank_pop"
-    case editorUseWordCompletion     = "editor.use_word_completion"
+    // ============================
+    // editor
+    // ============================
 
-    // ---------------------------------------------------------
-    // [search_window]
-    // ---------------------------------------------------------
-    case searchWindowFont            = "search_window.search_field.font"
-    case searchWindowFontSize        = "search_window.search_field.font.size"
-    case searchWindowFontFamily      = "search_window.search_field.font.family"
+    case editorKeyAssign          // enumerated
+    case editorUseEditMode
+    case editorEditMode           // enumerated
+    case editorUseYankPop
+    case editorUseWordCompletion
 
-    case searchWindowReplaceFont         = "search_window.replace_field.font"
-    case searchWindowReplaceFontSize     = "search_window.replace_field.font.size"
-    case searchWindowReplaceFontFamily   = "search_window.replace_field.font.family"
 
-    case searchWindowCloseWhenDone   = "search_window.close_when_done"
-    case searchWindowIgnoreCase      = "search_window.ignore_case"
-    case searchWindowUseRegex        = "search_window.use_regex"
+    // ============================
+    // search window
+    // ============================
 
-    // ---------------------------------------------------------
-    // [color_panel]
-    // ---------------------------------------------------------
-    case colorPanelWithAlpha         = "color_panel.with_alpha"
+    case searchFieldFontSize
+    case searchFieldFontFamily
 
-    // ---------------------------------------------------------
-    // [parser.base]
-    // ---------------------------------------------------------
-    case parserBaseTabWidth          = "parser.base.tab_width"
-    case parserBaseLineSpacing       = "parser.base.line_spacing"
-    case parserBaseWordWrap          = "parser.base.word_wrap"
-    case parserBaseAutoIndent        = "parser.base.auto_indent"
-    case parserBaseShowInvisibles    = "parser.base.show.invisibles"
-    case parserBaseWrapLineOffset    = "parser.base.wrapline_offset"
+    case replaceFieldFontSize
+    case replaceFieldFontFamily
 
-    case parserBaseShowInvTab        = "parser.base.show.invisibles.tab"
-    case parserBaseShowInvNewline    = "parser.base.show.invisibles.newline"
-    case parserBaseShowInvSpace      = "parser.base.show.invisibles.space"
-    case parserBaseShowInvFullWidth  = "parser.base.show.invisibles.fullwidth_space"
+    case searchWindowCloseWhenDone
+    case searchWindowIgnoreCase
+    case searchWindowUseRegex
 
-    case parserBaseGlyphNewline      = "parser.base.invisibles.glyph.newline"
-    case parserBaseGlyphTab          = "parser.base.invisibles.glyph.tab"
-    case parserBaseGlyphSpace        = "parser.base.invisibles.glyph.space"
-    case parserBaseGlyphFullWidth    = "parser.base.invisibles.glyph.fullwidth_space"
 
-    // ---- light/dark color (dark variant の存在を schema が管理) ----
-    case parserBaseColorText         = "parser.base.color.text"
-    case parserBaseColorBackground   = "parser.base.color.background"
-    case parserBaseColorLiteral      = "parser.base.color.literal"
-    case parserBaseColorComment      = "parser.base.color.comment"
-    case parserBaseColorVariable     = "parser.base.color.variable"
-    case parserBaseColorKeyword      = "parser.base.color.keyword"
-    case parserBaseColorNumeric      = "parser.base.color.numeric"
-    case parserBaseColorInvisibles   = "parser.base.color.invisibles"
-    case parserBaseColorCompletion   = "parser.base.color.completion"
-    case parserBaseColorSelection    = "parser.base.color.selection_highlight"
+    // ============================
+    // color panel
+    // ============================
 
-    case parserBaseFont              = "parser.base.font"
-    case parserBaseFontFamily        = "parser.base.font.family"
-    case parserBaseFontSize          = "parser.base.font.size"
+    case colorPanelWithAlpha
 
-    // ---------------------------------------------------------
-    // [parser.plain]
-    // ---------------------------------------------------------
-    case parserPlainColorText        = "parser.plain.color.text"
-    case parserPlainColorComment     = "parser.plain.color.comment"
-    case parserPlainColorKeyword     = "parser.plain.color.keyword"
-    case parserPlainColorLiteral     = "parser.plain.color.literal"
-    case parserPlainColorBackground  = "parser.plain.color.background"
 
-    // ---------------------------------------------------------
-    // [parser.ruby]
-    // ---------------------------------------------------------
-    case parserRubyColorComment      = "parser.ruby.color.comment"
-    case parserRubyColorKeyword      = "parser.ruby.color.keyword"
-    case parserRubyColorLiteral      = "parser.ruby.color.literal"
-    case parserRubyColorNumeric      = "parser.ruby.color.numeric"
-    case parserRubyColorVariable     = "parser.ruby.color.variable"
+    // ============================
+    // parser settings（base 設定の論理キー）
+    //
+    // rawKey は parser.base.… に紐づく。
+    // lang 付き呼び出しで fallback:
+    //   parser.<lang>.xxx
+    //   parser.base.xxx
+    //   default
+    // ============================
 
-    // ---------------------------------------------------------
-    // [parser.html]
-    // ---------------------------------------------------------
-    case parserHtmlColorTag          = "parser.html.color.tag"
-    case parserHtmlColorLiteral      = "parser.html.color.literal"
-    case parserHtmlColorComment      = "parser.html.color.comment"
-    case parserHtmlColorKeyword      = "parser.html.color.keyword"
+    case parserTabWidth
+    case parserLineSpacing
+    case parserWordWrap
+    case parserAutoIndent
+    case parserShowInvisibles
+    case parserWraplineOffset     // enumerated
 
-    // ---------------------------------------------------------
-    // [parser.css]
-    // ---------------------------------------------------------
-    case parserCssColorText          = "parser.css.color.text"
-    case parserCssColorKeyword       = "parser.css.color.keyword"
-    case parserCssColorComment       = "parser.css.color.comment"
-    case parserCssColorLiteral       = "parser.css.color.literal"
+    case parserShowInvisiblesTab
+    case parserShowInvisiblesNewline
+    case parserShowInvisiblesSpace
+    case parserShowInvisiblesFullwidthSpace
+
+    case parserInvisiblesGlyphNewline
+    case parserInvisiblesGlyphTab
+    case parserInvisiblesGlyphSpace
+    case parserInvisiblesGlyphFullwidthSpace
+
+
+    // ============================
+    // parser color（論理キー）
+    //
+    // rawKey は parser.base.color.… に紐づける
+    // ============================
+
+    case parserColorText
+    case parserColorBackground
+    case parserColorLiteral
+    case parserColorComment
+    case parserColorVariable
+    case parserColorKeyword
+    case parserColorNumeric
+    case parserColorInvisibles
+    case parserColorCompletion
+    case parserColorSelectionHighlight
+
+
+    // ============================
+    // parser font（論理キー）
+    // ============================
+
+    case parserFontFamily
+    case parserFontSize
+    case parserFont        // 抽象キー（rawKey: nil）
+
+
+    // ============================
+    // rawKey mapping
+    // ============================
+
+    var rawKey: String? {
+        switch self {
+
+        // ---- system ----
+        case .systemAutoDetectionNewline:
+            return "system.auto_detection.newline"
+        case .systemAutoDetectionCharacterCode:
+            return "system.auto_detection.character_code"
+        case .systemAutoDetectionFileType:
+            return "system.auto_detection.file_type"
+        case .systemAppearanceMode:
+            return "system.appearance_mode"
+
+        // ---- document ----
+        case .documentSizeHeight:
+            return "document.size.height"
+        case .documentSizeWidth:
+            return "document.size.width"
+
+        case .documentNewline:
+            return "document.newline"
+        case .documentCharacterCode:
+            return "document.character_code"
+        case .documentFileType:
+            return "document.file_type"
+
+        case .documentShowLineNumber:
+            return "document.show_line_number"
+        case .documentRejectFontChange:
+            return "document.reject_font_change"
+
+        // ---- editor ----
+        case .editorKeyAssign:
+            return "editor.key_assign"
+        case .editorUseEditMode:
+            return "editor.use_edit_mode"
+        case .editorEditMode:
+            return "editor.edit_mode"
+        case .editorUseYankPop:
+            return "editor.use_yank_pop"
+        case .editorUseWordCompletion:
+            return "editor.use_word_completion"
+
+        // ---- search window ----
+        case .searchFieldFontSize:
+            return "search_window.search_field.font.size"
+        case .searchFieldFontFamily:
+            return "search_window.search_field.font.family"
+
+        case .replaceFieldFontSize:
+            return "search_window.replace_field.font.size"
+        case .replaceFieldFontFamily:
+            return "search_window.replace_field.font.family"
+
+        case .searchWindowCloseWhenDone:
+            return "search_window.close_when_done"
+        case .searchWindowIgnoreCase:
+            return "search_window.ignore_case"
+        case .searchWindowUseRegex:
+            return "search_window.use_regex"
+
+        // ---- color panel ----
+        case .colorPanelWithAlpha:
+            return "color_panel.with_alpha"
+
+        // ---- parser general ----
+        case .parserTabWidth:
+            return "parser.base.tab_width"
+        case .parserLineSpacing:
+            return "parser.base.line_spacing"
+        case .parserWordWrap:
+            return "parser.base.word_wrap"
+        case .parserAutoIndent:
+            return "parser.base.auto_indent"
+        case .parserShowInvisibles:
+            return "parser.base.show.invisibles"
+        case .parserWraplineOffset:
+            return "parser.base.wrapline_offset"
+
+        case .parserShowInvisiblesTab:
+            return "parser.base.show_invisibles.tab"
+        case .parserShowInvisiblesNewline:
+            return "parser.base.show_invisibles.newline"
+        case .parserShowInvisiblesSpace:
+            return "parser.base.show_invisibles.space"
+        case .parserShowInvisiblesFullwidthSpace:
+            return "parser.base.show_invisibles.fullwidth_space"
+
+        case .parserInvisiblesGlyphNewline:
+            return "parser.base.invisibles.glyph.newline"
+        case .parserInvisiblesGlyphTab:
+            return "parser.base.invisibles.glyph.tab"
+        case .parserInvisiblesGlyphSpace:
+            return "parser.base.invisibles.glyph.space"
+        case .parserInvisiblesGlyphFullwidthSpace:
+            return "parser.base.invisibles.glyph.fullwidth_space"
+
+        // ---- parser color ----
+        case .parserColorText:
+            return "parser.base.color.text"
+        case .parserColorBackground:
+            return "parser.base.color.background"
+        case .parserColorLiteral:
+            return "parser.base.color.literal"
+        case .parserColorComment:
+            return "parser.base.color.comment"
+        case .parserColorVariable:
+            return "parser.base.color.variable"
+        case .parserColorKeyword:
+            return "parser.base.color.keyword"
+        case .parserColorNumeric:
+            return "parser.base.color.numeric"
+        case .parserColorInvisibles:
+            return "parser.base.color.invisibles"
+        case .parserColorCompletion:
+            return "parser.base.color.completion"
+        case .parserColorSelectionHighlight:
+            return "parser.base.color.selection_highlight"
+
+        // ---- parser font ----
+        case .parserFontFamily:
+            return "parser.base.font.family"
+        case .parserFontSize:
+            return "parser.base.font.size"
+        case .parserFont:
+            return nil
+        }
+    }
 }

@@ -40,14 +40,14 @@ enum KKeyAssignKind {
         }
     }
     
-    static func fromSetting(_ raw: String) -> KKeyAssignKind {
+    static func fromSetting(_ raw: String) -> KKeyAssignKind? {
         switch raw.lowercased() {
         case "ganpi": return .ganpi
         case "emacs": return .emacs
         case "vi":    return .vi
         case "system": return .system
         case "user":   return .user
-        default:       return .ganpi
+        default:       return nil
         }
     }
 

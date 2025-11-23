@@ -1141,9 +1141,9 @@ extension KTextView {
     //MARK: - Test function
     
     @IBAction func testFunction(_ sender:Any?) {
-        if let url = Bundle.main.url(forResource: "default", withExtension: "ini") {
-            let dic = KPrefLoader.load(from: url)
-            log("dic: \(dic)")
-        }
+        let prefs = KPreference.shared
+        log("baseFont:\(prefs.font(.parserFont))")
+        log("showLineNumber:\(prefs.bool(.documentShowLineNumber))")
+        log("colorTextDark:\(prefs.color(.parserColorText))")
     }
 }

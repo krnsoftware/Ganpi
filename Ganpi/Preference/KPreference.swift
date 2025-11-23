@@ -8,186 +8,255 @@
 //  All rights reserved.
 //
 
-
-
-//
-//  KPreference.swift
-//  Ganpi - macOS Text Editor
-//
-//  設定ファイル（default.ini, user.ini）を読み込み、
-//  内部的に型変換を行った上で value accessor を提供する。
-//  列挙型は String のまま保持し、getter 側で fromSetting() を実行。
-//  色は light/dark に対応し fallback を処理する。
-//
-
-
+import Foundation
 import AppKit
 
 final class KPreference {
 
-    // シングルトン
     static let shared = KPreference()
 
-    // KPrefKey → 生文字列（loader が生成）
-    private var _rawValues: [KPrefKey: String] = [:]
+    private let _defaultINI: URL
+    private let _userINI: URL
 
-    // KPrefKey → 型変換後の値（Color/Font/Bool/Int/Float/String）
-    private var _values: [KPrefKey: Any] = [:]
+    private var _values: [String : Any] = [:]
+    private var _appearanceMode: KAppearance = .system
+    private var _currentAppearance: KAppearance = .light
 
-    private init() {}
+    private var _colorCache: [String : NSColor] = [:]
+    private var _fontCache:  [String : NSFont]  = [:]
+
+    private init() {
+
+        _defaultINI = Bundle.main.url(forResource: "default", withExtension: "ini")!
+
+        let support = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library")
+            .appendingPathComponent("Application Support")
+            .appendingPathComponent("Ganpi")
+
+        _userINI = support.appendingPathComponent("user.ini")
+
+        load()
+    }
 
 
-    // MARK: - Load (default.ini + user.ini)
-
-    func load(defaultURL: URL, userURL: URL?) {
-        _rawValues.removeAll()
+    func load() {
         _values.removeAll()
+        _colorCache.removeAll()
+        _fontCache.removeAll()
 
-        // --- default.ini （必須。読めない場合も空辞書が返る）---
-        let rawDefault = KPrefLoader.load(from: defaultURL)
-        if rawDefault.isEmpty {
-            log("KPreference.load(): default.ini is empty or could not be read")
+        let base = KPrefLoader.load(from: _defaultINI)
+        let user = KPrefLoader.load(from: _userINI)
+
+        var merged = base
+        for (k,v) in user { merged[k] = v }
+
+        for (fullKey, raw) in merged {
+
+            if let schema = KPrefSchema.table[fullKey] {
+
+                switch schema.type {
+
+                case .bool:
+                    let lc = raw.lowercased()
+                    if lc == "true" {
+                        _values[fullKey] = true
+                    } else if lc == "false" {
+                        _values[fullKey] = false
+                    } else {
+                        log("Invalid bool '\(raw)' for key '\(fullKey)'", from: self)
+                    }
+
+                case .int:
+                    if let v = Int(raw) {
+                        _values[fullKey] = v
+                    } else {
+                        log("Invalid int '\(raw)' for key '\(fullKey)'", from: self)
+                    }
+
+                case .float:
+                    if let d = Double(raw) {
+                        _values[fullKey] = CGFloat(d)
+                    } else {
+                        log("Invalid float '\(raw)' for key '\(fullKey)'", from: self)
+                    }
+
+                case .string:
+                    _values[fullKey] = raw
+
+                case .enumerated:
+                    _values[fullKey] = raw
+
+                case .color:
+                    if let c = NSColor(hexString: raw) {
+                        _values[fullKey] = c
+                    } else {
+                        log("Invalid color '\(raw)' for key '\(fullKey)'", from: self)
+                    }
+
+                case .font:
+                    _values[fullKey] = raw
+                }
+
+            } else {
+                _values[fullKey] = raw
+            }
         }
-        merge(rawDefault)
 
-        // --- user.ini （任意。存在しなければ呼び出し側で nil を渡す）---
-        if let userURL {
-            let rawUser = KPrefLoader.load(from: userURL)
-            if rawUser.isEmpty {
-                log("KPreference.load(): user.ini is empty or could not be read")
-            }
-            merge(rawUser)
-        }
-
-        // --- 生文字列を内部型へ変換 ---
-        convertAll()
-    }
-
-
-
-    // MARK: - Raw merge
-
-    /// loader の [String:String]（フルキー → 値）を rawValue 辞書へ統合
-    private func merge(_ dict: [String:String]) {
-        for (fullKey, val) in dict {
-            guard let key = KPrefKey(rawValue: fullKey) else {
-                log("KPreference.merge(): unknown key '\(fullKey)'")
-                continue
-            }
-            _rawValues[key] = val
-        }
-    }
-
-
-    // MARK: - Convert rawValue → typed value
-
-    private func convertAll() {
-        for entry in KPrefSchema.all {
-            let key = entry.key
-
-            guard let rawStr = _rawValues[key] else {
-                // 設定が存在しない（default.ini でも user.ini でも無い）
-                // → _values に登録しない（getter 側で default を適用）
-                continue
-            }
-
-            let converted: Any?
-
-            switch entry.type {
-
-            case .bool:
-                converted = Bool(rawStr)
-
-            case .int:
-                converted = Int(rawStr)
-
-            case .float:
-                converted = CGFloat(Double(rawStr) ?? 0.0)
-
-            case .string:
-                converted = rawStr
-
-            case .enumerated:
-                converted = rawStr   // enum 化は getter で実施
-
-            case .color:
-                converted = parseColor(rawStr)
-
-            case .font:
-                converted = parseFont(rawStr)
-            }
-
-            if converted == nil {
-                log("KPreference.convertAll(): invalid value for \(key.rawValue) = '\(rawStr)'")
-            }
-
-            if let v = converted {
-                _values[key] = v
-            }
+        if let raw = _values["system.appearance_mode"] as? String {
+            _appearanceMode = KAppearance.fromSetting(raw)
         }
     }
 
 
-    // MARK: - Color/Font parsing
 
-    private func parseColor(_ s: String) -> NSColor? {
-        // "#RRGGBB" 形式
-        guard s.hasPrefix("#") else { return nil }
-        let hex = String(s.dropFirst())
+    // ---------- Public Getter（Non-Optional + loud fallback）
 
-        guard hex.count == 6,
-              let rgb = Int(hex, radix: 16) else { return nil }
-
-        let r = CGFloat((rgb >> 16) & 0xFF) / 255.0
-        let g = CGFloat((rgb >> 8) & 0xFF) / 255.0
-        let b = CGFloat(rgb & 0xFF) / 255.0
-        return NSColor(calibratedRed: r, green: g, blue: b, alpha: 1.0)
+    func bool(_ key: KPrefKey, lang: KSyntaxType? = nil) -> Bool {
+        if let v = _boolInternal(key, lang: lang) { return v }
+        log("Missing Bool for '\(key.rawKey ?? "?")' — fallback to false", from: self)
+        return false
     }
 
-    private func parseFont(_ s: String) -> NSFont? {
-        // "FontName 14.0"
-        let parts = s.split(separator: " ")
-        guard parts.count >= 2 else { return nil }
-
-        let fam = parts.dropLast().joined(separator: " ")
-        guard let size = Double(parts.last!) else { return nil }
-
-        return NSFont(name: fam, size: CGFloat(size))
+    func int(_ key: KPrefKey, lang: KSyntaxType? = nil) -> Int {
+        if let v = _intInternal(key, lang: lang) { return v }
+        log("Missing Int for '\(key.rawKey ?? "?")' — fallback to 0", from: self)
+        return 0
     }
 
-
-    // MARK: - Getter（型別アクセサ）
-
-    func bool(_ key: KPrefKey, default def: Bool) -> Bool {
-        (_values[key] as? Bool) ?? def
+    func float(_ key: KPrefKey, lang: KSyntaxType? = nil) -> CGFloat {
+        if let v = _floatInternal(key, lang: lang) { return v }
+        log("Missing Float for '\(key.rawKey ?? "?")' — fallback to 0", from: self)
+        return 0.0
     }
 
-    func int(_ key: KPrefKey, default def: Int) -> Int {
-        (_values[key] as? Int) ?? def
+    func string(_ key: KPrefKey, lang: KSyntaxType? = nil) -> String {
+        if let v = _stringInternal(key, lang: lang) { return v }
+        log("Missing String for '\(key.rawKey ?? "?")' — fallback to \"\"", from: self)
+        return ""
     }
 
-    func float(_ key: KPrefKey, default def: CGFloat) -> CGFloat {
-        (_values[key] as? CGFloat) ?? def
-    }
+    func color(_ key: KPrefKey, lang: KSyntaxType? = nil) -> NSColor {
+        let resolved = _selectColorKey(key)
 
-    func string(_ key: KPrefKey, default def: String = "") -> String {
-        (_values[key] as? String) ?? def
-    }
-
-    func color(_ key: KPrefKey,
-               lightDefault: NSColor,
-               darkDefault: NSColor) -> NSColor {
-
-        // 値そのもの
-        if let c = _values[key] as? NSColor {
+        if let cached = _colorCache[resolved] { return cached }
+        if let c = _colorInternal(resolved) {
+            _colorCache[resolved] = c
             return c
         }
 
-        // dark の fallback 判定は外部（KParser など）が呼ぶ想定
-        return lightDefault
+        log("Missing color for '\(resolved)' — fallback to black", from: self)
+        let fallback = NSColor.black
+        _colorCache[resolved] = fallback
+        return fallback
     }
 
-    func font(_ key: KPrefKey, default def: NSFont) -> NSFont {
-        (_values[key] as? NSFont) ?? def
+    func font(_ key: KPrefKey, lang: KSyntaxType? = nil) -> NSFont {
+        let fam  = string(.parserFontFamily, lang: lang)
+        let size = float(.parserFontSize,  lang: lang)
+
+        if let cached = _fontCache["\(fam):\(size)"] { return cached }
+
+        let f = NSFont(name: fam, size: size) ?? NSFont.systemFont(ofSize: size)
+        _fontCache["\(fam):\(size)"] = f
+        return f
+    }
+    
+    // MARK: - Enum Getters
+
+    func appearanceMode() -> KAppearance {
+        let raw = string(.systemAppearanceMode)
+        return KAppearance.fromSetting(raw)
+    }
+
+    func keyAssign() -> KKeyAssignKind {
+        let raw = string(.editorKeyAssign)
+        if let v = KKeyAssignKind.fromSetting(raw) {
+            return v
+        }
+        log("Invalid key_assign '\(raw)' — fallback to .ganpi", from: self)
+        return .ganpi
+    }
+
+    func editMode() -> KEditMode {
+        let raw = string(.editorEditMode)
+        return KEditMode.fromSetting(raw)
+    }
+
+    // wrapline_offset（言語依存）
+    func wraplineOffset(_ lang: KSyntaxType?) -> KWrapLineOffsetType {
+        if let raw = _stringInternal(.parserWraplineOffset, lang: lang),
+           let v = KWrapLineOffsetType.fromSetting(raw) {
+            return v
+        }
+        log("Invalid wrapline_offset — fallback to .same", from: self)
+        return .same
+    }
+
+
+
+    // ---------- Internal Optional Getter
+
+    private func _boolInternal(_ key: KPrefKey, lang: KSyntaxType?) -> Bool? {
+        _lookup(key, lang: lang) as? Bool
+    }
+
+    private func _intInternal(_ key: KPrefKey, lang: KSyntaxType?) -> Int? {
+        _lookup(key, lang: lang) as? Int
+    }
+
+    private func _floatInternal(_ key: KPrefKey, lang: KSyntaxType?) -> CGFloat? {
+        _lookup(key, lang: lang) as? CGFloat
+    }
+
+    private func _stringInternal(_ key: KPrefKey, lang: KSyntaxType?) -> String? {
+        _lookup(key, lang: lang) as? String
+    }
+
+    private func _colorInternal(_ rk: String) -> NSColor? {
+        _values[rk] as? NSColor
+    }
+
+
+    // ---------- Lookup with meta-table
+
+    private func _lookup(_ key: KPrefKey, lang: KSyntaxType?) -> Any? {
+
+        if let lang = lang,
+           let base = key.rawKey,
+           base.hasPrefix("parser.base.") {
+
+            let suffix = base.dropFirst("parser.base.".count)
+            let ln = lang.settingName
+            let lk = "parser.\(ln).\(suffix)"
+
+            if let v = _values[lk] { return v }
+        }
+
+        if let rk = key.rawKey, let v = _values[rk] { return v }
+
+        return nil
+    }
+
+
+    private func _selectColorKey(_ key: KPrefKey) -> String {
+        guard let raw = key.rawKey else { return "" }
+
+        switch _currentAppearance {
+
+        case .light:
+            if _values[raw] != nil { return raw }
+            let dark = raw + ".dark"
+            return _values[dark] != nil ? dark : raw
+
+        case .dark:
+            let dark = raw + ".dark"
+            if _values[dark] != nil { return dark }
+            return raw
+
+        default:
+            log("Unexpected appearance '\(_currentAppearance)' — fallback base color", from: self)
+            return raw
+        }
     }
 }

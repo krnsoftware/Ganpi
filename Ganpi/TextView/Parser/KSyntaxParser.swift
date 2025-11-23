@@ -56,15 +56,32 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         }
     }
     
-    // 設定ファイルに記述された文字列を変換する。
-    static func fromSetting(_ raw: String) -> KSyntaxType {
-        switch raw.lowercased() {
-        case "plain": return .plain
-        case "ruby": return .ruby
-        case "html": return .html
-        case "ini": return .ini
-        default: return .plain
-        }
+    // 設定ファイルに記述された文字列をenumに変換する。
+    static func fromSetting(_ raw: String) -> KSyntaxType? {
+        let key = raw.lowercased()
+        return KSyntaxMeta.reverse[key]
+    }
+    
+    // enumを設定ファイルに記述される文字列に変換する。
+    var settingName: String {
+        return KSyntaxMeta.map[self]!
+    }
+    
+    // enumと設定名の対応を示す構造体。
+    private struct KSyntaxMeta {
+        // enum → 設定名
+        static let map: [KSyntaxType : String] = [
+            .plain : "plain",
+            .ruby  : "ruby",
+            .html  : "html",
+            .ini   : "ini"
+        ]
+        // 設定名 → enum
+        static let reverse: [String : KSyntaxType] = {
+            var r: [String : KSyntaxType] = [:]
+            for (k, v) in map { r[v] = k }
+            return r
+        }()
     }
     
     // KSyntaxType.plain.makeParser(storage:self)...といった形で生成する。

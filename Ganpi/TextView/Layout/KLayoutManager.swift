@@ -34,14 +34,14 @@ enum KWrapLineOffsetType : Int {
     case tab1_5 = 3 // 最初の行の更に1.5tab分右にオフセット
     case tab2 = 4 // 最初の行の更に2tab分右にオフセット
     
-    static func fromSetting(_ raw:String) -> KWrapLineOffsetType {
+    static func fromSetting(_ raw:String) -> KWrapLineOffsetType? {
         switch raw.lowercased() {
         case "none": return .none
         case "same": return .same
         case "1tab": return .tab1
         case "1.5tab": return .tab1_5
         case "2tab": return .tab2
-        default: return .none
+        default: return nil
         }
     }
 }
