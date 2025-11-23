@@ -117,7 +117,8 @@ enum KPrefKey {
     case parserColorNumeric
     case parserColorInvisibles
     case parserColorCompletion
-    case parserColorSelectionHighlight
+    case parserColorSelectionHighlightActive
+    case parserColorSelectionHighlightInactive
 
 
     // ============================
@@ -249,8 +250,11 @@ enum KPrefKey {
             return "parser.base.color.invisibles"
         case .parserColorCompletion:
             return "parser.base.color.completion"
-        case .parserColorSelectionHighlight:
-            return "parser.base.color.selection_highlight"
+        case .parserColorSelectionHighlightActive:
+            return "parser.base.color.selection_highlight.active"
+        case .parserColorSelectionHighlightInactive:
+            return "parser.base.color.selection_highlight.inactive"
+
 
         // ---- parser font ----
         case .parserFontFamily:
