@@ -28,8 +28,8 @@ final class KSyntaxParserPlain: KSyntaxParserProtocol {
     // ハイライトなし
     func attributes(in range: Range<Int>, tabWidth: Int) -> [KAttributedSpan] { [] }
     
-    var baseTextColor: NSColor { NSColor.black }
-    var backgroundColor: NSColor { NSColor.white }
+    var baseTextColor: NSColor { KPreference.shared.color(.parserColorText, lang: .plain) }
+    var backgroundColor: NSColor { KPreference.shared.color(.parserColorBackground, lang: .plain) }
     
     // 欧文のみ（日本語は storage.wordRange が先に処理）
     func wordRange(at index: Int) -> Range<Int>? { return nil }
