@@ -621,7 +621,9 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         // 行番号部分を描画。
         if _showLineNumbers, let lnRect = layoutRects.lineNumberRegion?.rect {
-            NSColor.white.setFill()
+            
+            //NSColor.white.setFill()
+            NSColor.windowBackgroundColor.setFill()
             lnRect.fill()
             
             // 非選択行の文字のattribute

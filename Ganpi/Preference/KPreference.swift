@@ -187,20 +187,8 @@ final class KPreference {
         return f
     }
 
+    
     // enum 型
-
-    func appearanceMode() -> KAppearance {
-        //KAppearance.fromSetting(string(.systemAppearanceMode))
-        if let raw = _userValues["system.appearance_mode"] as? String {
-            return KAppearance.fromSetting(raw)
-        }
-        if let raw = _defaultValues["system.appearance_mode"] as? String {
-            return KAppearance.fromSetting(raw)
-        }
-        // default.ini に必ず存在するため本来到達しないが一応
-        log("Missing system.appearance_mode — fallback to system", from: self)
-        return .system
-    }
 
     func keyAssign() -> KKeyAssignKind {
         let raw = string(.editorKeyAssign)

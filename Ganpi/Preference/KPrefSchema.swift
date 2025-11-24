@@ -38,9 +38,6 @@ struct KPrefSchema {
         "system.auto_detection.character_code"  : .init(type: .bool),
         "system.auto_detection.file_type"       : .init(type: .bool),
         
-        // enumerated (system|light|dark)
-        "system.appearance_mode"                : .init(type: .enumerated),
-        
         
         // -----------------------------
         // document
