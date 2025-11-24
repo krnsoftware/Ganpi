@@ -1525,6 +1525,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 info.range.upperBound == selectionRange.lowerBound /*1文字削除*/ {
                 // このtextviewによる編集。
                 caretIndex = info.range.lowerBound + info.insertedCount
+                scrollSelectionToVisible()
                 
             } else {
                 // 他のtextviewやAppleScriptなどによる編集。
