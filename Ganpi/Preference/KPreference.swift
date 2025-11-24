@@ -72,13 +72,21 @@ final class KPreference {
     private func loadOne(dict: [String:String], into store: inout [String:Any]) {
         for (key, raw) in dict {
             
+            var modifiedKey = key
+            
             // .darkについてはそれを取り除いたkeyでschemaを取り出す。
-            var modifiedKey:String
-            if key.hasSuffix(".dark") {
-                modifiedKey = String(key.dropLast(5))
-            } else {
-                modifiedKey = key
+            let darkSuffix = ".dark"
+            if modifiedKey.hasSuffix(darkSuffix) {
+                modifiedKey = String(modifiedKey.dropLast(darkSuffix.count))
             }
+            
+            // parser.<lang>. の場合、schemaはparser.base.のものを使用する。
+            modifiedKey = modifiedKey.replacingOccurrences(
+                of: #"^parser\.[A-Za-z_]+\."#,
+                with: "parser.base.",
+                options: .regularExpression
+            )
+
                         
             if let schema = KPrefSchema.table[modifiedKey] {
                 switch schema.type {
