@@ -70,7 +70,8 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
         "defined?"
     ]
     
-    // 既定テーマ（必要最小限）
+    // 既定テーマ
+    
     private static let _builtInTheme: [KFunctionalColor: NSColor] = [
         .base:       NSColor.labelColor,
         .background: NSColor.textBackgroundColor,
@@ -90,7 +91,18 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
     init(storage: KTextStorageReadable) {
         self.storage = storage
         setKeywords(Self._defaultKeywords)
-        setTheme(Self._builtInTheme)
+        //setTheme(Self._builtInTheme)
+        
+        let prefs = KPreference.shared
+        var theme:[KFunctionalColor: NSColor] = [:]
+        theme[.base] = prefs.color(.parserColorText, lang: .ruby)
+        theme[.background] = prefs.color(.parserColorBackground, lang: .ruby)
+        theme[.comment] = prefs.color(.parserColorComment, lang: .ruby)
+        theme[.string] = prefs.color(.parserColorLiteral, lang: .ruby)
+        theme[.keyword] = prefs.color(.parserColorKeyword, lang: .ruby)
+        theme[.variable] = prefs.color(.parserColorVariable, lang: .ruby)
+        theme[.number] = prefs.color(.parserColorNumeric, lang: .ruby)
+        setTheme(theme)
     }
 
     // MARK: - Protocol basics

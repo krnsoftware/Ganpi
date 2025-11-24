@@ -1144,6 +1144,6 @@ extension KTextView {
         let prefs = KPreference.shared
         log("baseFont:\(prefs.font(.parserFont))")
         log("showLineNumber:\(prefs.bool(.documentShowLineNumber))")
-        log("colorTextDark:\(prefs.color(.parserColorText))")
+        log("colorTextDark:\(prefs.color(.parserColorText, lang:.ruby))")
     }
 }
