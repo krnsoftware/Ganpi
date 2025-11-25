@@ -287,7 +287,7 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
 
         // 見た目（薄いセパレータ）
         _statusBarView.wantsLayer = true
-        _statusBarView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+        
         let separator = NSBox()
         separator.boxType = .separator
         separator.translatesAutoresizingMaskIntoConstraints = false
@@ -301,6 +301,7 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         buildStatusBarUI()
         updateStatusBar()
     }
+    
 
     // MARK: - Build split view + first pane
 

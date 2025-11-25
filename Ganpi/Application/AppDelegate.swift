@@ -7,15 +7,6 @@
 
 import Cocoa
 
-enum KAppearance: String {
-    case system = "system"
-    case light = "light"
-    case dark = "dark"
-    
-    static func fromSetting(_ raw: String) -> KAppearance {
-        return KAppearance(rawValue: raw) ?? .system
-    }
-}
 
 @main
 class AppDelegate: NSObject, NSApplicationDelegate {

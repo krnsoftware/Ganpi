@@ -198,6 +198,7 @@ protocol KSyntaxParserProtocol: AnyObject {
     var baseTextColor: NSColor { get }
     var backgroundColor: NSColor { get }
     func setTheme(_ theme: [KFunctionalColor: NSColor])
+    func reloadTheme() //reloading all colors.
     
     // caretのindex:iに於いてそれに属すると思われる単語の領域。
     func wordRange(at index: Int) -> Range<Int>?

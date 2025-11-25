@@ -69,21 +69,6 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
         "module","ensure","unless","return","rescue",
         "defined?"
     ]
-    
-    // 既定テーマ
-    
-    private static let _builtInTheme: [KFunctionalColor: NSColor] = [
-        .base:       NSColor.labelColor,
-        .background: NSColor.textBackgroundColor,
-        .comment:    NSColor.systemGreen,
-        .string:     NSColor.systemRed,
-        .keyword:    NSColor.systemBlue,
-        .number:     NSColor.systemBlue,
-        .variable:   NSColor.systemBrown,
-        .tag:        NSColor.systemBlue,              // no use.
-        .attribute:  NSColor.secondaryLabelColor,     //
-        .selector:   NSColor.systemPurple             //
-    ]
 
     // ストレージ
     let storage: KTextStorageReadable
@@ -91,8 +76,11 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
     init(storage: KTextStorageReadable) {
         self.storage = storage
         setKeywords(Self._defaultKeywords)
-        //setTheme(Self._builtInTheme)
         
+        reloadTheme()
+    }
+    
+    func reloadTheme() {
         let prefs = KPreference.shared
         var theme:[KFunctionalColor: NSColor] = [:]
         theme[.base] = prefs.color(.parserColorText, lang: .ruby)

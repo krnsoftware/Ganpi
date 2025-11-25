@@ -24,6 +24,7 @@ final class KSyntaxParserPlain: KSyntaxParserProtocol {
     var lineCommentPrefix: String? { nil }
     func setKeywords(_ words: [String]) { /* no-op */ }
     func setTheme(_ theme: [KFunctionalColor : NSColor]) { /* no-op */ }
+    func reloadTheme() { /* no-op */}
 
     // ハイライトなし
     func attributes(in range: Range<Int>, tabWidth: Int) -> [KAttributedSpan] { [] }

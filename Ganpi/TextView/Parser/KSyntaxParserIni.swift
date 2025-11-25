@@ -51,6 +51,10 @@ final class KSyntaxParserIni: KSyntaxParserProtocol {
     func setTheme(_ theme: [KFunctionalColor : NSColor]) {
         // do nothing.
     }
+    
+    func reloadTheme() {
+        // do nothing.
+    }
 
     // MARK: - Painter hook
 

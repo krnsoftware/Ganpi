@@ -19,6 +19,8 @@ import AppKit
 final class KPreference {
 
     static let shared = KPreference()
+    
+    private var _appearanceObserver: NSKeyValueObservation?
 
     private let _defaultINI: URL
     private let _userINI: URL
@@ -26,9 +28,6 @@ final class KPreference {
     // user.ini / default.ini の raw
     private var _userValues:    [String:Any] = [:]
     private var _defaultValues: [String:Any] = [:]
-
-    private var _appearanceMode: KAppearance = .system
-    private var _currentAppearance: KAppearance = .light
 
     private var _colorCache: [String : NSColor] = [:]
     private var _fontCache:  [String : NSFont]  = [:]
@@ -45,12 +44,29 @@ final class KPreference {
         _userINI = support.appendingPathComponent("user.ini")
 
         load()
-        updateCurrentAppearance()
+        
+        _appearanceObserver = NSApp.observe(\.effectiveAppearance, options: [.new]) { [weak self] _, _ in
+                    self?.handleAppearanceChange()
+                }
         
         //test
         //_defaultValues.keys.forEach{ log("key:\($0), \(_defaultValues[$0]!)") }
     }
 
+    deinit {
+        _appearanceObserver = nil
+    }
+
+    // Appearanceが変更された時に呼び出されるメソッド
+    private func handleAppearanceChange() {
+        for doc in NSDocumentController.shared.documents {
+            if let document = doc as? Document {
+                // パーサを新しいものに入れ替える。
+                document.textStorage.replaceParser(for: document.syntaxType)
+            }
+        }
+    }
+    
     func load() {
         _userValues.removeAll()
         _defaultValues.removeAll()
@@ -63,10 +79,7 @@ final class KPreference {
         loadOne(dict: defaultDict, into: &_defaultValues)
         loadOne(dict: userDict,    into: &_userValues)
 
-        if let raw = (_userValues["system.appearance_mode"] ??
-                      _defaultValues["system.appearance_mode"]) as? String {
-            _appearanceMode = KAppearance.fromSetting(raw)
-        }
+        
     }
 
     private func loadOne(dict: [String:String], into store: inout [String:Any]) {
@@ -125,19 +138,7 @@ final class KPreference {
         }
     }
 
-    // appearance_mode = system のときに実際の macOS appearance を読む
-    func updateCurrentAppearance() {
-        if _appearanceMode == .system {
-            if NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua {
-                _currentAppearance = .dark
-            } else {
-                _currentAppearance = .light
-            }
-        } else {
-            _currentAppearance = _appearanceMode
-        }
-        _colorCache.removeAll()
-    }
+    
 
     // getter（非 optional）
 
@@ -147,29 +148,34 @@ final class KPreference {
         return false
     }
 
+    
     func int(_ key: KPrefKey, lang: KSyntaxType? = nil) -> Int {
         if let v = lookupValue(key, lang: lang) as? Int { return v }
         log("Int missing for \(key.rawKey ?? "?")", from: self)
         return 0
     }
 
+    
     func float(_ key: KPrefKey, lang: KSyntaxType? = nil) -> CGFloat {
         if let v = lookupValue(key, lang: lang) as? CGFloat { return v }
         log("Float missing for \(key.rawKey ?? "?")", from: self)
         return 0
     }
 
+    
     func string(_ key: KPrefKey, lang: KSyntaxType? = nil) -> String {
         if let v = lookupValue(key, lang: lang) as? String { return v }
         log("String missing for \(key.rawKey ?? "?")", from: self)
         return ""
     }
 
+    
     func color(_ key: KPrefKey, lang: KSyntaxType?) -> NSColor {
-        if let final = resolveColorKey(key, lang: lang),
-           let c = _defaultValues[final] as? NSColor ?? _userValues[final] as? NSColor {
-            return c
+        if let final = resolveColorKey(key, lang: lang) {
+            if let user = _userValues[final] as? NSColor { return user }
+            if let def = _defaultValues[final] as? NSColor { return def }
         }
+        
         log("color fallback for \(key.rawKey ?? "?")", from:self)
         return .black
     }
@@ -220,14 +226,11 @@ final class KPreference {
 
         // appearance 展開
         func expand(_ raw: String) -> [String] {
-            switch _currentAppearance {
-            case .light:
-                return [ raw ]
-            case .dark:
-                return [ raw + ".dark", raw ]
-            case .system:
-                log("Unexpected _currentAppearance == .system", from:self)
-                return [ raw ]
+            
+            if isInDarkAppearance {
+                return [raw + ".dark", raw]
+            } else {
+                return [raw]
             }
         }
 
@@ -280,7 +283,8 @@ final class KPreference {
         guard let base = key.rawKey else { return nil }
 
         let suffix = base.dropFirst("parser.base.".count)
-        let modeIsDark = (_currentAppearance == .dark)
+        //let modeIsDark = (_currentAppearance == .dark)
+        let modeIsDark = isInDarkAppearance
 
         // 1) user.lang
         if let lang = lang {
@@ -321,7 +325,9 @@ final class KPreference {
         return nil
     }
 
-
+    var isInDarkAppearance: Bool {
+        return NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+    }
 
 
     private func lookupValue(_ key: KPrefKey, lang: KSyntaxType?) -> Any? {
