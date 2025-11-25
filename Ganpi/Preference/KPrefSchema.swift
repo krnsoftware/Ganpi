@@ -45,9 +45,9 @@ struct KPrefSchema {
         "document.size.height"                  : .init(type: .float),
         "document.size.width"                   : .init(type: .float),
         
-        "document.newline"                      : .init(type: .string),
-        "document.character_code"               : .init(type: .string),
-        "document.file_type"                    : .init(type: .string),
+        "document.newline"                      : .init(type: .enumerated),
+        "document.character_code"               : .init(type: .enumerated),
+        "document.file_type"                    : .init(type: .enumerated),
         
         "document.show_line_number"             : .init(type: .bool),
         "document.reject_font_change"           : .init(type: .bool),

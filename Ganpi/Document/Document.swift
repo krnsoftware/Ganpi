@@ -11,7 +11,7 @@ import CryptoKit
 
 class Document: NSDocument {
     private static var lastCascadeTopLeft: NSPoint?
-    private let _defaultWindowSize = NSSize(width: 600, height: 600)
+    private var _defaultWindowSize = NSSize(width: 600, height: 600)
     private let _windowMinimumSize = NSSize(width: 480, height: 320)
     
     private var _characterCode: KTextEncoding = .utf32
@@ -43,6 +43,8 @@ class Document: NSDocument {
     
     override init() {
         super.init()
+        
+        loadDefaultSettings()
         
         textStorage.replaceParser(for: syntaxType)
         
@@ -165,6 +167,7 @@ class Document: NSDocument {
     
     
     override func read(from data: Data, ofType typeName: String) throws {
+        let prefs = KPreference.shared
         
         // 文字コードの推定 → 文字列化
         let encoding = String.estimateCharacterCode(from: data) ?? .utf8
@@ -190,11 +193,12 @@ class Document: NSDocument {
         textStorage.replaceString(in: 0..<_textStorage.count, with: normalizedString)
         textStorage.resetUndoHistory()
         
-        
-        // シンタックスタイプを推定
-        let fileExt = fileURL?.pathExtension
-        syntaxType = KSyntaxType.detect(fromTypeName: typeName, orExtension: fileExt)
-        textStorage.replaceParser(for: syntaxType)
+        if prefs.bool(.systemAutoDetectionFileType) {
+            // シンタックスタイプを推定
+            let fileExt = fileURL?.pathExtension
+            syntaxType = KSyntaxType.detect(fromTypeName: typeName, orExtension: fileExt)
+            textStorage.replaceParser(for: syntaxType)
+        }
         
         // 読み込み完了（未変更状態へ）
         updateChangeCount(.changeCleared)
@@ -208,6 +212,7 @@ class Document: NSDocument {
         return super.validateUserInterfaceItem(item)
     }
     
+    
     // ドキュメントを保存せずに閉じるアクション。
     @IBAction func performCloseWithoutStore(_ sender: Any?) {
         if let autosaveURL = autosavedContentsFileURL {
@@ -216,6 +221,17 @@ class Document: NSDocument {
         }
         updateChangeCount(.changeCleared)
         close()
+    }
+    
+    private func loadDefaultSettings() {
+        let prefs = KPreference.shared
+        _characterCode = prefs.characterCodeType()
+        _returnCode = prefs.newlineType()
+        _syntaxType = prefs.syntaxType()
+        
+        let width = prefs.float(.documentSizeWidth)
+        let height = prefs.float(.documentSizeHeight)
+        _defaultWindowSize = NSSize(width: width, height: height)
     }
     
 }

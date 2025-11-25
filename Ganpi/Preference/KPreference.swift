@@ -215,6 +215,24 @@ final class KPreference {
         log("Invalid wrapline_offset", from: self)
         return .same
     }
+    
+    func newlineType() -> String.ReturnCharacter {
+        if let type = String.ReturnCharacter.fromSetting(string(.editorEditMode)) { return type }
+        log("Invalid newlineType",from:self)
+        return .lf
+    }
+    
+    func characterCodeType() -> KTextEncoding {
+        if let type = KTextEncoding.fromSetting(string(.documentCharacterCode)) { return type }
+        log("Invalid characterCodeType",from:self)
+        return .utf8
+    }
+    
+    func syntaxType() -> KSyntaxType {
+        if let type = KSyntaxType.fromSetting(string(.documentFileType)) { return type }
+        log("Invalid syntaxType/documentFileType",from:self)
+        return .plain
+    }
 
     // -------- resolver（本丸）
 
