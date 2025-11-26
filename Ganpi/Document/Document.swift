@@ -46,6 +46,7 @@ class Document: NSDocument {
         
         loadDefaultSettings()
         
+        textStorage.baseFont = KPreference.shared.font(.parserFont)
         textStorage.replaceParser(for: syntaxType)
         
     }

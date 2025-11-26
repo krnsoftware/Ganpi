@@ -20,8 +20,6 @@ enum KPrefKey {
     // system
     // ============================
 
-    case systemAutoDetectionNewline
-    case systemAutoDetectionCharacterCode
     case systemAutoDetectionFileType
 
 
@@ -137,10 +135,6 @@ enum KPrefKey {
         switch self {
 
         // ---- system ----
-        case .systemAutoDetectionNewline:
-            return "system.auto_detection.newline"
-        case .systemAutoDetectionCharacterCode:
-            return "system.auto_detection.character_code"
         case .systemAutoDetectionFileType:
             return "system.auto_detection.file_type"
 

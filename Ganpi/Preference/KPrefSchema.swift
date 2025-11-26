@@ -34,8 +34,6 @@ struct KPrefSchema {
         // -----------------------------
         // system
         // -----------------------------
-        "system.auto_detection.newline"         : .init(type: .bool),
-        "system.auto_detection.character_code"  : .init(type: .bool),
         "system.auto_detection.file_type"       : .init(type: .bool),
         
         
