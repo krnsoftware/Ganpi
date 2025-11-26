@@ -183,6 +183,8 @@ protocol KSyntaxParserProtocol: AnyObject {
     // 対象とするKTextStorageの参照。
     var storage: KTextStorageReadable { get }
     
+    var type: KSyntaxType { get }
+    
     // パース用メソッド TextStorageから呼び出す。
     func noteEdit(oldRange: Range<Int>, newCount: Int)
     func ensureUpToDate(for range: Range<Int>)

@@ -18,7 +18,9 @@ final class KSyntaxParserIni: KSyntaxParserProtocol {
     // MARK: - Required by protocol
 
     let storage: KTextStorageReadable
-
+    
+    var type: KSyntaxType { .ini }
+    
     // コメント用のプレフィクス（プロトコル上は単一）。歴史的経緯に合わせて「;」を返す。
     // 「#」は attributes(in:) の字句解析で行内コメントとして扱う。
     var lineCommentPrefix: String? { ";" }

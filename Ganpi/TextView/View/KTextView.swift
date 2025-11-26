@@ -541,6 +541,10 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         //log("visibleLineRange: \(visibleLineRange)")
         */
         
+        let prefs = KPreference.shared
+        let lang = textStorage.parser.type
+        let lineNumberBackgroundColor = prefs.color(.parserColorBackground, lang: lang)
+        
         // 背景透け対策。
         let bgColor = NSColor.textBackgroundColor.usingColorSpace(.deviceRGB)?.withAlphaComponent(1.0) ?? .red
         bgColor.setFill()
@@ -622,9 +626,22 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         // 行番号部分を描画。
         if _showLineNumbers, let lnRect = layoutRects.lineNumberRegion?.rect {
             
-            //NSColor.white.setFill()
-            NSColor.windowBackgroundColor.setFill()
-            lnRect.fill()
+            lineNumberBackgroundColor.setFill()
+            
+            let fadeWidth: CGFloat = 12.0
+            
+            // draw opaque area.
+            let opaqueRect = NSRect(origin: lnRect.origin, size: NSSize(width: lnRect.width - fadeWidth, height: lnRect.height))
+            opaqueRect.fill()
+            
+            // draw tranceparent area.
+            let fadeRectOrigin = NSPoint(x: lnRect.origin.x + lnRect.width - fadeWidth, y: lnRect.origin.y)
+            let fadeRectSize = NSSize(width: fadeWidth + layoutRects.textEdgeInsets.right, height: lnRect.height)
+            let fadeRect =  NSRect(origin: fadeRectOrigin, size: fadeRectSize)
+            let transparent = lineNumberBackgroundColor.withAlphaComponent(0.0)
+            let gradient = NSGradient(colors: [lineNumberBackgroundColor, transparent])
+            gradient?.draw(in: fadeRect, angle: 0)
+            
             
             // 非選択行の文字のattribute
             let attrs: [NSAttributedString.Key: Any] = [

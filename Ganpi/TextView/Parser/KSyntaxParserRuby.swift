@@ -73,6 +73,9 @@ final class KSyntaxParserRuby: KSyntaxParserProtocol {
     // ストレージ
     let storage: KTextStorageReadable
     
+    
+    var type: KSyntaxType { .ruby }
+    
     init(storage: KTextStorageReadable) {
         self.storage = storage
         setKeywords(Self._defaultKeywords)

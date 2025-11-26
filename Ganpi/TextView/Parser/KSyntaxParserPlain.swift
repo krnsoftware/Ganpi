@@ -12,6 +12,7 @@ final class KSyntaxParserPlain: KSyntaxParserProtocol {
     
     private unowned let _storage: KTextStorageReadable
     var storage: KTextStorageReadable { _storage }
+    var type: KSyntaxType { .plain }
     init(storage: KTextStorageReadable) { _storage = storage }
 
     func noteEdit(oldRange: Range<Int>, newCount: Int) { /* no-op */ }

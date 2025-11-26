@@ -277,16 +277,12 @@ final class KPreference {
 
         let candidates = resolveCandidates(for: key, lang: lang)
         
-        log("candidates:\(candidates)",from:self)
-
         for ck in candidates {
             if _userValues[ck] != nil { return ck }
         }
         for ck in candidates {
             if _defaultValues[ck] != nil { return ck }
         }
-        
-        log("here")
 
         if let raw = key.rawKey {
             if _userValues[raw] != nil { return raw }
