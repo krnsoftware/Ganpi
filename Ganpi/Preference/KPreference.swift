@@ -182,15 +182,16 @@ final class KPreference {
 
 
     func font(_ key: KPrefKey, lang: KSyntaxType? = nil) -> NSFont {
-        let fam  = string(.parserFontFamily, lang: lang)
-        let size = float(.parserFontSize,  lang: lang)
-
-        let k = "\(fam):\(size)"
-        if let c = _fontCache[k] { return c }
-
-        let f = NSFont(name: fam, size: size) ?? NSFont.systemFont(ofSize: size)
-        _fontCache[k] = f
-        return f
+        let fontFamily = string(.parserFontFamily, lang: lang)
+        let rawSize = float(.parserFontSize, lang: lang)
+        let fontSize = rawSize > 3.0 && rawSize < 100.0 ? rawSize : 12.0
+        
+        let fontKey = "\(fontFamily):\(fontSize)"
+        if let cache = _fontCache[fontKey] { return cache }
+        
+        let font = NSFont(name: fontFamily, size: fontSize) ?? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
+        _fontCache[fontKey] = font
+        return font
     }
 
     
