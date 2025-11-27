@@ -830,6 +830,11 @@ CQ
                                     <action selector="showLogPanel:" target="-1" id="PyF-tf-cO7"/>
                                 </connections>
                             </menuItem>
+                            <menuItem title="Reload Preferences" keyEquivalent="t" id="BYS-wn-5iK">
+                                <connections>
+                                    <action selector="reloadPreferences:" target="-1" id="EUD-04-qmz"/>
+                                </connections>
+                            </menuItem>
                         </items>
                     </menu>
                 </menuItem>

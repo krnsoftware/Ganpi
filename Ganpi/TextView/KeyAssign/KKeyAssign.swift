@@ -105,6 +105,33 @@ class KKeyAssign {
         }
     }
     
+    func load() {
+        let assign = KPreference.shared.keyAssign()
+        
+        let support = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library")
+            .appendingPathComponent("Application Support")
+            .appendingPathComponent("Ganpi")
+            .appendingPathComponent("keymap_user")
+            .appendingPathExtension("ini")
+        
+        let url: URL?
+        switch assign {
+        case .ganpi: url = Bundle.main.url(forResource: "keymap_ganpi", withExtension: "ini")
+        case .emacs: url = Bundle.main.url(forResource: "keymap_emacs", withExtension: "ini")
+        case .vi: url = Bundle.main.url(forResource: "keymap_vi", withExtension: "ini")
+        case .user: url = support
+        case .system: url = nil
+        }
+        
+        if let url = url {
+            loadUserKeymap(at: url)
+        }
+        
+        reset()
+        
+    }
+    
     func setShortcuts(with shortcuts:[KShortCut], for mode:KEditMode = .normal) {
         switch mode {
         case .normal: _normalmodeShortcuts = shortcuts

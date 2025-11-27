@@ -78,7 +78,6 @@ final class KPreference {
 
         loadOne(dict: defaultDict, into: &_defaultValues)
         loadOne(dict: userDict,    into: &_userValues)
-
         
     }
 
@@ -218,8 +217,8 @@ final class KPreference {
     }
     
     func newlineType() -> String.ReturnCharacter {
-        if let type = String.ReturnCharacter.fromSetting(string(.editorEditMode)) { return type }
-        log("Invalid newlineType",from:self)
+        if let type = String.ReturnCharacter.fromSetting(string(.documentNewline)) { return type }
+        log("Invalid newlineType: \(string(.documentNewline))",from:self)
         return .lf
     }
     
