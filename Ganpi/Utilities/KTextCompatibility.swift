@@ -68,7 +68,12 @@ extension String {
         case crlf = "\r\n"
         
         static func fromSetting(_ raw: String) -> ReturnCharacter? {
-            return ReturnCharacter(rawValue: raw)
+            switch raw {
+            case "lf": return .lf
+            case "cr": return .cr
+            case "crlf": return .crlf
+            default: return nil
+            }
         }
         
         var description: String {
