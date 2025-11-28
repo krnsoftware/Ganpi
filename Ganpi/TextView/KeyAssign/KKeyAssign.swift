@@ -100,9 +100,10 @@ class KKeyAssign {
     
     init() {
         // Load bundled keymap on launch if present
-        if let path = Bundle.main.path(forResource: "keymap_ganpi", ofType: "ini") {
+        /*if let path = Bundle.main.path(forResource: "keymap_ganpi", ofType: "ini") {
             loadUserKeymap(at: URL(fileURLWithPath: path))
-        }
+        }*/
+        load()
     }
     
     func load() {
@@ -124,7 +125,11 @@ class KKeyAssign {
         case .system: url = nil
         }
         
+        _normalmodeShortcuts.removeAll()
+        _editmodeShortcuts.removeAll()
+        
         if let url = url {
+            log("url is not nil. \(url)")
             loadUserKeymap(at: url)
         }
         
@@ -133,6 +138,7 @@ class KKeyAssign {
     }
     
     func setShortcuts(with shortcuts:[KShortCut], for mode:KEditMode = .normal) {
+        log("setShortcuts")
         switch mode {
         case .normal: _normalmodeShortcuts = shortcuts
         case .edit:   _editmodeShortcuts   = shortcuts

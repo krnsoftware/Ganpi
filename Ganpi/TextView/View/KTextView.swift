@@ -1852,6 +1852,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         for action in actions {
             switch action {
             case .selector(let name):
+                log("SELECTOR: \(name)")
                 doCommand(by: Selector(name + ":"))
             case .command(let cmd):
                 guard let result = cmd.execute(for: textStorage, in: selectionRange) else { log("#01"); return }
