@@ -315,6 +315,15 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         registerForDraggedTypes([.string])
     }
     
+    func loadPreferences() {
+        let prefs = KPreference.shared
+        let lang = textStorage.parser.type
+        
+        _wordWrap = prefs.bool(.parserWordWrap, lang: lang)
+        _showInvisibleCharacters = prefs.bool(.parserShowInvisibles, lang: lang)
+        
+    }
+    
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         
@@ -322,9 +331,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         DispatchQueue.main.async { [weak self] in
             self?.applyWordWrapToEnclosingScrollView()
         }
-        
-        //_layoutManager.textView = self
-        
+                
         window?.makeFirstResponder(self)  // 念のため明示的に指定
         
         // キャレットの位置を再計算して表示しておく。

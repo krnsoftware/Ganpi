@@ -135,7 +135,7 @@ final class KLayoutManager: KLayoutManagerReadable {
     
     var textView: KTextView? {
         get { return _textView }
-        set { _textView = newValue }
+        set { _textView = newValue; loadPreferences() }
     }
 
     var tabWidth: Int {
@@ -173,20 +173,24 @@ final class KLayoutManager: KLayoutManagerReadable {
                 self.textView?.textStorageDidModify(.colorChanged(range: 0..<_textStorageRef.count))
             case .parserChanged:
                 self.loadPreferences()
+                self.rebuildLayout(reason: .destructiveChange)
+                self.textView?.textStorageDidModify(.colorChanged(range: 0..<_textStorageRef.count))
             }
         }
         
-        loadPreferences()
+        //loadPreferences()
         
     }
     
     func loadPreferences() {
-        log("loadPreferences()",from:self)
         let prefs = KPreference.shared
         let syntaxType = _textStorageRef.parser.type
-        wrapLineOffsetType = prefs.wraplineOffset(syntaxType)
-        tabWidth = prefs.int(.parserTabWidth, lang: syntaxType)
-        lineSpacing = prefs.float(.parserLineSpacing, lang: syntaxType)
+        _wrapLineOffsetType = prefs.wraplineOffset(syntaxType)
+        _tabWidth = prefs.int(.parserTabWidth, lang: syntaxType)
+        _lineSpacing = prefs.float(.parserLineSpacing, lang: syntaxType)
+        
+        textView?.loadPreferences()
+        
     }
     
     deinit {

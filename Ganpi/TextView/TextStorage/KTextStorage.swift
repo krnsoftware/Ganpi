@@ -313,8 +313,6 @@ final class KTextStorage: KTextStorageProtocol {
         set {
             _parser = newValue
             _parser.noteEdit(oldRange: 0..<count, newCount: count)
-            //_parser.ensureUpToDate(for: 0..<count)
-            notifyObservers(.colorChanged(range: 0..<count))
             notifyObservers(.parserChanged)
         }
     }
