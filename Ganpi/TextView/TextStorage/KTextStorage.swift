@@ -21,6 +21,7 @@ struct KStorageModifiedInfo {
 enum KStorageModified {
     case textChanged(info: KStorageModifiedInfo)
     case colorChanged(range: Range<Int>)
+    case parserChanged
 }
 
 // 方向を示すenum
@@ -314,6 +315,7 @@ final class KTextStorage: KTextStorageProtocol {
             _parser.noteEdit(oldRange: 0..<count, newCount: count)
             //_parser.ensureUpToDate(for: 0..<count)
             notifyObservers(.colorChanged(range: 0..<count))
+            notifyObservers(.parserChanged)
         }
     }
     

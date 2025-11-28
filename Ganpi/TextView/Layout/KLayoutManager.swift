@@ -171,9 +171,22 @@ final class KLayoutManager: KLayoutManagerReadable {
             case .colorChanged(_):
                 self.rebuildLayout(reason: .destructiveChange)
                 self.textView?.textStorageDidModify(.colorChanged(range: 0..<_textStorageRef.count))
+            case .parserChanged:
+                self.loadPreferences()
             }
         }
         
+        loadPreferences()
+        
+    }
+    
+    func loadPreferences() {
+        log("loadPreferences()",from:self)
+        let prefs = KPreference.shared
+        let syntaxType = _textStorageRef.parser.type
+        wrapLineOffsetType = prefs.wraplineOffset(syntaxType)
+        tabWidth = prefs.int(.parserTabWidth, lang: syntaxType)
+        lineSpacing = prefs.float(.parserLineSpacing, lang: syntaxType)
     }
     
     deinit {

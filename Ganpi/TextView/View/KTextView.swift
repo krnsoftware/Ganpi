@@ -1574,6 +1574,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             updateCaretPosition()
             scrollCaretToVisible()
             needsDisplay = true
+        case .parserChanged:
+            log("parserChanged:",from:self)
         }
         
     }
