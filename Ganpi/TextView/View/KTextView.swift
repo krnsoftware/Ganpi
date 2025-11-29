@@ -2424,6 +2424,17 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         moveSelectionHorizontally(for: .document, to: .forward, extendSelection: true)
     }
     
+    // Selection.
+    @IBAction func moveToBeginningOfSelection(_ sender: Any?) {
+        caretIndex = selectionRange.lowerBound
+        scrollCaretToVisible()
+    }
+    
+    @IBAction func moveToEndOfSelection(_ sender: Any?) {
+        caretIndex = selectionRange.upperBound
+        updateCaretPosition()
+    }
+    
     
     //MARK: - Select.
     
