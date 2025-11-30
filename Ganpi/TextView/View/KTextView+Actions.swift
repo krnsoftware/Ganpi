@@ -40,6 +40,34 @@ extension KTextView {
     }
     
     
+    // AltanateSearch Functions.
+    
+    @IBAction func searchAlternateAction(_ sender: Any?) {
+        if isAlternateSearchDirectionForward {
+            search(for: .forward)
+        } else {
+            search(for: .backward)
+        }
+        
+    }
+    
+    @IBAction func searchAlternateActionReverse(_ sender: Any?) {
+        if isAlternateSearchDirectionForward {
+            search(for: .backward)
+        } else {
+            search(for: .forward)
+        }
+    }
+    
+    @IBAction func setSearchDirectionToForward(_ sender: Any?) {
+        isAlternateSearchDirectionForward = true
+    }
+    
+    @IBAction func setSearchDirectionToBackward(_ sender: Any?) {
+        isAlternateSearchDirectionForward = false
+    }
+    
+    
     
     // MARK: - Undo actions
     

@@ -30,7 +30,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     private var _containerView: KTextViewContainerView?
     
     // 選択範囲
-    var _selectionRange: Range<Int> = 0..<0
+    private var _selectionRange: Range<Int> = 0..<0
     
     // キャレットの表示に関するプロパティ
     private var _caretBlinkTimer: Timer?
@@ -59,6 +59,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     enum KPasteMode { case character; case paragraph }
     private var _pasteMode: KPasteMode = .character
+    
+    var isAlternateSearchDirectionForward:Bool = true
     
     // Delete Buffer関連
     private var _deleteBuffer: String = "" // Automatically filled with 'delete' motion.
