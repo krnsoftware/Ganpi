@@ -57,6 +57,13 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     private var _yankSelection: Range<Int>?
     private var _isApplyingYank: Bool = false
     
+    enum KPasteMode { case character; case paragraph }
+    private var _pasteMode: KPasteMode = .character
+    
+    // Delete Buffer関連
+    private var _deleteBuffer: String = "" // Automatically filled with 'delete' motion.
+    private var _selectionBuffer: Range<Int>? // Action control only.
+    
     // Edit mode.
     private var _editMode: KEditMode = .normal
     
@@ -177,6 +184,9 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     var completion: KCompletionController {
         _completion
     }
+    
+    var deleteBuffer: String { _deleteBuffer }
+    var selectionBuffer: Range<Int>? { _selectionBuffer }
     
     var wordWrap: Bool {
         get { _wordWrap }
@@ -2042,7 +2052,12 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     // キーアサイン用のキャレット移動をサポートする関数
     // 水平方向の移動をサポート
     @discardableResult
-    private func moveSelectionHorizontally(for kind: KCaretHorizontalMoveKind, to direction: KDirection, extendSelection: Bool, remove: Bool = false) -> Bool {
+    private func moveSelectionHorizontally(
+            for kind: KCaretHorizontalMoveKind,
+            to direction: KDirection,
+            extendSelection: Bool,
+            remove: Bool = false,
+            ignoreLeadingSpaces: Bool = false) -> Bool {
         
         let selection = selectionRange
         let count = textStorage.count
@@ -2059,7 +2074,21 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
         
         if kind == .paragraph {
-            if direction == .forward {
+            if ignoreLeadingSpaces { // ignoring direction.
+                guard let range = textStorage.lineRange(at: selection.lowerBound) else {
+                    log("lineRange is nil.",from:self); return false }
+                var index = range.lowerBound
+                let parag = KTextParagraph(storage: textStorage, range: range)
+                let leadingSpacesRange = parag.leadingWhitespaceRange
+                if range.count >= leadingSpacesRange.count {
+                    index += leadingSpacesRange.count
+                }
+                let lower = min(index, selection.lowerBound)
+                let upper = max(index, selection.upperBound)
+                if extendSelection { newRange = lower..<upper }
+                else { newRange = index..<index }
+    
+            }else if direction == .forward {
                 guard let range = textStorage.lineRange(at: selection.upperBound) else {
                     log("lineRange is nil.",from:self); return false }
                 let upper = range.upperBound
@@ -2068,6 +2097,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             } else {
                 guard let range = textStorage.lineRange(at: selection.lowerBound) else {
                     log("lineRange is nil.",from:self); return false }
+                
                 let lower = range.lowerBound
                 if extendSelection { newRange = lower..<selection.upperBound }
                 else { newRange = lower..<lower }
@@ -2075,6 +2105,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
         
         if kind == .line {
+            // ignoreLeadingSpacesは未実装。
+            
             if direction == .forward {
                 guard let line = layoutManager.lines[currentLineIndex] else { log("line is nil.",from:self); return false }
                 let upper = line.range.upperBound
@@ -2145,6 +2177,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
         
         if remove {
+            _deleteBuffer = textStorage.string(in: newRange)
             _textStorageRef.deleteCharacters(in: newRange)
             selectionRange = newRange.lowerBound..<newRange.lowerBound
             
@@ -2424,6 +2457,17 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         moveSelectionHorizontally(for: .document, to: .forward, extendSelection: true)
     }
     
+    // Paragraph without leading white spaces.
+    @IBAction func moveToFirstPrintableCharacterInParagraph(_ sender: Any?) {
+        moveSelectionHorizontally(for: .paragraph, to: .backward, extendSelection: false, remove: false, ignoreLeadingSpaces: true)
+    }
+    
+    @IBAction func moveToFirstPrintableCharacterInParagraphAndModifySelection(_ sender: Any?) {
+        moveSelectionHorizontally(for: .paragraph, to: .backward, extendSelection: true, remove: false, ignoreLeadingSpaces: true)
+    }
+    
+    
+    
     // Selection.
     @IBAction func moveToBeginningOfSelection(_ sender: Any?) {
         caretIndex = selectionRange.lowerBound
@@ -2499,6 +2543,11 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     @IBAction override func deleteToEndOfParagraph(_ sender: Any?) {
         moveSelectionHorizontally(for: .paragraph, to: .forward, extendSelection: true, remove: true)
     }
+    
+    @IBAction func deleteToBeginningOfParagraphWithoutLeadingSpaces(_ sender: Any?) {
+        moveSelectionHorizontally(for: .paragraph, to: .forward, extendSelection: true, remove: true, ignoreLeadingSpaces: true)
+    }
+    
     
 
     //MARK: - Scrolling.
@@ -2793,18 +2842,16 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         copy(sender)
         
         _textStorageRef.replaceCharacters(in: selectionRange, with: [])
-        
     }
     
     @IBAction func copy(_ sender: Any?) {
-        guard !selectionRange.isEmpty else { return }
+        if selectionRange.isEmpty { return }
+        
         guard let slicedCharacters = _textStorageRef[selectionRange] else { return }
         let selectedText = String(slicedCharacters)
         
-        //test
         let buffer = KClipBoardBuffer.shared
         buffer.append()
-        //end
         
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
@@ -2812,13 +2859,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     }
     
     @IBAction func paste(_ sender: Any?) {
-        
-        /*
-        let pasteboard = NSPasteboard.general
-        guard let rawString = pasteboard.string(forType: .string) else { return }
-        
-        let string = rawString.normalizedString
-         */
         
         _isApplyingYank = true
         defer { _isApplyingYank = false }
@@ -2839,9 +2879,25 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     // MARK: - Others.
     
-    
+    @IBAction func insertDeleteBuffer(_ sender: Any?) {
+        _textStorageRef.replaceString(in: selectionRange, with: deleteBuffer)
+    }
 
+    @IBAction func storeSelectionRange(_ sender: Any?) {
+        _selectionBuffer = selectionRange
+    }
     
+    @IBAction func restoreSelectionRange(_ sender: Any?) {
+        if let buffer = selectionBuffer {
+            //log("buffer:\(buffer)",from:self)
+            let selection = selectionRange
+            let lower = max(selection.lowerBound, buffer.lowerBound)
+            let upper = min(selection.upperBound, buffer.upperBound)
+            selectionRange = lower..<upper
+        } else {
+            log("no selection buffer.", from:self)
+        }
+    }
     
 }
 
