@@ -17,6 +17,8 @@ final class KMiniSearchPanel: NSWindowController {
     @IBOutlet private weak var _findField: NSTextField!
     
     var isAlternateSearchDirectionForward:Bool = true
+    
+    private var _suspendAction = false
         
     override func windowDidLoad() {
         _findField.target = self
@@ -26,15 +28,21 @@ final class KMiniSearchPanel: NSWindowController {
     func show(at point:CGPoint) {
         var origin = point
         if let frameHeight = window?.frame.height {
-            log("height:\(frameHeight)")
+            //log("height:\(frameHeight)")
             origin.y -= frameHeight
         }
         window?.setFrameOrigin(origin)
+        
+        _suspendAction = true
         
         if window?.screen == nil { window?.center() }
         window?.makeKeyAndOrderFront(nil)
         window?.makeFirstResponder(_findField)  // initial focus.
         _findField.stringValue = KSearchPanel.shared.searchString
+        
+        DispatchQueue.main.async {
+            self._suspendAction = false
+        }
 
     }
     
@@ -44,6 +52,7 @@ final class KMiniSearchPanel: NSWindowController {
 
     
     @objc private func fieldEdited(_ sender: Any?) {
+        if _suspendAction { return }
         
         let search = _findField.stringValue
         
