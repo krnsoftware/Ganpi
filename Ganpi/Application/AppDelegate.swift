@@ -40,9 +40,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         KSearchPanel.shared.show()
     }
     
-    @IBAction func showMiniSearchPanel(_ sender: Any?) {
-        KMiniSearchPanel.shared.show()
-    }
+    
     
     @IBAction func showLogPanel(_ sender: Any?) {
         KLogPanel.shared.show()

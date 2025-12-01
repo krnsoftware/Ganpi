@@ -15,13 +15,22 @@ final class KMiniSearchPanel: NSWindowController {
     static let shared = KMiniSearchPanel(windowNibName: "MiniSearchPanel")
     
     @IBOutlet private weak var _findField: NSTextField!
+    
+    var isAlternateSearchDirectionForward:Bool = true
         
     override func windowDidLoad() {
         _findField.target = self
         _findField.action = #selector(fieldEdited)
     }
     
-    func show() {
+    func show(at point:CGPoint) {
+        var origin = point
+        if let frameHeight = window?.frame.height {
+            log("height:\(frameHeight)")
+            origin.y -= frameHeight
+        }
+        window?.setFrameOrigin(origin)
+        
         if window?.screen == nil { window?.center() }
         window?.makeKeyAndOrderFront(nil)
         window?.makeFirstResponder(_findField)  // initial focus.

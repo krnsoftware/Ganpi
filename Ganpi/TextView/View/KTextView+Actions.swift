@@ -43,7 +43,7 @@ extension KTextView {
     // AltanateSearch Functions.
     
     @IBAction func searchAlternateAction(_ sender: Any?) {
-        if isAlternateSearchDirectionForward {
+        if KMiniSearchPanel.shared.isAlternateSearchDirectionForward {
             search(for: .forward)
         } else {
             search(for: .backward)
@@ -52,7 +52,7 @@ extension KTextView {
     }
     
     @IBAction func searchAlternateActionReverse(_ sender: Any?) {
-        if isAlternateSearchDirectionForward {
+        if KMiniSearchPanel.shared.isAlternateSearchDirectionForward {
             search(for: .backward)
         } else {
             search(for: .forward)
@@ -60,11 +60,11 @@ extension KTextView {
     }
     
     @IBAction func setSearchDirectionToForward(_ sender: Any?) {
-        isAlternateSearchDirectionForward = true
+        KMiniSearchPanel.shared.isAlternateSearchDirectionForward = true
     }
     
     @IBAction func setSearchDirectionToBackward(_ sender: Any?) {
-        isAlternateSearchDirectionForward = false
+        KMiniSearchPanel.shared.isAlternateSearchDirectionForward = false
     }
     
     

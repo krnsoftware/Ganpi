@@ -57,10 +57,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     private var _yankSelection: Range<Int>?
     private var _isApplyingYank: Bool = false
     
-    enum KPasteMode { case character; case paragraph }
-    private var _pasteMode: KPasteMode = .character
     
-    var isAlternateSearchDirectionForward:Bool = true
+    // var isAlternateSearchDirectionForward:Bool = true
     
     // Delete Buffer関連
     private var _deleteBuffer: String = "" // Automatically filled with 'delete' motion.
@@ -2899,6 +2897,18 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         } else {
             log("no selection buffer.", from:self)
         }
+    }
+    
+    
+    @IBAction func showMiniSearchPanel(_ sender: Any?) {
+        var point = characterPosition(at: caretIndex)
+        point.y = point.y + layoutManager.lineHeight
+        if let window = self.window {
+            point = convert(point, to: nil)
+            point = window.convertPoint(toScreen: point)
+        }
+        KMiniSearchPanel.shared.show(at: point)
+        
     }
     
 }

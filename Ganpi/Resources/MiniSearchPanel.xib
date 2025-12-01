@@ -17,14 +17,14 @@
         <window title="mini search" allowsToolTipsWhenApplicationIsInactive="NO" autorecalculatesKeyViewLoop="NO" hidesOnDeactivate="YES" releasedWhenClosed="NO" visibleAtLaunch="NO" frameAutosaveName="" animationBehavior="default" id="FTh-FR-qwD" customClass="NSPanel">
             <windowStyleMask key="styleMask" titled="YES" utility="YES"/>
             <windowPositionMask key="initialPositionMask" leftStrut="YES" rightStrut="YES" topStrut="YES" bottomStrut="YES"/>
-            <rect key="contentRect" x="196" y="239" width="258" height="21"/>
+            <rect key="contentRect" x="196" y="239" width="272" height="33"/>
             <rect key="screenRect" x="0.0" y="0.0" width="2560" height="1415"/>
             <view key="contentView" id="EK3-ms-aHv">
-                <rect key="frame" x="0.0" y="0.0" width="258" height="21"/>
+                <rect key="frame" x="0.0" y="0.0" width="272" height="33"/>
                 <autoresizingMask key="autoresizingMask"/>
                 <subviews>
                     <textField focusRingType="none" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="BbW-xE-Eia">
-                        <rect key="frame" x="0.0" y="0.0" width="258" height="21"/>
+                        <rect key="frame" x="6" y="6" width="258" height="21"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <textFieldCell key="cell" scrollable="YES" lineBreakMode="clipping" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" usesSingleLineMode="YES" id="ycv-Y2-yc9">
                             <font key="font" usesAppearanceFont="YES"/>
@@ -40,7 +40,7 @@
             <connections>
                 <outlet property="delegate" destination="-2" id="FZa-9i-h0D"/>
             </connections>
-            <point key="canvasLocation" x="-2" y="149.5"/>
+            <point key="canvasLocation" x="5" y="155.5"/>
         </window>
     </objects>
 </document>
