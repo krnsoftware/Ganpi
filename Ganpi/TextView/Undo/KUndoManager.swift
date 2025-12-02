@@ -109,6 +109,12 @@ final class KUndoManager {
     func register(range: Range<Int>, oldString: String, newString: String) {
         // Undo/Redo実行中は履歴を積まない
         if _isPerformingUndoRedo { return }
+        
+        // delegateのdeleteBufferに削除される文字列を詰める。
+        
+        if oldString.count >= 2, let delegate = (NSApp.delegate as? AppDelegate) {
+            delegate.deleteBuffer = oldString
+        }
 
         // 新規編集が入る時点で Redo は無効
         if !_redoStack.isEmpty { _redoStack.removeAll(keepingCapacity: true) }

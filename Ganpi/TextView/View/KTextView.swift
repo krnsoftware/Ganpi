@@ -57,11 +57,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     private var _yankSelection: Range<Int>?
     private var _isApplyingYank: Bool = false
     
-    
-    // var isAlternateSearchDirectionForward:Bool = true
-    
     // Delete Buffer関連
-    private var _deleteBuffer: String = "" // Automatically filled with 'delete' motion.
     private var _selectionBuffer: Range<Int>? // Action control only.
     
     // Edit mode.
@@ -185,7 +181,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         _completion
     }
     
-    var deleteBuffer: String { _deleteBuffer }
     var selectionBuffer: Range<Int>? { _selectionBuffer }
     
     var wordWrap: Bool {
@@ -2177,7 +2172,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
         
         if remove {
-            _deleteBuffer = textStorage.string(in: newRange)
             _textStorageRef.deleteCharacters(in: newRange)
             selectionRange = newRange.lowerBound..<newRange.lowerBound
             
@@ -2880,7 +2874,12 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     // MARK: - Others.
     
     @IBAction func insertDeleteBuffer(_ sender: Any?) {
-        _textStorageRef.replaceString(in: selectionRange, with: deleteBuffer)
+        if let deleteBuffer = (NSApp.delegate as? AppDelegate)?.deleteBuffer {
+            _textStorageRef.replaceString(in: selectionRange, with: deleteBuffer)
+        } else {
+            log("no delete buffer.", from:self)
+        }
+        
     }
 
     @IBAction func storeSelectionRange(_ sender: Any?) {
