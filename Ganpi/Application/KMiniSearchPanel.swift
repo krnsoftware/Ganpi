@@ -21,23 +21,50 @@ final class KMiniSearchPanel: NSWindowController {
     private var _suspendAction = false
         
     override func windowDidLoad() {
+        super.windowDidLoad()
+        
         _findField.target = self
         _findField.action = #selector(fieldEdited)
+        
+        //_findField.backgroundColor = NSColor(hexString: "#B8B8B8FF")
+        
+        guard let w = window else { return }
+        
+        // タイトルバーを“見た目だけ”完全に隠す
+        w.titleVisibility = .hidden
+        w.titlebarAppearsTransparent = true
+        
+        // ウィンドウボタンを消す
+        w.standardWindowButton(.closeButton)?.isHidden = true
+        w.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        w.standardWindowButton(.zoomButton)?.isHidden = true
+        
+        // 透明ウィンドウとして扱う（必要なら）
+        w.isOpaque = false
+        w.backgroundColor = .clear
+        
     }
     
     func show(at point:CGPoint) {
         var origin = point
         if let frameHeight = window?.frame.height {
-            //log("height:\(frameHeight)")
-            origin.y -= frameHeight
+            origin.y -= frameHeight / 2
         }
-        window?.setFrameOrigin(origin)
+        guard let win = window else { log("#01", from:self); return }
+        
+        win.setFrameOrigin(origin)
+        
+        if win.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua {
+            _findField.backgroundColor = NSColor(calibratedWhite: 0.15, alpha: 0.55)
+        } else {
+            _findField.backgroundColor = NSColor(calibratedWhite: 1.0, alpha: 0.05)
+        }
         
         _suspendAction = true
         
-        if window?.screen == nil { window?.center() }
-        window?.makeKeyAndOrderFront(nil)
-        window?.makeFirstResponder(_findField)  // initial focus.
+        if win.screen == nil { window?.center() }
+        win.makeKeyAndOrderFront(nil)
+        win.makeFirstResponder(_findField)
         _findField.stringValue = KSearchPanel.shared.searchString
         
         DispatchQueue.main.async {
