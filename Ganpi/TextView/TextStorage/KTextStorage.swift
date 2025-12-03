@@ -281,8 +281,9 @@ final class KTextStorage: KTextStorageProtocol {
         if let invisibleCharacters = _invisibleCharacters {
             return invisibleCharacters
         }
+        let font = NSFont.monospacedSystemFont(ofSize: fontSize * 0.8, weight: .regular)
         let attr: [NSAttributedString.Key: Any] = [
-            .font: baseFont,
+            .font: font,
             .foregroundColor: NSColor.secondaryLabelColor
         ]
         _invisibleCharacters = KInvisibleCharacters(attributes: attr)
