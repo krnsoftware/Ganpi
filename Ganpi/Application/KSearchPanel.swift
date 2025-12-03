@@ -64,7 +64,7 @@ final class KSearchPanel: NSWindowController {
     // MARK: - Lifecycle
     override func windowDidLoad() {
         super.windowDidLoad()
-        guard let p = window as? NSPanel else { return }
+        //guard let p = window as? NSPanel else { return }
         
         // パネル設定
         /*

@@ -1031,7 +1031,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         _ = self.autoscroll(with: event)
         
         updateCaretPosition()
-        scrollCaretToVisible()
     }
 
     // ドラッグ&ドロップ時に使用するアイコンを生成する。
