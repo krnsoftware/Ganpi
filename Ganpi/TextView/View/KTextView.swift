@@ -1278,8 +1278,9 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         let targetRanage:Range<Int>
         let postSelectionLowerBound:Int
         
-        // 選択範囲があればその範囲を、なければ全文を置換対象とする。
-        if selectionRange.count > 0 {
+        let selectionOnly = KSearchPanel.shared.selectionOnly
+        
+        if selectionOnly {
             targetRanage = selectionRange
             postSelectionLowerBound = selectionRange.lowerBound
         } else {

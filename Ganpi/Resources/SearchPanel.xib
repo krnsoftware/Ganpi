@@ -14,6 +14,7 @@
                 <outlet property="replaceAllButton" destination="xQZ-LC-aUX" id="M2F-2D-vuy"/>
                 <outlet property="replaceField" destination="rrP-aj-gRi" id="Kho-xV-pjD"/>
                 <outlet property="searchButton" destination="htv-K9-PiX" id="HiC-Bz-c8b"/>
+                <outlet property="selectionOnlyBtn" destination="8P3-X5-Iyn" id="2Ld-2W-ZyE"/>
                 <outlet property="useRegexBtn" destination="aUO-f1-mte" id="QFo-AV-hvO"/>
                 <outlet property="window" destination="QvC-M9-y7g" id="CJf-VZ-Fg0"/>
             </connections>
@@ -23,14 +24,14 @@
         <window title="Search" allowsToolTipsWhenApplicationIsInactive="NO" autorecalculatesKeyViewLoop="NO" restorable="NO" hidesOnDeactivate="YES" releasedWhenClosed="NO" visibleAtLaunch="NO" frameAutosaveName="KSearchPanelFrame" animationBehavior="default" titlebarAppearsTransparent="YES" id="QvC-M9-y7g" customClass="NSPanel">
             <windowStyleMask key="styleMask" titled="YES" closable="YES" utility="YES"/>
             <windowPositionMask key="initialPositionMask" leftStrut="YES" rightStrut="YES" topStrut="YES" bottomStrut="YES"/>
-            <rect key="contentRect" x="196" y="240" width="319" height="260"/>
+            <rect key="contentRect" x="196" y="240" width="407" height="204"/>
             <rect key="screenRect" x="0.0" y="0.0" width="2560" height="1415"/>
             <view key="contentView" wantsLayer="YES" id="EiT-Mj-1SZ">
-                <rect key="frame" x="0.0" y="0.0" width="319" height="260"/>
+                <rect key="frame" x="0.0" y="0.0" width="407" height="204"/>
                 <autoresizingMask key="autoresizingMask"/>
                 <subviews>
                     <textField focusRingType="none" verticalHuggingPriority="750" fixedFrame="YES" textCompletion="NO" translatesAutoresizingMaskIntoConstraints="NO" id="OY9-NE-dHF">
-                        <rect key="frame" x="76" y="181" width="223" height="70"/>
+                        <rect key="frame" x="76" y="148" width="311" height="50"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <textFieldCell key="cell" scrollable="YES" lineBreakMode="clipping" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="QNy-Gz-dF8">
                             <font key="font" size="14" name="Osaka-Mono"/>
@@ -42,7 +43,7 @@
                         </connections>
                     </textField>
                     <textField focusRingType="none" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="rrP-aj-gRi">
-                        <rect key="frame" x="76" y="100" width="223" height="71"/>
+                        <rect key="frame" x="76" y="92" width="311" height="50"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <textFieldCell key="cell" scrollable="YES" lineBreakMode="clipping" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="nye-DN-gGG">
                             <font key="font" size="14" name="Osaka-Mono"/>
@@ -54,7 +55,7 @@
                         </connections>
                     </textField>
                     <textField focusRingType="none" horizontalHuggingPriority="251" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="tY0-aT-zjr">
-                        <rect key="frame" x="8" y="235" width="54" height="16"/>
+                        <rect key="frame" x="8" y="179" width="54" height="16"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <textFieldCell key="cell" lineBreakMode="clipping" title="Search :" id="T6q-TH-um2">
                             <font key="font" metaFont="system"/>
@@ -63,7 +64,7 @@
                         </textFieldCell>
                     </textField>
                     <textField focusRingType="none" horizontalHuggingPriority="251" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Arc-1g-xcG">
-                        <rect key="frame" x="8" y="155" width="60" height="16"/>
+                        <rect key="frame" x="8" y="126" width="60" height="16"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <textFieldCell key="cell" lineBreakMode="clipping" title="Replace :" id="fTa-fJ-pHc">
                             <font key="font" metaFont="system"/>
@@ -72,7 +73,7 @@
                         </textFieldCell>
                     </textField>
                     <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="htv-K9-PiX">
-                        <rect key="frame" x="205" y="13" width="101" height="32"/>
+                        <rect key="frame" x="293" y="13" width="101" height="32"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <buttonCell key="cell" type="push" title="Search" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="nxe-Wk-1VY">
                             <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
@@ -82,35 +83,38 @@
                             <action selector="searchNextAction:" target="-1" id="R2A-qw-8Kb"/>
                         </connections>
                     </button>
-                    <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="xQZ-LC-aUX">
-                        <rect key="frame" x="205" y="47" width="101" height="32"/>
-                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                        <buttonCell key="cell" type="push" title="Replace All" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="i6g-yv-r4Z">
-                            <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
-                            <font key="font" metaFont="system"/>
-                        </buttonCell>
-                        <connections>
-                            <action selector="replaceAllAction:" target="-1" id="sZc-EH-8mt"/>
-                        </connections>
-                    </button>
                     <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="aUO-f1-mte">
-                        <rect key="frame" x="74" y="53" width="91" height="18"/>
+                        <rect key="frame" x="74" y="45" width="114" height="18"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                        <buttonCell key="cell" type="check" title="Use Regex" bezelStyle="regularSquare" imagePosition="left" state="on" inset="2" id="SSz-Or-sP3">
+                        <buttonCell key="cell" type="check" title="Use Regex (U)" bezelStyle="regularSquare" imagePosition="left" state="on" inset="2" id="SSz-Or-sP3">
                             <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
                             <font key="font" metaFont="system"/>
+                            <string key="keyEquivalent">u</string>
+                            <modifierMask key="keyEquivalentModifierMask" command="YES"/>
                         </buttonCell>
                     </button>
                     <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="vLN-bx-Trp">
-                        <rect key="frame" x="74" y="75" width="99" height="18"/>
+                        <rect key="frame" x="74" y="67" width="116" height="18"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                        <buttonCell key="cell" type="check" title="Ignore Case" bezelStyle="regularSquare" imagePosition="left" state="on" inset="2" id="cUs-L6-MrI">
+                        <buttonCell key="cell" type="check" title="Ignore Case (I)" bezelStyle="regularSquare" imagePosition="left" state="on" inset="2" id="cUs-L6-MrI">
                             <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
                             <font key="font" metaFont="system"/>
+                            <string key="keyEquivalent">i</string>
+                            <modifierMask key="keyEquivalentModifierMask" command="YES"/>
+                        </buttonCell>
+                    </button>
+                    <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="8P3-X5-Iyn">
+                        <rect key="frame" x="74" y="23" width="137" height="18"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <buttonCell key="cell" type="check" title="Selection Only (O)" bezelStyle="regularSquare" imagePosition="left" state="on" inset="2" id="nbz-rP-wF9">
+                            <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                            <font key="font" metaFont="system"/>
+                            <string key="keyEquivalent">o</string>
+                            <modifierMask key="keyEquivalentModifierMask" command="YES"/>
                         </buttonCell>
                     </button>
                     <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="jrV-Og-YRt">
-                        <rect key="frame" x="131" y="13" width="76" height="32"/>
+                        <rect key="frame" x="219" y="13" width="76" height="32"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <buttonCell key="cell" type="push" title="Cancel" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="8dI-ne-wta">
                             <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
@@ -123,12 +127,25 @@ Gw
                             <action selector="actCancel:" target="-2" id="A6M-M4-QbL"/>
                         </connections>
                     </button>
+                    <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="xQZ-LC-aUX">
+                        <rect key="frame" x="271" y="45" width="123" height="32"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <buttonCell key="cell" type="push" title="Replace All (R)" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="i6g-yv-r4Z">
+                            <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                            <font key="font" metaFont="system"/>
+                            <string key="keyEquivalent">r</string>
+                            <modifierMask key="keyEquivalentModifierMask" command="YES"/>
+                        </buttonCell>
+                        <connections>
+                            <action selector="replaceAllAction:" target="-1" id="sZc-EH-8mt"/>
+                        </connections>
+                    </button>
                 </subviews>
             </view>
             <connections>
                 <outlet property="initialFirstResponder" destination="OY9-NE-dHF" id="igh-KI-Ga7"/>
             </connections>
-            <point key="canvasLocation" x="109.5" y="169"/>
+            <point key="canvasLocation" x="-13.5" y="83"/>
         </window>
     </objects>
 </document>

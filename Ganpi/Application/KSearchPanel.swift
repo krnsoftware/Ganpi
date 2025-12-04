@@ -18,6 +18,7 @@ final class KSearchPanel: NSWindowController {
     @IBOutlet private weak var replaceField: NSTextField!
     @IBOutlet private weak var ignoreCaseBtn: NSButton!
     @IBOutlet private weak var useRegexBtn: NSButton!
+    @IBOutlet private weak var selectionOnlyBtn: NSButton!
 
     @IBOutlet private weak var searchButton: NSButton!      // Default (Return)
     @IBOutlet private weak var cancelButton: NSButton!      // Esc
@@ -28,6 +29,7 @@ final class KSearchPanel: NSWindowController {
     private var _replaceString: String = ""
     private var _ignoreCase:    Bool   = true
     private var _useRegex:      Bool   = false
+    private var _selectionOnly: Bool   = false
     
     
 
@@ -60,6 +62,13 @@ final class KSearchPanel: NSWindowController {
             if isWindowLoaded { useRegexBtn.state = newValue ? .on : .off }
         }
     }
+    @objc dynamic var selectionOnly: Bool {
+        get { isWindowLoaded ? (selectionOnlyBtn.state == .on) : _selectionOnly }
+        set {
+            _selectionOnly = newValue
+            if isWindowLoaded { selectionOnlyBtn.state = newValue ? .on : .off }
+        }
+    }
 
     // MARK: - Lifecycle
     override func windowDidLoad() {
@@ -84,6 +93,7 @@ final class KSearchPanel: NSWindowController {
         replaceField.stringValue = _replaceString
         ignoreCaseBtn.state      = _ignoreCase ? .on : .off
         useRegexBtn.state        = _useRegex ? .on : .off
+        selectionOnlyBtn.state   = _selectionOnly ? .on : .off
 
         // 任意：編集終了でバックストアへ戻す
         findField.target = self;     findField.action = #selector(_fieldsEdited)
@@ -112,11 +122,12 @@ final class KSearchPanel: NSWindowController {
         window?.performClose(nil)
     }
 
-    // MARK: - UI→バックストア 同期（任意）
+    // MARK: - UI→バックストア 同期
     @objc private func _fieldsEdited(_ sender: Any?) {
         _searchString  = findField.stringValue
         _replaceString = replaceField.stringValue
         _ignoreCase    = (ignoreCaseBtn.state == .on)
         _useRegex      = (useRegexBtn.state == .on)
+        _selectionOnly = (selectionOnlyBtn.state == .on)
     }
 }
