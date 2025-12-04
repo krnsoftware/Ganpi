@@ -27,7 +27,7 @@
                 <rect key="frame" x="0.0" y="0.0" width="407" height="204"/>
                 <autoresizingMask key="autoresizingMask"/>
                 <subviews>
-                    <textField focusRingType="none" verticalHuggingPriority="750" fixedFrame="YES" textCompletion="NO" translatesAutoresizingMaskIntoConstraints="NO" id="OY9-NE-dHF">
+                    <textField focusRingType="none" verticalHuggingPriority="750" fixedFrame="YES" textCompletion="NO" translatesAutoresizingMaskIntoConstraints="NO" id="OY9-NE-dHF" customClass="KTextField" customModule="Ganpi" customModuleProvider="target">
                         <rect key="frame" x="76" y="148" width="311" height="50"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <textFieldCell key="cell" scrollable="YES" lineBreakMode="clipping" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="QNy-Gz-dF8">
@@ -39,7 +39,7 @@
                             <outlet property="nextKeyView" destination="rrP-aj-gRi" id="Qlo-8p-kxW"/>
                         </connections>
                     </textField>
-                    <textField focusRingType="none" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="rrP-aj-gRi">
+                    <textField focusRingType="none" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="rrP-aj-gRi" customClass="KTextField" customModule="Ganpi" customModuleProvider="target">
                         <rect key="frame" x="76" y="92" width="311" height="50"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <textFieldCell key="cell" scrollable="YES" lineBreakMode="clipping" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="nye-DN-gGG">
@@ -87,7 +87,7 @@
                             <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
                             <font key="font" metaFont="system"/>
                             <string key="keyEquivalent">u</string>
-                            <modifierMask key="keyEquivalentModifierMask" command="YES"/>
+                            <modifierMask key="keyEquivalentModifierMask" option="YES"/>
                         </buttonCell>
                         <connections>
                             <binding destination="GCE-Yv-oaf" name="value" keyPath="values.searchUseRegex" id="Srj-oE-PN8"/>
@@ -100,7 +100,7 @@
                             <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
                             <font key="font" metaFont="system"/>
                             <string key="keyEquivalent">i</string>
-                            <modifierMask key="keyEquivalentModifierMask" command="YES"/>
+                            <modifierMask key="keyEquivalentModifierMask" option="YES"/>
                         </buttonCell>
                         <connections>
                             <binding destination="GCE-Yv-oaf" name="value" keyPath="values.searchIgnoreCase" id="Z57-P7-UCF"/>
@@ -113,7 +113,7 @@
                             <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
                             <font key="font" metaFont="system"/>
                             <string key="keyEquivalent">o</string>
-                            <modifierMask key="keyEquivalentModifierMask" command="YES"/>
+                            <modifierMask key="keyEquivalentModifierMask" option="YES"/>
                         </buttonCell>
                         <connections>
                             <binding destination="GCE-Yv-oaf" name="value" keyPath="values.searchSelectionOnly" id="woA-gJ-5G5"/>
@@ -140,7 +140,7 @@ Gw
                             <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
                             <font key="font" metaFont="system"/>
                             <string key="keyEquivalent">r</string>
-                            <modifierMask key="keyEquivalentModifierMask" command="YES"/>
+                            <modifierMask key="keyEquivalentModifierMask" option="YES"/>
                         </buttonCell>
                         <connections>
                             <action selector="replaceAllAction:" target="-1" id="sZc-EH-8mt"/>
