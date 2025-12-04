@@ -1262,7 +1262,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     func replace() -> Bool {
         if selectionRange.isEmpty { NSSound.beep(); return false }
         
-        let count = replaceAll(for: selectionRange)
+        let (count, _) = replaceAll(for: selectionRange)
         if count == 0 { return false }
         
         updateCaretPosition()
@@ -1274,29 +1274,39 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     @discardableResult
     func replaceAll() -> Bool {
         if textStorage.count == 0 { NSSound.beep(); return false }
-        let count = replaceAll(for: 0..<textStorage.count)
-        caretIndex = 0
+        
+        let targetRanage:Range<Int>
+        let postSelectionLowerBound:Int
+        
+        // 選択範囲があればその範囲を、なければ全文を置換対象とする。
+        if selectionRange.count > 0 {
+            targetRanage = selectionRange
+            postSelectionLowerBound = selectionRange.lowerBound
+        } else {
+            targetRanage = 0..<textStorage.count
+            postSelectionLowerBound = 0
+        }
+        let (count, length) = replaceAll(for: targetRanage)
+        var postSelection = postSelectionLowerBound..<postSelectionLowerBound + length
+        if postSelection == 0..<textStorage.count {
+            postSelection = 0..<0
+        }
+        selectionRange = postSelection
         
         updateCaretPosition()
         scrollCaretToVisible()
         
-        let alert = NSAlert()
-        alert.messageText = "Replacement"
-        alert.informativeText = "Replacement has done. \(count) times."
-        alert.alertStyle = .informational
-        alert.addButton(withTitle: "OK")
-
-        alert.runModal()  // モーダルで表示
+        KLog.shared.log(id: "TextView:replaceAll", message: "Replace All: \(count) replacement done.")
         
         return true
     }
     
     @discardableResult
-    private func replaceAll(for range: Range<Int>) -> Int {
-        if range.isEmpty { NSSound.beep(); return 0 }
+    private func replaceAll(for range: Range<Int>) -> (count: Int, length: Int) {
+        if range.isEmpty { NSSound.beep(); return (0, range.count) }
         guard range.lowerBound >= 0, range.upperBound <= textStorage.count else {
             log("range is out of bounds.",from:self)
-            return 0
+            return (0, range.count)
         }
 
         let searchString = KSearchPanel.shared.searchString
@@ -1304,7 +1314,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         let isCaseInsensitive = KSearchPanel.shared.ignoreCase
         let usesRegularExpression = KSearchPanel.shared.useRegex
         
-        guard !searchString.isEmpty else { log("searchString is empty.",from:self); return 0 }
+        guard !searchString.isEmpty else { log("searchString is empty.",from:self); return (0, range.count) }
 
         let wholeString  = textStorage.string
         let targetString = wholeString[range]
@@ -1321,7 +1331,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         let options: NSRegularExpression.Options = isCaseInsensitive ? [.caseInsensitive] : []
         guard let regex = try? NSRegularExpression(pattern: pattern, options: options) else {
             log("regex is nil.",from:self)
-            NSSound.beep(); return 0
+            NSSound.beep(); return (0, range.count)
         }
 
         // 部分文字列を可変化して置換＋件数取得
@@ -1329,17 +1339,17 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         let mutableRange = NSRange(location: 0, length: mutableString.length)
         let count = regex.replaceMatches(in: mutableString, options: [], range: mutableRange, withTemplate: template)
 
-        guard count > 0 else { NSSound.beep(); return 0 }
+        guard count > 0 else { NSSound.beep(); return (0, range.count) }
 
         // 置換結果で選択範囲全体を差し替え（nsRange内のみ変更されている）
         let replacedSub = String(mutableString)
         _textStorageRef.replaceString(in: range, with: replacedSub)
         
-        caretIndex = range.lowerBound + replacedSub.count
+        //caretIndex = range.lowerBound + replacedSub.count
         //log("caretIndex: \(caretIndex), range: \(range)",from:self)
 
 
-        return count
+        return (count, replacedSub.count)
     }
     
     
