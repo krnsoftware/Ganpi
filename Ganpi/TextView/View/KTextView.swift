@@ -1211,8 +1211,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     @discardableResult
     func search(for direction:KDirection = .forward) -> Bool {
         let searchString = KSearchPanel.shared.searchString
-        let isCaseInsensitive = KSearchPanel.shared.ignoreCase
-        let usesRegularExpression = KSearchPanel.shared.useRegex
+        let isCaseInsensitive = UserDefaults.standard.bool(forKey: KDefaultSearchKey.ignoreCase)
+        let usesRegularExpression = UserDefaults.standard.bool(forKey: KDefaultSearchKey.useRegex)
         let wholeString = textStorage.string
         
         var regexPattern:Regex<Substring>
@@ -1252,7 +1252,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
         
         updateCaretPosition()
-        //scrollCaretToVisible()
         centerSelectionInVisibleArea(nil)
         
         return true
@@ -1278,7 +1277,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         let targetRanage:Range<Int>
         let postSelectionLowerBound:Int
         
-        let selectionOnly = KSearchPanel.shared.selectionOnly
+        let selectionOnly = UserDefaults.standard.bool(forKey: KDefaultSearchKey.selectionOnly)
         
         if selectionOnly {
             targetRanage = selectionRange
@@ -1312,8 +1311,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
 
         let searchString = KSearchPanel.shared.searchString
         let replaceString = KSearchPanel.shared.replaceString
-        let isCaseInsensitive = KSearchPanel.shared.ignoreCase
-        let usesRegularExpression = KSearchPanel.shared.useRegex
+        let isCaseInsensitive = UserDefaults.standard.bool(forKey: KDefaultSearchKey.ignoreCase)
+        let usesRegularExpression = UserDefaults.standard.bool(forKey: KDefaultSearchKey.useRegex)
         
         guard !searchString.isEmpty else { log("searchString is empty.",from:self); return (0, range.count) }
 
@@ -1345,10 +1344,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         // 置換結果で選択範囲全体を差し替え（nsRange内のみ変更されている）
         let replacedSub = String(mutableString)
         _textStorageRef.replaceString(in: range, with: replacedSub)
-        
-        //caretIndex = range.lowerBound + replacedSub.count
-        //log("caretIndex: \(caretIndex), range: \(range)",from:self)
-
 
         return (count, replacedSub.count)
     }
@@ -1382,36 +1377,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         _prevContentViewBounds = contentBounds
         needsDisplay = true
         
-        /*
-        // ワードラップ時：可視領域サイズが変われば再描画
-        if contentBounds.size != _prevContentViewBounds.size, wordWrap {
-            _prevContentViewBounds = contentBounds
-            needsDisplay = true
-            return
-        }
-
-        // ノーラップ時：スクロールに伴う原点移動で再描画
-        //if bounds.origin != _prevContentViewBounds.origin {
-        if contentBounds.origin != _prevContentViewBounds.origin {
-            _prevContentViewBounds = contentBounds
-
-            if let layoutRects = _layoutManager.makeLayoutRects(),
-               let contentView = enclosingScrollView?.contentView {
-                let pos = characterPosition(at: caretIndex)
-                let currentX = pos.x - layoutRects.horizontalInsets - contentView.bounds.minX
-
-                // 選択が空のときだけ表示可。行番号領域に隠れたら消す。
-                _caretView.isHidden = !selectionRange.isEmpty || (currentX < 0)
-            }
-
-            needsDisplay = true
-            return
-        }
-        
-        // 原点にいる時にワードラップオフの状態で右にスクロールすると行番号が一瞬ブレる問題を解決。
-        if contentBounds.minX != _prevContentViewBounds.minX {
-            needsDisplay = true
-        }*/
     }
     
     

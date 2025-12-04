@@ -33,6 +33,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.activate(ignoringOtherApps: true)
+        
+        UserDefaults.standard.register(defaults: [
+            KDefaultSearchKey.ignoreCase : true,
+            KDefaultSearchKey.useRegex : false,
+            KDefaultSearchKey.selectionOnly : false
+        ])
     }
     
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {

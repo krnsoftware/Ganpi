@@ -10,12 +10,9 @@
             <connections>
                 <outlet property="cancelButton" destination="jrV-Og-YRt" id="zle-Vg-PdL"/>
                 <outlet property="findField" destination="OY9-NE-dHF" id="Rzt-ZF-A7h"/>
-                <outlet property="ignoreCaseBtn" destination="vLN-bx-Trp" id="ajk-yL-toS"/>
                 <outlet property="replaceAllButton" destination="xQZ-LC-aUX" id="M2F-2D-vuy"/>
                 <outlet property="replaceField" destination="rrP-aj-gRi" id="Kho-xV-pjD"/>
                 <outlet property="searchButton" destination="htv-K9-PiX" id="HiC-Bz-c8b"/>
-                <outlet property="selectionOnlyBtn" destination="8P3-X5-Iyn" id="2Ld-2W-ZyE"/>
-                <outlet property="useRegexBtn" destination="aUO-f1-mte" id="QFo-AV-hvO"/>
                 <outlet property="window" destination="QvC-M9-y7g" id="CJf-VZ-Fg0"/>
             </connections>
         </customObject>
@@ -92,6 +89,9 @@
                             <string key="keyEquivalent">u</string>
                             <modifierMask key="keyEquivalentModifierMask" command="YES"/>
                         </buttonCell>
+                        <connections>
+                            <binding destination="GCE-Yv-oaf" name="value" keyPath="values.searchUseRegex" id="Srj-oE-PN8"/>
+                        </connections>
                     </button>
                     <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="vLN-bx-Trp">
                         <rect key="frame" x="74" y="67" width="116" height="18"/>
@@ -102,6 +102,9 @@
                             <string key="keyEquivalent">i</string>
                             <modifierMask key="keyEquivalentModifierMask" command="YES"/>
                         </buttonCell>
+                        <connections>
+                            <binding destination="GCE-Yv-oaf" name="value" keyPath="values.searchIgnoreCase" id="Z57-P7-UCF"/>
+                        </connections>
                     </button>
                     <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="8P3-X5-Iyn">
                         <rect key="frame" x="74" y="23" width="137" height="18"/>
@@ -112,6 +115,9 @@
                             <string key="keyEquivalent">o</string>
                             <modifierMask key="keyEquivalentModifierMask" command="YES"/>
                         </buttonCell>
+                        <connections>
+                            <binding destination="GCE-Yv-oaf" name="value" keyPath="values.searchSelectionOnly" id="woA-gJ-5G5"/>
+                        </connections>
                     </button>
                     <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="jrV-Og-YRt">
                         <rect key="frame" x="219" y="13" width="76" height="32"/>
@@ -147,5 +153,6 @@ Gw
             </connections>
             <point key="canvasLocation" x="-13.5" y="83"/>
         </window>
+        <userDefaultsController representsSharedInstance="YES" id="GCE-Yv-oaf"/>
     </objects>
 </document>
