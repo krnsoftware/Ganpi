@@ -297,47 +297,80 @@ final class KPreference {
         guard let base = key.rawKey else { return nil }
 
         let suffix = base.dropFirst("parser.base.".count)
-        //let modeIsDark = (_currentAppearance == .dark)
         let modeIsDark = isInDarkAppearance
 
-        // 1) user.lang
-        if let lang = lang {
-            if modeIsDark, _userValues["parser.\(lang.settingName).\(suffix).dark"] != nil {
-                return "parser.\(lang.settingName).\(suffix).dark"
-            }
-            if _userValues["parser.\(lang.settingName).\(suffix)"] != nil {
-                return "parser.\(lang.settingName).\(suffix)"
-            }
+        func makeKeys(prefix: String) -> (dark: String, light: String) {
+            return (
+                dark:  "\(prefix).\(suffix).dark",
+                light: "\(prefix).\(suffix)"
+            )
         }
 
-        // 2) user.base
-        if modeIsDark, _userValues["parser.base.\(suffix).dark"] != nil {
-            return "parser.base.\(suffix).dark"
-        }
-        if _userValues["parser.base.\(suffix)"] != nil {
-            return "parser.base.\(suffix)"
-        }
-
-        // 3) default.lang
-        if let lang = lang {
-            if modeIsDark, _defaultValues["parser.\(lang.settingName).\(suffix).dark"] != nil {
-                return "parser.\(lang.settingName).\(suffix).dark"
-            }
-            if _defaultValues["parser.\(lang.settingName).\(suffix)"] != nil {
-                return "parser.\(lang.settingName).\(suffix)"
-            }
+        // ---------------------------
+        // 1. 構築: lang 系の key
+        // ---------------------------
+        var langKeys: (dark: String, light: String)?
+        if let lang {
+            langKeys = makeKeys(prefix: "parser.\(lang.settingName)")
         }
 
-        // 4) default.base
-        if modeIsDark, _defaultValues["parser.base.\(suffix).dark"] != nil {
-            return "parser.base.\(suffix).dark"
+        // ---------------------------
+        // 2. 構築: base 系の key
+        // ---------------------------
+        let baseKeys = makeKeys(prefix: "parser.base")
+
+        // ============================================================
+        //   Dark Mode の場合の探索順序（ご主人様指定の 1〜8）
+        // ============================================================
+        if modeIsDark {
+
+            // 1. user.lang.dark
+            if let keys = langKeys, _userValues[keys.dark] != nil { return keys.dark }
+
+            // 2. app.lang.dark
+            if let keys = langKeys, _defaultValues[keys.dark] != nil { return keys.dark }
+
+            // 3. user.lang.light
+            if let keys = langKeys, _userValues[keys.light] != nil { return keys.light }
+
+            // 4. app.lang.light
+            if let keys = langKeys, _defaultValues[keys.light] != nil { return keys.light }
+
+            // 5. user.base.dark
+            if _userValues[baseKeys.dark] != nil { return baseKeys.dark }
+
+            // 6. app.base.dark
+            if _defaultValues[baseKeys.dark] != nil { return baseKeys.dark }
+
+            // 7. user.base.light
+            if _userValues[baseKeys.light] != nil { return baseKeys.light }
+
+            // 8. app.base.light
+            if _defaultValues[baseKeys.light] != nil { return baseKeys.light }
+
+            return nil
         }
-        if _defaultValues["parser.base.\(suffix)"] != nil {
-            return "parser.base.\(suffix)"
-        }
+
+        // ============================================================
+        //   Light Mode の場合（ダーク関連は完全無視）
+        // ============================================================
+
+        // user.lang.light
+        if let keys = langKeys, _userValues[keys.light] != nil { return keys.light }
+
+        // app.lang.light
+        if let keys = langKeys, _defaultValues[keys.light] != nil { return keys.light }
+
+        // user.base.light
+        if _userValues[baseKeys.light] != nil { return baseKeys.light }
+
+        // app.base.light
+        if _defaultValues[baseKeys.light] != nil { return baseKeys.light }
 
         return nil
     }
+
+
 
     var isInDarkAppearance: Bool {
         return NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
