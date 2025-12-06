@@ -45,10 +45,43 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
 
     // MARK: - Menu actions and others.
 
+    // SplitView
     @IBAction func splitVertically(_ sender: Any?)   { ensureSecondPane(orientation: .vertical) }
     @IBAction func splitHorizontally(_ sender: Any?) { ensureSecondPane(orientation: .horizontal) }
     @IBAction func removeSplit(_ sender: Any?)       { removeSecondPaneIfExists() }
+    
+    // 現在アクティブなTextViewの次(右または下)のTextViewをフォーカスする。
+    @IBAction func focusForwardTextView(_ sender: Any?) {
+        focusAdjoiningTextView(for: .forward)
+    }
+    
+    @IBAction func focusBackwardTextView(_ sender: Any?) {
+        focusAdjoiningTextView(for: .backward)
+    }
+    
+    @IBAction func setDividerCenter(_ sender: Any?) {
+        guard let sv = _splitView else { log("#01",from:self); return }
+        let mid = sv.isVertical ? sv.bounds.width / 2 : sv.bounds.height / 2
+        sv.setPosition(mid, ofDividerAt: 0)
+    }
+    
+    @IBAction func setDividerForward(_ sender: Any?) {
+        guard let sv = _splitView else { log("#01",from:self); return }
+        let current = sv.isVertical ? sv.subviews[0].frame.width : sv.subviews[0].frame.height
+        let svMax = sv.isVertical ? sv.frame.width : sv.frame.height
+        let newSplit = min(svMax - 5.0, current + 20.0)
+        sv.setPosition(newSplit, ofDividerAt: 0)
+    }
+    
+    @IBAction func setDividerBackward(_ sender: Any?) {
+        guard let sv = _splitView else { log("#01",from:self); return }
+        let current = sv.isVertical ? sv.subviews[0].frame.width : sv.subviews[0].frame.height
+        let newSplit = max(5.0, current - 20.0)
+        sv.setPosition(newSplit, ofDividerAt: 0)
+    }
 
+    
+    // Settings
     @IBAction func toggleAutoIndent(_ sender: Any?) {
         guard let activeTextView = activeTextView() else { log("activeTextView is nil.",from:self); return }
         activeTextView.autoIndent.toggle()
@@ -76,8 +109,24 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         if !syncOptions { return }
         textViews.forEach { if $0 !== activeTextView { $0.showInvisibleCharacters = activeTextView.showInvisibleCharacters } }
     }
+    
 
     @IBAction func toggleSyncOptions(_ sender: Any?) { syncOptions.toggle() }
+    
+    // Edit mode
+    @IBAction func setEditModeToNormal(_ sender: Any?) {
+        guard let activeTextView = activeTextView() else { log("activeTextView is nil.",from:self); return }
+        activeTextView.editMode = .normal
+        if !syncOptions { return }
+        textViews.forEach { if $0 !== activeTextView { $0.editMode = .normal } }
+    }
+    
+    @IBAction func setEditModeToEdit(_ sender: Any?) {
+        guard let activeTextView = activeTextView() else { log("activeTextView is nil.",from:self); return }
+        activeTextView.editMode = .edit
+        if !syncOptions { return }
+        textViews.forEach { if $0 !== activeTextView { $0.editMode = .edit } }
+    }
     
     @IBAction func lineWrapAlignment(_ sender: Any?) {
         guard let activeTextView = activeTextView() else { log("activeTextView is nil.",from:self); return }
@@ -86,15 +135,6 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         activeTextView.layoutManager.wrapLineOffsetType = menuTag
         if !syncOptions { return }
         textViews.forEach { if $0 !== activeTextView { $0.layoutManager.wrapLineOffsetType = menuTag } }
-    }
-    
-    // 現在アクティブなTextViewの次(右または下)のTextViewをフォーカスする。
-    @IBAction func focusForwardTextView(_ sender: Any?) {
-        focusAdjoiningTextView(for: .forward)
-    }
-    
-    @IBAction func focusBackwardTextView(_ sender: Any?) {
-        focusAdjoiningTextView(for: .backward)
     }
 
     @IBAction func increaseLineSpacing(_ sender: Any?) {
@@ -465,7 +505,6 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
                 menuItem.indentationLevel = 1
             }
             menuItem.representedObject = outlineItem.nameRange
-            //menuItem.image = img
             menu.addItem(menuItem)
         }
         popUp(menu, from: sender)
@@ -613,9 +652,6 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         sv.addSubview(second)
         sv.adjustSubviews()
 
-        // 設定同期
-        //second.textView.loadSettings(from: firstTextView)
-
         // 半分位置へ
         let mid: CGFloat = sv.isVertical ? sv.bounds.width / 2 : sv.bounds.height / 2
         sv.setPosition(mid, ofDividerAt: 0)
@@ -637,7 +673,7 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         if _panes.count <= 1 { return }
         for (i, textView) in textViews.enumerated() {
             if textView === view.window?.firstResponder {
-                view.window?.makeFirstResponder( textViews[(i + direction.rawValue) % textViews.count])
+                view.window?.makeFirstResponder( textViews[(i + direction.rawValue + textViews.count) % textViews.count])
                 return
             }
         }

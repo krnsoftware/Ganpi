@@ -1574,6 +1574,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         wordWrap = textView.wordWrap
         showInvisibleCharacters = textView.showInvisibleCharacters
         showLineNumbers = textView.showLineNumbers
+        editMode = textView.editMode
         
         layoutManager.lineSpacing = textView.layoutManager.lineSpacing
         layoutManager.wrapLineOffsetType = textView.layoutManager.wrapLineOffsetType
@@ -2784,14 +2785,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
     }
     
-    // MARK: - Edit mode
-    @IBAction func setEditModeToNormal(_ sender: Any?) {
-        editMode = .normal
-    }
     
-    @IBAction func setEditModeToEdit(_ sender: Any?) {
-        editMode = .edit
-    }
     
     // MARK: - Completion
     @IBAction func setCompletionModeOn(_ sender: Any?) {
