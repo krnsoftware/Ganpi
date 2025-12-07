@@ -553,9 +553,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         //log("visibleLineRange: \(visibleLineRange)")
         */
         
-        let prefs = KPreference.shared
-        let lang = textStorage.parser.type
-        let textBackgroundColor = prefs.color(.parserColorBackground, lang: lang)
+        let textBackgroundColor = textStorage.parser.backgroundColor
         
         // 背景塗り潰し
         textBackgroundColor.setFill()
