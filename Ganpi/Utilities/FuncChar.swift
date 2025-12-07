@@ -60,7 +60,24 @@ struct FuncChar {
     static let underscore: UInt8 = 0x5F  // _
     
     
+    // Utilities
+    static func paired(of opener: UInt8) -> UInt8? {
+        switch opener {
+        case leftParen:   return rightParen
+        case rightParen:  return leftParen
+        case leftBracket: return rightBracket
+        case rightBracket:return leftBracket
+        case leftBrace:   return rightBrace
+        case rightBrace:  return leftBrace
+        case lt:          return gt
+        case gt:          return lt
+        default:          return nil
+        }
+    }
+    
+    private init() {}
 }
+
 
 /*
  // 編集・描画処理で扱う代表的な機能文字（不可視・記号）を定義する列挙型。
