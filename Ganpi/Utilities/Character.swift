@@ -76,6 +76,15 @@ extension Character {
     var isAllASCII: Bool { unicodeScalars.allSatisfy { $0.isASCII } }
     
 
+    
+    // Stringが1文字で、かつシングルバイト文字である場合にそれをUInt8で返す。
+    @inline(__always)
+    var singleByteValue: UInt8? {
+        let bytes = utf8
+        if bytes.count != 1 { return nil }
+        
+        return bytes.first
+    }
 }
 
 
