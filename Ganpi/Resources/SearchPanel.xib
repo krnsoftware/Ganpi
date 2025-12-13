@@ -21,10 +21,11 @@
         <window title="Search" allowsToolTipsWhenApplicationIsInactive="NO" autorecalculatesKeyViewLoop="NO" restorable="NO" hidesOnDeactivate="YES" releasedWhenClosed="NO" visibleAtLaunch="NO" frameAutosaveName="KSearchPanelFrame" animationBehavior="default" titlebarAppearsTransparent="YES" id="QvC-M9-y7g" customClass="NSPanel">
             <windowStyleMask key="styleMask" titled="YES" closable="YES" resizable="YES" utility="YES"/>
             <windowPositionMask key="initialPositionMask" leftStrut="YES" rightStrut="YES" topStrut="YES" bottomStrut="YES"/>
-            <rect key="contentRect" x="196" y="240" width="408" height="219"/>
+            <rect key="contentRect" x="196" y="240" width="408" height="234"/>
             <rect key="screenRect" x="0.0" y="0.0" width="2560" height="1415"/>
+            <value key="minSize" type="size" width="408" height="234"/>
             <view key="contentView" wantsLayer="YES" id="EiT-Mj-1SZ">
-                <rect key="frame" x="0.0" y="0.0" width="408" height="219"/>
+                <rect key="frame" x="0.0" y="0.0" width="408" height="234"/>
                 <autoresizingMask key="autoresizingMask"/>
                 <subviews>
                     <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="htv-K9-PiX">
@@ -39,7 +40,7 @@
                         </connections>
                     </button>
                     <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="aUO-f1-mte">
-                        <rect key="frame" x="272" y="54" width="114" height="18"/>
+                        <rect key="frame" x="225" y="47" width="114" height="18"/>
                         <autoresizingMask key="autoresizingMask" flexibleMinX="YES" flexibleMaxY="YES"/>
                         <buttonCell key="cell" type="check" title="Use Regex (U)" bezelStyle="regularSquare" imagePosition="left" state="on" inset="2" id="SSz-Or-sP3">
                             <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
@@ -52,7 +53,7 @@
                         </connections>
                     </button>
                     <button verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="vLN-bx-Trp">
-                        <rect key="frame" x="272" y="76" width="116" height="18"/>
+                        <rect key="frame" x="225" y="69" width="116" height="18"/>
                         <autoresizingMask key="autoresizingMask" flexibleMinX="YES" flexibleMaxY="YES"/>
                         <buttonCell key="cell" type="check" title="Ignore Case (I)" bezelStyle="regularSquare" imagePosition="left" state="on" inset="2" id="cUs-L6-MrI">
                             <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
@@ -78,80 +79,80 @@ Gw
                             <action selector="actCancel:" target="-2" id="A6M-M4-QbL"/>
                         </connections>
                     </button>
-                    <box title="Box" titlePosition="noTitle" transparent="YES" id="z4y-v1-lb4">
-                        <rect key="frame" x="-3" y="97" width="418" height="124"/>
+                    <splitView arrangesAllSubviews="NO" dividerStyle="thin" id="tqU-9z-YKi">
+                        <rect key="frame" x="0.0" y="91" width="408" height="143"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
-                        <view key="contentView" id="30W-Lm-afS">
-                            <rect key="frame" x="4" y="5" width="410" height="116"/>
-                            <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
-                            <subviews>
-                                <box fixedFrame="YES" title="Box" titlePosition="noTitle" transparent="YES" translatesAutoresizingMaskIntoConstraints="NO" id="DBZ-tk-SM1">
-                                    <rect key="frame" x="-3" y="50" width="413" height="68"/>
-                                    <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMaxX="YES" flexibleMinY="YES" heightSizable="YES"/>
-                                    <view key="contentView" id="Xjp-gJ-S1q">
-                                        <rect key="frame" x="4" y="5" width="405" height="60"/>
-                                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
-                                        <subviews>
-                                            <textField focusRingType="none" verticalHuggingPriority="750" fixedFrame="YES" textCompletion="NO" translatesAutoresizingMaskIntoConstraints="NO" id="OY9-NE-dHF" customClass="KTextField" customModule="Ganpi" customModuleProvider="target">
-                                                <rect key="frame" x="74" y="5" width="311" height="52"/>
-                                                <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES" heightSizable="YES"/>
-                                                <textFieldCell key="cell" scrollable="YES" lineBreakMode="clipping" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="QNy-Gz-dF8">
-                                                    <font key="font" size="14" name="Osaka-Mono"/>
-                                                    <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
-                                                    <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
-                                                </textFieldCell>
-                                                <connections>
-                                                    <outlet property="nextKeyView" destination="rrP-aj-gRi" id="Qlo-8p-kxW"/>
-                                                </connections>
-                                            </textField>
-                                            <textField focusRingType="none" horizontalHuggingPriority="251" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="tY0-aT-zjr">
-                                                <rect key="frame" x="14" y="38" width="54" height="16"/>
-                                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                                                <textFieldCell key="cell" lineBreakMode="clipping" title="Search :" id="T6q-TH-um2">
-                                                    <font key="font" metaFont="system"/>
-                                                    <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
-                                                    <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
-                                                </textFieldCell>
-                                            </textField>
-                                        </subviews>
-                                    </view>
-                                </box>
-                                <box fixedFrame="YES" title="Box" titlePosition="noTitle" transparent="YES" translatesAutoresizingMaskIntoConstraints="NO" id="euc-uL-bnx">
-                                    <rect key="frame" x="-3" y="-7" width="413" height="71"/>
-                                    <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMaxX="YES" flexibleMinY="YES" heightSizable="YES" flexibleMaxY="YES"/>
-                                    <view key="contentView" id="Me1-Fp-W8t">
-                                        <rect key="frame" x="4" y="5" width="405" height="63"/>
-                                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
-                                        <subviews>
-                                            <textField focusRingType="none" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="rrP-aj-gRi" customClass="KTextField" customModule="Ganpi" customModuleProvider="target">
-                                                <rect key="frame" x="74" y="5" width="311" height="54"/>
-                                                <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES" heightSizable="YES"/>
-                                                <textFieldCell key="cell" scrollable="YES" lineBreakMode="clipping" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="nye-DN-gGG">
-                                                    <font key="font" size="14" name="Osaka-Mono"/>
-                                                    <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
-                                                    <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
-                                                </textFieldCell>
-                                                <connections>
-                                                    <outlet property="nextKeyView" destination="OY9-NE-dHF" id="Ww9-nj-dx9"/>
-                                                </connections>
-                                            </textField>
-                                            <textField focusRingType="none" horizontalHuggingPriority="251" verticalHuggingPriority="750" id="Arc-1g-xcG">
-                                                <rect key="frame" x="8" y="42" width="60" height="16"/>
-                                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                                                <textFieldCell key="cell" lineBreakMode="clipping" title="Replace :" id="fTa-fJ-pHc">
-                                                    <font key="font" metaFont="system"/>
-                                                    <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
-                                                    <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
-                                                </textFieldCell>
-                                            </textField>
-                                        </subviews>
-                                    </view>
-                                </box>
-                            </subviews>
-                        </view>
-                    </box>
+                        <subviews>
+                            <box fixedFrame="YES" title="Box" titlePosition="noTitle" transparent="YES" id="DBZ-tk-SM1">
+                                <rect key="frame" x="-3" y="-2" width="414" height="76"/>
+                                <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMaxX="YES" flexibleMinY="YES" heightSizable="YES"/>
+                                <view key="contentView" id="Xjp-gJ-S1q">
+                                    <rect key="frame" x="4" y="5" width="406" height="68"/>
+                                    <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                                    <subviews>
+                                        <textField focusRingType="none" verticalHuggingPriority="750" fixedFrame="YES" textCompletion="NO" translatesAutoresizingMaskIntoConstraints="NO" id="OY9-NE-dHF" customClass="KTextField" customModule="Ganpi" customModuleProvider="target">
+                                            <rect key="frame" x="74" y="0.0" width="312" height="65"/>
+                                            <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES" heightSizable="YES"/>
+                                            <textFieldCell key="cell" scrollable="YES" lineBreakMode="clipping" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="QNy-Gz-dF8">
+                                                <font key="font" size="14" name="Osaka-Mono"/>
+                                                <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                                                <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                                            </textFieldCell>
+                                            <connections>
+                                                <outlet property="nextKeyView" destination="rrP-aj-gRi" id="Qlo-8p-kxW"/>
+                                            </connections>
+                                        </textField>
+                                        <textField focusRingType="none" horizontalHuggingPriority="251" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="tY0-aT-zjr">
+                                            <rect key="frame" x="14" y="46" width="54" height="16"/>
+                                            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                                            <textFieldCell key="cell" lineBreakMode="clipping" title="Search :" id="T6q-TH-um2">
+                                                <font key="font" metaFont="system"/>
+                                                <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                                                <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                                            </textFieldCell>
+                                        </textField>
+                                    </subviews>
+                                </view>
+                            </box>
+                            <box fixedFrame="YES" title="Box" titlePosition="noTitle" transparent="YES" id="euc-uL-bnx">
+                                <rect key="frame" x="-3" y="69" width="414" height="78"/>
+                                <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMaxX="YES" flexibleMinY="YES" heightSizable="YES" flexibleMaxY="YES"/>
+                                <view key="contentView" id="Me1-Fp-W8t">
+                                    <rect key="frame" x="4" y="5" width="406" height="70"/>
+                                    <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                                    <subviews>
+                                        <textField focusRingType="none" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="rrP-aj-gRi" customClass="KTextField" customModule="Ganpi" customModuleProvider="target">
+                                            <rect key="frame" x="74" y="5" width="312" height="65"/>
+                                            <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES" heightSizable="YES"/>
+                                            <textFieldCell key="cell" scrollable="YES" lineBreakMode="clipping" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="nye-DN-gGG">
+                                                <font key="font" size="14" name="Osaka-Mono"/>
+                                                <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                                                <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                                            </textFieldCell>
+                                            <connections>
+                                                <outlet property="nextKeyView" destination="OY9-NE-dHF" id="Ww9-nj-dx9"/>
+                                            </connections>
+                                        </textField>
+                                        <textField focusRingType="none" horizontalHuggingPriority="251" verticalHuggingPriority="750" id="Arc-1g-xcG">
+                                            <rect key="frame" x="8" y="49" width="60" height="16"/>
+                                            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                                            <textFieldCell key="cell" lineBreakMode="clipping" title="Replace :" id="fTa-fJ-pHc">
+                                                <font key="font" metaFont="system"/>
+                                                <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                                                <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                                            </textFieldCell>
+                                        </textField>
+                                    </subviews>
+                                </view>
+                            </box>
+                        </subviews>
+                        <holdingPriorities>
+                            <real value="250"/>
+                            <real value="250"/>
+                        </holdingPriorities>
+                    </splitView>
                     <box fixedFrame="YES" title="Box" titlePosition="noTitle" translatesAutoresizingMaskIntoConstraints="NO" id="P2H-PG-Yu7">
-                        <rect key="frame" x="32" y="16" width="181" height="69"/>
+                        <rect key="frame" x="33" y="20" width="181" height="69"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
                         <view key="contentView" id="5qo-VQ-0OL">
                             <rect key="frame" x="4" y="5" width="173" height="61"/>
@@ -191,81 +192,8 @@ Gw
             <connections>
                 <outlet property="initialFirstResponder" destination="OY9-NE-dHF" id="igh-KI-Ga7"/>
             </connections>
-            <point key="canvasLocation" x="-13" y="90.5"/>
+            <point key="canvasLocation" x="-13" y="98"/>
         </window>
         <userDefaultsController representsSharedInstance="YES" id="GCE-Yv-oaf"/>
-        <splitView arrangesAllSubviews="NO" dividerStyle="thin" id="tqU-9z-YKi">
-            <rect key="frame" x="0.0" y="0.0" width="416" height="186"/>
-            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-            <subviews>
-                <box fixedFrame="YES" title="Box" titlePosition="noTitle" transparent="YES" id="aax-hW-9gq">
-                    <rect key="frame" x="-3" y="-2" width="422" height="98"/>
-                    <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMaxX="YES" flexibleMinY="YES" heightSizable="YES"/>
-                    <view key="contentView" id="7Qj-l0-Fre">
-                        <rect key="frame" x="4" y="5" width="414" height="90"/>
-                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
-                        <subviews>
-                            <textField focusRingType="none" verticalHuggingPriority="750" fixedFrame="YES" textCompletion="NO" translatesAutoresizingMaskIntoConstraints="NO" id="XgS-nT-RlN" customClass="KTextField" customModule="Ganpi" customModuleProvider="target">
-                                <rect key="frame" x="74" y="8" width="320" height="79"/>
-                                <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
-                                <textFieldCell key="cell" scrollable="YES" lineBreakMode="clipping" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="ylU-dE-1fr">
-                                    <font key="font" size="14" name="Osaka-Mono"/>
-                                    <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
-                                    <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
-                                </textFieldCell>
-                                <connections>
-                                    <outlet property="nextKeyView" destination="rrP-aj-gRi" id="nIi-1x-Nza"/>
-                                </connections>
-                            </textField>
-                            <textField focusRingType="none" horizontalHuggingPriority="251" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="PEv-9K-H8b">
-                                <rect key="frame" x="14" y="68" width="54" height="16"/>
-                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                                <textFieldCell key="cell" lineBreakMode="clipping" title="Search :" id="Zec-Ie-9ci">
-                                    <font key="font" metaFont="system"/>
-                                    <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
-                                    <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
-                                </textFieldCell>
-                            </textField>
-                        </subviews>
-                    </view>
-                </box>
-                <box fixedFrame="YES" title="Box" titlePosition="noTitle" transparent="YES" id="uCe-y0-OZc">
-                    <rect key="frame" x="-3" y="91" width="422" height="99"/>
-                    <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMaxX="YES" flexibleMinY="YES" heightSizable="YES" flexibleMaxY="YES"/>
-                    <view key="contentView" id="J1f-Ni-t4U">
-                        <rect key="frame" x="4" y="5" width="414" height="91"/>
-                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
-                        <subviews>
-                            <textField focusRingType="none" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="ejb-u2-ZXa" customClass="KTextField" customModule="Ganpi" customModuleProvider="target">
-                                <rect key="frame" x="74" y="10" width="320" height="77"/>
-                                <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
-                                <textFieldCell key="cell" scrollable="YES" lineBreakMode="clipping" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="4H7-1Z-4Lr">
-                                    <font key="font" size="14" name="Osaka-Mono"/>
-                                    <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
-                                    <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
-                                </textFieldCell>
-                                <connections>
-                                    <outlet property="nextKeyView" destination="OY9-NE-dHF" id="PZN-th-2cW"/>
-                                </connections>
-                            </textField>
-                            <textField focusRingType="none" horizontalHuggingPriority="251" verticalHuggingPriority="750" id="po6-wE-5xX">
-                                <rect key="frame" x="8" y="70" width="60" height="16"/>
-                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                                <textFieldCell key="cell" lineBreakMode="clipping" title="Replace :" id="mYH-sL-fid">
-                                    <font key="font" metaFont="system"/>
-                                    <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
-                                    <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
-                                </textFieldCell>
-                            </textField>
-                        </subviews>
-                    </view>
-                </box>
-            </subviews>
-            <holdingPriorities>
-                <real value="250"/>
-                <real value="250"/>
-            </holdingPriorities>
-            <point key="canvasLocation" x="37" y="382"/>
-        </splitView>
     </objects>
 </document>
