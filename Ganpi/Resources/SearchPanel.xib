@@ -46,7 +46,7 @@
                             <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
                             <font key="font" metaFont="system"/>
                             <string key="keyEquivalent">u</string>
-                            <modifierMask key="keyEquivalentModifierMask" option="YES"/>
+                            <modifierMask key="keyEquivalentModifierMask" command="YES"/>
                         </buttonCell>
                         <connections>
                             <binding destination="GCE-Yv-oaf" name="value" keyPath="values.searchUseRegex" id="Srj-oE-PN8"/>
@@ -59,7 +59,7 @@
                             <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
                             <font key="font" metaFont="system"/>
                             <string key="keyEquivalent">i</string>
-                            <modifierMask key="keyEquivalentModifierMask" option="YES"/>
+                            <modifierMask key="keyEquivalentModifierMask" command="YES"/>
                         </buttonCell>
                         <connections>
                             <binding destination="GCE-Yv-oaf" name="value" keyPath="values.searchIgnoreCase" id="Z57-P7-UCF"/>
@@ -165,7 +165,7 @@ Gw
                                         <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
                                         <font key="font" metaFont="system"/>
                                         <string key="keyEquivalent">o</string>
-                                        <modifierMask key="keyEquivalentModifierMask" option="YES"/>
+                                        <modifierMask key="keyEquivalentModifierMask" command="YES"/>
                                     </buttonCell>
                                     <connections>
                                         <binding destination="GCE-Yv-oaf" name="value" keyPath="values.searchSelectionOnly" id="woA-gJ-5G5"/>
@@ -178,7 +178,7 @@ Gw
                                         <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
                                         <font key="font" metaFont="system"/>
                                         <string key="keyEquivalent">r</string>
-                                        <modifierMask key="keyEquivalentModifierMask" option="YES"/>
+                                        <modifierMask key="keyEquivalentModifierMask" command="YES"/>
                                     </buttonCell>
                                     <connections>
                                         <action selector="replaceAllAction:" target="-1" id="sZc-EH-8mt"/>
