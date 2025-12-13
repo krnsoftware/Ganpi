@@ -29,7 +29,7 @@ extension Selector {
         self == #selector(KTextView.pageDownAndModifySelection(_:)) 
     }
     
-    var isHorizontalActino: Bool {
+    var isHorizontalAction: Bool {
         return self == #selector(KTextView.moveLeft(_:)) ||
         self == #selector(KTextView.moveRight(_:)) ||
         self == #selector(KTextView.moveLeftAndModifySelection(_:)) ||
@@ -74,18 +74,19 @@ extension Selector {
         self == #selector(KTextView.moveToEndOfParagraphAndModifySelection(_:)) ||
         self == #selector(KTextView.moveToBeginningOfDocumentAndModifySelection(_:)) ||
         self == #selector(KTextView.moveToEndOfDocumentAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveToFirstPrintableCharacterInParagraph(_:)) ||
+        self == #selector(KTextView.moveToFirstPrintableCharacterInParagraphAndModifySelection(_:)) ||
         self == #selector(KTextView.selectWord(_:)) ||
         self == #selector(KTextView.selectLine(_:)) ||
         self == #selector(KTextView.selectParagraph(_:)) ||
-        self == #selector(KTextView.selectParagraph(_:))
+        self == #selector(KTextView.selectAll(_:))
     }
     
     var isCopyPasteAction: Bool {
         return self == #selector(KTextView.yank(_:)) ||
         self == #selector(KTextView.cut(_:)) ||
         self == #selector(KTextView.copy(_:)) ||
-        self == #selector(KTextView.paste(_:)) ||
-        self == #selector(KTextView.selectAll(_:))
+        self == #selector(KTextView.paste(_:))
     }
     
     var isCapitalizeAction: Bool {
@@ -95,7 +96,7 @@ extension Selector {
         self == #selector(KTextView.uppercaseWord(_:))
     }
     
-    var isRecordingTargetAction: Bool {
+    var isRecordable: Bool {
         return self.isDeleteAction ||
         self.isModifySelectionAction ||
         self.isCopyPasteAction ||
