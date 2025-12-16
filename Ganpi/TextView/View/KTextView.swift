@@ -1216,7 +1216,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         do {
             if usesRegularExpression {
-                regexPattern = try Regex(searchString)
+                regexPattern = try Regex(searchString).anchorsMatchLineEndings(true)
             } else {
                 regexPattern = try Regex(NSRegularExpression.escapedPattern(for: searchString))
             }
@@ -1325,7 +1325,10 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             ? replaceString
             : NSRegularExpression.escapedTemplate(for: replaceString)
 
-        let options: NSRegularExpression.Options = isCaseInsensitive ? [.caseInsensitive] : []
+        var options: NSRegularExpression.Options =  [.anchorsMatchLines]
+        if isCaseInsensitive {
+            options.insert(.caseInsensitive)
+        }
         guard let regex = try? NSRegularExpression(pattern: pattern, options: options) else {
             log("regex is nil.",from:self)
             NSSound.beep(); return (0, range.count)
