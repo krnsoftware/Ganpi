@@ -337,7 +337,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             self?.applyWordWrapToEnclosingScrollView()
         }
                 
-        window?.makeFirstResponder(self)  // 念のため明示的に指定
+        window?.makeFirstResponder(self)
         
         // キャレットの位置を再計算して表示しておく。
         updateCaretPosition()
@@ -466,18 +466,9 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     // MARK: - Caret (KTextView methods)
     
     private func updateCaretPosition() {
-        /*
-        let caretPosition = characterPosition(at: caretIndex)
-        _caretView.updateFrame(x: caretPosition.x, y: caretPosition.y, height: _layoutManager.lineHeight)
-         */
         guard let layoutRects = layoutManager.makeLayoutRects() else { log("layoutRects is nil.", from:self); return }
-        //let lines = layoutManager.lines
-        //guard let lineIndex = lines.lineIndex(at: caretIndex) else { log("lineIndex is nil.", from:self); return }
-        //let caretPosition:CGPoint = layoutRects.characterPosition(lineIndex: lineIndex, characterIndex: caretIndex)
         let caretPosition:CGPoint = layoutRects.characterPosition(lineIndex: currentLineIndex, characterIndex: caretIndex)
         
-        
-        //_caretView.updateFrame(x: caretPosition.x, y: caretPosition.y, height: layoutManager.lineHeight)
         _caretView.updateFrame(x: caretPosition.x, y: caretPosition.y, height: layoutManager.fontHeight)
         
         _caretView.alphaValue = 1.0
@@ -630,8 +621,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         lines.removeFakeLines()
         
-        
-        
         // 行番号部分を描画。
         if _showLineNumbers, let lnRect = layoutRects.lineNumberRegion?.rect {
             
@@ -654,12 +643,12 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             
             // 非選択行の文字のattribute
             let attrs: [NSAttributedString.Key: Any] = [
-                .font: _textStorageRef.lineNumberFont,
+                .font: textStorage.lineNumberFont,
                 .foregroundColor: NSColor.secondaryLabelColor
             ]
             // 選択行の文字のattribute
             let attrs_emphasized: [NSAttributedString.Key: Any] = [
-                .font: _textStorageRef.lineNumberFontEmph,
+                .font: textStorage.lineNumberFontEmph,
                 .foregroundColor: NSColor.labelColor
             ]
             
@@ -677,12 +666,12 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 
                 let numberPointX = lnRect.maxX - size.width - KLayoutRects.KLineNumberEdgeInsets.default.right
                 // 上下がずれないよう、base lineを合わせる。
-                let numberPointY = lnRect.origin.y + y - visibleRect.origin.y + _textStorageRef.baseFont.ascender - _textStorageRef.lineNumberFont.ascender
+                let numberPointY = lnRect.origin.y + y - visibleRect.origin.y + textStorage.baseFont.ascender - textStorage.lineNumberFont.ascender
                 let numberPoint = CGPoint(x: numberPointX, y: numberPointY)
                 
                 if !verticalRange.contains(numberPoint.y) { continue }
                 
-                let lineRange = _textStorageRef.lineRange(at: line.range.lowerBound) ?? line.range
+                let lineRange = textStorage.lineRange(at: line.range.lowerBound) ?? line.range
                 let isActive =
                 selectionRange.overlaps(lineRange)
                 || (selectionRange.isEmpty && (
@@ -745,7 +734,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
         
         // キーアサインに適合するかチェック。適合しなければinputContextに投げて、そちらでも使われなければkeyDown()へ。
-        // let keyStroke = KKeyStroke(event: event)
         guard let keyStroke = KKeyStroke(event: event) else { log("#01"); return }
         let status = KKeyAssign.shared.estimateKeyStroke(keyStroke, requester: self, mode: _editMode)
         if status == .passthrough {
@@ -797,7 +785,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         // 日本語入力中の場合はクリックに対応して変換を確定する。
         if hasMarkedText() {
-            _textStorageRef.replaceString(in: selectionRange, with: markedText.string)
+            textStorage.replaceString(in: selectionRange, with: markedText.string)
             inputContext?.discardMarkedText()
             unmarkText()
             return
@@ -833,31 +821,26 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                     return
                 }
                 
-                // ソフトウェア行の右端をクリックした際に右端にキャレットを移動させる。
-                //「前回のキャレット位置より現在のキャレット位置の方が右なら自動的に右端に表示される。
-                /*if layoutManager.lines.isBoundaryBetweenSoftwareLines(index: index) {
-                    caretIndex = index - 1
-                }*/
-                
                 _currentLineIndex = lineIndex
-                
                 caretIndex = index
                 
             case 2: // ダブルクリック - クリックした部分を単語選択。
-                if let wordRange = _textStorageRef.wordRange(at: index) {
+                if let wordRange = textStorage.wordRange(at: index) {
                     selectionRange = wordRange
                 } else {
                     caretIndex = index
                 }
                 _horizontalSelectionBase = selectionRange.lowerBound
                 _mouseSelectionMode = .word
+                
             case 3: // トリプルクリック - クリックした部分の行全体を選択。
-                guard let hardLineRange = _textStorageRef.lineRange(at: index) else { log("lineRange is nil", from:self); return }
-                let isLastLine = hardLineRange.upperBound == _textStorageRef.count
+                guard let hardLineRange = textStorage.lineRange(at: index) else { log("lineRange is nil", from:self); return }
+                let isLastLine = hardLineRange.upperBound == textStorage.count
                 selectionRange = hardLineRange.lowerBound..<hardLineRange.upperBound + (isLastLine ? 0 : 1)
                 
                 _horizontalSelectionBase = selectionRange.lowerBound
                 _mouseSelectionMode = .line
+                
             default:
                 break
             }
@@ -865,8 +848,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             
             guard let line = _layoutManager.lines[line] else { log("line is nil", from:self); return }
             //selectionRange = lineInfo.range
-            guard let hardLineRange = _textStorageRef.lineRange(at: line.range.lowerBound) else { log("lineRange is nil", from:self); return }
-            let isLastLine = hardLineRange.upperBound == _textStorageRef.count
+            guard let hardLineRange = textStorage.lineRange(at: line.range.lowerBound) else { log("lineRange is nil", from:self); return }
+            let isLastLine = hardLineRange.upperBound == textStorage.count
             selectionRange = hardLineRange.lowerBound..<hardLineRange.upperBound + (isLastLine ? 0 : 1)
             _horizontalSelectionBase = hardLineRange.lowerBound
             log("hardLineRange:\(hardLineRange), isLastLine: \(isLastLine)",from:self)
@@ -940,7 +923,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         if _prepareDraggingText, let dragStartPoint = _dragStartPoint {
             let dragDistance: CGFloat = hypot(location.x - dragStartPoint.x, location.y - dragStartPoint.y)
             if dragDistance >= _minimumDragDistance {
-                let str = String(_textStorageRef.characterSlice[selectionRange])
+                let str = String(textStorage.characterSlice[selectionRange])
                 let pasteboardItem = NSPasteboardItem()
                 pasteboardItem.setString(str, forType: .string)
                 
@@ -969,16 +952,16 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             case .character:
                 selectionRange = min(anchor, index)..<max(anchor, index)
             case .word:
-                if let wordRange1 = _textStorageRef.wordRange(at: index),
-                   let wordRange2 = _textStorageRef.wordRange(at: anchor) {
+                if let wordRange1 = textStorage.wordRange(at: index),
+                   let wordRange2 = textStorage.wordRange(at: anchor) {
                     selectionRange = min(wordRange1.lowerBound, wordRange2.lowerBound)..<max(wordRange1.upperBound, wordRange2.upperBound)
                 }
             case .line:
-                if let lineRangeForIndex = _textStorageRef.lineRange(at: index),
-                   let lineRangeForAnchor = _textStorageRef.lineRange(at: anchor) {
+                if let lineRangeForIndex = textStorage.lineRange(at: index),
+                   let lineRangeForAnchor = textStorage.lineRange(at: anchor) {
                     let lower = min(lineRangeForIndex.lowerBound, lineRangeForAnchor.lowerBound)
                     let upper = max(lineRangeForIndex.upperBound, lineRangeForAnchor.upperBound)
-                    let isLastLine = (_textStorageRef.count == upper)
+                    let isLastLine = (textStorage.count == upper)
                     selectionRange = lower..<(isLastLine ? upper : upper + 1)
                 }
             }
@@ -1020,7 +1003,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 //selectionRange = 0..<(_horizontalSelectionBase ?? caretIndex)
                 selectionRange = 0..<selectionRange.upperBound
             } else if location.y > (_layoutManager.lineHeight * CGFloat(_layoutManager.lineCount) + layoutRects.textEdgeInsets.top)  {
-                selectionRange = (_horizontalSelectionBase ?? caretIndex)..<_textStorageRef.count
+                selectionRange = (_horizontalSelectionBase ?? caretIndex)..<textStorage.count
             }
             return
         }
@@ -1136,17 +1119,17 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             
             if isOptionKeyPressed || !isSenderMyself { // .copy  オプションキーが押下されているか外部からのdrag and drop.
                 //log(".copy: ", from: self)
-                _textStorageRef.replaceCharacters(in: index..<index, with: Array(droppedString))
+                textStorage.replaceCharacters(in: index..<index, with: Array(droppedString))
                 selectionRange = index..<index + droppedString.count
             } else  { // .move
                 if isSenderMyself { // 自分自身からのdrag and drop
                     if index < selectionRange.lowerBound {
-                        _textStorageRef.replaceCharacters(in: selectionRange, with: Array(""))
-                        _textStorageRef.replaceCharacters(in: index..<index, with: Array(droppedString))
+                        textStorage.replaceCharacters(in: selectionRange, with: Array(""))
+                        textStorage.replaceCharacters(in: index..<index, with: Array(droppedString))
                     } else {
                         let selectionLengh = selectionRange.upperBound - selectionRange.lowerBound
-                        _textStorageRef.replaceCharacters(in: selectionRange, with: Array(""))
-                        _textStorageRef.replaceCharacters(in: index - selectionLengh..<index - selectionLengh, with: Array(droppedString))
+                        textStorage.replaceCharacters(in: selectionRange, with: Array(""))
+                        textStorage.replaceCharacters(in: index - selectionLengh..<index - selectionLengh, with: Array(droppedString))
                         selectionRange = index - selectionLengh..<index - selectionLengh + droppedString.count
                     }
                 }
@@ -1343,7 +1326,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
 
         // 置換結果で選択範囲全体を差し替え（nsRange内のみ変更されている）
         let replacedSub = String(mutableString)
-        _textStorageRef.replaceString(in: range, with: replacedSub)
+        textStorage.replaceString(in: range, with: replacedSub)
 
         return (count, replacedSub.count)
     }
@@ -1416,12 +1399,10 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         let range = Range(replacementRange) ?? selectionRange
         
         let string = rawString.normalizedString
-        _textStorageRef.replaceCharacters(in: range, with: Array(string))
+        textStorage.replaceCharacters(in: range, with: Array(string))
        
         _markedTextRange = nil
         _markedText = NSAttributedString()
-        
-        
         
     }
     
@@ -1442,7 +1423,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         // 選択範囲がある場合は、その部分を削除しておく。
         if selectionRange.count > 0 {
-            _textStorageRef.replaceCharacters(in: selectionRange, with: [])
+            textStorage.replaceCharacters(in: selectionRange, with: [])
             selectionRange = selectionRange.lowerBound..<selectionRange.lowerBound
         }
         
@@ -1481,8 +1462,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
 
     func attributedSubstring(forProposedRange range: NSRange, actualRange: NSRangePointer?) -> NSAttributedString? {
         guard let swiftRange = Range(range),
-              swiftRange.upperBound <= _textStorageRef.count,
-              let chars = _textStorageRef[swiftRange] else {
+              swiftRange.upperBound <= textStorage.count,
+              let chars = textStorage[swiftRange] else {
             return nil
         }
 
@@ -1556,7 +1537,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             updateFrameSizeToFitContent()
             needsDisplay = true
             
-        case let .colorChanged(range):
+        case .colorChanged(_):
             //log("カラー変更: range = \(range)",from:self)
             updateFrameSizeToFitContent()
             updateCaretPosition()
@@ -1673,6 +1654,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                                          to: nil, from: self)
     }
     
+    /*
     /// 文字列指定を絶対オフセット/範囲に変換する。
     ///
     /// 受理フォーマット（A/Bそれぞれ）:
@@ -1809,7 +1791,77 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
 
         return nil
+    }*/
+    func selectString(with spec: String) -> Range<Int>? {
+        let skeleton = textStorage.skeletonString
+        let newlines = skeleton.newlineIndices
+        let docLen = textStorage.count
+
+        func startOfLine(_ line: Int) -> Int? {
+            guard line >= 1 else { return nil }
+            if line == 1 { return 0 }
+            let idx = line - 2
+            guard idx < newlines.count else { return nil }
+            return newlines[idx] + 1
+        }
+
+        func lineEndExclusive(from start: Int) -> Int {
+            newlines.first(where: { $0 >= start }) ?? docLen
+        }
+
+        let tokens = spec
+            .split(whereSeparator: { !$0.isNumber && $0 != ":" })
+            .map(String.init)
+            .prefix(2)
+
+        guard !tokens.isEmpty else { return nil }
+
+        func parseToken(_ t: String, isRightEdge: Bool) -> (start: Int, end: Int)? {
+            // 純粋な行番号
+            if let line = Int(t), !t.contains(":") {
+                guard let start = startOfLine(line) else { return nil }
+                let endEx = lineEndExclusive(from: start)
+                guard endEx < docLen else { return nil }
+                let end = endEx + 1
+                return isRightEdge ? (end, end) : (start, end)
+            }
+
+            // L:C / L: / :C / :
+            let parts = t.split(separator: ":", omittingEmptySubsequences: false)
+            let line = Int(parts.first ?? "1") ?? 1
+            let col  = Int(parts.count > 1 ? parts[1] : "1") ?? 1
+            guard line >= 1, col >= 1 else { return nil }
+            guard let lineStart = startOfLine(line) else { return nil }
+
+            let lineEnd = lineEndExclusive(from: lineStart)
+            let pos = lineStart + (col - 1)
+            guard pos <= lineEnd else { return nil }
+
+            return (pos, pos)
+        }
+
+        let parsed = tokens.enumerated().compactMap {
+            parseToken($0.element, isRightEdge: $0.offset == 1)
+        }
+
+        guard parsed.count == tokens.count else { return nil }
+
+        if parsed.count == 1 {
+            let p = parsed[0]
+            return p.start..<p.end
+        }
+
+        let a = parsed[0]
+        let b = parsed[1]
+
+        guard a.start <= b.start else { return nil }
+        return a.start < b.end ? a.start..<b.end : nil
+
     }
+
+
+
+
     
     
     
@@ -1841,7 +1893,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 let string = result.string
                 let stringCount = string.count
                 let targetRange = result.options.target == .selection ? selectionRange : 0..<textStorage.count
-                _textStorageRef.replaceString(in: targetRange, with: string)
+                textStorage.replaceString(in: targetRange, with: string)
                 switch result.options.caret {
                 case .left: caretIndex = targetRange.lowerBound
                 case .right: caretIndex = targetRange.lowerBound + stringCount
@@ -2149,7 +2201,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
         
         if remove {
-            _textStorageRef.deleteCharacters(in: newRange)
+            textStorage.deleteCharacters(in: newRange)
             selectionRange = newRange.lowerBound..<newRange.lowerBound
             
         } else {
@@ -2582,26 +2634,26 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         var spaces:[Character] = [newlineChar]
         
-        if _autoIndent && selectionRange.lowerBound != 0 && _textStorageRef[selectionRange.lowerBound - 1] != newlineChar {
+        if _autoIndent && selectionRange.lowerBound != 0 && textStorage[selectionRange.lowerBound - 1] != newlineChar {
             var range = 0..<0
             for i in (0..<selectionRange.lowerBound - 1).reversed() {
                 if i == 0 {
                     range = 0..<selectionRange.lowerBound
-                } else if _textStorageRef[i] == newlineChar {
+                } else if textStorage[i] == newlineChar {
                     range = (i + 1)..<selectionRange.lowerBound
                     break
                 }
             }
             
             for i in range {
-                if let c = _textStorageRef[i] {
+                if let c = textStorage[i] {
                     if !" \t".contains(c) { break }
                     spaces.append(c)
                 }
             }
         }
         
-        _textStorageRef.replaceString(in: selectionRange, with: String(spaces))
+        textStorage.replaceString(in: selectionRange, with: String(spaces))
     }
     
 
@@ -2710,7 +2762,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         guard let left = textStorage[replace.lowerBound], let right = textStorage[replace.lowerBound + 1] else { log("left or right char is nil.",from:self); return }
         // if target characters contain LF, no transpose.
         if (textStorage.skeletonString[replace.lowerBound] == FuncChar.lf || textStorage.skeletonString[replace.lowerBound + 1] == FuncChar.lf) { return }
-        _textStorageRef.replaceCharacters(in: replace, with: [right, left])
+        textStorage.replaceCharacters(in: replace, with: [right, left])
         caretIndex = replace.lowerBound + 1
     }
     
@@ -2748,7 +2800,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         case .uppercased: newString = string.uppercased()
         case .capitalized: newString = string.capitalized
         }
-        _textStorageRef.replaceString(in: newSelection, with: newString)
+        textStorage.replaceString(in: newSelection, with: newString)
         selectionRange = newSelection
         
     }
@@ -2764,7 +2816,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         defer { _isApplyingYank = false }
         textStorage.undo()
         buffer.pop()
-        _textStorageRef.replaceString(in: selection, with: buffer.currentBuffer)
+        textStorage.replaceString(in: selection, with: buffer.currentBuffer)
     }
     
     @IBAction func yankPopReverse(_ sender: Any?) {
@@ -2774,7 +2826,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         defer { _isApplyingYank = false }
         textStorage.undo()
         buffer.popReverse()
-        _textStorageRef.replaceString(in: selection, with: buffer.currentBuffer)
+        textStorage.replaceString(in: selection, with: buffer.currentBuffer)
     }
     
     // Yankの動作を終了させるためのメソッド。一時的にここに置く。
@@ -2805,13 +2857,13 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     @IBAction func cut(_ sender: Any?) {
         copy(sender)
         
-        _textStorageRef.replaceCharacters(in: selectionRange, with: [])
+        textStorage.replaceCharacters(in: selectionRange, with: [])
     }
     
     @IBAction func copy(_ sender: Any?) {
         if selectionRange.isEmpty { return }
         
-        guard let slicedCharacters = _textStorageRef[selectionRange] else { return }
+        guard let slicedCharacters = textStorage[selectionRange] else { return }
         let selectedText = String(slicedCharacters)
         
         let buffer = KClipBoardBuffer.shared
@@ -2831,12 +2883,12 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         _yankSelection = selectionRange
         buffer.beginCycle()
         let string = buffer.currentBuffer
-        _textStorageRef.replaceCharacters(in: selectionRange, with: Array(string))
+        textStorage.replaceCharacters(in: selectionRange, with: Array(string))
         
     }
     
     @IBAction override func selectAll(_ sender: Any?) {
-        selectionRange = 0..<_textStorageRef.count
+        selectionRange = 0..<textStorage.count
         
     }
     
@@ -2852,7 +2904,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         buffer.beginCycle()
         let pasteString = buffer.currentBuffer
         let removedString = textStorage.string(in: selectionRange)
-        _textStorageRef.replaceCharacters(in: selectionRange, with: Array(pasteString))
+        textStorage.replaceCharacters(in: selectionRange, with: Array(pasteString))
         
         if removedString.count == 0 { return }
         
@@ -2867,7 +2919,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     @IBAction func insertDeleteBuffer(_ sender: Any?) {
         if let deleteBuffer = (NSApp.delegate as? AppDelegate)?.deleteBuffer {
-            _textStorageRef.replaceString(in: selectionRange, with: deleteBuffer)
+            textStorage.replaceString(in: selectionRange, with: deleteBuffer)
         } else {
             log("no delete buffer.", from:self)
         }

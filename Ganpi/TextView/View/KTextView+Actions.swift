@@ -295,38 +295,6 @@ extension KTextView {
         selectionRange = replaceRange.lowerBound ..< (replaceRange.lowerBound + newBlock.count)
     }
     
-    /*
-     func sortSelectedLines(options: String.CompareOptions = [], ascending: Bool = true) {
-     let snapshot = textStorage.snapshot
-     let selection = selectionRange
-     guard let paraRange = snapshot.paragraphRange(containing: selection),
-     !paraRange.isEmpty else { return }
-     
-     var lines: [String] = []
-     for i in paraRange {
-     lines.append(snapshot.paragraphs[i].string)
-     }
-     
-     let locale = Locale.current
-     lines.sort {
-     let cmp = $0.compare($1,
-     options: options,
-     range: nil,
-     locale: locale)
-     return ascending
-     ? (cmp == .orderedAscending)
-     : (cmp == .orderedDescending)
-     }
-     
-     let lower = snapshot.paragraphs[paraRange.lowerBound].range.lowerBound
-     let upper = snapshot.paragraphs[paraRange.upperBound - 1].range.upperBound
-     let replaceRange = lower..<upper
-     
-     let newBlock = lines.joined(separator: "\n")
-     textStorage.replaceString(in: replaceRange, with: newBlock)
-     selectionRange = replaceRange.lowerBound ..< (replaceRange.lowerBound + newBlock.count)
-     }*/
-    
     
     // MARK: - Unique Lines
     
