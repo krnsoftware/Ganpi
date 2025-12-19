@@ -2823,7 +2823,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     }
     
     @IBAction func paste(_ sender: Any?) {
-        
         _isApplyingYank = true
         defer { _isApplyingYank = false }
         
@@ -2839,6 +2838,27 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     @IBAction override func selectAll(_ sender: Any?) {
         selectionRange = 0..<_textStorageRef.count
         
+    }
+    
+    // クリップボードの文字列をペーストする際、選択範囲の文字列をクリップボードにコピーする。
+    // 次のペーストは前回のペーストで削除された文字列に入れ替わる。
+    @IBAction func exchangePaste(_ sender: Any?) {
+        _isApplyingYank = true
+        defer { _isApplyingYank = false }
+        
+        let buffer = KClipBoardBuffer.shared
+        
+        _yankSelection = selectionRange
+        buffer.beginCycle()
+        let pasteString = buffer.currentBuffer
+        let removedString = textStorage.string(in: selectionRange)
+        _textStorageRef.replaceCharacters(in: selectionRange, with: Array(pasteString))
+        
+        buffer.append()
+        
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(removedString, forType: .string)
     }
     
     // MARK: - Others.

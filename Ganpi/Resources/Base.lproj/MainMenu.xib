@@ -137,31 +137,38 @@
                                     <action selector="copy:" target="-1" id="G1f-GL-Joy"/>
                                 </connections>
                             </menuItem>
-                            <menuItem title="Paste" keyEquivalent="v" id="gVA-U4-sdL">
-                                <connections>
-                                    <action selector="paste:" target="-1" id="UvS-8e-Qdg"/>
-                                </connections>
-                            </menuItem>
-                            <menuItem title="Paste Delete Buffer" keyEquivalent="v" id="aV1-fd-bkd">
-                                <modifierMask key="keyEquivalentModifierMask" option="YES" command="YES"/>
-                                <connections>
-                                    <action selector="insertDeleteBuffer:" target="-1" id="tGl-kt-apc"/>
-                                </connections>
-                            </menuItem>
-                            <menuItem title="Paste Pop" id="Exo-Zq-5YN">
+                            <menuItem title="Paste" id="dS1-iI-gws">
                                 <modifierMask key="keyEquivalentModifierMask"/>
-                                <menu key="submenu" id="nxk-18-9VD">
+                                <menu key="submenu" id="SWJ-eJ-QXJ">
                                     <items>
-                                        <menuItem title="Paste Pop" id="QFR-4d-MM4">
-                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                        <menuItem title="Paste" keyEquivalent="v" id="rzz-bJ-A8m">
                                             <connections>
-                                                <action selector="yankPop:" target="-1" id="iEN-uE-gHP"/>
+                                                <action selector="paste:" target="-1" id="pAU-Jv-0UJ"/>
                                             </connections>
                                         </menuItem>
-                                        <menuItem title="Paste Pop Reverse" id="A02-5t-7yl">
+                                        <menuItem title="Paste and Replace" keyEquivalent="v" id="wm0-cl-cNA">
+                                            <modifierMask key="keyEquivalentModifierMask" option="YES" command="YES"/>
+                                            <connections>
+                                                <action selector="exchangePaste:" target="-1" id="KVx-AX-2hn"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Paste Delete Buffer" id="nj4-Fs-jBH">
                                             <modifierMask key="keyEquivalentModifierMask"/>
                                             <connections>
-                                                <action selector="yankPopReverse:" target="-1" id="R6l-ku-irI"/>
+                                                <action selector="insertDeleteBuffer:" target="-1" id="m0Z-aS-eaB"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem isSeparatorItem="YES" id="4vl-nD-jF7"/>
+                                        <menuItem title="Paste Pop" id="F1c-VG-2lb">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="yankPop:" target="-1" id="NTc-Ur-YtQ"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Paste Pop Reverse" id="MEL-YB-Xf0">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="yankPopReverse:" target="-1" id="uLc-1g-5If"/>
                                             </connections>
                                         </menuItem>
                                     </items>
