@@ -2854,6 +2854,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         let removedString = textStorage.string(in: selectionRange)
         _textStorageRef.replaceCharacters(in: selectionRange, with: Array(pasteString))
         
+        if removedString.count == 0 { return }
+        
         buffer.append()
         
         let pasteboard = NSPasteboard.general
