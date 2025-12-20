@@ -1833,10 +1833,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             guard line >= 1, col >= 1 else { return nil }
             guard let lineStart = startOfLine(line) else { return nil }
 
-            let lineEnd = lineEndExclusive(from: lineStart)
             let pos = lineStart + (col - 1)
-            guard pos <= lineEnd else { return nil }
-
             return (pos, pos)
         }
 
