@@ -6,6 +6,7 @@
 //
 
 import Cocoa
+import Carbon
 
 final class KViewController: NSViewController, NSUserInterfaceValidations, NSSplitViewDelegate {
 
@@ -16,6 +17,10 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
     private var _panes: [KTextViewContainerView] = []
     private var _needsConstruct: Bool = false
     private var _syncOptions: Bool = true
+    
+    // IM切り替え用
+    private var _previousInputSource: TISInputSource?
+    private let _asciiID:CFString = "com.apple.keylayout.ABC" as CFString
 
     private let _dividerHitWidth: CGFloat = 5.0
     private let _statusBarHeight: CGFloat = 20
@@ -586,6 +591,8 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
             _jumpPopover = pop
         }
         _jumpPopover?.show(relativeTo: sender.bounds, of: sender, preferredEdge: .maxY)
+        
+        switchToASCIIInputSource()
     }
 
     @objc private func showTypographyPopover_ForFontSize(_ sender: NSButton) {
@@ -626,9 +633,36 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
     }
 
     private func dismissPopovers() {
+        restoreInputSource()
         _jumpPopover?.performClose(nil)
         _typographyPopover?.performClose(nil)
     }
+    
+    
+    // IMを欧文モードに変更する。
+    private func switchToASCIIInputSource() {
+        _previousInputSource = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue()
+        
+        let properties = [
+            kTISPropertyInputSourceID: _asciiID
+        ] as CFDictionary
+        
+        guard let list = TISCreateInputSourceList(properties, false)?
+            .takeRetainedValue() as? [TISInputSource],
+              let source = list.first
+        else { return }
+        
+        TISSelectInputSource(source)
+    }
+    
+    // IMを変更前の状態に戻す。
+    func restoreInputSource() {
+        guard let src = _previousInputSource else { return }
+        TISSelectInputSource(src)
+        _previousInputSource = nil
+    }
+
+
 
     // MARK: - Split / Merge
 
