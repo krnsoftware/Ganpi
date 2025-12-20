@@ -1654,144 +1654,17 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                                          to: nil, from: self)
     }
     
-    /*
-    /// 文字列指定を絶対オフセット/範囲に変換する。
-    ///
-    /// 受理フォーマット（A/Bそれぞれ）:
-    ///   - "L:C"  → L行目の行頭からC文字（1起点）
-    ///   - "L"    → L行全体（※改行を含める。最終行は含めない）
-    ///   - ":C"   → 文頭からC文字（1起点）
-    ///
-    /// 組み合わせ:
-    ///   - "A-B"  → Aを開始、Bを終端として範囲を返す
-    ///     * 右端Bが純粋な行番号（"L"）なら、その行の改行までを含める（最終行は含めない）
-    ///
-    /// 無効な指定は `nil` を返す。
-    func selectString(with spec: String) -> Range<Int>? {
-        let query = spec.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return nil }
-
-        let skeleton = textStorage.skeletonString
-        let newlineIndices = skeleton.newlineIndices
-        let docLen = textStorage.count
-
-        func startOfLine(_ oneBased: Int) -> Int? {
-            guard oneBased >= 1 else { return nil }
-            if oneBased == 1 { return 0 }
-            let idx = oneBased - 2
-            if idx >= 0, idx < newlineIndices.count {
-                return newlineIndices[idx] + 1
-            } else if let last = newlineIndices.last {
-                return last + 1 // 行超過は最終行頭
-            } else {
-                return 0
-            }
-        }
-
-        // 改行直前（排他的終端）— 改行は含めない
-        func endOfLineExclusive(fromStart start: Int) -> Int {
-            if let nextBreak = newlineIndices.first(where: { $0 >= start }) {
-                return min(nextBreak, docLen)
-            }
-            return docLen
-        }
-        
-        // spec から最大2個の座標トークンを抽出（順序保持）
-        func extractPointTokens(_ s: String) -> [String] {
-            let pattern = #"(\d+:\d+)|(:\d+)|(\d+)"#
-            guard let re = try? NSRegularExpression(pattern: pattern, options: []) else { return [] }
-            let ns = s as NSString
-            let matches = re.matches(in: s, options: [], range: NSRange(location: 0, length: ns.length))
-            // 先頭から2個だけ採用（3個以上は誤入力として捨てる）
-            return matches.prefix(2).map { ns.substring(with: $0.range) }
-        }
-
-        // 改行を含めた行末（最終行は含めない）
-        func endOfLineIncludingNewline(fromStart start: Int) -> Int {
-            let end = endOfLineExclusive(fromStart: start)
-            return (end < docLen) ? end + 1 : end
-        }
-
-        enum PointHint { case normal, rightEdgeLineIncludesNewline }
-
-        // 単点指定を絶対位置に
-        func parsePoint(_ s: String, hint: PointHint) -> Int? {
-            let part = s.trimmingCharacters(in: .whitespaces)
-            if part.isEmpty { return nil }
-
-            if let colon = part.firstIndex(of: ":") {
-                // "L:C" or ":C"
-                let lp = String(part[..<colon]).trimmingCharacters(in: .whitespaces)
-                let cp = String(part[part.index(after: colon)...]).trimmingCharacters(in: .whitespaces)
-                let line = lp.isEmpty ? 1 : (Int(lp) ?? -1)
-                guard line >= 1, let lineStart = startOfLine(line) else { return nil }
-                guard let col = Int(cp), col >= 1 else { return nil }
-                return min(lineStart + (col - 1), docLen)
-            }
-
-            if part.hasPrefix(":") {
-                let cp = String(part.dropFirst()).trimmingCharacters(in: .whitespaces)
-                guard let col = Int(cp), col >= 1 else { return nil }
-                return min(col - 1, docLen)
-            }
-
-            if let line = Int(part), line >= 1 {
-                guard let lineStart = startOfLine(line) else { return nil }
-                switch hint {
-                case .normal:
-                    return lineStart // 開始点としての行指定は行頭位置
-                case .rightEdgeLineIncludesNewline:
-                    return endOfLineIncludingNewline(fromStart: lineStart) // 右端は改行込み
-                }
-            }
-
-            return nil
-        }
-
-        // "A-B" 形式
-        let tokens = extractPointTokens(query)
-        if tokens.count == 2 {
-            let left  = tokens[0]
-            let right = tokens[1]
-
-            guard let a = parsePoint(left, hint: .normal) else { return nil }
-
-            // 右端が純粋な行番号なら「改行込みの終端」
-            let rightIsPureLine = Int(right) != nil && !right.contains(":")
-            let hint: PointHint = rightIsPureLine ? .rightEdgeLineIncludesNewline : .normal
-            guard let b = parsePoint(right, hint: hint) else { return nil }
-
-            let lo = max(0, min(a, b))
-            let hi = min(docLen, max(a, b))
-            return (lo < hi) ? lo..<hi : nil
-        }
-
-        // 単体指定（従来互換＋"L"は改行込みに変更）
-        if let colon = query.firstIndex(of: ":") {
-            let lp = String(query[..<colon]).trimmingCharacters(in: .whitespaces)
-            let cp = String(query[query.index(after: colon)...]).trimmingCharacters(in: .whitespaces)
-            let line = lp.isEmpty ? 1 : (Int(lp) ?? -1)
-            guard line >= 1, let lineStart = startOfLine(line) else { return nil }
-            guard let col = Int(cp), col >= 1 else { return nil }
-            let abs = min(lineStart + (col - 1), docLen)
-            return abs..<abs
-        }
-
-        if query.hasPrefix(":") {
-            let cp = String(query.dropFirst()).trimmingCharacters(in: .whitespaces)
-            guard let col = Int(cp), col >= 1 else { return nil }
-            let abs = min(col - 1, docLen)
-            return abs..<abs
-        }
-
-        // "L" → 行全体（改行を含める。最終行は含めない）
-        if let line = Int(query), line >= 1, let start = startOfLine(line) {
-            let end = endOfLineIncludingNewline(fromStart: start)
-            return start..<end
-        }
-
-        return nil
-    }*/
+    
+    // 行番号ジャンプのためのメソッド
+    // 対象を1つないし2つの指定子で指定する。
+    // 指定子は「行:文字」で表される文字列で、それぞれ1から始まる行番号・行頭からの文字番号を示す。
+    // 番号は省略が可能で、省略した場合は1と見做される。
+    // L:C はL行目のC番目の文字、L: はL行目の1番目の文字、:Cは1行目のC番目の文字、:は1行目の1番目の文字を表す。
+    // 単独の数値LはL行目全体(行末の改行含む)を表す。
+    // 文字番号CはL行目の文字数を越えても問題ない。単にL行目の1文字目から数えてC文字目を表す。
+    // 2つの指定子を並べた場合、1つ目と2つ目の示す領域全体を表す。
+    // L1:C1 L2:C2 は、L1:C1 から L2:C2までを表す。L1 L2はL1行目からL2行目まで。L1:C1 L2 はL1のC1文字目から行L2の行末まで。
+    // 3つ目以降の指定子、数値(0-9)・コロンを除く文字は全てスペーサーと見做される。
     func selectString(with spec: String) -> Range<Int>? {
         let skeleton = textStorage.skeletonString
         let newlines = skeleton.newlineIndices

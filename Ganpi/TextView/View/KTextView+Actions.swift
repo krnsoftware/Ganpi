@@ -1170,7 +1170,8 @@ extension KTextView {
         string += "  Selection:\n"
         string += "    Characters : \(selectionChars)\n"
         string += "    Lines      : \(selectionLines)\n"
-        string += "    Genko      : \(selectionGenko.formatted(.number.locale(.init(identifier: "en_US")))) (\(selectionPage) pages as 400 Genko paper)\n"
+        string += "    Genko      : \(selectionGenko.formatted(.number.locale(.init(identifier: "en_US")))) (\(selectionPage) pages as 400 Genko paper)\n\n"
+        string += "  Selection Range : \(selectionRange)"
         
         klog.log(id:"info", message:string)
         doCommand(by: #selector(AppDelegate.showLogPanel(_:)))
