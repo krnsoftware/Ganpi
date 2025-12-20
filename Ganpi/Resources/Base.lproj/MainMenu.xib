@@ -838,7 +838,13 @@ CQ
                                 </menu>
                             </menuItem>
                             <menuItem isSeparatorItem="YES" id="6Su-uP-LnA"/>
+                            <menuItem title="Show Information" keyEquivalent="i" id="zLE-la-DnB">
+                                <connections>
+                                    <action selector="showInfomation:" target="-1" id="1x2-qN-bd5"/>
+                                </connections>
+                            </menuItem>
                             <menuItem title="Show Log Window" keyEquivalent="i" id="Y9W-W2-80V">
+                                <modifierMask key="keyEquivalentModifierMask" option="YES" command="YES"/>
                                 <connections>
                                     <action selector="showLogPanel:" target="-1" id="PyF-tf-cO7"/>
                                 </connections>

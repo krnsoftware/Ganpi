@@ -45,7 +45,8 @@ final class KLogPanel: NSWindowController, NSWindowDelegate {
         _textView.isRichText = false
         _textView.isAutomaticQuoteSubstitutionEnabled = false
         _textView.isAutomaticDashSubstitutionEnabled = false
-        _textView.font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
+        //_textView.font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular) //PTMono-Regular 14.0
+        _textView.font = NSFont(name: "Menlo-Regular", size: 12.0)
         _textView.textColor = NSColor(calibratedWhite: 0.85, alpha: 1)
         _textView.backgroundColor = .black
         _textView.drawsBackground = true

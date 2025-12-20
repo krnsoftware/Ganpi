@@ -1147,6 +1147,59 @@ extension KTextView {
         caretIndex = index
     }
     
+    //MARK: - Show Information (insert to Log Window)
+    
+    @IBAction func showInfomation(_ sender: Any?) {
+        let klog = KLog.shared
+        
+        let totalChars = textStorage.count.formatted(.number.locale(.init(identifier: "en_US")))
+        let totalLines = countLines(at: 0..<textStorage.count).formatted(.number.locale(.init(identifier: "en_US")))
+        let totalGenko = genko(at: 0..<textStorage.count)
+        let totalPage = String(format: "%.1f", Float(totalGenko) / 400)
+        
+        let selectionChars = selectionRange.count.formatted(.number.locale(.init(identifier: "en_US")))
+        let selectionLines = countLines(at: selectionRange).formatted(.number.locale(.init(identifier: "en_US")))
+        let selectionGenko = genko(at: selectionRange)
+        let selectionPage = String(format: "%.1f", Float(selectionGenko) / 400)
+        
+        var string = "Information\n"
+        string += "  Total:\n"
+        string += "    Characters : \(totalChars)\n"
+        string += "    Lines      : \(totalLines)\n"
+        string += "    Genko      : \(totalGenko.formatted(.number.locale(.init(identifier: "en_US")))) (\(totalPage) pages as 400 Genko paper)\n"
+        string += "  Selection:\n"
+        string += "    Characters : \(selectionChars)\n"
+        string += "    Lines      : \(selectionLines)\n"
+        string += "    Genko      : \(selectionGenko.formatted(.number.locale(.init(identifier: "en_US")))) (\(selectionPage) pages as 400 Genko paper)\n"
+        
+        klog.log(id:"info", message:string)
+        doCommand(by: #selector(AppDelegate.showLogPanel(_:)))
+        
+        func genko(at range:Range<Int>) -> Int {
+            var num = 0.0
+            for i in range {
+                if let ch = textStorage[i], ch.unicodeScalars.count == 1,
+                        let s = ch.unicodeScalars.first, s.value < 0x80 {
+                    if ch != "\n" { num += 0.5 }
+                } else {
+                    num += 1
+                }
+            }
+            return Int(num + 0.5)
+        }
+        
+        func countLines(at range:Range<Int>) -> Int {
+            if range.count == 0 { return 0 }
+            
+            let skeleton = textStorage.skeletonString
+            var num = 0
+            for i in range {
+                if skeleton[i] == FC.lf { num += 1 }
+            }
+            return num + 1
+        }
+    }
+    
     
     //MARK: - Test function
     
