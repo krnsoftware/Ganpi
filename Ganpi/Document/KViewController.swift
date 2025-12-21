@@ -17,13 +17,9 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
     private var _panes: [KTextViewContainerView] = []
     private var _needsConstruct: Bool = false
     private var _syncOptions: Bool = true
-    
-    // IM切り替え用
-    private var _previousInputSource: TISInputSource?
-    private let _asciiID:CFString = "com.apple.keylayout.ABC" as CFString
 
     private let _dividerHitWidth: CGFloat = 5.0
-    private let _statusBarHeight: CGFloat = 20
+    private let _statusBarHeight: CGFloat = 20.0
     private let _statusBarFont: NSFont = .monospacedSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .regular)
     private let _statusBarFontBold: NSFont = .monospacedSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .bold)
 
@@ -633,7 +629,6 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
     }
 
     private func dismissPopovers() {
-        restoreInputSource()
         _jumpPopover?.performClose(nil)
         _typographyPopover?.performClose(nil)
     }
@@ -641,10 +636,8 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
     
     // IMを欧文モードに変更する。
     private func switchToASCIIInputSource() {
-        _previousInputSource = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue()
-        
         let properties = [
-            kTISPropertyInputSourceID: _asciiID
+            kTISPropertyInputSourceID: "com.apple.keylayout.ABC" as CFString
         ] as CFDictionary
         
         guard let list = TISCreateInputSourceList(properties, false)?
@@ -653,13 +646,6 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         else { return }
         
         TISSelectInputSource(source)
-    }
-    
-    // IMを変更前の状態に戻す。
-    func restoreInputSource() {
-        guard let src = _previousInputSource else { return }
-        TISSelectInputSource(src)
-        _previousInputSource = nil
     }
 
 
