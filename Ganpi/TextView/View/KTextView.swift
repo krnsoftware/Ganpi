@@ -66,6 +66,9 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     // completion.
     private lazy var _completion: KCompletionController = .init(textView: self)
     
+    // 簡易マーク
+    private var _markedCaretIndex: Int?
+    
     // スクロール関連
     private var _isSmoothScrollEnabled = true
     
@@ -222,6 +225,11 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             updateCaretPosition()
             needsDisplay = true
         }
+    }
+    
+    var markedCaretIndex:Int? {
+        get { _markedCaretIndex }
+        set { _markedCaretIndex = newValue }
     }
     
     
