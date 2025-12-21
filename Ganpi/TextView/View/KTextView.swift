@@ -129,7 +129,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             
             _ = currentLineIndex
 
-            //_caretView.isHidden = !selectionRange.isEmpty
             updateCaretPosition()
             sendStatusBarUpdateAction()
             updateCaretActiveStatus()
@@ -1515,6 +1514,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     func textStorageDidModify(_ modification: KStorageModified) {
         switch modification {
         case let .textChanged(info):
+            let delta = info.insertedCount - info.range.count
             
             if info.range.lowerBound == selectionRange.lowerBound /*(削除+)追記*/ ||
                 info.range.upperBound == selectionRange.lowerBound /*1文字削除*/ {
@@ -1530,7 +1530,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 //2. 後方にある場合: 選択範囲は挿入された文字列の増減の分だけシフト
                 //3. 挿入部分を完全に包含する場合: 選択部分の終端を文字列の増減分だけシフト
                 //4. 前後に重なっている場合: 挿入部分の末尾にcaretを移動
-                let delta = info.insertedCount - info.range.count
+                
                 if selectionRange.upperBound < info.range.lowerBound {
                     // no arrangement of selection
                 } else if selectionRange.lowerBound > info.range.upperBound {
@@ -1541,6 +1541,18 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                     caretIndex = selectionRange.upperBound + delta
                 }
             }
+            
+            // 簡易マーク機能で設定したマーク部分のindexを編集内容に合わせて変更。
+            if let markedIndex = _markedCaretIndex {
+                if markedIndex < info.range.lowerBound {
+                    // do nothing
+                } else if markedIndex > info.range.upperBound {
+                    _markedCaretIndex = markedIndex + delta
+                } else {
+                    _markedCaretIndex = info.range.lowerBound
+                }
+            }
+            
             sendEditedToDocument()
             updateFrameSizeToFitContent()
             needsDisplay = true
