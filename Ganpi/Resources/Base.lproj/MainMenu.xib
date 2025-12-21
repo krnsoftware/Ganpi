@@ -224,6 +224,25 @@
                                     </items>
                                 </menu>
                             </menuItem>
+                            <menuItem title="Mark" id="Ecb-wz-YcK">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <menu key="submenu" id="tzT-fL-liE">
+                                    <items>
+                                        <menuItem title="Mark Current Caret Index" keyEquivalent="0" id="cJs-r6-yYN">
+                                            <modifierMask key="keyEquivalentModifierMask" option="YES" command="YES"/>
+                                            <connections>
+                                                <action selector="setMarkedCaretIndex:" target="-1" id="ERi-3Z-10R"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Jump to Marked Index and Reset" keyEquivalent="j" id="fVN-7U-KeV">
+                                            <modifierMask key="keyEquivalentModifierMask" option="YES" command="YES"/>
+                                            <connections>
+                                                <action selector="jumpToMarkedCaretIndexAndReset:" target="-1" id="Xpm-Kk-qZO"/>
+                                            </connections>
+                                        </menuItem>
+                                    </items>
+                                </menu>
+                            </menuItem>
                             <menuItem title="Jump to Line..." keyEquivalent="u" id="FEa-wC-1Gp">
                                 <connections>
                                     <action selector="showCaretJumpPopoverFromMenu:" target="-1" id="02L-NE-POT"/>
