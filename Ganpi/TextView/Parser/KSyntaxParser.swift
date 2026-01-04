@@ -18,7 +18,7 @@ struct KAttributedSpan {
 }
 
 /// 言語共通で使う機能別カラー
-enum KFunctionalColor {
+enum KFunctionalColor: CaseIterable {
     case base
     case background
     case comment
@@ -37,14 +37,25 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
     case html  = "public.html"
     case ini = "public.ini-text"
     
-    // 拡張子 → SyntaxType マップ
-    private static let _extMap: [String: KSyntaxType] = [
-            /* plain */ "txt": .plain, "text": .plain, "md": .plain,
-            /* ruby */  "rb": .ruby, "rake": .ruby, "ru": .ruby, "erb": .ruby,
-            /* html */  "html": .html, "htm": .html,
-                        /* ini */   "ini": .ini, "conf": .html, "cfg": .ini,
-                        
-        ]
+    // extensions for every type.
+    var extensions: [String] {
+        switch self {
+        case .plain: return ["txt", "text", "md"]
+        case .ruby:  return ["rb", "rake", "ru", "erb"]
+        case .html:  return ["html", "htm"]
+        case .ini:   return ["ini", "cfg", "conf"]
+        }
+    }
+    
+    // ext is extension only (without '.')
+    static func fromExtension(_ ext: String) -> Self? {
+        let key = ext.lowercased()
+        
+        for type in Self.allCases {
+            if type.extensions.contains(key) { return type }
+        }
+        return nil
+    }
     
     // メニュー表示用の文字列
     var string: String {
@@ -57,7 +68,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
     }
     
     // 設定ファイルに記述された文字列をenumに変換する。
-    static func fromSetting(_ raw: String) -> KSyntaxType? {
+    static func fromSetting(_ raw: String) -> Self? {
         let key = raw.lowercased()
         return KSyntaxMeta.reverse[key]
     }
@@ -85,6 +96,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
     }
     
     // KSyntaxType.plain.makeParser(storage:self)...といった形で生成する。
+    // 最終的にはdefault節なしとする。
     func makeParser(storage:KTextStorageReadable) -> KSyntaxParserProtocol {
         switch self {
         case .plain: return KSyntaxParserPlain(storage: storage)
@@ -94,16 +106,16 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         }
     }
     
-    static func detect(fromTypeName typeName: String?, orExtension ext: String?) -> KSyntaxType {
+    static func detect(fromTypeName typeName: String?, orExtension ext: String?) -> Self {
         // 1) typeName が UTI として一致するか
         if let type = typeName, let knownType = KSyntaxType(rawValue: type) {
             return knownType
         }
         
         // 2) 拡張子から推定
-        if let fileExtionsion = ext?.lowercased() {
-            if let mapped = _extMap[fileExtionsion] {
-                return mapped
+        if let fileExtensioin = ext?.lowercased() {
+            if let type = Self.fromExtension(fileExtensioin) {
+                return type
             }
         }
         
@@ -224,5 +236,80 @@ protocol KSyntaxParserProtocol: AnyObject {
     
 }
 
+
+class KSyntaxParser {
+    // Properties
+    let storage: KTextStorageReadable
+    private lazy var _keywords: [[UInt8]] = loadKeywords()
+    private lazy var _theme: [KFunctionalColor: NSColor] = loadTheme()
+    
+    var keywords:[[UInt8]] { _keywords } // interface for completion.
+    var baseTextColor: NSColor { return color(.base) }
+    var backgroundColor: NSColor { return color(.background) }
+    
+    var type: KSyntaxType { fatalError("Subclasses must override 'var type'") }
+    var lineCommentPrefix: String? { return nil }
+    
+    func noteEdit(oldRange: Range<Int>, newCount: Int) { /* no-op */ }
+    
+    // ensure internal state is valid for given range
+    func ensureUpToDate(for range: Range<Int>) { fatalError("Subclasses must override 'func ensureUpToDate()'") }
+    
+    func attributes(in range: Range<Int>, tabWidth: Int) -> [KAttributedSpan] {
+        fatalError("Subclasses must override 'func attributes(in:tabWidth:)'")
+    }
+    
+    func color(_ role: KFunctionalColor) -> NSColor {
+        if let color = _theme[role] { return color }
+        log("no such color.",from:self)
+        return NSColor.textColor
+    }
+    
+    // Additional functions.
+    func wordRange(at index: Int) -> Range<Int>? { return nil }
+    // where the caret is. Outer: class/struct, Inner: var/func.
+    func currentContext(at index: Int) -> (outer: String?, inner: String?) { return (nil, nil) }
+    // get outline of structures. for 'jump' menu.
+    func outline(in range: Range<Int>?) -> [KOutlineItem] { return [] }
+    // get completion words.
+    func completionEntries(prefix: String) -> [String] { return [] }
+    
+    
+    init(storage: KTextStorageReadable){
+        self.storage = storage
+    }
+    
+    private func loadKeywords() -> [[UInt8]] {
+        return []
+    }
+    
+    private func loadTheme() -> [KFunctionalColor: NSColor] {
+        let prefs = KPreference.shared
+        var theme: [KFunctionalColor: NSColor] = [:]
+        
+        for role in KFunctionalColor.allCases {
+            if let key = prefKey(for: role) {
+                theme[role] = prefs.color(key, lang: type)
+            }
+        }
+        return theme
+    }
+    
+    private func prefKey(for role: KFunctionalColor) -> KPrefKey? {
+        switch role {
+        case .base:       return .parserColorText
+        case .background: return .parserColorBackground
+        case .comment:    return .parserColorComment
+        case .string:     return .parserColorLiteral
+        case .keyword:    return .parserColorKeyword
+        case .number:     return .parserColorNumeric
+        case .variable:   return .parserColorVariable
+        case .tag:        return .parserColorTag
+        case .attribute, .selector:
+            return nil
+        }
+    }
+
+}
 
 
