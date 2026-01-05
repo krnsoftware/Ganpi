@@ -11,6 +11,13 @@
 
 import AppKit
 
+final class KSyntaxParserRuby: KSyntaxParser {
+    init(storage:KTextStorageReadable){
+        super.init(storage: storage, type: .ruby)
+    }
+}
+
+/*
 final class KSyntaxParserRuby: KSyntaxParserProtocol {
 
     // MARK: - 内部モデル
@@ -1392,3 +1399,4 @@ extension KSyntaxParserRuby {
         return out
     }
 }
+*/

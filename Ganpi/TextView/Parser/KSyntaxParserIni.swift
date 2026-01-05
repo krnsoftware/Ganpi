@@ -11,6 +11,44 @@
 
 import AppKit
 
+final class KSyntaxParserIni: KSyntaxParser {
+
+    init(storage: KTextStorageReadable) {
+        super.init(storage: storage, type: .ini)
+    }
+
+    override func attributes(in range: Range<Int>, tabWidth: Int) -> [KAttributedSpan] {
+        let skeleton = storage.skeletonString
+        let lineRange = skeleton.expandToFullLines(range: range)
+        
+        //guard lineRange.count != 0 else { return [] }
+        
+        var i = lineRange.lowerBound
+        let end = lineRange.upperBound
+        
+        var spans: [KAttributedSpan] = []
+        
+        if skeleton[i] == FC.numeric || skeleton[i] == FC.semicolon {
+            spans += [makeSpan(range: lineRange.clamped(to: range), role: .comment)]
+        } else if skeleton[i] == FC.leftBracket {
+            let start = i
+            
+            while i < end {
+                if skeleton[i] == FC.rightBracket {
+                    spans += [makeSpan(range: (start..<i + 1).clamped(to: range), role: .variable)]
+                }
+                i += 1
+            }
+        }
+        return spans
+    }
+    
+    
+}
+
+
+
+/*
 /// INI 専用の軽量パーサ（アウトライン無し）
 /// - ポリシー: キャッシュを持たない / 見えている行だけ毎回解析 / 行越え状態は保持しない
 final class KSyntaxParserIni: KSyntaxParserProtocol {
@@ -419,3 +457,5 @@ final class KSyntaxParserIni: KSyntaxParserProtocol {
         return i == b
     }
 }
+
+*/

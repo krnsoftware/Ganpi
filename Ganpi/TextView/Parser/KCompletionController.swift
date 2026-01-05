@@ -85,11 +85,13 @@ final class KCompletionController {
             //let prefix = storage[string: range]
             let prefix = storage.string(in: range)
             
+            /* 一時的にカット
             parser.rebuildCompletionsIfNeeded(dirtyRange:nil)
             _entries.append(contentsOf: parser.completionEntries(prefix: prefix, around: _caretIndex,
                                                                  limit: 100, policy: .alphabetical))
             _currentPrefix = prefix
             setCurrentWordTail()
+             */
         }
         
         

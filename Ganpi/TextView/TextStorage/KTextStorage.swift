@@ -72,7 +72,8 @@ protocol KTextStorageCommon: AnyObject {
     
     // propaties.
     var baseFont: NSFont { get }
-    var parser: KSyntaxParserProtocol { get }
+    //var parser: KSyntaxParserProtocol { get }
+    var parser: KSyntaxParser { get }
 
     // observers.
     func addObserver(_ owner: AnyObject, _ handler: @escaping (KStorageModified) -> Void)
@@ -158,7 +159,8 @@ final class KTextStorage: KTextStorageProtocol {
     // data.
     private(set) var _characters: [Character] = []
     private var _observers: [_ObserverEntry] = []
-    private lazy var _parser: KSyntaxParserProtocol = KSyntaxParserPlain(storage: self)
+    //private lazy var _parser: KSyntaxParserProtocol = KSyntaxParserPlain(storage: self)
+    private lazy var _parser: KSyntaxParser = KSyntaxParserPlain(storage: self)
     private var _skeletonString: KSkeletonStringInUTF8 = .init()
     
     // propaties for appearances.
@@ -309,7 +311,8 @@ final class KTextStorage: KTextStorageProtocol {
         return newCache
     }
     
-    var parser: KSyntaxParserProtocol {
+    //var parser: KSyntaxParserProtocol {
+    var parser: KSyntaxParser {
         get { _parser }
         set {
             _parser = newValue

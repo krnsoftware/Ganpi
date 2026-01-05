@@ -8,6 +8,13 @@
 import AppKit
 
 // KSyntaxParserProtocolの最小実装。
+final class KSyntaxParserPlain: KSyntaxParser {
+    init(storage:KTextStorageReadable){
+        super.init(storage: storage, type: .plain)
+    }
+}
+
+/*
 final class KSyntaxParserPlain: KSyntaxParserProtocol {
     
     private unowned let _storage: KTextStorageReadable
@@ -39,5 +46,6 @@ final class KSyntaxParserPlain: KSyntaxParserProtocol {
     private var _baseTextColor = KPreference.shared.color(.parserColorText, lang: .plain)
     private var _backgroundColor = KPreference.shared.color(.parserColorBackground, lang: .plain)
 }
+ */
 
 

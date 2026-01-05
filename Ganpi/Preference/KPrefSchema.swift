@@ -119,6 +119,7 @@ struct KPrefSchema {
         "parser.base.color.variable"            : .init(type: .color),
         "parser.base.color.keyword"             : .init(type: .color),
         "parser.base.color.numeric"             : .init(type: .color),
+        "parser.base.color.tag"                 : .init(type: .color),
         "parser.base.color.invisibles"          : .init(type: .color),
         "parser.base.color.completion"          : .init(type: .color),
         "parser.base.color.selection_highlight.active"        : .init(type: .color),

@@ -754,10 +754,12 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
             // 今後改善予定。
             let parser = textView.textStorage.parser
             let ctx = parser.currentContext(at: caret)
+            
+            /* 一時的にカット
             let (display, tooltip) = makeStatusTitle(from: ctx)
             _funcMenuButton.title = display
             _funcMenuButton.toolTip = tooltip
-             
+             */
             
         } else {
             _caretButton.title = ""

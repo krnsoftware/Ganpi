@@ -97,7 +97,8 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
     
     // KSyntaxType.plain.makeParser(storage:self)...といった形で生成する。
     // 最終的にはdefault節なしとする。
-    func makeParser(storage:KTextStorageReadable) -> KSyntaxParserProtocol {
+    //func makeParser(storage:KTextStorageReadable) -> KSyntaxParserProtocol {
+    func makeParser(storage:KTextStorageReadable) -> KSyntaxParser {
         switch self {
         case .plain: return KSyntaxParserPlain(storage: storage)
         case .ruby: return KSyntaxParserRuby(storage: storage)
@@ -148,6 +149,11 @@ struct KOutlineItem {
 
 // MARK: - Completion Common Types
 
+
+struct KCompletionEntry {
+    let text: String
+}
+/*
 /// 候補の種類（共通）
 enum KCompletionKind {
     case keyword
@@ -185,12 +191,13 @@ struct KCompletionWeights {
     var freqUnit: Int = 0
     var recentHit: Int = 0
 }
-
+*/
 
 
 
 // MARK: - Parser protocol
 
+/*
 protocol KSyntaxParserProtocol: AnyObject {
     // 対象とするKTextStorageの参照。
     var storage: KTextStorageReadable { get }
@@ -235,29 +242,26 @@ protocol KSyntaxParserProtocol: AnyObject {
     func setKeywords(_ words: [String])
     
 }
-
+*/
 
 class KSyntaxParser {
     // Properties
     let storage: KTextStorageReadable
-    private lazy var _keywords: [[UInt8]] = loadKeywords()
-    private lazy var _theme: [KFunctionalColor: NSColor] = loadTheme()
+    let type: KSyntaxType
+    let keywords: [[UInt8]]
+    private let _theme: [KFunctionalColor: NSColor]
     
-    var keywords:[[UInt8]] { _keywords } // interface for completion.
     var baseTextColor: NSColor { return color(.base) }
     var backgroundColor: NSColor { return color(.background) }
     
-    var type: KSyntaxType { fatalError("Subclasses must override 'var type'") }
     var lineCommentPrefix: String? { return nil }
     
     func noteEdit(oldRange: Range<Int>, newCount: Int) { /* no-op */ }
     
     // ensure internal state is valid for given range
-    func ensureUpToDate(for range: Range<Int>) { fatalError("Subclasses must override 'func ensureUpToDate()'") }
+    func ensureUpToDate(for range: Range<Int>) { /* no-op */ }
     
-    func attributes(in range: Range<Int>, tabWidth: Int) -> [KAttributedSpan] {
-        fatalError("Subclasses must override 'func attributes(in:tabWidth:)'")
-    }
+    func attributes(in range: Range<Int>, tabWidth: Int) -> [KAttributedSpan] { return [] }
     
     func color(_ role: KFunctionalColor) -> NSColor {
         if let color = _theme[role] { return color }
@@ -275,27 +279,26 @@ class KSyntaxParser {
     func completionEntries(prefix: String) -> [String] { return [] }
     
     
-    init(storage: KTextStorageReadable){
+    init(storage: KTextStorageReadable, type:KSyntaxType){
         self.storage = storage
-    }
-    
-    private func loadKeywords() -> [[UInt8]] {
-        return []
-    }
-    
-    private func loadTheme() -> [KFunctionalColor: NSColor] {
+        self.type = type
+        
+        // load keywords
+        keywords = []
+        
+        // load theme.
         let prefs = KPreference.shared
         var theme: [KFunctionalColor: NSColor] = [:]
         
         for role in KFunctionalColor.allCases {
-            if let key = prefKey(for: role) {
+            if let key = Self.prefKey(for: role) {
                 theme[role] = prefs.color(key, lang: type)
             }
         }
-        return theme
+        _theme = theme
     }
     
-    private func prefKey(for role: KFunctionalColor) -> KPrefKey? {
+    private static func prefKey(for role: KFunctionalColor) -> KPrefKey? {
         switch role {
         case .base:       return .parserColorText
         case .background: return .parserColorBackground
@@ -308,6 +311,10 @@ class KSyntaxParser {
         case .attribute, .selector:
             return nil
         }
+    }
+    
+    func makeSpan(range: Range<Int>, role: KFunctionalColor) -> KAttributedSpan {
+        return KAttributedSpan(range: range, attributes: [.foregroundColor: color(role)])
     }
 
 }
