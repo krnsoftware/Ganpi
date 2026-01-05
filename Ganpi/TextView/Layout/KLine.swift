@@ -108,12 +108,10 @@ class KLine: CustomStringConvertible {
     
     // KTextView.draw()から利用される描画メソッド
     func draw(at point: CGPoint, in bounds: CGRect) {
-        guard range.count != 0 else { return }
         guard let context = NSGraphicsContext.current?.cgContext else { return }
         guard let ctLine = self.ctLine else { return }
         guard let textStorageRef = _textStorageRef else { log("_textStorageRef is nil.", from: self); return }
-        guard let layoutManager = _layoutManager else { log("_layoutManager is nil.", from: self); return }
-        
+        guard let layoutManager = _layoutManager else { log("_layoutManager is nil.", from: self); return }        
         
         func _alignToDevicePixel(_ yFromTop: CGFloat) -> CGFloat {
             // ウインドウが無いケースもあるので 1.0 をフォールバック
