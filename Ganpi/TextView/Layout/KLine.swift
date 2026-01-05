@@ -108,6 +108,7 @@ class KLine: CustomStringConvertible {
     
     // KTextView.draw()から利用される描画メソッド
     func draw(at point: CGPoint, in bounds: CGRect) {
+        guard range.count != 0 else { return }
         guard let context = NSGraphicsContext.current?.cgContext else { return }
         guard let ctLine = self.ctLine else { return }
         guard let textStorageRef = _textStorageRef else { log("_textStorageRef is nil.", from: self); return }
