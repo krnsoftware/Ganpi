@@ -79,6 +79,7 @@ final class KSkeletonStringInUTF8 {
             let end: UnsafePointer<UInt8> = base.advanced(by: range.upperBound)
 
             while p < end {
+                
                 let remaining: Int = end - p
                 let foundRaw: UnsafeMutableRawPointer? = Darwin.memchr(
                     UnsafeRawPointer(p),
@@ -86,8 +87,8 @@ final class KSkeletonStringInUTF8 {
                     remaining
                 )
                 guard let qRaw = foundRaw else { break }
-
-                // ★ ここを明示変換
+                
+                // Swift+C APIの関連で一旦mutableにする必要がある。
                 let qMut: UnsafeMutablePointer<UInt8> = qRaw.assumingMemoryBound(to: UInt8.self)
                 let q: UnsafePointer<UInt8> = UnsafePointer(qMut)
 
@@ -113,8 +114,6 @@ final class KSkeletonStringInUTF8 {
         _bytes.replaceSubrange(range, with: addition)
         
         _newlineCache = nil
-        
-        //log("skeleton = \(String(bytes:_bytes, encoding: .utf8)!)",from:self)
     }
     
     
@@ -139,7 +138,7 @@ final class KSkeletonStringInUTF8 {
     }
     
     
-    
+    /*
     func matchesKeyword(at index: Int, word: ArraySlice<UInt8>) -> Bool {
         let wCount = word.count
         guard wCount > 0 else { return false }
@@ -148,18 +147,30 @@ final class KSkeletonStringInUTF8 {
             log("index:\(index), wordCount:\(wCount), count:\(_bytes.count) — out of range", from: self)
             return false
         }
+        /*
         if wCount <= 16,
            let lhs = _bytes.withContiguousStorageIfAvailable({ $0.baseAddress?.advanced(by: index) }),
            let rhs = word.withContiguousStorageIfAvailable({ $0.baseAddress }) {
             return memcmp(lhs, rhs, wCount) == 0
         }
+         */
         return _bytes[index..<end].elementsEqual(word)
     }
 
     func matchesKeyword(at index: Int, word: [UInt8]) -> Bool {
         matchesKeyword(at: index, word: word[...])
     }
-    
+    */
+    func matchesKeyword(at index: Int, word: [UInt8]) -> Bool {
+        let wordLength = word.count
+        guard wordLength > 0 else { return false }
+        let end = index &+ wordLength
+        guard index >= 0, end <= _bytes.count else {
+            log("index:\(index), wordCount:\(wordLength), count:\(_bytes.count) — out of range", from: self)
+            return false
+        }
+        return _bytes[index..<end].elementsEqual(word)
+    }
     
     // 改行コード("\n")のoffsetを全て返す。昇順。
     var newlineIndices: [Int] {
@@ -196,7 +207,7 @@ final class KSkeletonStringInUTF8 {
     // 範囲内の行を分割、\nは含めない.
     func lineRanges(range: Range<Int>) -> [Range<Int>] {
         guard !range.isEmpty else { return [] }
-        let lineFeedIndices = Self.indicesOfCharacter(in: _bytes,range: range,target: FuncChar.lf)
+        let lineFeedIndices = newlineIndices//Self.indicesOfCharacter(in: _bytes,range: range,target: FuncChar.lf)
         var result: [Range<Int>] = []
         var lineStart = range.lowerBound
         for lf in lineFeedIndices {
@@ -212,15 +223,7 @@ final class KSkeletonStringInUTF8 {
     // range を含む行すべて（\n除外で各行Range配列）
     func lineRangeExpanded(range: Range<Int>) -> [Range<Int>] {
         guard !range.isEmpty else { return [] }
-        let lf = newlineIndices
-
-        let lowerIdx = lastIndexLT(lf, range.lowerBound)
-        let lower = lowerIdx.map { lf[$0] + 1 } ?? 0
-
-        let upperIdx = firstIndexGE(lf, range.upperBound)
-        let upper = (upperIdx < lf.count) ? lf[upperIdx] : _bytes.count
-
-        return lineRanges(range: lower..<upper)
+        return lineRanges(range: expandToFullLines(range: range))
     }
 
     // range を行単位に拡張して単一Range（末尾は \n を含む）
