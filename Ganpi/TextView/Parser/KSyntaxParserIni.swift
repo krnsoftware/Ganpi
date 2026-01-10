@@ -21,7 +21,8 @@ final class KSyntaxParserIni: KSyntaxParser {
         guard range.count > 0 else { return [] }
         
         let skeleton = storage.skeletonString
-        let lineRange = skeleton.expandToFullLines(range: range)
+        //let lineRange = skeleton.expandToFullLines(range: range)
+        let lineRange = skeleton.lineRange(contains: range)
         
         var i = lineRange.lowerBound
         let end = lineRange.upperBound

@@ -13,7 +13,8 @@ import Cocoa
 import Darwin
 
 // KTextStorageに於いて、_characters:[Characters]の代わりに用いられる[UInt8]のwrapper。
-// 主にTree-Sitterのパースと、テキスト内の制御文字等を検出するために使用される。
+// 主にテキスト内の制御文字等を検出するために使用される。
+
 final class KSkeletonStringInUTF8 {
     // MARK: - Enum and Struct.
     
@@ -24,28 +25,13 @@ final class KSkeletonStringInUTF8 {
     private var _bytes: [UInt8] = []
     private var _newlineCache: [Int]? = nil
     
-    var bytes:[UInt8]  {
-        _bytes
-    }
+    var bytes:[UInt8]  { _bytes }
+    var count: Int { _bytes.count }
     
     // MARK: - Static functions.
     
     // [Character]をUTF-8実装のUnicodeに変換するが、その際、複数バイトになる文字については"a"を代替文字とする。
     // 元の[Character]と文字の位置が一致するためRange<Int>をそのまま使用できるが、生成した文字列から元の文字列は復元できない。
-    /*static func convertCharactersToApproximateUTF8(_ characters: [Character]) -> [UInt8] {
-        var result: [UInt8] = []
-
-        for char in characters {
-            let utf8Bytes = String(char).utf8
-            if utf8Bytes.count == 1 {
-                result.append(contentsOf: utf8Bytes)
-            } else {
-                result.append(0x61) // 'a'
-            }
-        }
-
-        return result
-    }*/
     static func convertCharactersToApproximateUTF8(_ characters: [Character]) -> [UInt8] {
         var result: [UInt8] = []
         result.reserveCapacity(characters.count) // 出力は必ず等長
@@ -137,39 +123,56 @@ final class KSkeletonStringInUTF8 {
         return _bytes[range]
     }
     
+    // 渡されたwordがskeletonのrangeの文字列と一致するか否かを返す。
+    func matches(range: Range<Int>, word: [UInt8]) -> Bool {
+        let len = range.count
+        if word.count != len { return false }
+        if range.upperBound > count { log("out of range.", from:self); return false }
+        
+        return _bytes[range].elementsEqual(word)
+    }
     
-    /*
-    func matchesKeyword(at index: Int, word: ArraySlice<UInt8>) -> Bool {
-        let wCount = word.count
-        guard wCount > 0 else { return false }
-        let end = index &+ wCount
-        guard index >= 0, end <= _bytes.count else {
-            log("index:\(index), wordCount:\(wCount), count:\(_bytes.count) — out of range", from: self)
-            return false
-        }
-        /*
-        if wCount <= 16,
-           let lhs = _bytes.withContiguousStorageIfAvailable({ $0.baseAddress?.advanced(by: index) }),
-           let rhs = word.withContiguousStorageIfAvailable({ $0.baseAddress }) {
-            return memcmp(lhs, rhs, wCount) == 0
-        }
-         */
-        return _bytes[index..<end].elementsEqual(word)
-    }
+    // 渡されたwordのリストにskeletonのrangeの文字列と一致するものがあるか否かを返す。
+    func matches(range: Range<Int>, words: [[UInt8]]) -> Bool {
+        var lo = 0
+        var hi = words.count
 
-    func matchesKeyword(at index: Int, word: [UInt8]) -> Bool {
-        matchesKeyword(at: index, word: word[...])
-    }
-    */
-    func matchesKeyword(at index: Int, word: [UInt8]) -> Bool {
-        let wordLength = word.count
-        guard wordLength > 0 else { return false }
-        let end = index &+ wordLength
-        guard index >= 0, end <= _bytes.count else {
-            log("index:\(index), wordCount:\(wordLength), count:\(_bytes.count) — out of range", from: self)
-            return false
+        while lo < hi {
+            let mid = (lo + hi) >> 1
+            let w = words[mid]
+
+            let cmp = compare(range: range, word: w)
+            if cmp == 0 {
+                return true
+            } else if cmp < 0 {
+                hi = mid
+            } else {
+                lo = mid + 1
+            }
         }
-        return _bytes[index..<end].elementsEqual(word)
+        return false
+    }
+    
+    // return <0 : range < word
+    //         0 : equal
+    //        >0 : range > word
+    private func compare(range: Range<Int>, word: [UInt8]) -> Int {
+        let rlen = range.count
+        let wlen = word.count
+        let minLen = (rlen < wlen) ? rlen : wlen
+
+        var i = 0
+        while i < minLen {
+            let a = _bytes[range.lowerBound + i]
+            let b = word[i]
+            if a != b {
+                return Int(a) - Int(b)
+            }
+            i += 1
+        }
+
+        // prefix が一致している場合は長さで決定
+        return rlen - wlen
     }
     
     // 改行コード("\n")のoffsetを全て返す。昇順。
@@ -182,63 +185,71 @@ final class KSkeletonStringInUTF8 {
     }
     
     // 行頭のインデックスを全て返す。昇順。
+    // キャッシュされないため頻繁に呼び出す場合はnewlineIndicesを使用すること。
     var lineStartIndices: [Int] {
         [0] + newlineIndices.map { $0 + 1 }
     }
     
-    
-    // --- 二分探索ヘルパ（昇順配列 a 前提） ---
-    @inline(__always)
-    private func firstIndexGE(_ a: [Int], _ x: Int) -> Int {
-        var lo = 0, hi = a.count
+    // 指定された文字インデックスの含まれる物理行の行番号を返す。0開始。
+    func lineIndex(at characterIndex: Int) -> Int {
+        var lo = 0, hi = newlineIndices.count
         while lo < hi {
             let mid = (lo + hi) >> 1
-            if a[mid] < x { lo = mid + 1 } else { hi = mid }
+            if newlineIndices[mid] < characterIndex { lo = mid + 1 } else { hi = mid }
         }
-        return lo // a中の最初の >= x の位置（なければ a.count）
+        return lo
     }
     
-    @inline(__always)
-    private func lastIndexLT(_ a: [Int], _ x: Int) -> Int? {
-        let i = firstIndexGE(a, x) - 1
-        return (i >= 0) ? i : nil
-    }
-
-    // 範囲内の行を分割、\nは含めない.
-    func lineRanges(range: Range<Int>) -> [Range<Int>] {
-        guard !range.isEmpty else { return [] }
-        let lineFeedIndices = newlineIndices//Self.indicesOfCharacter(in: _bytes,range: range,target: FuncChar.lf)
-        var result: [Range<Int>] = []
-        var lineStart = range.lowerBound
-        for lf in lineFeedIndices {
-            result.append(lineStart..<lf)
-            lineStart = lf + 1
+    // 指定された行インデックスの行のRangeを返す。末尾の改行を含まない。
+    func lineRange(at lineIndex: Int) -> Range<Int> {
+        let start: Int
+        if lineIndex == 0 {
+            start = 0
+        } else {
+            start = newlineIndices[lineIndex - 1] + 1
         }
-        if lineStart < range.upperBound {
-            result.append(lineStart..<range.upperBound)
+
+        let end: Int
+        if lineIndex < newlineIndices.count {
+            end = newlineIndices[lineIndex]
+        } else {
+            end = bytes.count
         }
-        return result
+
+        return start..<end
+    }
+    
+    // 指定されたLFの場所を返す。
+    func newlineIndex(after lineIndex: Int) -> Int? {
+        guard lineIndex < newlineIndices.count else { return nil }
+        return newlineIndices[lineIndex]
+    }
+    
+    // rangeで指定された領域を含む行の行頭から行末までを返す。末尾の改行を含まない。
+    func lineRange(contains range: Range<Int>) -> Range<Int> {
+        let startIndex = range.lowerBound
+        let endIndex = (range.upperBound > startIndex) ? range.upperBound - 1 : startIndex
+
+        let firstLine = lineIndex(at: startIndex)
+        let lastLine  = lineIndex(at: endIndex)
+
+        let start: Int
+        if firstLine == 0 {
+            start = 0
+        } else {
+            start = newlineIndices[firstLine - 1] + 1
+        }
+
+        let end: Int
+        if lastLine < newlineIndices.count {
+            end = newlineIndices[lastLine]
+        } else {
+            end = count
+        }
+
+        return start..<end
     }
 
-    // range を含む行すべて（\n除外で各行Range配列）
-    func lineRangeExpanded(range: Range<Int>) -> [Range<Int>] {
-        guard !range.isEmpty else { return [] }
-        return lineRanges(range: expandToFullLines(range: range))
-    }
-
-    // range を行単位に拡張して単一Range（末尾は \n を含む）
-    func expandToFullLines(range: Range<Int>) -> Range<Int> {
-        guard !range.isEmpty else { return range }
-        let lf = newlineIndices
-
-        let lowerIdx = lastIndexLT(lf, range.lowerBound)
-        let lower = lowerIdx.map { lf[$0] + 1 } ?? 0
-
-        let upperIdx = firstIndexGE(lf, range.upperBound)
-        let upper = (upperIdx < lf.count) ? (lf[upperIdx] + 1) : _bytes.count
-
-        return lower..<upper
-    }
 }
 
 

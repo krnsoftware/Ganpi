@@ -261,6 +261,7 @@ class KSyntaxParser {
     // ensure internal state is valid for given range
     func ensureUpToDate(for range: Range<Int>) { /* no-op */ }
     
+    // 'range' always doesn't contain LF.
     func attributes(in range: Range<Int>, tabWidth: Int) -> [KAttributedSpan] { return [] }
     
     func color(_ role: KFunctionalColor) -> NSColor {
