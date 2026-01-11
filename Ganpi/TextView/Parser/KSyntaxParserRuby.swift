@@ -4,55 +4,66 @@
 //
 //
 
-import Cocoa
+import AppKit
 
 final class KSyntaxParserRuby: KSyntaxParser {
 
-    // MARK: - Constants
+    private enum EndState: Equatable {
+        case neutral
+        case inMultiComment
+    }
+
+    private struct LineInfo {
+        var endState: EndState
+    }
+
+    private var _lines: [LineInfo] = []
 
     private let _commentBeginBytes = Array("=begin".utf8)
     private let _commentEndBytes   = Array("=end".utf8)
-
-    // MARK: - Initializer
 
     init(storage: KTextStorageReadable) {
         super.init(storage: storage, type: .ruby)
     }
 
-    // MARK: - Overrides
-
-    override var lineCommentPrefix: String? {
-        "#"
-    }
-
     override func ensureUpToDate(for range: Range<Int>) {
-        // 簡易実装なので no-op
+        syncLineBuffer(lines: &_lines) { LineInfo(endState: .neutral) }
+        guard !_lines.isEmpty else { return }
+
+        let skeleton = storage.skeletonString
+        let firstLine = skeleton.lineIndex(at: range.lowerBound)
+
+        // 直前行から再評価（=begin の影響を拾う）
+        let startLine = max(0, firstLine - 1)
+        scanFrom(line: startLine)
     }
 
     override func attributes(in range: Range<Int>, tabWidth: Int) -> [KAttributedSpan] {
         // 前提：range は必ず 1 行内
         let skeleton = storage.skeletonString
+        syncLineBuffer(lines: &_lines) { LineInfo(endState: .neutral) }
+        guard !_lines.isEmpty else { return [] }
 
         let lineIndex = skeleton.lineIndex(at: range.lowerBound)
+        if lineIndex < 0 || lineIndex >= _lines.count { return [] }
+
         let lineRange = skeleton.lineRange(at: lineIndex)
 
         let localRange =
             max(range.lowerBound, lineRange.lowerBound)
             ..< min(range.upperBound, lineRange.upperBound)
 
-        if isBlockCommentLine(lineRange: lineRange, skeleton: skeleton) {
+        if localRange.isEmpty { return [] }
+
+        let stateAtLineStart: EndState =
+            (lineIndex > 0) ? _lines[lineIndex - 1].endState : .neutral
+
+        let isBegin = isLineHeadDirective(_commentBeginBytes, lineRange: lineRange, skeleton: skeleton)
+
+        if stateAtLineStart == .inMultiComment || isBegin {
             return [
                 KAttributedSpan(
                     range: localRange,
-                    attributes: [.foregroundColor: color(.comment)]
-                )
-            ]
-        }
-
-        if let commentRange = lineCommentRange(in: localRange, skeleton: skeleton) {
-            return [
-                KAttributedSpan(
-                    range: commentRange,
                     attributes: [.foregroundColor: color(.comment)]
                 )
             ]
@@ -63,74 +74,70 @@ final class KSyntaxParserRuby: KSyntaxParser {
 
     // MARK: - Private
 
-    private func isBlockCommentLine(
+    private func scanFrom(line startLine: Int) {
+        let skeleton = storage.skeletonString
+
+        var state: EndState =
+            (startLine > 0) ? _lines[startLine - 1].endState : .neutral
+
+        for line in startLine..<_lines.count {
+            let lineRange = skeleton.lineRange(at: line)
+
+            let newState = scanOneLine(lineRange: lineRange, initial: state, skeleton: skeleton)
+
+            if _lines[line].endState == newState {
+                // 状態が変わらないなら以降も変わらない前提で打ち切り
+                break
+            }
+
+            _lines[line].endState = newState
+            state = newState
+        }
+    }
+
+    private func scanOneLine(
+        lineRange: Range<Int>,
+        initial: EndState,
+        skeleton: KSkeletonStringInUTF8
+    ) -> EndState {
+
+        switch initial {
+        case .inMultiComment:
+            // =end 行自体はコメント色、endState は neutral に戻す
+            if isLineHeadDirective(_commentEndBytes, lineRange: lineRange, skeleton: skeleton) {
+                return .neutral
+            }
+            return .inMultiComment
+
+        case .neutral:
+            if isLineHeadDirective(_commentBeginBytes, lineRange: lineRange, skeleton: skeleton) {
+                return .inMultiComment
+            }
+            return .neutral
+        }
+    }
+
+    // token が「行頭にあり、かつ token 直後が空白(tab含む) または行末」なら true
+    // (=beginx などの誤検出を避けるための最小判定)
+    private func isLineHeadDirective(
+        _ token: [UInt8],
         lineRange: Range<Int>,
         skeleton: KSkeletonStringInUTF8
     ) -> Bool {
-        if containsWord(_commentBeginBytes, in: lineRange, skeleton: skeleton) { return true }
-        if containsWord(_commentEndBytes, in: lineRange, skeleton: skeleton) { return true }
-        return false
-    }
+        let start = lineRange.lowerBound
+        let end = start + token.count
+        if end > lineRange.upperBound { return false }
 
-    private func lineCommentRange(
-        in range: Range<Int>,
-        skeleton: KSkeletonStringInUTF8
-    ) -> Range<Int>? {
-        guard let index = firstIndex(of: FuncChar.numeric, in: range, skeleton: skeleton) else {
-            return nil
-        }
-        return index..<range.upperBound
-    }
+        if !skeleton.matchesPrefix(token, at: start) { return false }
 
-    private func firstIndex(
-        of byte: UInt8,
-        in range: Range<Int>,
-        skeleton: KSkeletonStringInUTF8
-    ) -> Int? {
-        if range.isEmpty { return nil }
-        var i = range.lowerBound
-        while i < range.upperBound {
-            if skeleton[i] == byte { return i }
-            i += 1
-        }
-        return nil
-    }
+        if end == lineRange.upperBound { return true }
 
-    private func containsWord(
-        _ word: [UInt8],
-        in range: Range<Int>,
-        skeleton: KSkeletonStringInUTF8
-    ) -> Bool {
-        if word.isEmpty { return true }
-
-        let hay = skeleton.bytes(in: range)
-        if hay.count < word.count { return false }
-
-        var start = hay.startIndex
-        let end = hay.endIndex
-
-        while true {
-            let remaining = hay.distance(from: start, to: end)
-            if remaining < word.count { break }
-
-            var matched = true
-            var j = 0
-            while j < word.count {
-                let idx = hay.index(start, offsetBy: j)
-                if hay[idx] != word[j] {
-                    matched = false
-                    break
-                }
-                j += 1
-            }
-            if matched { return true }
-
-            start = hay.index(after: start)
-        }
-
-        return false
+        let next = skeleton[end]
+        return next == FuncChar.space || next == FuncChar.tab
     }
 }
+
+
 
 
 

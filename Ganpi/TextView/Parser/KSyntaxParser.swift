@@ -299,6 +299,27 @@ class KSyntaxParser {
         _theme = theme
     }
     
+    // KAttributedSpanをシンプルに作成する補助メソッド
+    func makeSpan(range: Range<Int>, role: KFunctionalColor) -> KAttributedSpan {
+        return KAttributedSpan(range: range, attributes: [.foregroundColor: color(role)])
+    }
+    
+    // 現在の skeleton に基づく物理行数（最低1）
+    func skeletonLineCount() -> Int {
+        let skeleton = storage.skeletonString
+        return max(1, skeleton.newlineIndices.count + 1)
+    }
+
+    // skeleton の行数に追随する行バッファを用意する（型は呼び出し側で自由）
+    func syncLineBuffer<T>(lines: inout [T], make: () -> T) {
+        let count = skeletonLineCount()
+        if lines.count != count {
+            lines = (0..<count).map { _ in make() }
+        }
+    }
+    
+    
+    // KFunctionColorに対応する初期設定のkeyを取り出す。
     private static func prefKey(for role: KFunctionalColor) -> KPrefKey? {
         switch role {
         case .base:       return .parserColorText
@@ -312,10 +333,6 @@ class KSyntaxParser {
         case .attribute, .selector:
             return nil
         }
-    }
-    
-    func makeSpan(range: Range<Int>, role: KFunctionalColor) -> KAttributedSpan {
-        return KAttributedSpan(range: range, attributes: [.foregroundColor: color(role)])
     }
 
 }
