@@ -4,136 +4,292 @@
 //
 //
 
+//
+//  KSyntaxParserRuby.swift
+//  Ganpi
+//
+//
+
 import AppKit
 
 final class KSyntaxParserRuby: KSyntaxParser {
 
-    private enum EndState: Equatable {
+    // MARK: - Types
+
+    private enum KEndState: Equatable {
         case neutral
         case inMultiComment
+        case inHeredoc(label: [UInt8], allowIndent: Bool)
     }
 
-    private struct LineInfo {
-        var endState: EndState
+    private struct KLineInfo {
+        var endState: KEndState
     }
 
-    private var _lines: [LineInfo] = []
+    // MARK: - Properties
+
+    private var _lines: [KLineInfo] = []
 
     private let _commentBeginBytes = Array("=begin".utf8)
     private let _commentEndBytes   = Array("=end".utf8)
+
+    // MARK: - Init
 
     init(storage: KTextStorageReadable) {
         super.init(storage: storage, type: .ruby)
     }
 
+    // MARK: - Override
+
     override func ensureUpToDate(for range: Range<Int>) {
-        syncLineBuffer(lines: &_lines) { LineInfo(endState: .neutral) }
-        guard !_lines.isEmpty else { return }
-
         let skeleton = storage.skeletonString
-        let firstLine = skeleton.lineIndex(at: range.lowerBound)
+        let lineCount = skeleton.newlineIndices.count + 1
 
-        // 直前行から再評価（=begin の影響を拾う）
+        if _lines.count != lineCount {
+            _lines = Array(repeating: KLineInfo(endState: .neutral), count: lineCount)
+        }
+        if _lines.isEmpty { return }
+
+        let firstLine = skeleton.lineIndex(at: range.lowerBound)
         let startLine = max(0, firstLine - 1)
         scanFrom(line: startLine)
     }
 
     override func attributes(in range: Range<Int>, tabWidth: Int) -> [KAttributedSpan] {
-        // 前提：range は必ず 1 行内
-        let skeleton = storage.skeletonString
-        syncLineBuffer(lines: &_lines) { LineInfo(endState: .neutral) }
-        guard !_lines.isEmpty else { return [] }
+        ensureUpToDate(for: range)
+        if range.isEmpty { return [] }
 
+        let skeleton = storage.skeletonString
         let lineIndex = skeleton.lineIndex(at: range.lowerBound)
+
         if lineIndex < 0 || lineIndex >= _lines.count { return [] }
 
         let lineRange = skeleton.lineRange(at: lineIndex)
+        let paintRange = range.clamped(to: lineRange)
+        if paintRange.isEmpty { return [] }
 
-        let localRange =
-            max(range.lowerBound, lineRange.lowerBound)
-            ..< min(range.upperBound, lineRange.upperBound)
+        // 行頭状態（＝前行のendState）
+        let startState: KEndState = (lineIndex > 0) ? _lines[lineIndex - 1].endState : .neutral
 
-        if localRange.isEmpty { return [] }
-
-        let stateAtLineStart: EndState =
-            (lineIndex > 0) ? _lines[lineIndex - 1].endState : .neutral
-
-        let isBegin = isLineHeadDirective(_commentBeginBytes, lineRange: lineRange, skeleton: skeleton)
-
-        if stateAtLineStart == .inMultiComment || isBegin {
-            return [
-                KAttributedSpan(
-                    range: localRange,
-                    attributes: [.foregroundColor: color(.comment)]
-                )
-            ]
+        // ディレクティブ行はそれ自体もコメント色にする
+        if isLineHeadDirective(lineRange: lineRange, directiveBytes: _commentBeginBytes)
+            || isLineHeadDirective(lineRange: lineRange, directiveBytes: _commentEndBytes) {
+            return [makeSpan(range: paintRange, role: .comment)]
         }
 
-        return []
+        switch startState {
+        case .inMultiComment:
+            return [makeSpan(range: paintRange, role: .comment)]
+
+        case .inHeredoc:
+            return [makeSpan(range: paintRange, role: .string)]
+
+        case .neutral:
+            return []
+        }
     }
 
-    // MARK: - Private
+    // MARK: - Line scan
 
     private func scanFrom(line startLine: Int) {
         let skeleton = storage.skeletonString
 
-        var state: EndState =
-            (startLine > 0) ? _lines[startLine - 1].endState : .neutral
+        var state: KEndState = (startLine > 0) ? _lines[startLine - 1].endState : .neutral
 
         for line in startLine..<_lines.count {
             let lineRange = skeleton.lineRange(at: line)
 
-            let newState = scanOneLine(lineRange: lineRange, initial: state, skeleton: skeleton)
+            let oldEndState = _lines[line].endState
+            let newEndState = scanOneLine(lineRange: lineRange, startState: state)
 
-            if _lines[line].endState == newState {
-                // 状態が変わらないなら以降も変わらない前提で打ち切り
+            _lines[line].endState = newEndState
+            state = newEndState
+
+            // 連鎖が止まったら打ち切り
+            if oldEndState == newEndState {
                 break
             }
-
-            _lines[line].endState = newState
-            state = newState
         }
     }
 
-    private func scanOneLine(
-        lineRange: Range<Int>,
-        initial: EndState,
-        skeleton: KSkeletonStringInUTF8
-    ) -> EndState {
-
-        switch initial {
+    private func scanOneLine(lineRange: Range<Int>, startState: KEndState) -> KEndState {
+        switch startState {
         case .inMultiComment:
-            // =end 行自体はコメント色、endState は neutral に戻す
-            if isLineHeadDirective(_commentEndBytes, lineRange: lineRange, skeleton: skeleton) {
+            if isLineHeadDirective(lineRange: lineRange, directiveBytes: _commentEndBytes) {
                 return .neutral
             }
             return .inMultiComment
 
+        case .inHeredoc(let label, let allowIndent):
+            if isHeredocTerminatorLine(lineRange: lineRange, label: label, allowIndent: allowIndent) {
+                return .neutral
+            }
+            return .inHeredoc(label: label, allowIndent: allowIndent)
+
         case .neutral:
-            if isLineHeadDirective(_commentBeginBytes, lineRange: lineRange, skeleton: skeleton) {
+            if isLineHeadDirective(lineRange: lineRange, directiveBytes: _commentBeginBytes) {
                 return .inMultiComment
+            }
+            if let hd = detectHeredocStart(lineRange: lineRange) {
+                return .inHeredoc(label: hd.label, allowIndent: hd.allowIndent)
             }
             return .neutral
         }
     }
 
-    // token が「行頭にあり、かつ token 直後が空白(tab含む) または行末」なら true
-    // (=beginx などの誤検出を避けるための最小判定)
-    private func isLineHeadDirective(
-        _ token: [UInt8],
-        lineRange: Range<Int>,
-        skeleton: KSkeletonStringInUTF8
-    ) -> Bool {
-        let start = lineRange.lowerBound
-        let end = start + token.count
-        if end > lineRange.upperBound { return false }
+    // MARK: - Multi comment helpers
 
-        if !skeleton.matchesPrefix(token, at: start) { return false }
+    private func isLineHeadDirective(lineRange: Range<Int>, directiveBytes: [UInt8]) -> Bool {
+        if lineRange.isEmpty { return false }
 
-        if end == lineRange.upperBound { return true }
+        let skeleton = storage.skeletonString
+        let head = lineRange.lowerBound
+        let end = lineRange.upperBound
 
-        let next = skeleton[end]
-        return next == FuncChar.space || next == FuncChar.tab
+        if head + directiveBytes.count > end { return false }
+
+        for i in 0..<directiveBytes.count {
+            if skeleton[head + i] != directiveBytes[i] { return false }
+        }
+
+        let next = head + directiveBytes.count
+        if next >= end { return true }
+
+        let b = skeleton[next]
+        return b == FuncChar.space || b == FuncChar.tab
+    }
+
+    // MARK: - Heredoc helpers
+
+    private func detectHeredocStart(lineRange: Range<Int>) -> (label: [UInt8], allowIndent: Bool, introducerRange: Range<Int>)? {
+        if lineRange.count < 3 { return nil }
+
+        let skeleton = storage.skeletonString
+        let end = lineRange.upperBound
+
+        var i = lineRange.lowerBound
+        while i + 1 < end {
+            if skeleton[i] == FuncChar.lt, skeleton[i + 1] == FuncChar.lt {
+                let introducerStart = i
+
+                var j = i + 2
+                if j >= end { return nil }
+
+                // `<<=` は除外
+                if skeleton[j] == FuncChar.equals {
+                    i += 1
+                    continue
+                }
+
+                var allowIndent = false
+                if skeleton[j] == FuncChar.minus || skeleton[j] == FuncChar.tilde {
+                    allowIndent = true
+                    j += 1
+                    if j >= end {
+                        i += 1
+                        continue
+                    }
+                }
+
+                // quoted label: <<'EOF' / <<"EOF"
+                let c = skeleton[j]
+                if c == FuncChar.singleQuote || c == FuncChar.doubleQuote {
+                    if let (label, endExclusive) = readQuotedLabel(from: j, in: lineRange) {
+                        return (label: label, allowIndent: allowIndent, introducerRange: introducerStart..<endExclusive)
+                    }
+                    i += 1
+                    continue
+                }
+
+                // unquoted label: <<EOF
+                // `<<` の演算子/メソッド衝突を極力避けるため、先頭は ASCII大文字 or '_' のみを許可
+                if !(c.isAsciiUpper || c == FuncChar.underscore) {
+                    i += 1
+                    continue
+                }
+
+                if let (label, endExclusive) = readUnquotedLabel(from: j, in: lineRange) {
+                    return (label: label, allowIndent: allowIndent, introducerRange: introducerStart..<endExclusive)
+                }
+
+                i += 1
+                continue
+            }
+
+            i += 1
+        }
+
+        return nil
+    }
+
+
+    private func readQuotedLabel(from quoteIndex: Int, in lineRange: Range<Int>) -> (label: [UInt8], endExclusive: Int)? {
+        let skeleton = storage.skeletonString
+        let quote = skeleton[quoteIndex]
+
+        var i = quoteIndex + 1
+        let end = lineRange.upperBound
+        if i >= end { return nil }
+
+        let start = i
+        while i < end {
+            if skeleton[i] == quote {
+                if i <= start { return nil }
+                let label = Array(skeleton.bytes(in: start..<i))
+                return (label: label, endExclusive: i + 1) // 閉じクォートの次
+            }
+            i += 1
+        }
+
+        // 同一行内で閉じなければ heredoc とみなさない
+        return nil
+    }
+
+    private func readUnquotedLabel(from start: Int, in lineRange: Range<Int>) -> (label: [UInt8], endExclusive: Int)? {
+        let skeleton = storage.skeletonString
+        let end = lineRange.upperBound
+
+        var i = start
+        if i >= end { return nil }
+
+        // 先頭は A-Z / _ を許可している前提で呼ばれる
+        i += 1
+        while i < end {
+            if !skeleton[i].isIdentPartAZ09_ { break }
+            i += 1
+        }
+
+        if i <= start { return nil }
+        let label = Array(skeleton.bytes(in: start..<i))
+        return (label: label, endExclusive: i)
+    }
+
+    private func isHeredocTerminatorLine(lineRange: Range<Int>, label: [UInt8], allowIndent: Bool) -> Bool {
+        if lineRange.isEmpty { return false }
+
+        let skeleton = storage.skeletonString
+        let end = lineRange.upperBound
+
+        var i = lineRange.lowerBound
+        if allowIndent {
+            while i < end {
+                let b = skeleton[i]
+                if b != FuncChar.space && b != FuncChar.tab { break }
+                i += 1
+            }
+        }
+
+        if i + label.count > end { return false }
+
+        for k in 0..<label.count {
+            if skeleton[i + k] != label[k] { return false }
+        }
+
+        let next = i + label.count
+        if next >= end { return true }
+
+        let b = skeleton[next]
+        return b == FuncChar.space || b == FuncChar.tab
     }
 }
 

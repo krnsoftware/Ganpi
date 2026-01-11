@@ -311,12 +311,19 @@ class KSyntaxParser {
     }
 
     // skeleton の行数に追随する行バッファを用意する（型は呼び出し側で自由）
-    func syncLineBuffer<T>(lines: inout [T], make: () -> T) {
+    // 戻り値: バッファを作り直した（＝行数が変わった）場合 true
+    @discardableResult
+    func syncLineBuffer<T>(lines: inout [T], make: () -> T) -> Bool {
         let count = skeletonLineCount()
-        if lines.count != count {
-            lines = (0..<count).map { _ in make() }
+
+        if lines.count == count {
+            return false
         }
+
+        lines = (0..<count).map { _ in make() }
+        return true
     }
+
     
     
     // KFunctionColorに対応する初期設定のkeyを取り出す。
