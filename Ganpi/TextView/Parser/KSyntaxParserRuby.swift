@@ -2,170 +2,138 @@
 //  KSyntaxParserRuby.swift
 //  Ganpi
 //
-//  Ruby syntax parser with incremental diff parsing (3/3 分割の第1部)
-//  - 可視行のみ attributes を生成（クリック遅延の軽減）
-//  - 多行要素（=begin…=end / ヒアドキュメント / 複数行文字列）と /regex/ を「恒久スパン」として保持
-//  - 単行の数値/キーワード/行コメント/単行クォート/%文字列は表示要求時にオンデマンドで付与
-//  - private の var/let は _ で始める。private func は _ で始めない（規約遵守）
 //
 
-import AppKit
+import Cocoa
 
 final class KSyntaxParserRuby: KSyntaxParser {
-    private enum KEndState: Equatable {
-        case neutral
-        case inMultiComment
-    }
-    
-    private struct KLineInfo {
-        var endState: KEndState
-    }
-    
-    private var _lines: [KLineInfo] = []
-    
-    
-    init(storage:KTextStorageReadable){
+
+    // MARK: - Constants
+
+    private let _commentBeginBytes = Array("=begin".utf8)
+    private let _commentEndBytes   = Array("=end".utf8)
+
+    // MARK: - Initializer
+
+    init(storage: KTextStorageReadable) {
         super.init(storage: storage, type: .ruby)
     }
-    
-    private func syncLinesIfNeeded() {
-        let starts = storage.skeletonString.lineStartIndices
-        let lineCount = max(0, starts.count - 1)
 
-        if _lines.count != lineCount {
-            _lines = Array(repeating: KLineInfo(endState: .neutral),
-                           count: lineCount)
-        }
+    // MARK: - Overrides
+
+    override var lineCommentPrefix: String? {
+        "#"
     }
-    
+
     override func ensureUpToDate(for range: Range<Int>) {
-        syncLinesIfNeeded()
-        guard !_lines.isEmpty else { return }
-
-        let starts = storage.skeletonString.lineStartIndices
-
-        // 編集位置に対応する行
-        let firstLine = lineIndex(for: range.lowerBound, in: starts)
-
-        // 1行前から再評価（=begin が直前にある可能性）
-        let startLine = max(0, firstLine - 1)
-
-        scanFrom(line: startLine)
-    }
-    
-    private func lineIndex(for offset: Int, in starts: [Int]) -> Int {
-        var low = 0
-        var high = starts.count - 1
-
-        while low < high {
-            let mid = (low + high + 1) >> 1
-            if starts[mid] <= offset {
-                low = mid
-            } else {
-                high = mid - 1
-            }
-        }
-        return min(low, max(0, _lines.count - 1))
-    }
-
-    private func scanFrom(line startLine: Int) {
-        let skeleton = storage.skeletonString
-        let starts = skeleton.lineStartIndices
-
-        skeleton.bytes.withUnsafeBufferPointer { buf in
-            guard let base = buf.baseAddress else { return }
-
-            var state: KEndState =
-                (startLine > 0) ? _lines[startLine - 1].endState : .neutral
-
-            for line in startLine..<_lines.count {
-                let lo = starts[line]
-                let hi = starts[line + 1]
-                let len = hi - lo
-                let lineBase = base + lo
-
-                let newState = scanOneLine(base: lineBase,
-                                           length: len,
-                                           initial: state)
-
-                if _lines[line].endState == newState {
-                    // 状態が変わらなければ、以降も変わらないとみなして打ち切り
-                    break
-                }
-
-                _lines[line].endState = newState
-                state = newState
-            }
-        }
-    }
-    
-    @inline(__always)
-    private func matchLineHead(_ base: UnsafePointer<UInt8>,
-                               _ length: Int,
-                               token: String) -> Bool {
-        let t = Array(token.utf8)
-        guard length >= t.count else { return false }
-        for i in 0..<t.count where base[i] != t[i] { return false }
-        return true
+        // 簡易実装なので no-op
     }
 
     override func attributes(in range: Range<Int>, tabWidth: Int) -> [KAttributedSpan] {
-        var result: [KAttributedSpan] = []
-
+        // 前提：range は必ず 1 行内
         let skeleton = storage.skeletonString
-        let starts = skeleton.lineStartIndices
-        let lineCount = _lines.count
-        guard lineCount > 0 else { return result }
 
-        let firstLine = lineIndex(for: range.lowerBound, in: starts)
-        let lastLine  = lineIndex(for: max(range.upperBound - 1, 0), in: starts)
+        let lineIndex = skeleton.lineIndex(at: range.lowerBound)
+        let lineRange = skeleton.lineRange(at: lineIndex)
 
-        let startLine = min(firstLine, lastLine)
-        let endLine   = min(max(firstLine, lastLine) + 1, lineCount)
+        let localRange =
+            max(range.lowerBound, lineRange.lowerBound)
+            ..< min(range.upperBound, lineRange.upperBound)
 
-        skeleton.bytes.withUnsafeBufferPointer { buf in
-            guard let base = buf.baseAddress else { return }
+        if isBlockCommentLine(lineRange: lineRange, skeleton: skeleton) {
+            return [
+                KAttributedSpan(
+                    range: localRange,
+                    attributes: [.foregroundColor: color(.comment)]
+                )
+            ]
+        }
 
-            for line in startLine..<endLine {
-                let stateAtLineStart: KEndState =
-                    (line > 0) ? _lines[line - 1].endState : .neutral
+        if let commentRange = lineCommentRange(in: localRange, skeleton: skeleton) {
+            return [
+                KAttributedSpan(
+                    range: commentRange,
+                    attributes: [.foregroundColor: color(.comment)]
+                )
+            ]
+        }
 
-                let lo = starts[line]
-                let hi = starts[line + 1]
-                let len = hi - lo
-                let lineBase = base + lo
+        return []
+    }
 
-                let isBegin = matchLineHead(lineBase, len, token: "=begin")
+    // MARK: - Private
 
-                if stateAtLineStart == .inMultiComment || isBegin {
-                    let rLo = max(lo, range.lowerBound)
-                    let rHi = min(hi, range.upperBound)
-                    if rLo < rHi {
-                        result.append(makeSpan(range: rLo..<rHi, role: .comment))
-                    }
+    private func isBlockCommentLine(
+        lineRange: Range<Int>,
+        skeleton: KSkeletonStringInUTF8
+    ) -> Bool {
+        if containsWord(_commentBeginBytes, in: lineRange, skeleton: skeleton) { return true }
+        if containsWord(_commentEndBytes, in: lineRange, skeleton: skeleton) { return true }
+        return false
+    }
+
+    private func lineCommentRange(
+        in range: Range<Int>,
+        skeleton: KSkeletonStringInUTF8
+    ) -> Range<Int>? {
+        guard let index = firstIndex(of: FuncChar.numeric, in: range, skeleton: skeleton) else {
+            return nil
+        }
+        return index..<range.upperBound
+    }
+
+    private func firstIndex(
+        of byte: UInt8,
+        in range: Range<Int>,
+        skeleton: KSkeletonStringInUTF8
+    ) -> Int? {
+        if range.isEmpty { return nil }
+        var i = range.lowerBound
+        while i < range.upperBound {
+            if skeleton[i] == byte { return i }
+            i += 1
+        }
+        return nil
+    }
+
+    private func containsWord(
+        _ word: [UInt8],
+        in range: Range<Int>,
+        skeleton: KSkeletonStringInUTF8
+    ) -> Bool {
+        if word.isEmpty { return true }
+
+        let hay = skeleton.bytes(in: range)
+        if hay.count < word.count { return false }
+
+        var start = hay.startIndex
+        let end = hay.endIndex
+
+        while true {
+            let remaining = hay.distance(from: start, to: end)
+            if remaining < word.count { break }
+
+            var matched = true
+            var j = 0
+            while j < word.count {
+                let idx = hay.index(start, offsetBy: j)
+                if hay[idx] != word[j] {
+                    matched = false
+                    break
                 }
+                j += 1
             }
+            if matched { return true }
+
+            start = hay.index(after: start)
         }
 
-        return result
+        return false
     }
-
-
-
-    // KSyntaxParserRuby.swift / class KSyntaxParserRuby
-    private func scanOneLine(base: UnsafePointer<UInt8>,
-                             length: Int,
-                             initial: KEndState) -> KEndState {
-        switch initial {
-        case .inMultiComment:
-            return matchLineHead(base, length, token: "=end") ? .neutral : .inMultiComment
-        case .neutral:
-            return matchLineHead(base, length, token: "=begin") ? .inMultiComment : .neutral
-        }
-    }
-
-    
 }
+
+
+
 
 /*
 final class KSyntaxParserRuby: KSyntaxParserProtocol {

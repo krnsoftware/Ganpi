@@ -107,21 +107,115 @@ final class KSkeletonStringInUTF8 {
     
     // 読み取り専用：範囲外は 0 を返し、ログに記録
     subscript(_ index: Int) -> UInt8 {
+    #if DEBUG
+        precondition(index >= 0 && index < _bytes.count,
+                     "Index \(index) out of range (count: \(_bytes.count))")
+        return _bytes[index]
+    #else
         if index < 0 || index >= _bytes.count {
             log("Index \(index) out of range (count: \(_bytes.count))", from: self)
             return 0
         }
         return _bytes[index]
+    #endif
     }
 
-    // 範囲取得：範囲外は空スライスを返し、ログに記録
+    // 範囲取得：Debugは即クラッシュ、Releaseは空スライス＋ログ
     func bytes(in range: Range<Int>) -> ArraySlice<UInt8> {
+    #if DEBUG
+        precondition(range.lowerBound >= 0 && range.upperBound <= _bytes.count,
+                     "Range \(range) out of bounds (count: \(_bytes.count))")
+        return _bytes[range]
+    #else
         guard range.lowerBound >= 0, range.upperBound <= _bytes.count else {
             log("Range \(range) out of bounds (count: \(_bytes.count))", from: self)
             return []
         }
         return _bytes[range]
+    #endif
     }
+
+    
+    // 字句走査などについての関数群
+    // 指定range内で最初に見つかった byte の index を返す。見つからなければ nil。
+    func firstIndex(of byte: UInt8, in range: Range<Int>) -> Int? {
+        let slice = bytes(in: range)   // Debug: 範囲外ならここで落ちる / Release: 範囲外なら空
+        if slice.isEmpty { return nil }
+
+        for i in slice.indices {
+            if _bytes[i] == byte { return i }
+        }
+        return nil
+    }
+
+    // 指定range内で最後に見つかった byte の index を返す。見つからなければ nil。
+    func lastIndex(of byte: UInt8, in range: Range<Int>) -> Int? {
+        let slice = bytes(in: range)
+        if slice.isEmpty { return nil }
+
+        var i = slice.endIndex
+        while i > slice.startIndex {
+            i -= 1
+            if _bytes[i] == byte { return i }
+        }
+        return nil
+    }
+
+    // index位置から word が前方一致するか
+    func matchesPrefix(_ word: [UInt8], at index: Int) -> Bool {
+        if word.isEmpty { return true }
+        if index < 0 { return false }
+        if index + word.count > _bytes.count { return false }
+
+        var i = 0
+        while i < word.count {
+            if _bytes[index + i] != word[i] { return false }
+            i += 1
+        }
+        return true
+    }
+
+    // range 内で needle が最初に出現する index を返す。見つからなければ nil。
+    func firstIndex(ofSequence needle: [UInt8], in range: Range<Int>) -> Int? {
+        if needle.isEmpty { return range.lowerBound }
+
+        let slice = bytes(in: range)
+        if slice.isEmpty { return nil }
+        if slice.count < needle.count { return nil }
+
+        let lastStart = slice.endIndex - needle.count
+        var i = slice.startIndex
+        while i <= lastStart {
+            if matchesPrefix(needle, at: i) { return i }
+            i += 1
+        }
+        return nil
+    }
+
+    // range 内に needle が含まれるか
+    func containsSubsequence(_ needle: [UInt8], in range: Range<Int>) -> Bool {
+        firstIndex(ofSequence: needle, in: range) != nil
+    }
+
+    // index から upperBound まで、space / tab を読み飛ばした位置を返す（upperBound は含まない）
+    func skipSpaces(from index: Int, to upperBound: Int) -> Int {
+        if index >= upperBound { return index }
+
+        let slice = bytes(in: index..<upperBound)
+        if slice.isEmpty { return index }
+
+        var i = slice.startIndex
+        while i < slice.endIndex {
+            let b = _bytes[i]
+            if b != FuncChar.space && b != FuncChar.tab { return i }
+            i += 1
+        }
+        return upperBound
+    }
+
+
+    
+    
     
     // 渡されたwordがskeletonのrangeの文字列と一致するか否かを返す。
     func matches(range: Range<Int>, word: [UInt8]) -> Bool {
