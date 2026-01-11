@@ -20,6 +20,7 @@ final class KSyntaxParserRuby: KSyntaxParser {
         case neutral
         case inMultiComment
         case inHeredoc(label: [UInt8], allowIndent: Bool)
+        case inDoubleQuote
     }
 
     private struct KLineInfo {
@@ -84,9 +85,25 @@ final class KSyntaxParserRuby: KSyntaxParser {
         case .inHeredoc:
             return [makeSpan(range: paintRange, role: .string)]
 
+        case .inDoubleQuote:
+            return [makeSpan(range: paintRange, role: .string)]
+
         case .neutral:
+            // 複数行 " の開始行だけは、開始位置から行末まで string 色にする
+            // （単行 " の中身塗りは後でオンデマンド実装する方針）
+            if _lines[lineIndex].endState == .inDoubleQuote {
+                if let start = multiLineDoubleQuoteStartIndex(lineRange: lineRange) {
+                    let stringRange = (start..<lineRange.upperBound).clamped(to: lineRange)
+                    let paint = paintRange.clamped(to: stringRange)
+                    if !paint.isEmpty {
+                        return [makeSpan(range: paint, role: .string)]
+                    }
+                }
+            }
             return []
+
         }
+
     }
 
     // MARK: - Line scan
@@ -126,16 +143,21 @@ final class KSyntaxParserRuby: KSyntaxParser {
             }
             return .inHeredoc(label: label, allowIndent: allowIndent)
 
+        case .inDoubleQuote:
+            // 文字列継続中：閉じた後に heredoc が来る可能性もあるので、その行を最後まで走査する
+            return scanLineForMultiLineState(lineRange: lineRange, startInDoubleQuote: true)
+
         case .neutral:
             if isLineHeadDirective(lineRange: lineRange, directiveBytes: _commentBeginBytes) {
                 return .inMultiComment
             }
-            if let hd = detectHeredocStart(lineRange: lineRange) {
-                return .inHeredoc(label: hd.label, allowIndent: hd.allowIndent)
-            }
-            return .neutral
+
+            // neutralでも1回走査し、" 内では heredoc 開始を拾わない
+            return scanLineForMultiLineState(lineRange: lineRange, startInDoubleQuote: false)
         }
     }
+
+
 
     // MARK: - Multi comment helpers
 
@@ -158,6 +180,279 @@ final class KSyntaxParserRuby: KSyntaxParser {
         let b = skeleton[next]
         return b == FuncChar.space || b == FuncChar.tab
     }
+    
+    private func scanLineForMultiLineState(lineRange: Range<Int>, startInDoubleQuote: Bool) -> KEndState {
+        if lineRange.isEmpty {
+            return startInDoubleQuote ? .inDoubleQuote : .neutral
+        }
+
+        let skeleton = storage.skeletonString
+        let end = lineRange.upperBound
+
+        var inString = startInDoubleQuote
+        var isEscaped = false
+
+        var i = lineRange.lowerBound
+        while i < end {
+            let b = skeleton[i]
+
+            if inString {
+                if isEscaped {
+                    isEscaped = false
+                    i += 1
+                    continue
+                }
+                if b == FuncChar.backSlash {
+                    isEscaped = true
+                    i += 1
+                    continue
+                }
+                if b == FuncChar.doubleQuote {
+                    inString = false
+                    isEscaped = false
+                    i += 1
+                    continue
+                }
+                i += 1
+                continue
+            }
+
+            // outside double quote
+
+            // # comment: 以降は無視（色付けはしないが、状態検出には必須）
+            if b == 0x23 { // '#'
+                break
+            }
+
+            // single quote: 単行だけ飛ばす（複数行 single quote は後で）
+            if b == FuncChar.singleQuote {
+                i = skipSingleQuotedLiteral(from: i, end: end)
+                continue
+            }
+
+            // %r... 正規表現リテラル内は飛ばす（" を拾わないため）
+            if b == FuncChar.percent, i + 1 < end {
+                let c = skeleton[i + 1]
+                if c == 0x72 || c == 0x52 { // 'r' or 'R'
+                    i = skipPercentRegexLiteral(fromPercent: i, end: end)
+                    continue
+                }
+            }
+
+            if b == FuncChar.doubleQuote {
+                inString = true
+                isEscaped = false
+                i += 1
+                continue
+            }
+
+            // heredoc start candidate (only when not in quotes / regex / single-quote / comment)
+            if b == FuncChar.lt, i + 1 < end, skeleton[i + 1] == FuncChar.lt {
+                if let hd = parseHeredocAtIntroducer(introducerStart: i, in: lineRange) {
+                    return .inHeredoc(label: hd.label, allowIndent: hd.allowIndent)
+                }
+            }
+
+            i += 1
+        }
+
+        return inString ? .inDoubleQuote : .neutral
+    }
+
+    
+    private func multiLineDoubleQuoteStartIndex(lineRange: Range<Int>) -> Int? {
+        if lineRange.isEmpty { return nil }
+
+        let skeleton = storage.skeletonString
+        let end = lineRange.upperBound
+
+        var inString = false
+        var isEscaped = false
+        var lastOpenIndex: Int? = nil
+
+        var i = lineRange.lowerBound
+        while i < end {
+            let b = skeleton[i]
+
+            if inString {
+                if isEscaped {
+                    isEscaped = false
+                    i += 1
+                    continue
+                }
+                if b == FuncChar.backSlash {
+                    isEscaped = true
+                    i += 1
+                    continue
+                }
+                if b == FuncChar.doubleQuote {
+                    inString = false
+                    isEscaped = false
+                    lastOpenIndex = nil
+                    i += 1
+                    continue
+                }
+                i += 1
+                continue
+            }
+
+            // outside double quote
+            if b == FuncChar.doubleQuote {
+                inString = true
+                isEscaped = false
+                lastOpenIndex = i
+                i += 1
+                continue
+            }
+
+            i += 1
+        }
+
+        // 行末で閉じていない " があるなら、それが複数行文字列の開始
+        return inString ? lastOpenIndex : nil
+    }
+
+
+    private func parseHeredocAtIntroducer(
+        introducerStart: Int,
+        in lineRange: Range<Int>
+    ) -> (label: [UInt8], allowIndent: Bool, introducerRange: Range<Int>)? {
+        let skeleton = storage.skeletonString
+        let end = lineRange.upperBound
+
+        var j = introducerStart + 2
+        if j >= end { return nil }
+
+        // `<<=` は除外
+        if skeleton[j] == FuncChar.equals { return nil }
+
+        var allowIndent = false
+        if skeleton[j] == FuncChar.minus || skeleton[j] == FuncChar.tilde {
+            allowIndent = true
+            j += 1
+            if j >= end { return nil }
+        }
+
+        let c = skeleton[j]
+
+        // quoted label: <<'EOF' / <<"EOF"
+        if c == FuncChar.singleQuote || c == FuncChar.doubleQuote {
+            if let info = readQuotedLabel(from: j, in: lineRange) {
+                return (label: info.label, allowIndent: allowIndent, introducerRange: introducerStart..<info.endExclusive)
+            }
+            return nil
+        }
+
+        // unquoted label: <<EOF
+        // 衝突回避の最小ガード：先頭は ASCII大文字 or '_' のみ
+        if !(c.isAsciiUpper || c == FuncChar.underscore) { return nil }
+
+        if let info = readUnquotedLabel(from: j, in: lineRange) {
+            return (label: info.label, allowIndent: allowIndent, introducerRange: introducerStart..<info.endExclusive)
+        }
+
+        return nil
+    }
+    
+    private func skipSingleQuotedLiteral(from quoteIndex: Int, end: Int) -> Int {
+        let skeleton = storage.skeletonString
+
+        var i = quoteIndex + 1
+        var isEscaped = false
+
+        while i < end {
+            let b = skeleton[i]
+
+            if isEscaped {
+                isEscaped = false
+                i += 1
+                continue
+            }
+
+            if b == FuncChar.backSlash {
+                isEscaped = true
+                i += 1
+                continue
+            }
+
+            if b == FuncChar.singleQuote {
+                return i + 1
+            }
+
+            i += 1
+        }
+
+        // 同一行内で閉じなければ行末まで（複数行 single quote は後で）
+        return end
+    }
+
+    private func skipPercentRegexLiteral(fromPercent percentIndex: Int, end: Int) -> Int {
+        let skeleton = storage.skeletonString
+
+        var i = percentIndex + 2 // after %r
+        if i >= end { return end }
+
+        let open = skeleton[i]
+        let close = closingDelimiter(for: open)
+        i += 1
+        if i >= end { return end }
+
+        var depth = (open == close) ? 0 : 1
+        var isEscaped = false
+
+        while i < end {
+            let b = skeleton[i]
+
+            if isEscaped {
+                isEscaped = false
+                i += 1
+                continue
+            }
+
+            if b == FuncChar.backSlash {
+                isEscaped = true
+                i += 1
+                continue
+            }
+
+            if open != close {
+                if b == open {
+                    depth += 1
+                    i += 1
+                    continue
+                }
+                if b == close {
+                    depth -= 1
+                    i += 1
+                    if depth == 0 { return i }
+                    continue
+                }
+                i += 1
+                continue
+            }
+
+            // non-paired delimiter
+            if b == close {
+                return i + 1
+            }
+
+            i += 1
+        }
+
+        return end
+    }
+
+    private func closingDelimiter(for open: UInt8) -> UInt8 {
+        switch open {
+        case FuncChar.leftParen:    return FuncChar.rightParen
+        case FuncChar.leftBracket:  return FuncChar.rightBracket
+        case FuncChar.leftBrace:    return FuncChar.rightBrace
+        case FuncChar.lt:           return FuncChar.gt
+        default:                    return open
+        }
+    }
+
+
 
     // MARK: - Heredoc helpers
 
@@ -291,6 +586,9 @@ final class KSyntaxParserRuby: KSyntaxParser {
         let b = skeleton[next]
         return b == FuncChar.space || b == FuncChar.tab
     }
+    
+    
+
 }
 
 
