@@ -28,7 +28,22 @@ final class KSkeletonStringInUTF8 {
     var bytes:[UInt8]  { _bytes }
     var count: Int { _bytes.count }
     
-    // MARK: - Static functions.
+    // 改行コード("\n")のoffsetを全て返す。昇順。
+    var newlineIndices: [Int] {
+        if let cache = _newlineCache { return cache }
+        
+        let res = Self.indicesOfCharacter(in: _bytes, range: 0..<_bytes.count, target: FuncChar.lf)
+        _newlineCache = res
+        return res
+    }
+    
+    // 行頭のインデックスを全て返す。昇順。
+    // キャッシュされないため頻繁に呼び出す場合はnewlineIndicesを使用すること。
+    var lineStartIndices: [Int] {
+        [0] + newlineIndices.map { $0 + 1 }
+    }
+    
+    // MARK: - Static functions
     
     // [Character]をUTF-8実装のUnicodeに変換するが、その際、複数バイトになる文字については"a"を代替文字とする。
     // 元の[Character]と文字の位置が一致するためRange<Int>をそのまま使用できるが、生成した文字列から元の文字列は復元できない。
@@ -103,6 +118,8 @@ final class KSkeletonStringInUTF8 {
     }
     
     
+    
+    
     // MARK: - Internal functions.
     
     // 読み取り専用：範囲外は 0 を返し、ログに記録
@@ -136,6 +153,8 @@ final class KSkeletonStringInUTF8 {
     }
 
     
+    // MARK: - Scan utilities
+    
     // 字句走査などについての関数群
     // 指定range内で最初に見つかった byte の index を返す。見つからなければ nil。
     func firstIndex(of byte: UInt8, in range: Range<Int>) -> Int? {
@@ -159,20 +178,6 @@ final class KSkeletonStringInUTF8 {
             if _bytes[i] == byte { return i }
         }
         return nil
-    }
-
-    // index位置から word が前方一致するか
-    func matchesPrefix(_ word: [UInt8], at index: Int) -> Bool {
-        if word.isEmpty { return true }
-        if index < 0 { return false }
-        if index + word.count > _bytes.count { return false }
-
-        var i = 0
-        while i < word.count {
-            if _bytes[index + i] != word[i] { return false }
-            i += 1
-        }
-        return true
     }
 
     // range 内で needle が最初に出現する index を返す。見つからなければ nil。
@@ -212,13 +217,150 @@ final class KSkeletonStringInUTF8 {
         }
         return upperBound
     }
+    
+    // opener から始まる区切りリテラルをスキップし、閉じ区切りの「次」のインデックスを返す。
+    // 見つからない場合は range.upperBound または stop に到達した位置を返す。
+    //
+    // - Parameters:
+    //   - startIndex: opener の位置（opener 自身を指す）
+    //   - range: 走査範囲
+    //   - opener: 開始区切り
+    //   - allowNesting: opener/closer のネストを許可するか（括弧系向け）
+    //   - escape: エスケープ文字（0 を渡すと無効）
+    //   - stop: 指定があれば、そのバイトに到達したらそこで止める（例：LF）
+    func skipDelimited(
+        from startIndex: Int,
+        in range: Range<Int>,
+        opener: UInt8,
+        allowNesting: Bool,
+        escape: UInt8 = FuncChar.backSlash,
+        stop: UInt8? = nil
+    ) -> Int {
+        let closer = FuncChar.paired(of: opener) ?? opener
+        let canNest = allowNesting && opener != closer
+        
+        if startIndex + 1 >= range.upperBound { return range.upperBound }
+        
+        let slice = bytes(in: (startIndex + 1)..<range.upperBound)
+        if slice.isEmpty { return range.upperBound }
+        
+        var isEscaped = false
+        
+        if opener == closer {
+            // opener == closer（例：" ' / など）: ネストなし、closer を見つけたら終了
+            var i = slice.startIndex
+            while i < slice.endIndex {
+                let b = _bytes[i]
+                
+                if let stopByte = stop, b == stopByte {
+                    return i
+                }
+                
+                if isEscaped {
+                    isEscaped = false
+                    i += 1
+                    continue
+                }
+                
+                if escape != 0 && b == escape {
+                    isEscaped = true
+                    i += 1
+                    continue
+                }
+                
+                if b == closer {
+                    return i + 1
+                }
+                
+                i += 1
+            }
+            
+            return range.upperBound
+        }
+        
+        // opener != closer（括弧系）
+        var depth = 1
+        
+        var i = slice.startIndex
+        while i < slice.endIndex {
+            let b = _bytes[i]
+            
+            if let stopByte = stop, b == stopByte {
+                return i
+            }
+            
+            if isEscaped {
+                isEscaped = false
+                i += 1
+                continue
+            }
+            
+            if escape != 0 && b == escape {
+                isEscaped = true
+                i += 1
+                continue
+            }
+            
+            if canNest && b == opener {
+                depth += 1
+                i += 1
+                continue
+            }
+            
+            if b == closer {
+                depth -= 1
+                i += 1
+                if depth == 0 { return i }
+                continue
+            }
+            
+            i += 1
+        }
+        
+        return range.upperBound
+    }
+    
+    // 1行内専用：LF に到達したら打ち切る版（内部的には skipDelimited を呼ぶだけ）
+    func skipDelimitedInLine(from startIndex: Int, in range: Range<Int>, opener: UInt8,
+            allowNesting: Bool, escape: UInt8 = FuncChar.backSlash) -> Int {
+        skipDelimited(from: startIndex, in: range, opener: opener, allowNesting: allowNesting, escape: escape, stop: FuncChar.lf)
+    }
+    
+    // quote（' や "）から始まるクォート文字列をスキップし、閉じクォートの「次」のインデックスを返す。
+    // 見つからない場合は range.upperBound または stop に到達した位置を返す。
+    func skipQuoted(from startIndex: Int, in range: Range<Int>, quote: UInt8,
+            escape: UInt8 = FuncChar.backSlash, stop: UInt8? = nil) -> Int {
+        skipDelimited(from: startIndex, in: range, opener: quote, allowNesting: false, escape: escape, stop: stop)
+    }
+    
+    // 1行内専用：LF に到達したら打ち切る版
+    func skipQuotedInLine(from startIndex: Int, in range: Range<Int>, quote: UInt8, escape: UInt8 = FuncChar.backSlash) -> Int {
+        skipQuoted(from: startIndex, in: range, quote: quote, escape: escape, stop: FuncChar.lf)
+    }
 
+    // MARK: - Quote wrappers
+    
+    func skipSingleQuoted(from startIndex: Int, in range: Range<Int> ) -> Int {
+        skipQuoted(from: startIndex, in: range, quote: FuncChar.singleQuote)
+    }
+    
+    func skipDoubleQuoted(from startIndex: Int, in range: Range<Int>) -> Int {
+        skipQuoted(from: startIndex, in: range, quote: FuncChar.doubleQuote)
+    }
+    
+    func skipSingleQuotedInLine(from startIndex: Int, in range: Range<Int>) -> Int {
+        skipQuotedInLine(from: startIndex, in: range, quote: FuncChar.singleQuote)
+    }
+    
+    func skipDoubleQuotedInLine(from startIndex: Int, in range: Range<Int>) -> Int {
+        skipQuotedInLine(from: startIndex, in: range, quote: FuncChar.doubleQuote)
+    }
 
     
-    
+    //MARK: - Matching utilities
     
     // 渡されたwordがskeletonのrangeの文字列と一致するか否かを返す。
-    func matches(range: Range<Int>, word: [UInt8]) -> Bool {
+    func matches(word: [UInt8], in range:Range<Int>) -> Bool {
         let len = range.count
         if word.count != len { return false }
         if range.upperBound > count { log("out of range.", from:self); return false }
@@ -227,7 +369,7 @@ final class KSkeletonStringInUTF8 {
     }
     
     // 渡されたwordのリストにskeletonのrangeの文字列と一致するものがあるか否かを返す。
-    func matches(range: Range<Int>, words: [[UInt8]]) -> Bool {
+    func matches(words:[[UInt8]], in range: Range<Int>) -> Bool {
         var lo = 0
         var hi = words.count
 
@@ -235,7 +377,8 @@ final class KSkeletonStringInUTF8 {
             let mid = (lo + hi) >> 1
             let w = words[mid]
 
-            let cmp = compare(range: range, word: w)
+            //let cmp = compare(range: range, word: w)
+            let cmp = compare(word: w, in: range)
             if cmp == 0 {
                 return true
             } else if cmp < 0 {
@@ -246,11 +389,25 @@ final class KSkeletonStringInUTF8 {
         }
         return false
     }
+
+    // index位置から word が前方一致するか否かを返す。
+    func matchesPrefix(_ word: [UInt8], at index: Int) -> Bool {
+        if word.isEmpty { return true }
+        if index < 0 { return false }
+        if index + word.count > _bytes.count { return false }
+
+        var i = 0
+        while i < word.count {
+            if _bytes[index + i] != word[i] { return false }
+            i += 1
+        }
+        return true
+    }
     
     // return <0 : range < word
     //         0 : equal
     //        >0 : range > word
-    private func compare(range: Range<Int>, word: [UInt8]) -> Int {
+    private func compare(word: [UInt8], in range: Range<Int>) -> Int {
         let rlen = range.count
         let wlen = word.count
         let minLen = (rlen < wlen) ? rlen : wlen
@@ -267,21 +424,6 @@ final class KSkeletonStringInUTF8 {
 
         // prefix が一致している場合は長さで決定
         return rlen - wlen
-    }
-    
-    // 改行コード("\n")のoffsetを全て返す。昇順。
-    var newlineIndices: [Int] {
-        if let cache = _newlineCache { return cache }
-        
-        let res = Self.indicesOfCharacter(in: _bytes, range: 0..<_bytes.count, target: FuncChar.lf)
-        _newlineCache = res
-        return res
-    }
-    
-    // 行頭のインデックスを全て返す。昇順。
-    // キャッシュされないため頻繁に呼び出す場合はnewlineIndicesを使用すること。
-    var lineStartIndices: [Int] {
-        [0] + newlineIndices.map { $0 + 1 }
     }
     
     // 指定された文字インデックスの含まれる物理行の行番号を返す。0開始。
