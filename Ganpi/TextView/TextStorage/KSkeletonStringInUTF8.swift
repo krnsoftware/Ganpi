@@ -201,7 +201,54 @@ final class KSkeletonStringInUTF8 {
     func containsSubsequence(_ needle: [UInt8], in range: Range<Int>) -> Bool {
         firstIndex(ofSequence: needle, in: range) != nil
     }
+    
+    // 指定range内で、エスケープを考慮しつつ target に到達するまで走査し、到達したら「次」のインデックスを返す。
+    // stop が指定されている場合、stop に到達したらその位置で止めて stop 自身のインデックスを返す。
+    // 見つからなければ range.upperBound を返す。
+    func skip(
+        from startIndex: Int,
+        in range: Range<Int>,
+        target: UInt8,
+        escape: UInt8? = FuncChar.backSlash,
+        stop: UInt8? = nil
+    ) -> Int {
+        if startIndex >= range.upperBound { return range.upperBound }
 
+        let slice = bytes(in: startIndex..<range.upperBound)
+        if slice.isEmpty { return range.upperBound }
+
+        var isEscaped = false
+
+        var i = slice.startIndex
+        while i < slice.endIndex {
+            let b = _bytes[i]
+
+            if let stop, b == stop {
+                return i
+            }
+
+            if isEscaped {
+                isEscaped = false
+                i += 1
+                continue
+            }
+
+            if let escape, b == escape {
+                isEscaped = true
+                i += 1
+                continue
+            }
+
+            if b == target {
+                return i + 1
+            }
+
+            i += 1
+        }
+
+        return range.upperBound
+    }
+    
     // index から upperBound まで、space / tab を読み飛ばした位置を返す（upperBound は含まない）
     func skipSpaces(from index: Int, to upperBound: Int) -> Int {
         if index >= upperBound { return index }
@@ -217,7 +264,7 @@ final class KSkeletonStringInUTF8 {
         }
         return upperBound
     }
-    
+
     // opener から始まる区切りリテラルをスキップし、閉じ区切りの「次」のインデックスを返す。
     // 見つからない場合は range.upperBound または stop に到達した位置を返す。
     //
@@ -233,7 +280,7 @@ final class KSkeletonStringInUTF8 {
         in range: Range<Int>,
         opener: UInt8,
         allowNesting: Bool,
-        escape: UInt8 = FuncChar.backSlash,
+        escape: UInt8? = FuncChar.backSlash,
         stop: UInt8? = nil
     ) -> Int {
         let closer = FuncChar.paired(of: opener) ?? opener
@@ -262,7 +309,7 @@ final class KSkeletonStringInUTF8 {
                     continue
                 }
                 
-                if escape != 0 && b == escape {
+                if let escape, b == escape {
                     isEscaped = true
                     i += 1
                     continue
