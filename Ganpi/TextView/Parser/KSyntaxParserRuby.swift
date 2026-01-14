@@ -91,10 +91,17 @@ final class KSyntaxParserRuby: KSyntaxParser {
         let startState: KEndState = (lineIndex > 0) ? _lines[lineIndex - 1].endState : .neutral
 
         // ディレクティブ行はそれ自体もコメント色にする
-        if isLineHeadDirective(lineRange: lineRange, directiveBytes: _commentBeginBytes)
-            || isLineHeadDirective(lineRange: lineRange, directiveBytes: _commentEndBytes) {
+        // - "=begin" は常にコメント色
+        // - "=end"   は multi comment 中（前行 endState が inMultiComment）のときだけコメント色
+        if isLineHeadDirective(lineRange: lineRange, directiveBytes: _commentBeginBytes) {
             return [makeSpan(range: paintRange, role: .comment)]
         }
+        if isLineHeadDirective(lineRange: lineRange, directiveBytes: _commentEndBytes) {
+            if startState == .inMultiComment {
+                return [makeSpan(range: paintRange, role: .comment)]
+            }
+        }
+
 
         switch startState {
         case .inMultiComment:
