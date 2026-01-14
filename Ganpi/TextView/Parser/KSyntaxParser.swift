@@ -250,13 +250,42 @@ class KSyntaxParser {
     let type: KSyntaxType
     let keywords: [[UInt8]]
     private let _theme: [KFunctionalColor: NSColor]
+    private var _dirtyLineRange: Range<Int>? = nil
+    private var _lastSkeletonLineCount: Int = 0
+
     
     var baseTextColor: NSColor { return color(.base) }
     var backgroundColor: NSColor { return color(.background) }
     
     var lineCommentPrefix: String? { return nil }
     
-    func noteEdit(oldRange: Range<Int>, newCount: Int) { /* no-op */ }
+    func noteEdit(oldRange: Range<Int>, newCount: Int) {
+        let skeleton = storage.skeletonString
+        let currentLineCount = skeletonLineCount()
+
+        if _lastSkeletonLineCount == 0 {
+            _lastSkeletonLineCount = currentLineCount
+            _dirtyLineRange = 0..<currentLineCount
+            return
+        }
+
+        let oldLineCount = _lastSkeletonLineCount
+        _lastSkeletonLineCount = currentLineCount
+
+        // 行数が変わったら安全側：全体を dirty
+        if currentLineCount != oldLineCount {
+            _dirtyLineRange = 0..<currentLineCount
+            return
+        }
+
+        // 編集が入った行（その1つ前から状態連鎖を作り直す）
+        let editedLine = skeleton.lineIndex(at: oldRange.lowerBound)
+        let fromLine = max(0, editedLine - 1)
+        let toLine = min(currentLineCount, editedLine + 1) // exclusive（最低でも editedLine を含む）
+
+        mergeDirtyLineRange(from: fromLine, to: toLine)
+    }
+
     
     // ensure internal state is valid for given range
     func ensureUpToDate(for range: Range<Int>) { /* no-op */ }
@@ -309,6 +338,37 @@ class KSyntaxParser {
         let skeleton = storage.skeletonString
         return max(1, skeleton.newlineIndices.count + 1)
     }
+    
+    private func mergeDirtyLineRange(from: Int, to: Int) {
+        let r = from..<to
+        if let existing = _dirtyLineRange {
+            let lower = min(existing.lowerBound, r.lowerBound)
+            let upper = max(existing.upperBound, r.upperBound)
+            _dirtyLineRange = lower..<upper
+        } else {
+            _dirtyLineRange = r
+        }
+    }
+
+    func consumeRescanPlan(for range: Range<Int>) -> (startLine: Int, minLine: Int) {
+        let skeleton = storage.skeletonString
+        let clamped = min(range.lowerBound, skeleton.count)
+        let requestedLine = skeleton.lineIndex(at: clamped)
+
+        var startLine = max(0, requestedLine - 1)
+        var minLine = requestedLine
+
+        if let dirty = _dirtyLineRange {
+            startLine = min(startLine, dirty.lowerBound)
+            if dirty.upperBound > 0 {
+                minLine = max(minLine, dirty.upperBound - 1)
+            }
+        }
+
+        _dirtyLineRange = nil
+        return (startLine: startLine, minLine: minLine)
+    }
+
 
     // skeleton の行数に追随する行バッファを用意する（型は呼び出し側で自由）
     // 戻り値: バッファを作り直した（＝行数が変わった）場合 true

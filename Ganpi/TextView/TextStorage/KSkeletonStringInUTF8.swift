@@ -202,30 +202,28 @@ final class KSkeletonStringInUTF8 {
         firstIndex(ofSequence: needle, in: range) != nil
     }
     
-    // 指定range内で、エスケープを考慮しつつ target に到達するまで走査し、到達したら「次」のインデックスを返す。
-    // stop が指定されている場合、stop に到達したらその位置で止めて stop 自身のインデックスを返す。
-    // 見つからなければ range.upperBound を返す。
-    func skip(
-        from startIndex: Int,
-        in range: Range<Int>,
-        target: UInt8,
-        escape: UInt8? = FuncChar.backSlash,
-        stop: UInt8? = nil
-    ) -> Int {
-        if startIndex >= range.upperBound { return range.upperBound }
 
-        let slice = bytes(in: startIndex..<range.upperBound)
-        if slice.isEmpty { return range.upperBound }
+
+    enum KScanResult: Equatable {
+        case hit(index: Int, byte: UInt8)
+        case notFound
+    }
+
+    func scan(
+        in range: Range<Int>,
+        targets: [UInt8],
+        escape: UInt8? = FuncChar.backSlash
+    ) -> KScanResult {
+        if range.isEmpty { return .notFound }
+        if targets.isEmpty { return .notFound }
+
+        let slice = bytes(in: range)
+        if slice.isEmpty { return .notFound }
 
         var isEscaped = false
-
         var i = slice.startIndex
         while i < slice.endIndex {
             let b = _bytes[i]
-
-            if let stop, b == stop {
-                return i
-            }
 
             if isEscaped {
                 isEscaped = false
@@ -239,15 +237,155 @@ final class KSkeletonStringInUTF8 {
                 continue
             }
 
-            if b == target {
-                return i + 1
+            for t in targets where b == t {
+                return .hit(index: i, byte: b)
             }
 
             i += 1
         }
 
-        return range.upperBound
+        return .notFound
     }
+    
+    
+    enum KSkipResult: Equatable {
+        case found(next: Int)     // closer を見つけた（閉じの次）
+        case stopped(at: Int)     // stop に当たった（stop の位置）
+        case notFound             // 終端まで見つからない
+    }
+
+    // range.lowerBound が opening quote（'）である前提。
+    // 1行内専用：LF に当たったら stopped。
+    // 見つかった場合は closing quote の「次」を返す。
+    func skipSingleQuotedInLine(
+        in range: Range<Int>,
+        escape: UInt8? = FuncChar.backSlash
+    ) -> KSkipResult {
+        if range.isEmpty { return .notFound }
+        if range.lowerBound + 1 >= range.upperBound { return .notFound }
+        if self[range.lowerBound] != FuncChar.singleQuote { return .notFound }
+
+        let scanRange = (range.lowerBound + 1)..<range.upperBound
+        let targets: [UInt8] = [FuncChar.singleQuote, FuncChar.lf]
+
+        while true {
+            switch scan(in: scanRange, targets: targets, escape: escape) {
+            case .hit(let index, let byte):
+                if byte == FuncChar.lf { return .stopped(at: index) }
+                // closing '
+                return .found(next: index + 1)
+
+            case .notFound:
+                return .notFound
+            }
+        }
+    }
+
+    // range.lowerBound が opening quote（"）である前提。
+    // 1行内専用：LF に当たったら stopped。
+    // 見つかった場合は closing quote の「次」を返す。
+    func skipDoubleQuotedInLine(
+        in range: Range<Int>,
+        escape: UInt8? = FuncChar.backSlash
+    ) -> KSkipResult {
+        if range.isEmpty { return .notFound }
+        if range.lowerBound + 1 >= range.upperBound { return .notFound }
+        if self[range.lowerBound] != FuncChar.doubleQuote { return .notFound }
+
+        let scanRange = (range.lowerBound + 1)..<range.upperBound
+        let targets: [UInt8] = [FuncChar.doubleQuote, FuncChar.lf]
+
+        while true {
+            switch scan(in: scanRange, targets: targets, escape: escape) {
+            case .hit(let index, let byte):
+                if byte == FuncChar.lf { return .stopped(at: index) }
+                // closing "
+                return .found(next: index + 1)
+
+            case .notFound:
+                return .notFound
+            }
+        }
+    }
+
+    // range.lowerBound が opener の位置である前提。
+    // opener は range.lowerBound の実バイトから決める（呼び出し側が opener を渡さない設計）。
+    //
+    // - found(next:): closer を見つけた（閉じの次）
+    // - stopped(at:): stop（InLine なら LF）に当たった
+    // - notFound: closer を見つけられず range 終端に到達
+    func skipDelimited(
+        in range: Range<Int>,
+        allowNesting: Bool,
+        escape: UInt8? = FuncChar.backSlash,
+        stop: UInt8? = nil
+    ) -> KSkipResult {
+        if range.isEmpty { return .notFound }
+        if range.lowerBound + 1 >= range.upperBound { return .notFound }
+
+        let opener = self[range.lowerBound]
+        let closer = FuncChar.paired(of: opener) ?? opener
+        let canNest = allowNesting && opener != closer
+
+        // scan() の targets を作る（stop も target と同列に入れて、当たった byte で解釈する）
+        var targets: [UInt8] = [closer]
+        if canNest { targets.append(opener) }
+        if let stop { targets.append(stop) }
+
+        var scanRange = (range.lowerBound + 1)..<range.upperBound
+
+        // opener == closer（" や ' など）はネスト無し扱い
+        if opener == closer {
+            while true {
+                switch scan(in: scanRange, targets: targets, escape: escape) {
+                case .hit(let index, let byte):
+                    if let stop, byte == stop { return .stopped(at: index) }
+                    return .found(next: index + 1)
+
+                case .notFound:
+                    return .notFound
+                }
+            }
+        }
+
+        // opener != closer（括弧系）: ネストあり
+        var depth = 1
+
+        while true {
+            switch scan(in: scanRange, targets: targets, escape: escape) {
+            case .hit(let index, let byte):
+                if let stop, byte == stop { return .stopped(at: index) }
+
+                if canNest && byte == opener {
+                    depth += 1
+                } else if byte == closer {
+                    depth -= 1
+                    if depth == 0 { return .found(next: index + 1) }
+                }
+
+                let next = index + 1
+                if next >= range.upperBound { return .notFound }
+                scanRange = next..<range.upperBound
+
+            case .notFound:
+                return .notFound
+            }
+        }
+    }
+
+    // 1行内専用：LF に到達したら stopped。
+    // range.lowerBound が opener の位置である前提。
+    func skipDelimitedInLine(
+        in range: Range<Int>,
+        allowNesting: Bool,
+        escape: UInt8? = FuncChar.backSlash
+    ) -> KSkipResult {
+        skipDelimited(in: range, allowNesting: allowNesting, escape: escape, stop: FuncChar.lf)
+    }
+
+    
+    
+
     
     // index から upperBound まで、space / tab を読み飛ばした位置を返す（upperBound は含まない）
     func skipSpaces(from index: Int, to upperBound: Int) -> Int {
@@ -264,144 +402,10 @@ final class KSkeletonStringInUTF8 {
         }
         return upperBound
     }
+    
+    
 
-    // opener から始まる区切りリテラルをスキップし、閉じ区切りの「次」のインデックスを返す。
-    // 見つからない場合は range.upperBound または stop に到達した位置を返す。
-    //
-    // - Parameters:
-    //   - startIndex: opener の位置（opener 自身を指す）
-    //   - range: 走査範囲
-    //   - opener: 開始区切り
-    //   - allowNesting: opener/closer のネストを許可するか（括弧系向け）
-    //   - escape: エスケープ文字（0 を渡すと無効）
-    //   - stop: 指定があれば、そのバイトに到達したらそこで止める（例：LF）
-    func skipDelimited(
-        from startIndex: Int,
-        in range: Range<Int>,
-        opener: UInt8,
-        allowNesting: Bool,
-        escape: UInt8? = FuncChar.backSlash,
-        stop: UInt8? = nil
-    ) -> Int {
-        let closer = FuncChar.paired(of: opener) ?? opener
-        let canNest = allowNesting && opener != closer
-        
-        if startIndex + 1 >= range.upperBound { return range.upperBound }
-        
-        let slice = bytes(in: (startIndex + 1)..<range.upperBound)
-        if slice.isEmpty { return range.upperBound }
-        
-        var isEscaped = false
-        
-        if opener == closer {
-            // opener == closer（例：" ' / など）: ネストなし、closer を見つけたら終了
-            var i = slice.startIndex
-            while i < slice.endIndex {
-                let b = _bytes[i]
-                
-                if let stopByte = stop, b == stopByte {
-                    return i
-                }
-                
-                if isEscaped {
-                    isEscaped = false
-                    i += 1
-                    continue
-                }
-                
-                if let escape, b == escape {
-                    isEscaped = true
-                    i += 1
-                    continue
-                }
-                
-                if b == closer {
-                    return i + 1
-                }
-                
-                i += 1
-            }
-            
-            return range.upperBound
-        }
-        
-        // opener != closer（括弧系）
-        var depth = 1
-        
-        var i = slice.startIndex
-        while i < slice.endIndex {
-            let b = _bytes[i]
-            
-            if let stopByte = stop, b == stopByte {
-                return i
-            }
-            
-            if isEscaped {
-                isEscaped = false
-                i += 1
-                continue
-            }
-            
-            if escape != 0 && b == escape {
-                isEscaped = true
-                i += 1
-                continue
-            }
-            
-            if canNest && b == opener {
-                depth += 1
-                i += 1
-                continue
-            }
-            
-            if b == closer {
-                depth -= 1
-                i += 1
-                if depth == 0 { return i }
-                continue
-            }
-            
-            i += 1
-        }
-        
-        return range.upperBound
-    }
     
-    // 1行内専用：LF に到達したら打ち切る版（内部的には skipDelimited を呼ぶだけ）
-    func skipDelimitedInLine(from startIndex: Int, in range: Range<Int>, opener: UInt8,
-            allowNesting: Bool, escape: UInt8 = FuncChar.backSlash) -> Int {
-        skipDelimited(from: startIndex, in: range, opener: opener, allowNesting: allowNesting, escape: escape, stop: FuncChar.lf)
-    }
-    
-    // quote（' や "）から始まるクォート文字列をスキップし、閉じクォートの「次」のインデックスを返す。
-    // 見つからない場合は range.upperBound または stop に到達した位置を返す。
-    func skipQuoted(from startIndex: Int, in range: Range<Int>, quote: UInt8,
-            escape: UInt8 = FuncChar.backSlash, stop: UInt8? = nil) -> Int {
-        skipDelimited(from: startIndex, in: range, opener: quote, allowNesting: false, escape: escape, stop: stop)
-    }
-    
-    // 1行内専用：LF に到達したら打ち切る版
-    func skipQuotedInLine(from startIndex: Int, in range: Range<Int>, quote: UInt8, escape: UInt8 = FuncChar.backSlash) -> Int {
-        skipQuoted(from: startIndex, in: range, quote: quote, escape: escape, stop: FuncChar.lf)
-    }
-
-    // MARK: - Quote wrappers
-    
-    func skipSingleQuoted(from startIndex: Int, in range: Range<Int> ) -> Int {
-        skipQuoted(from: startIndex, in: range, quote: FuncChar.singleQuote)
-    }
-    
-    func skipDoubleQuoted(from startIndex: Int, in range: Range<Int>) -> Int {
-        skipQuoted(from: startIndex, in: range, quote: FuncChar.doubleQuote)
-    }
-    
-    func skipSingleQuotedInLine(from startIndex: Int, in range: Range<Int>) -> Int {
-        skipQuotedInLine(from: startIndex, in: range, quote: FuncChar.singleQuote)
-    }
-    
-    func skipDoubleQuotedInLine(from startIndex: Int, in range: Range<Int>) -> Int {
-        skipQuotedInLine(from: startIndex, in: range, quote: FuncChar.doubleQuote)
-    }
 
     
     //MARK: - Matching utilities
