@@ -252,6 +252,8 @@ class KSyntaxParser {
     private let _theme: [KFunctionalColor: NSColor]
     private var _dirtyLineRange: Range<Int>? = nil
     private var _lastSkeletonLineCount: Int = 0
+    private var _pendingLineDelta: Int = 0
+    private var _pendingSpliceIndex: Int = 0
 
     
     var baseTextColor: NSColor { return color(.base) }
@@ -272,19 +274,38 @@ class KSyntaxParser {
         let oldLineCount = _lastSkeletonLineCount
         _lastSkeletonLineCount = currentLineCount
 
-        // 行数が変わったら安全側：全体を dirty
+        // 行数が変わった場合は差分情報を保持し、dirty は局所に閉じ込める
         if currentLineCount != oldLineCount {
-            _dirtyLineRange = 0..<currentLineCount
+            _pendingLineDelta = currentLineCount - oldLineCount
+
+            let clamped = min(oldRange.lowerBound, skeleton.count)
+            let editedLine = skeleton.lineIndex(at: clamped)
+
+            // spliceIndex 推定：
+            // - 行頭での改行/改行削除はその行自身が動くので editedLine
+            // - それ以外（行途中/行末の改行、行末のLF削除）は editedLine+1 側が動く
+            let lineRange = skeleton.lineRange(at: min(editedLine, max(0, currentLineCount - 1)))
+            let atLineStart = (clamped == lineRange.lowerBound)
+
+            var spliceIndex = atLineStart ? editedLine : (editedLine + 1)
+            spliceIndex = max(0, min(spliceIndex, oldLineCount)) // old count 側で clamp
+
+            _pendingSpliceIndex = spliceIndex
+
+            // dirty は編集行の周辺だけ（状態連鎖で必要なら先に伝播する）
+            let fromLine = max(0, editedLine - 1)
+            let toLine = min(currentLineCount, editedLine + 1) // exclusive
+            mergeDirtyLineRange(from: fromLine, to: toLine)
             return
         }
 
-        // 編集が入った行（その1つ前から状態連鎖を作り直す）
+        // 行数が変わらない編集は従来どおり局所 dirty
         let editedLine = skeleton.lineIndex(at: oldRange.lowerBound)
         let fromLine = max(0, editedLine - 1)
         let toLine = min(currentLineCount, editedLine + 1) // exclusive（最低でも editedLine を含む）
-
         mergeDirtyLineRange(from: fromLine, to: toLine)
     }
+
 
     
     // ensure internal state is valid for given range
@@ -350,7 +371,7 @@ class KSyntaxParser {
         }
     }
 
-    func consumeRescanPlan(for range: Range<Int>) -> (startLine: Int, minLine: Int) {
+    func consumeRescanPlan(for range: Range<Int>) -> (startLine: Int, minLine: Int, spliceIndex: Int, lineDelta: Int) {
         let skeleton = storage.skeletonString
         let clamped = min(range.lowerBound, skeleton.count)
         let requestedLine = skeleton.lineIndex(at: clamped)
@@ -365,8 +386,32 @@ class KSyntaxParser {
             }
         }
 
+        let lineDelta = _pendingLineDelta
+        let spliceIndex = _pendingSpliceIndex
+
         _dirtyLineRange = nil
-        return (startLine: startLine, minLine: minLine)
+        _pendingLineDelta = 0
+        _pendingSpliceIndex = 0
+
+        return (startLine: startLine, minLine: minLine, spliceIndex: spliceIndex, lineDelta: lineDelta)
+    }
+
+    // 行数差分（改行追加/削除）を、行バッファへ splice として反映する
+    func applyLineDelta<T>(lines: inout [T], spliceIndex: Int, lineDelta: Int, make: () -> T) {
+        if lineDelta == 0 { return }
+
+        var index = spliceIndex
+        index = max(0, min(index, lines.count))
+
+        if lineDelta > 0 {
+            let inserted = (0..<lineDelta).map { _ in make() }
+            lines.insert(contentsOf: inserted, at: index)
+        } else {
+            let removeCount = min(-lineDelta, lines.count - index)
+            if removeCount > 0 {
+                lines.removeSubrange(index..<(index + removeCount))
+            }
+        }
     }
 
 

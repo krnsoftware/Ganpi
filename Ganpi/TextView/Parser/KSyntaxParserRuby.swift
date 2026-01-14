@@ -39,14 +39,39 @@ final class KSyntaxParserRuby: KSyntaxParser {
     // MARK: - Override
 
     override func ensureUpToDate(for range: Range<Int>) {
-        let rebuilt = syncLineBuffer(lines: &_lines) { KLineInfo(endState: .neutral) }
-        if _lines.isEmpty { return }
+        if _lines.isEmpty {
+            let _ = syncLineBuffer(lines: &_lines) { KLineInfo(endState: .neutral) }
+            if _lines.isEmpty { return }
+        }
 
         let plan = consumeRescanPlan(for: range)
 
-        let startLine = rebuilt ? 0 : plan.startLine
-        scanFrom(line: startLine, minLine: plan.minLine)
+        // まず差分（改行増減）を splice で反映
+        if plan.lineDelta != 0 {
+            applyLineDelta(lines: &_lines,
+                           spliceIndex: plan.spliceIndex,
+                           lineDelta: plan.lineDelta) { KLineInfo(endState: .neutral) }
+        }
+
+        // 安全弁：それでも行数が合わなければ全再構築
+        let rebuilt = syncLineBuffer(lines: &_lines) { KLineInfo(endState: .neutral) }
+        if rebuilt { log("Line counts do not match.", from: self) }
+        if _lines.isEmpty { return }
+
+        var startLine = plan.startLine
+        if plan.lineDelta != 0 {
+            startLine = min(startLine, max(0, plan.spliceIndex - 1))
+        }
+
+        let maxLine = max(0, _lines.count - 1)
+        startLine = max(0, min(startLine, maxLine))
+
+        var minLine = plan.minLine
+        minLine = max(0, min(minLine, maxLine))
+
+        scanFrom(line: rebuilt ? 0 : startLine, minLine: minLine)
     }
+
 
 
     override func attributes(in range: Range<Int>, tabWidth: Int) -> [KAttributedSpan] {
