@@ -293,17 +293,19 @@ class KSyntaxParser {
             _pendingSpliceIndex = spliceIndex
 
             // dirty は編集行の周辺だけ（状態連鎖で必要なら先に伝播する）
-            let fromLine = max(0, editedLine - 1)
-            let toLine = min(currentLineCount, editedLine + 1) // exclusive
+            let fromLine = max(0, min(editedLine, currentLineCount - 1))
+            let toLine = min(currentLineCount, fromLine + 1) // exclusive
             mergeDirtyLineRange(from: fromLine, to: toLine)
+
             return
         }
 
         // 行数が変わらない編集は従来どおり局所 dirty
         let editedLine = skeleton.lineIndex(at: oldRange.lowerBound)
-        let fromLine = max(0, editedLine - 1)
-        let toLine = min(currentLineCount, editedLine + 1) // exclusive（最低でも editedLine を含む）
+        let fromLine = max(0, min(editedLine, currentLineCount - 1))
+        let toLine = min(currentLineCount, fromLine + 1) // exclusive
         mergeDirtyLineRange(from: fromLine, to: toLine)
+
     }
 
 
