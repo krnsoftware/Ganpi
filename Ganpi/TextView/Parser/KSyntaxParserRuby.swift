@@ -79,32 +79,25 @@ final class KSyntaxParserRuby: KSyntaxParser {
             return [makeSpan(range: paintRange, role: .string)]
 
         case .inDoubleQuote:
-            // 行頭から閉じ " まで（閉じが無ければ行末まで）
-            let closeResult = skeleton.scan(
-                in: lineRange,
-                targets: [FuncChar.doubleQuote],
-                escape: FuncChar.backSlash
-            )
-
-            switch closeResult {
+            // 行頭から閉じ " まで（無ければ行末まで）
+            switch skeleton.scan(in: lineRange, targets: [FuncChar.doubleQuote], escape: FuncChar.backSlash) {
             case .notFound:
                 return [makeSpan(range: paintRange, role: .string)]
 
             case .hit(let closeIndex, _):
-                // closeIndex は閉じ " 自身
                 var spans: [KAttributedSpan] = []
 
-                // 行頭〜閉じの次（文字列部分）
+                // 行頭〜閉じ"（閉じ自身を含む）
                 let firstStringRange = lineRange.lowerBound..<(closeIndex + 1)
                 let paint1 = paintRange.clamped(to: firstStringRange)
                 if !paint1.isEmpty {
                     spans.append(makeSpan(range: paint1, role: .string))
                 }
 
-                // この行の endState が .inDoubleQuote の場合、閉じ後にもう一度 multi-line 開始がある
+                // この行の残りに、さらに複数行 " の開始があるならそこから行末まで
                 if _lines[lineIndex].endState == .inDoubleQuote {
-                    let restRange = (closeIndex + 1)..<lineRange.upperBound
-                    if let start = multiLineDoubleQuoteStartIndex(lineRange: restRange) {
+                    let rest = (closeIndex + 1)..<lineRange.upperBound
+                    if let start = multiLineDoubleQuoteStartIndex(lineRange: rest) {
                         let secondStringRange = start..<lineRange.upperBound
                         let paint2 = paintRange.clamped(to: secondStringRange)
                         if !paint2.isEmpty {
@@ -115,6 +108,7 @@ final class KSyntaxParserRuby: KSyntaxParser {
 
                 return spans
             }
+
 
         case .neutral:
             // この行が multi-line の開始行なら、開始位置から行末まで string 色
@@ -190,6 +184,7 @@ final class KSyntaxParserRuby: KSyntaxParser {
         let head = lineRange.lowerBound
         let end = lineRange.upperBound
 
+        // Ruby の =begin/=end は行頭（カラム0）前提：空白スキップ等はしない
         if !skeleton.matchesPrefix(directiveBytes, at: head) { return false }
 
         let next = head + directiveBytes.count
@@ -198,6 +193,7 @@ final class KSyntaxParserRuby: KSyntaxParser {
         let b = skeleton[next]
         return b == FuncChar.space || b == FuncChar.tab
     }
+
 
     // MARK: - Multi-line state scan (double-quote / heredoc)
 
@@ -211,13 +207,14 @@ final class KSyntaxParserRuby: KSyntaxParser {
 
         var i = lineRange.lowerBound
 
-        // 行頭が「すでに " の中」の場合：この行で閉じ " を探す
+        // 行頭が「すでに " の中」なら、この行で閉じを探す
         if startInDoubleQuote {
             switch skeleton.scan(in: i..<end, targets: [FuncChar.doubleQuote], escape: FuncChar.backSlash) {
-            case .hit(let index, _):
-                i = index + 1
             case .notFound:
                 return .inDoubleQuote
+
+            case .hit(let index, _):
+                i = index + 1
             }
         }
 
@@ -225,17 +222,18 @@ final class KSyntaxParserRuby: KSyntaxParser {
             let b = skeleton[i]
 
             // # comment: 以降は無視
-            if b == FuncChar.numeric { // '#'
+            if b == FC.numeric { // '#'
                 break
             }
 
-            // single quote: 単行だけ飛ばす
+            // single quote: 単行だけ飛ばす（複数行は後で）
             if b == FuncChar.singleQuote {
-                switch skeleton.skipSingleQuotedInLine(in: i..<end) {
+                switch skeleton.skipSingleQuotedInLine(in: i..<end, escape: FuncChar.backSlash) {
                 case .found(let next):
                     i = next
-                case .stopped(let at):
-                    i = at
+                case .stopped:
+                    // lineRange に LF は無い想定だが安全側
+                    return .neutral
                 case .notFound:
                     i = end
                 }
@@ -251,8 +249,8 @@ final class KSyntaxParserRuby: KSyntaxParser {
                         switch skeleton.skipDelimitedInLine(in: openerIndex..<end, allowNesting: true, escape: FuncChar.backSlash) {
                         case .found(let next):
                             i = next
-                        case .stopped(let at):
-                            i = at
+                        case .stopped:
+                            return .neutral
                         case .notFound:
                             i = end
                         }
@@ -263,20 +261,18 @@ final class KSyntaxParserRuby: KSyntaxParser {
                 }
             }
 
-            // double quote: 行内で閉じるなら飛ばす、閉じないなら複数行文字列へ
+            // double quote: 単行で閉じるなら飛ばす、閉じないなら複数行へ
             if b == FuncChar.doubleQuote {
-                switch skeleton.skipDoubleQuotedInLine(in: i..<end) {
+                switch skeleton.skipDoubleQuotedInLine(in: i..<end, escape: FuncChar.backSlash) {
                 case .found(let next):
                     i = next
-                case .stopped:
-                    // lineRange は LF を含まない前提だが、念のため
-                    return .inDoubleQuote
-                case .notFound:
+                    continue
+                case .stopped, .notFound:
                     return .inDoubleQuote
                 }
             }
 
-            // heredoc start candidate（クオート/正規表現/コメント外のみ）
+            // heredoc start candidate（クォート/正規表現/コメント外のみ）
             if b == FuncChar.lt, i + 1 < end, skeleton[i + 1] == FuncChar.lt {
                 if let hd = parseHeredocAtIntroducer(introducerStart: i, in: lineRange) {
                     return .inHeredoc(label: hd.label, allowIndent: hd.allowIndent)
@@ -289,6 +285,7 @@ final class KSyntaxParserRuby: KSyntaxParser {
         return .neutral
     }
 
+
     private func multiLineDoubleQuoteStartIndex(lineRange: Range<Int>) -> Int? {
         if lineRange.isEmpty { return nil }
 
@@ -299,16 +296,16 @@ final class KSyntaxParserRuby: KSyntaxParser {
         while i < end {
             let b = skeleton[i]
 
-            if b == FuncChar.numeric { // '#'
+            if b == FC.numeric { // '#'
                 break
             }
 
             if b == FuncChar.singleQuote {
-                switch skeleton.skipSingleQuotedInLine(in: i..<end) {
+                switch skeleton.skipSingleQuotedInLine(in: i..<end, escape: FuncChar.backSlash) {
                 case .found(let next):
                     i = next
-                case .stopped(let at):
-                    i = at
+                case .stopped:
+                    return nil
                 case .notFound:
                     i = end
                 }
@@ -323,8 +320,8 @@ final class KSyntaxParserRuby: KSyntaxParser {
                         switch skeleton.skipDelimitedInLine(in: openerIndex..<end, allowNesting: true, escape: FuncChar.backSlash) {
                         case .found(let next):
                             i = next
-                        case .stopped(let at):
-                            i = at
+                        case .stopped:
+                            return nil
                         case .notFound:
                             i = end
                         }
@@ -336,14 +333,13 @@ final class KSyntaxParserRuby: KSyntaxParser {
             }
 
             if b == FuncChar.doubleQuote {
-                switch skeleton.skipDoubleQuotedInLine(in: i..<end) {
+                switch skeleton.skipDoubleQuotedInLine(in: i..<end, escape: FuncChar.backSlash) {
                 case .found(let next):
-                    i = next
-                case .stopped:
-                    return i
-                case .notFound:
-                    return i
+                    i = next          // 単行で閉じたので次へ
+                case .stopped, .notFound:
+                    return i          // 閉じない＝複数行の開始
                 }
+                continue
             }
 
             i += 1
@@ -351,6 +347,7 @@ final class KSyntaxParserRuby: KSyntaxParser {
 
         return nil
     }
+
 
     // MARK: - Heredoc parsing
 
