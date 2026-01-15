@@ -31,14 +31,14 @@ class KTextParagraph {
         var whitespaceWidth = 0
         var isInLeadingTabs = true
         for i in range {
-            if skeleton[i] == FuncChar.tab {
+            if skeleton[i] == FC.tab {
                 if isInLeadingTabs {
                     whitespaceWidth += tabWidth
                 } else {
                     whitespaceWidth += 1
                 }
                 continue
-            } else if skeleton[i] == FuncChar.space {
+            } else if skeleton[i] == FC.space {
                 whitespaceWidth += 1
                 isInLeadingTabs = false
                 continue
@@ -72,9 +72,9 @@ class KTextParagraph {
         var spaces = 0
         var tabs = 0
         for i in range {
-            if skeleton[i] == FuncChar.tab {
+            if skeleton[i] == FC.tab {
                 tabs += 1
-            } else if skeleton[i] == FuncChar.space {
+            } else if skeleton[i] == FC.space {
                 spaces += 1
             } else {
                 break
@@ -104,14 +104,14 @@ class KTextParagraph {
         var cursor = range.lowerBound
         while cursor < index, cursor < range.upperBound {
             let ch = skeleton[cursor]
-            if ch == FuncChar.tab {
+            if ch == FC.tab {
                 if inLeadingTabs {
                     let rem = columns % tabWidth
                     columns += (rem == 0) ? tabWidth : (tabWidth - rem)
                 } else {
                     columns += 1
                 }
-            } else if ch == FuncChar.space {
+            } else if ch == FC.space {
                 columns += 1
                 inLeadingTabs = false
             } else {
@@ -140,7 +140,7 @@ class KTextSnapShot {
         var parags:[KTextParagraph] = []
         var lower = 0
         for (i, ch) in _storage.skeletonString.bytes.enumerated() {
-            if ch == FuncChar.lf {
+            if ch == FC.lf {
                 parags += [KTextParagraph(storage: _storage, range: lower..<i)]
                 lower = i + 1
             }

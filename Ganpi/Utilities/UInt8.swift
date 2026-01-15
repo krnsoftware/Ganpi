@@ -17,7 +17,7 @@ extension UInt8 {
     var isAsciiLower: Bool { self >= 0x61 && self <= 0x7A }
     var isAsciiAlpha: Bool { isAsciiUpper || isAsciiLower }
     
-    var isIdentStartAZ_: Bool { self.isAsciiAlpha || self == FuncChar.underscore }
+    var isIdentStartAZ_: Bool { self.isAsciiAlpha || self == KFuncChar.underscore }
     var isIdentPartAZ09_: Bool { self.isIdentStartAZ_ || self.isAsciiDigit }
     
 }

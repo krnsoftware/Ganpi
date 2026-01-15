@@ -1,5 +1,5 @@
 //
-//  KSkeletonStringInUTF8.swift
+//  KSkeletonString.swift
 //  Ganpi
 //
 //  Created by KARINO Masatugu,
@@ -15,7 +15,7 @@ import Darwin
 // KTextStorageに於いて、_characters:[Characters]の代わりに用いられる[UInt8]のwrapper。
 // 主にテキスト内の制御文字等を検出するために使用される。
 
-final class KSkeletonStringInUTF8 {
+final class KSkeletonString {
     // MARK: - Enum and Struct.
     
    
@@ -32,7 +32,7 @@ final class KSkeletonStringInUTF8 {
     var newlineIndices: [Int] {
         if let cache = _newlineCache { return cache }
         
-        let res = Self.indicesOfCharacter(in: _bytes, range: 0..<_bytes.count, target: FuncChar.lf)
+        let res = Self.indicesOfCharacter(in: _bytes, range: 0..<_bytes.count, target: FC.lf)
         _newlineCache = res
         return res
     }
@@ -212,7 +212,7 @@ final class KSkeletonStringInUTF8 {
     func scan(
         in range: Range<Int>,
         targets: [UInt8],
-        escape: UInt8? = FuncChar.backSlash
+        escape: UInt8? = FC.backSlash
     ) -> KScanResult {
         if range.isEmpty { return .notFound }
         if targets.isEmpty { return .notFound }
@@ -282,63 +282,6 @@ final class KSkeletonStringInUTF8 {
         return .notFound
     }
 
-
-/*
-    // range.lowerBound が opening quote（'）である前提。
-    // 1行内専用：LF に当たったら stopped。
-    // 見つかった場合は closing quote の「次」を返す。
-    func skipSingleQuotedInLine(
-        in range: Range<Int>,
-        escape: UInt8? = FuncChar.backSlash
-    ) -> KSkipResult {
-        if range.isEmpty { return .notFound }
-        if range.lowerBound + 1 >= range.upperBound { return .notFound }
-        if self[range.lowerBound] != FuncChar.singleQuote { return .notFound }
-
-        let scanRange = (range.lowerBound + 1)..<range.upperBound
-        let targets: [UInt8] = [FuncChar.singleQuote, FuncChar.lf]
-
-        while true {
-            switch scan(in: scanRange, targets: targets, escape: escape) {
-            case .hit(let index, let byte):
-                if byte == FuncChar.lf { return .stopped(at: index) }
-                // closing '
-                return .found(next: index + 1)
-
-            case .notFound:
-                return .notFound
-            }
-        }
-    }
-
-    // range.lowerBound が opening quote（"）である前提。
-    // 1行内専用：LF に当たったら stopped。
-    // 見つかった場合は closing quote の「次」を返す。
-    func skipDoubleQuotedInLine(
-        in range: Range<Int>,
-        escape: UInt8? = FuncChar.backSlash
-    ) -> KSkipResult {
-        if range.isEmpty { return .notFound }
-        if range.lowerBound + 1 >= range.upperBound { return .notFound }
-        if self[range.lowerBound] != FuncChar.doubleQuote { return .notFound }
-
-        let scanRange = (range.lowerBound + 1)..<range.upperBound
-        let targets: [UInt8] = [FuncChar.doubleQuote, FuncChar.lf]
-
-        while true {
-            switch scan(in: scanRange, targets: targets, escape: escape) {
-            case .hit(let index, let byte):
-                if byte == FuncChar.lf { return .stopped(at: index) }
-                // closing "
-                return .found(next: index + 1)
-
-            case .notFound:
-                return .notFound
-            }
-        }
-    }
- */
-
     // range.lowerBound が opener の位置である前提。
     // opener は range.lowerBound の実バイトから決める（呼び出し側が opener を渡さない設計）。
     //
@@ -348,14 +291,14 @@ final class KSkeletonStringInUTF8 {
     func skipDelimited(
         in range: Range<Int>,
         allowNesting: Bool,
-        escape: UInt8? = FuncChar.backSlash,
+        escape: UInt8? = FC.backSlash,
         stop: UInt8? = nil
     ) -> KSkipResult {
         if range.isEmpty { return .notFound }
         if range.lowerBound + 1 >= range.upperBound { return .notFound }
 
         let opener = self[range.lowerBound]
-        let closer = FuncChar.paired(of: opener) ?? opener
+        let closer = FC.paired(of: opener) ?? opener
         let canNest = allowNesting && opener != closer
 
         // scan() の targets を作る（stop も target と同列に入れて、当たった byte で解釈する）
@@ -409,9 +352,9 @@ final class KSkeletonStringInUTF8 {
     func skipDelimitedInLine(
         in range: Range<Int>,
         allowNesting: Bool,
-        escape: UInt8? = FuncChar.backSlash
+        escape: UInt8? = FC.backSlash
     ) -> KSkipResult {
-        skipDelimited(in: range, allowNesting: allowNesting, escape: escape, stop: FuncChar.lf)
+        skipDelimited(in: range, allowNesting: allowNesting, escape: escape, stop: FC.lf)
     }
 
     
@@ -428,7 +371,7 @@ final class KSkeletonStringInUTF8 {
         var i = slice.startIndex
         while i < slice.endIndex {
             let b = _bytes[i]
-            if b != FuncChar.space && b != FuncChar.tab { return i }
+            if b != FC.space && b != FC.tab { return i }
             i += 1
         }
         return upperBound

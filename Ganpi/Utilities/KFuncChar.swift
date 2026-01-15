@@ -8,9 +8,9 @@
 
 import Foundation
 
-typealias FC = FuncChar
+typealias FC = KFuncChar
 
-struct FuncChar {
+struct KFuncChar {
     // 制御
     static let lf: UInt8          = 0x0A  // \n
     static let cr: UInt8           = 0x0D // \r

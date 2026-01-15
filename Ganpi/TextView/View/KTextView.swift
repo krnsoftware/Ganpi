@@ -994,7 +994,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             let base = _horizontalSelectionBase ?? caretIndex
             if lineRange.upperBound > base {
                 let endsWithLF:Bool = lineRange.upperBound < textStorage.count
-                        && textStorage.skeletonString[lineRange.upperBound] == FuncChar.lf
+                        && textStorage.skeletonString[lineRange.upperBound] == FC.lf
                 selectionRange = base..<lineRange.upperBound + (endsWithLF ? 1 : 0) // if the line ends with LF, include it.
             } else {
                 selectionRange = lineRange.lowerBound..<base
@@ -2609,7 +2609,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             if caret > paragraph.range.lowerBound {
                 let skel = textStorage.skeletonString
                 let prev = caret - 1
-                if skel[prev] == FuncChar.space {
+                if skel[prev] == FC.space {
                     textStorage.replaceString(in: prev..<caret, with: "")
                 }
             }
@@ -2618,7 +2618,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
 
         // ★ まずタブを優先的に食う
         let skel = textStorage.skeletonString
-        if caret > head.lowerBound, skel[caret - 1] == FuncChar.tab {
+        if caret > head.lowerBound, skel[caret - 1] == FC.tab {
             textStorage.replaceString(in: (caret - 1)..<caret, with: "")
             return
         }
@@ -2628,7 +2628,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
 
         var to = caret
         var remain = delta
-        while remain > 0, to > head.lowerBound, skel[to - 1] == FuncChar.space {
+        while remain > 0, to > head.lowerBound, skel[to - 1] == FC.space {
             to -= 1
             remain -= 1
         }
@@ -2644,14 +2644,14 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         let caret = caretIndex
         if textStorage.count < 2 || caret == 0 { return }
         var replace:Range<Int>
-        if caret == textStorage.count || textStorage.skeletonString[caret] == FuncChar.lf {
+        if caret == textStorage.count || textStorage.skeletonString[caret] == FC.lf {
             replace = caret - 2..<caret // if the caret stays end of the text, last 2 characters will transpose.
         } else {
             replace = caret - 1..<caret + 1
         }
         guard let left = textStorage[replace.lowerBound], let right = textStorage[replace.lowerBound + 1] else { log("left or right char is nil.",from:self); return }
         // if target characters contain LF, no transpose.
-        if (textStorage.skeletonString[replace.lowerBound] == FuncChar.lf || textStorage.skeletonString[replace.lowerBound + 1] == FuncChar.lf) { return }
+        if (textStorage.skeletonString[replace.lowerBound] == FC.lf || textStorage.skeletonString[replace.lowerBound + 1] == FC.lf) { return }
         textStorage.replaceCharacters(in: replace, with: [right, left])
         caretIndex = replace.lowerBound + 1
     }

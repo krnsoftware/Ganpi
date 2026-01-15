@@ -240,23 +240,23 @@ extension String {
             let b0 = utf8Bytes[i]
             
             // LF
-            if b0 == FuncChar.lf {
+            if b0 == KFuncChar.lf {
                 if detected == nil { detected = .lf }
-                outputBytes.append(FuncChar.lf)
+                outputBytes.append(KFuncChar.lf)
                 utf8Bytes.formIndex(after: &i)
                 continue
             }
             
             // CR / CRLF
-            if b0 == FuncChar.cr {
+            if b0 == KFuncChar.cr {
                 let next = utf8Bytes.index(after: i)
-                if next != utf8Bytes.endIndex, utf8Bytes[next] == FuncChar.lf {
+                if next != utf8Bytes.endIndex, utf8Bytes[next] == KFuncChar.lf {
                     if detected == nil { detected = .crlf }
-                    outputBytes.append(FuncChar.lf)          // CRLF → LF
+                    outputBytes.append(KFuncChar.lf)          // CRLF → LF
                     i = utf8Bytes.index(after: next)          // 2 バイト進める
                 } else {
                     if detected == nil { detected = .cr }
-                    outputBytes.append(FuncChar.lf)          // CR → LF
+                    outputBytes.append(KFuncChar.lf)          // CR → LF
                     utf8Bytes.formIndex(after: &i)
                 }
                 continue
@@ -266,7 +266,7 @@ extension String {
             if b0 == 0xC2 {
                 let i1 = utf8Bytes.index(after: i)
                 if i1 != utf8Bytes.endIndex, utf8Bytes[i1] == 0x85 {
-                    outputBytes.append(FuncChar.lf)
+                    outputBytes.append(KFuncChar.lf)
                     i = utf8Bytes.index(after: i1)
                     continue
                 }
@@ -280,7 +280,7 @@ extension String {
                     if i2 != utf8Bytes.endIndex {
                         let b2 = utf8Bytes[i2]
                         if b2 == 0xA8 || b2 == 0xA9 {
-                            outputBytes.append(FuncChar.lf)
+                            outputBytes.append(KFuncChar.lf)
                             i = utf8Bytes.index(after: i2)
                             continue
                         }

@@ -107,15 +107,15 @@ extension KTextView {
         for i in range {
             let ch = skeleton[i]
             
-            if inHead, ch == FuncChar.tab {
+            if inHead, ch == FC.tab {
                 headSpaces += tabWidth
                 headChars  += 1
                 continue
-            } else if inHead, ch == FuncChar.space {
+            } else if inHead, ch == FC.space {
                 headSpaces += 1
                 headChars  += 1
                 continue
-            } else if ch == FuncChar.lf {
+            } else if ch == FC.lf {
                 // 本文は“行頭インデントの文字数”をスキップして切り出す
                 let contentStart = lineStart + headChars
                 let newWidth = max(headSpaces + tabWidth * direction.rawValue, 0)

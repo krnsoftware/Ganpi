@@ -582,14 +582,14 @@ final class KLines: CustomStringConvertible {
             
             // 前方：行頭まで戻る
             while lower > 0 {
-                if skeleton.bytes[lower - 1] == FuncChar.lf { break }
+                if skeleton.bytes[lower - 1] == FC.lf { break }
                 lower -= 1
             }
             
             // 後方：行末（改行を含めた直後）まで進む
             while upper < skeleton.bytes.count {
                 //if characters[upper] == newLineCharacter {
-                if skeleton.bytes[upper] == FuncChar.lf {
+                if skeleton.bytes[upper] == FC.lf {
                     upper += 1 // 改行そのものも範囲に含める
                     break
                 }
@@ -611,7 +611,7 @@ final class KLines: CustomStringConvertible {
         var start = addedCharacterRange.lowerBound
         for i in addedCharacterRange {
             //if characters[i] == newLineCharacter {
-            if skeleton.bytes[i] == FuncChar.lf {
+            if skeleton.bytes[i] == FC.lf {
                 if start < i {
                     lineRanges.append(start..<i)
                 } else {
@@ -649,7 +649,7 @@ final class KLines: CustomStringConvertible {
         guard let newLastLine = _lines.last else { log("#11"); return }
         
         // 最後の文字が改行で、かつ最後のKLineが末尾に達していなければ空行を追加
-        if skeleton.bytes.last == FuncChar.lf && newLastLine.range.upperBound < skeleton.bytes.count {
+        if skeleton.bytes.last == FC.lf && newLastLine.range.upperBound < skeleton.bytes.count {
             let emptyLine = layoutManager.makeEmptyLine(index: skeleton.bytes.count, hardLineIndex: newLastLine.hardLineIndex + 1)
             _lines.append(emptyLine)
         }

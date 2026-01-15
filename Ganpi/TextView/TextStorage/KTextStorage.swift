@@ -87,7 +87,7 @@ protocol KTextStorageCommon: AnyObject {
 // 読み取り専用プロトコル
 protocol KTextStorageReadable: KTextStorageCommon {
     var string: String { get }
-    var skeletonString: KSkeletonStringInUTF8 { get }
+    var skeletonString: KSkeletonString { get }
     var snapshot: KTextSnapShot { get }
     var hardLineCount: Int { get } // if _character is empty, return 1. if end of chars is '\n', add 1.
     var invisibleCharacters: KInvisibleCharacters? { get }
@@ -161,7 +161,7 @@ final class KTextStorage: KTextStorageProtocol {
     private var _observers: [_ObserverEntry] = []
     //private lazy var _parser: KSyntaxParserProtocol = KSyntaxParserPlain(storage: self)
     private lazy var _parser: KSyntaxParser = KSyntaxParserPlain(storage: self)
-    private var _skeletonString: KSkeletonStringInUTF8 = .init()
+    private var _skeletonString: KSkeletonString = .init()
     
     // propaties for appearances.
     private var _baseFont: NSFont = .monospacedSystemFont(ofSize: 12, weight: .regular)
@@ -195,7 +195,7 @@ final class KTextStorage: KTextStorageProtocol {
         set { replaceCharacters(in: 0..<_characters.count, with: newValue) }
     }
     
-    var skeletonString: KSkeletonStringInUTF8 {
+    var skeletonString: KSkeletonString {
         get { _skeletonString }
     }
 
@@ -445,12 +445,12 @@ final class KTextStorage: KTextStorageProtocol {
         
         var lower = index
         while lower > 0 {
-            if skeletonString.bytes[lower - 1] == FuncChar.lf { break }
+            if skeletonString.bytes[lower - 1] == FC.lf { break }
             lower -= 1
         }
         var upper = index
         while upper < count {
-            if skeletonString.bytes[upper] == FuncChar.lf { break }
+            if skeletonString.bytes[upper] == FC.lf { break }
             upper += 1
         }
         return lower..<upper
@@ -462,12 +462,12 @@ final class KTextStorage: KTextStorageProtocol {
         
         var lower = range.lowerBound
         while lower > 0 {
-            if skeletonString.bytes[lower - 1] == FuncChar.lf { break }
+            if skeletonString.bytes[lower - 1] == FC.lf { break }
             lower -= 1
         }
         var upper = range.upperBound
         while upper < count {
-            if skeletonString.bytes[upper] == FuncChar.lf { break }
+            if skeletonString.bytes[upper] == FC.lf { break }
             upper += 1
         }
         return lower..<upper
@@ -510,7 +510,7 @@ final class KTextStorage: KTextStorageProtocol {
         var iChar = slice.startIndex
         while iSkel < skel.endIndex {
             let ch = slice[iChar]
-            let isTab = (skel[iSkel] == FuncChar.tab)
+            let isTab = (skel[iSkel] == FC.tab)
             if !leadingTabsDone {
                 if isTab {
                     buffer.append(ch)            // keep leading tabs
