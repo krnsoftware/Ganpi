@@ -253,7 +253,37 @@ final class KSkeletonStringInUTF8 {
         case stopped(at: Int)     // stop に当たった（stop の位置）
         case notFound             // 終端まで見つからない
     }
+    
 
+    func skipQuotedInLine(for quote: UInt8, in range: Range<Int>, escape: UInt8? = FC.backSlash) -> KSkipResult {
+        assert(quote == FC.singleQuote || quote == FC.doubleQuote)
+        if range.isEmpty { return .notFound }
+        if self[range.lowerBound] != quote { return .notFound }
+
+        let scanRange = (range.lowerBound + 1)..<range.upperBound
+        switch scan(in: scanRange, targets: [quote, FC.lf], escape: escape) {
+        case .hit(let index, let byte):
+            if byte == FC.lf { return .stopped(at: index) }
+            return .found(next: index + 1)
+        case .notFound:
+            return .notFound
+        }
+    }
+    
+    // 行頭が ' または " なら、そのクォートを単行でスキップする
+    // - 閉じが見つからなければ .stopped(at:) または .notFound を返す（既存仕様に従う）
+    func skipAnyQuotedInLine(in range: Range<Int>, escape: UInt8? = FC.backSlash) -> KSkipResult {
+        if range.isEmpty { return .notFound }
+
+        let b = self[range.lowerBound]
+        if b == FC.singleQuote || b == FC.doubleQuote {
+            return skipQuotedInLine(for: b, in: range, escape: escape)
+        }
+        return .notFound
+    }
+
+
+/*
     // range.lowerBound が opening quote（'）である前提。
     // 1行内専用：LF に当たったら stopped。
     // 見つかった場合は closing quote の「次」を返す。
@@ -307,6 +337,7 @@ final class KSkeletonStringInUTF8 {
             }
         }
     }
+ */
 
     // range.lowerBound が opener の位置である前提。
     // opener は range.lowerBound の実バイトから決める（呼び出し側が opener を渡さない設計）。
