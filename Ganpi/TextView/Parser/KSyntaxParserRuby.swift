@@ -648,26 +648,24 @@ final class KSyntaxParserRuby: KSyntaxParser {
                 break
             }
 
-            // %r... は飛ばす
+            // %q/%Q/%w/%W/%i/%I/%s/%S/%x/%X/%r/%R は飛ばす（中の quote を拾わない）
             if b == FC.percent, i + 1 < end {
-                let c = skeleton[i + 1]
-                if c == 0x72 || c == 0x52 { // r/R
+                let type = skeleton[i + 1]
+                if _percentAllTypeBytes.contains(type) {
                     let openerIndex = i + 2
                     if openerIndex < end {
                         switch skeleton.skipDelimitedInLine(in: openerIndex..<end, allowNesting: true, escape: FC.backSlash) {
                         case .found(let next):
                             i = next
-                        case .stopped(_):
+                            continue
+                        case .stopped, .notFound:
                             return nil
-                        case .notFound:
-                            i = end
                         }
-                    } else {
-                        i = end
                     }
-                    continue
+                    return nil
                 }
             }
+
 
             // quote
             if b == FC.doubleQuote || b == FC.singleQuote {
@@ -972,24 +970,24 @@ final class KSyntaxParserRuby: KSyntaxParser {
                 break
             }
 
-            // %r... は飛ばす（中の / を拾わない）
+            // %q/%Q/%w/%W/%i/%I/%s/%S/%x/%X/%r/%R は飛ばす（中の / を拾わない）
             if b == FC.percent, i + 1 < end {
-                let c = skeleton[i + 1]
-                if c == 0x72 || c == 0x52 { // r/R
+                let type = skeleton[i + 1]
+                if _percentAllTypeBytes.contains(type) {
                     let openerIndex = i + 2
                     if openerIndex < end {
                         switch skeleton.skipDelimitedInLine(in: openerIndex..<end, allowNesting: true, escape: FC.backSlash) {
                         case .found(let next):
                             i = next
+                            continue
                         case .stopped, .notFound:
                             return nil
                         }
-                    } else {
-                        return nil
                     }
-                    continue
+                    return nil
                 }
             }
+
 
             // quote は飛ばす（中の / を拾わない）
             if b == FC.doubleQuote || b == FC.singleQuote {
@@ -1031,18 +1029,26 @@ final class KSyntaxParserRuby: KSyntaxParser {
             // quote は飛ばす
             if b == FC.doubleQuote || b == FC.singleQuote {
                 switch skeleton.skipQuotedInLine(for: b, in: i..<end) {
-                case .found(let next): i = next; continue
-                case .stopped, .notFound: return nil
+                case .found(let next):
+                    i = next
+                    continue
+                case .stopped, .notFound:
+                    return nil
                 }
             }
 
+            // %q... 等は “誤検出防止として” 単行で飛ばすが、閉じない場合は nil（この関数の担当外）
             if b == FC.percent, i + 1 < end {
-                let c = skeleton[i + 1]
-                if c == 0x72 || c == 0x52 { // r/R
+                let type = skeleton[i + 1]
+
+                // %r/%R だけが対象
+                if _percentRegexTypeBytes.contains(type) {
                     let delimIndex = i + 2
                     if delimIndex >= end { return i }
+
                     let info = percentDelimiterInfo(for: skeleton[delimIndex])
                     let bodyStart = delimIndex + 1
+
                     let rr = scanPercentRegexBodyInLine(
                         startIndex: bodyStart,
                         in: bodyStart..<end,
@@ -1050,18 +1056,35 @@ final class KSyntaxParserRuby: KSyntaxParser {
                         allowNesting: info.allowNesting,
                         depth: info.initialDepth
                     )
+
                     if rr.closed {
                         i = rr.nextIndex
                         continue
                     }
                     return i
                 }
+
+                // 他の %q... は単行で閉じるなら飛ばす
+                if _percentStringTypeBytes.contains(type) {
+                    let delimIndex = i + 2
+                    if delimIndex >= end { return nil }
+
+                    switch skeleton.skipDelimitedInLine(in: delimIndex..<end, allowNesting: true, escape: FC.backSlash) {
+                    case .found(let next):
+                        i = next
+                        continue
+                    case .stopped, .notFound:
+                        return nil
+                    }
+                }
             }
 
             i += 1
         }
+
         return nil
     }
+
 
     private func multiLinePercentLiteralStartIndex(lineRange: Range<Int>) -> Int? {
         if lineRange.isEmpty { return nil }
