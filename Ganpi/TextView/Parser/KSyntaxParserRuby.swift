@@ -632,7 +632,6 @@ final class KSyntaxParserRuby: KSyntaxParser {
 
     // neutral 行内で「閉じない quote の開始位置」を探す（見つかったらその index を返す）
     // - # 以降は無視
-    // - %r... は飛ばす（中の quote を拾わない）
     // - 反対側 quote が「閉じない」場合は、この行の状態が矛盾するので nil
     private func multiLineQuoteStartIndex(lineRange: Range<Int>, quote: UInt8) -> Int? {
         if lineRange.isEmpty { return nil }
@@ -680,7 +679,7 @@ final class KSyntaxParserRuby: KSyntaxParser {
                     }
                 } else {
                     // 反対 quote：閉じないなら矛盾なので nil
-                    switch skeleton.skipQuotedInLine(for: quote, in: i..<end) {
+                    switch skeleton.skipQuotedInLine(for: b, in: i..<end) {
                     case .found(let next):
                         i = next
                         continue
