@@ -20,7 +20,9 @@ final class KSyntaxParserRuby: KSyntaxParser {
         case inSingleQuote
         case inRegexSlash(inClass: Int)
         case inRegexPercent(close: UInt8, allowNesting: Bool, depth: Int)
+        case inPercentLiteral(close: UInt8, allowNesting: Bool, depth: Int)
     }
+
 
     private struct KLineInfo {
         var endState: KEndState
@@ -50,6 +52,15 @@ final class KSyntaxParserRuby: KSyntaxParser {
         Array("when".utf8),
         Array("while".utf8),
     ]
+    
+    // percent literal type bytes
+    // - string系: %q %Q %w %W %i %I %s %S %x %X
+    // - regex系:  %r %R（こちらは既存の regex ルートで処理）
+    private let _percentStringTypeBytes: [UInt8] = Array("qQwWiIsSxX".utf8)
+    private let _percentRegexTypeBytes: [UInt8] = Array("rR".utf8)
+
+    // “percent literal 全般”をスキップするための集合（誤検出防止に使う）
+    private let _percentAllTypeBytes: [UInt8] = Array("qQwWiIsSxXrR".utf8)
 
 
 
@@ -253,6 +264,45 @@ final class KSyntaxParserRuby: KSyntaxParser {
                 }
             }
             return spans
+        
+        case .inPercentLiteral(let close, let allowNesting, let depth):
+            let r = scanPercentLiteralBodyInLine(
+                startIndex: lineRange.lowerBound,
+                in: lineRange,
+                close: close,
+                allowNesting: allowNesting,
+                depth: depth
+            )
+
+            if !r.closed {
+                return [makeSpan(range: paintRange, role: .string)]
+            }
+
+            var spans: [KAttributedSpan] = []
+
+            let closeIndex = r.closeIndex ?? (r.nextIndex - 1)
+            let firstRange = lineRange.lowerBound..<(closeIndex + 1)
+            let paint1 = paintRange.clamped(to: firstRange)
+            if !paint1.isEmpty {
+                spans.append(makeSpan(range: paint1, role: .string))
+            }
+
+            // この行で percent literal を閉じた後、同一行の残りに別の multi-line 開始がある場合も塗る
+            let rest = r.nextIndex..<lineRange.upperBound
+            if !rest.isEmpty {
+                // 次行継続の percent literal 開始がこの残りにあるなら、その開始位置から行末まで string 色
+                if case .inPercentLiteral = _lines[lineIndex].endState {
+                    if let start = multiLinePercentLiteralStartIndex(lineRange: rest) {
+                        let paint2 = paintRange.clamped(to: start..<lineRange.upperBound)
+                        if !paint2.isEmpty {
+                            spans.append(makeSpan(range: paint2, role: .string))
+                        }
+                    }
+                }
+            }
+
+            return spans
+
 
         case .neutral:
             // この行が multi-line の開始行なら、開始位置から行末まで string 色
@@ -295,7 +345,15 @@ final class KSyntaxParserRuby: KSyntaxParser {
                     }
                 }
             }
-
+            // この行が multi-line percent literal の開始行なら、開始位置から行末まで string 色
+            if case .inPercentLiteral = _lines[lineIndex].endState {
+                if let start = multiLinePercentLiteralStartIndex(lineRange: lineRange) {
+                    let paint = paintRange.clamped(to: start..<lineRange.upperBound)
+                    if !paint.isEmpty {
+                        return [makeSpan(range: paint, role: .string)]
+                    }
+                }
+            }
 
 
             return []
@@ -342,7 +400,7 @@ final class KSyntaxParserRuby: KSyntaxParser {
         case .inDoubleQuote:
             // 文字列継続中：この行で閉じた後も、同一行の残りに multi-line 開始がある可能性がある
             return scanLineForMultiLineState(lineRange: lineRange, startInDoubleQuote: true, startInSingleQuote: false)
-            
+
         case .inSingleQuote:
             return scanLineForMultiLineState(lineRange: lineRange, startInDoubleQuote: false, startInSingleQuote: true)
 
@@ -352,6 +410,9 @@ final class KSyntaxParserRuby: KSyntaxParser {
         case .inRegexPercent(let close, let allowNesting, let depth):
             return scanLineStartingInPercentRegex(lineRange: lineRange, close: close, allowNesting: allowNesting, depth: depth)
 
+        case .inPercentLiteral(let close, let allowNesting, let depth):
+            return scanLineStartingInPercentLiteral(lineRange: lineRange, close: close, allowNesting: allowNesting, depth: depth)
+
         case .neutral:
             if isLineHeadDirective(lineRange: lineRange, directiveBytes: _commentBeginBytes) {
                 return .inMultiComment
@@ -359,6 +420,7 @@ final class KSyntaxParserRuby: KSyntaxParser {
             return scanLineForMultiLineState(lineRange: lineRange, startInDoubleQuote: false, startInSingleQuote: false)
         }
     }
+
 
     // MARK: - Multi comment helpers
 
@@ -428,18 +490,22 @@ final class KSyntaxParserRuby: KSyntaxParser {
                 }
             }
 
-            // %r... : 正規表現（単行で閉じれば読み飛ばし、閉じなければ endState）
+            // %q/%Q/%w/%W/%i/%I/%s/%S/%x/%X/%r/%R
+            // - 単行で閉じれば読み飛ばす
+            // - 閉じなければ endState
             if b == FC.percent, i + 1 < end {
-                let c = skeleton[i + 1]
-                if c == 0x72 || c == 0x52 { // r/R
+                let type = skeleton[i + 1]
+
+                // %r/%R : 正規表現（既存ルート）
+                if _percentRegexTypeBytes.contains(type) {
                     let delimIndex = i + 2
-                    if delimIndex >= end { return .inRegexPercent(close: FC.percent, allowNesting: false, depth: 1) }
+                    if delimIndex >= end {
+                        return .inRegexPercent(close: FC.percent, allowNesting: false, depth: 1)
+                    }
 
-                    let opener = skeleton[delimIndex]
-                    let info = percentDelimiterInfo(for: opener)
-
-                    // opener の直後から本文
+                    let info = percentDelimiterInfo(for: skeleton[delimIndex])
                     let bodyStart = delimIndex + 1
+
                     let rr = scanPercentRegexBodyInLine(
                         startIndex: bodyStart,
                         in: bodyStart..<end,
@@ -451,11 +517,36 @@ final class KSyntaxParserRuby: KSyntaxParser {
                     if rr.closed {
                         i = rr.nextIndex
                         continue
-                    } else {
-                        return .inRegexPercent(close: info.close, allowNesting: info.allowNesting, depth: rr.endDepth)
                     }
+                    return .inRegexPercent(close: info.close, allowNesting: info.allowNesting, depth: rr.endDepth)
+                }
+
+                // %q/%Q/%w/%W/%i/%I/%s/%S/%x/%X : 文字列系（新ルート）
+                if _percentStringTypeBytes.contains(type) {
+                    let delimIndex = i + 2
+                    if delimIndex >= end {
+                        return .inPercentLiteral(close: FC.percent, allowNesting: false, depth: 1)
+                    }
+
+                    let info = percentDelimiterInfo(for: skeleton[delimIndex])
+                    let bodyStart = delimIndex + 1
+
+                    let rr = scanPercentLiteralBodyInLine(
+                        startIndex: bodyStart,
+                        in: bodyStart..<end,
+                        close: info.close,
+                        allowNesting: info.allowNesting,
+                        depth: info.initialDepth
+                    )
+
+                    if rr.closed {
+                        i = rr.nextIndex
+                        continue
+                    }
+                    return .inPercentLiteral(close: info.close, allowNesting: info.allowNesting, depth: rr.endDepth)
                 }
             }
+
             
             // /regex/ : 除算と区別できる場合のみ開始扱いする
             if b == FC.slash {
@@ -513,6 +604,22 @@ final class KSyntaxParserRuby: KSyntaxParser {
 
         return scanLineForMultiLineState(lineRange: rest, startInDoubleQuote: false, startInSingleQuote: false)
     }
+    
+    private func scanLineStartingInPercentLiteral(lineRange: Range<Int>, close: UInt8, allowNesting: Bool, depth: Int) -> KEndState {
+        if lineRange.isEmpty { return .inPercentLiteral(close: close, allowNesting: allowNesting, depth: depth) }
+
+        let r = scanPercentLiteralBodyInLine(startIndex: lineRange.lowerBound, in: lineRange, close: close, allowNesting: allowNesting, depth: depth)
+
+        if !r.closed {
+            return .inPercentLiteral(close: close, allowNesting: allowNesting, depth: r.endDepth)
+        }
+
+        let rest = r.nextIndex..<lineRange.upperBound
+        if rest.isEmpty { return .neutral }
+
+        return scanLineForMultiLineState(lineRange: rest, startInDoubleQuote: false, startInSingleQuote: false)
+    }
+
 
     
     // MARK: - Quote helpers
@@ -765,6 +872,48 @@ final class KSyntaxParserRuby: KSyntaxParser {
 
         return (closed: false, closeIndex: nil, nextIndex: end, endInClass: cls)
     }
+    
+    private func scanPercentLiteralBodyInLine(
+        startIndex: Int,
+        in lineRange: Range<Int>,
+        close: UInt8,
+        allowNesting: Bool,
+        depth: Int
+    ) -> (closed: Bool, closeIndex: Int?, nextIndex: Int, endDepth: Int) {
+        let skeleton = storage.skeletonString
+        let end = lineRange.upperBound
+
+        var i = startIndex
+        var d = depth
+
+        while i < end {
+            let c = skeleton[i]
+
+            if c == close && !isEscaped(at: i, from: lineRange.lowerBound) {
+                d -= 1
+                if d == 0 {
+                    let closePos = i
+                    let next = i + 1
+                    return (closed: true, closeIndex: closePos, nextIndex: next, endDepth: 0)
+                }
+                i += 1
+                continue
+            }
+
+            if allowNesting {
+                // opener は close の対になるものだけネスト対象にする（{[(<）
+                if close == FC.rightParen,   c == FC.leftParen,   !isEscaped(at: i, from: lineRange.lowerBound) { d += 1; i += 1; continue }
+                if close == FC.rightBracket, c == FC.leftBracket, !isEscaped(at: i, from: lineRange.lowerBound) { d += 1; i += 1; continue }
+                if close == FC.rightBrace,   c == FC.leftBrace,   !isEscaped(at: i, from: lineRange.lowerBound) { d += 1; i += 1; continue }
+                if close == FC.gt,           c == FC.lt,          !isEscaped(at: i, from: lineRange.lowerBound) { d += 1; i += 1; continue }
+            }
+
+            i += 1
+        }
+
+        return (closed: false, closeIndex: nil, nextIndex: end, endDepth: d)
+    }
+
 
     private func scanPercentRegexBodyInLine(
         startIndex: Int,
@@ -911,6 +1060,72 @@ final class KSyntaxParserRuby: KSyntaxParser {
 
             i += 1
         }
+        return nil
+    }
+
+    private func multiLinePercentLiteralStartIndex(lineRange: Range<Int>) -> Int? {
+        if lineRange.isEmpty { return nil }
+
+        let skeleton = storage.skeletonString
+        let end = lineRange.upperBound
+        var i = lineRange.lowerBound
+
+        while i < end {
+            let b = skeleton[i]
+
+            // '#' comment 以降は無視
+            if b == FC.numeric { break }
+
+            // quote は飛ばす（中の % を拾わない）
+            if b == FC.doubleQuote || b == FC.singleQuote {
+                switch skeleton.skipQuotedInLine(for: b, in: i..<end) {
+                case .found(let next):
+                    i = next
+                    continue
+                case .stopped(_), .notFound:
+                    return nil
+                }
+            }
+
+            // /regex/ は飛ばす（閉じないならこの行は regex 継続で、percent literal 開始ではない）
+            if b == FC.slash {
+                if isRegexLikelyAfterSlash(slashIndex: i, in: lineRange) {
+                    let rx = scanRegexLiteralInLine(slashIndex: i, in: lineRange)
+                    if rx.closed {
+                        i = rx.nextIndex
+                        continue
+                    }
+                    return nil
+                }
+            }
+
+            // %q/%Q/%w/%W/%i/%I/%s/%S/%x/%X を探す
+            if b == FC.percent, i + 1 < end {
+                let type = skeleton[i + 1]
+
+                // %r/%R を含む “percent 全般” は中身を飛ばす（誤検出防止）
+                if _percentAllTypeBytes.contains(type) {
+                    let delimIndex = i + 2
+                    if delimIndex >= end {
+                        // 行末で途切れている：ここが開始位置になり得るのは string 系のみ
+                        return _percentStringTypeBytes.contains(type) ? i : nil
+                    }
+
+                    // delimiter から閉じまでを「単行で」スキップできるなら飛ばす
+                    switch skeleton.skipDelimitedInLine(in: delimIndex..<end, allowNesting: true, escape: FC.backSlash) {
+                    case .found(let next):
+                        i = next
+                        continue
+                    case .stopped(_), .notFound:
+                        // 単行で閉じなかった：string 系なら開始位置
+                        return _percentStringTypeBytes.contains(type) ? i : nil
+                    }
+                }
+            }
+
+            i += 1
+        }
+
         return nil
     }
 
