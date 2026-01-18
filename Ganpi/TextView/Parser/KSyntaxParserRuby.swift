@@ -32,6 +32,17 @@ final class KSyntaxParserRuby: KSyntaxParser {
 
     private let _commentBeginBytes = Array("=begin".utf8)
     private let _commentEndBytes   = Array("=end".utf8)
+    
+    private let _regexStartKeywordBytes: [[UInt8]] = [
+        Array("elsif".utf8),
+        Array("if".utf8),
+        Array("unless".utf8),
+        Array("until".utf8),
+        Array("when".utf8),
+        Array("while".utf8),
+    ]
+
+
 
     // MARK: - Init
 
@@ -598,19 +609,41 @@ final class KSyntaxParserRuby: KSyntaxParser {
         }
     }
 
-    // /regex/ の直前文脈（超簡易）
     private func isRegexLikelyAfterSlash(slashIndex: Int, in lineRange: Range<Int>) -> Bool {
         let skeleton = storage.skeletonString
 
+        // 直前の空白を飛ばす
         var j = slashIndex - 1
         while j >= lineRange.lowerBound {
             let b = skeleton[j]
             if b != FC.space && b != FC.tab { break }
             j -= 1
         }
-        if j < lineRange.lowerBound { return true }
+        if j < lineRange.lowerBound {
+            return true // 行頭は regex 寄り
+        }
 
-        switch skeleton[j] {
+        // 直前の空白を飛ばしたあと、j は直前の非空白位置
+
+        let prev = skeleton[j]
+
+        // ★先に「キーワード直後」を見る（ここが重要）
+        if prev.isAsciiLower {
+            var k = j
+            while k >= lineRange.lowerBound, skeleton[k].isAsciiLower { k -= 1 }
+            let wordRange = (k + 1)..<(j + 1)
+            if skeleton.matches(words: _regexStartKeywordBytes, in: wordRange) {
+                return true
+            }
+        }
+
+        // ここから「除算寄り」の早期 return をして良い
+        if prev == FC.period { return false }   // FC.period がある前提
+        if prev.isIdentStartAZ_ || prev.isAsciiDigit { return false }
+        if prev == FC.rightParen || prev == FC.rightBracket || prev == FC.rightBrace { return false }
+
+        // 2) 明確に「regex開始寄り」な直前記号
+        switch prev {
         case FC.equals, FC.plus, FC.asterisk, FC.percent,
              FC.caret, FC.pipe, FC.ampersand, FC.minus,
              FC.exclamation, FC.question, FC.colon, FC.semicolon,
@@ -621,28 +654,22 @@ final class KSyntaxParserRuby: KSyntaxParser {
             break
         }
 
-        // 直前の英小文字連続が if / elsif なら regex とみなす（例: if /.../, elsif /.../）
-        if skeleton[j].isAsciiLower {
+        // 3) キーワード直後（if/elsif/when/while/until/unless）を regex 寄りにする
+        //    直前が英小文字の連続なら、その単語を拾って判定
+        if prev.isAsciiLower {
             var k = j
             while k >= lineRange.lowerBound, skeleton[k].isAsciiLower { k -= 1 }
-            let start = k + 1
-            let len = j - start + 1
+            let wordRange = (k + 1)..<(j + 1)
 
-            if len == 2, skeleton[start] == 0x69, skeleton[start + 1] == 0x66 { // "if"
-                return true
-            }
-            if len == 5,
-               skeleton[start] == 0x65, skeleton[start + 1] == 0x6C, skeleton[start + 2] == 0x73,
-               skeleton[start + 3] == 0x69, skeleton[start + 4] == 0x66 {       // "elsif"
+            if skeleton.matches(words: _regexStartKeywordBytes, in: wordRange) {
                 return true
             }
         }
 
-        let prev = skeleton[j]
-        if prev.isIdentStartAZ_ || prev.isAsciiDigit { return false }
-        if prev == FC.rightParen || prev == FC.rightBracket || prev == FC.rightBrace { return false }
+        // 4) ここまで来たら「regex寄り」に倒す（色付けとして破綻しにくい側）
         return true
     }
+
 
     private func isEscaped(at index: Int, from lineStart: Int) -> Bool {
         let skeleton = storage.skeletonString
