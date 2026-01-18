@@ -19,6 +19,7 @@ final class KSyntaxParserRuby: KSyntaxParser {
         case inDoubleQuote
         case inSingleQuote
         case inRegexSlash(inClass: Int)
+        case inRegexPercent(close: UInt8, allowNesting: Bool, depth: Int)
     }
 
     private struct KLineInfo {
@@ -205,6 +206,32 @@ final class KSyntaxParserRuby: KSyntaxParser {
 
             return spans
 
+        case .inRegexPercent(let close, let allowNesting, let depth):
+            let r = scanPercentRegexBodyInLine(
+                startIndex: lineRange.lowerBound,
+                in: lineRange,
+                close: close,
+                allowNesting: allowNesting,
+                depth: depth
+            )
+            if !r.closed {
+                return [makeSpan(range: paintRange, role: .string)]
+            }
+
+            var spans: [KAttributedSpan] = []
+            let closeIndex = r.closeIndex ?? (r.nextIndex - 1)
+            let firstRange = lineRange.lowerBound..<(closeIndex + 1)
+            let paint1 = paintRange.clamped(to: firstRange)
+            if !paint1.isEmpty { spans.append(makeSpan(range: paint1, role: .string)) }
+
+            if isInRegex(_lines[lineIndex].endState) {
+                let rest = r.nextIndex..<lineRange.upperBound
+                if let start = multiLineRegexPercentStartIndex(lineRange: rest) {
+                    let paint2 = paintRange.clamped(to: start..<lineRange.upperBound)
+                    if !paint2.isEmpty { spans.append(makeSpan(range: paint2, role: .string)) }
+                }
+            }
+            return spans
 
         case .neutral:
             // この行が multi-line の開始行なら、開始位置から行末まで string 色
@@ -227,9 +254,19 @@ final class KSyntaxParserRuby: KSyntaxParser {
                     }
                 }
             }
-            // この行が multi-line /regex/ の開始行なら、開始位置から行末まで string 色
+            // この行が multi-line regex の開始行なら、開始位置から行末まで string 色
             if isInRegex(_lines[lineIndex].endState) {
-                if let start = multiLineRegexSlashStartIndex(lineRange: lineRange) {
+                let slashStart = multiLineRegexSlashStartIndex(lineRange: lineRange)
+                let percentStart = multiLineRegexPercentStartIndex(lineRange: lineRange)
+
+                let start: Int?
+                if let s0 = slashStart, let s1 = percentStart {
+                    start = min(s0, s1)
+                } else {
+                    start = slashStart ?? percentStart
+                }
+
+                if let start {
                     let stringRange = start..<lineRange.upperBound
                     let paint = paintRange.clamped(to: stringRange)
                     if !paint.isEmpty {
@@ -237,6 +274,8 @@ final class KSyntaxParserRuby: KSyntaxParser {
                     }
                 }
             }
+
+
 
             return []
         }
@@ -289,6 +328,8 @@ final class KSyntaxParserRuby: KSyntaxParser {
         case .inRegexSlash(let inClass):
             return scanLineStartingInRegex(lineRange: lineRange, inClass: inClass)
 
+        case .inRegexPercent(let close, let allowNesting, let depth):
+            return scanLineStartingInPercentRegex(lineRange: lineRange, close: close, allowNesting: allowNesting, depth: depth)
 
         case .neutral:
             if isLineHeadDirective(lineRange: lineRange, directiveBytes: _commentBeginBytes) {
@@ -366,24 +407,32 @@ final class KSyntaxParserRuby: KSyntaxParser {
                 }
             }
 
-            // %r... 正規表現リテラル内は飛ばす（" や << を拾わないため）
+            // %r... : 正規表現（単行で閉じれば読み飛ばし、閉じなければ endState）
             if b == FC.percent, i + 1 < end {
                 let c = skeleton[i + 1]
-                if c == 0x72 || c == 0x52 { // 'r' or 'R'
-                    let openerIndex = i + 2
-                    if openerIndex < end {
-                        switch skeleton.skipDelimitedInLine(in: openerIndex..<end, allowNesting: true, escape: FC.backSlash) {
-                        case .found(let next):
-                            i = next
-                        case .stopped:
-                            return .neutral
-                        case .notFound:
-                            i = end
-                        }
+                if c == 0x72 || c == 0x52 { // r/R
+                    let delimIndex = i + 2
+                    if delimIndex >= end { return .inRegexPercent(close: FC.percent, allowNesting: false, depth: 1) }
+
+                    let opener = skeleton[delimIndex]
+                    let info = percentDelimiterInfo(for: opener)
+
+                    // opener の直後から本文
+                    let bodyStart = delimIndex + 1
+                    let rr = scanPercentRegexBodyInLine(
+                        startIndex: bodyStart,
+                        in: bodyStart..<end,
+                        close: info.close,
+                        allowNesting: info.allowNesting,
+                        depth: info.initialDepth
+                    )
+
+                    if rr.closed {
+                        i = rr.nextIndex
+                        continue
                     } else {
-                        i = end
+                        return .inRegexPercent(close: info.close, allowNesting: info.allowNesting, depth: rr.endDepth)
                     }
-                    continue
                 }
             }
             
@@ -426,6 +475,21 @@ final class KSyntaxParserRuby: KSyntaxParser {
         if rest.isEmpty { return .neutral }
 
         // 同一行の残りに、さらに複数行要素が始まる可能性があるので通常スキャンへ
+        return scanLineForMultiLineState(lineRange: rest, startInDoubleQuote: false, startInSingleQuote: false)
+    }
+    
+    private func scanLineStartingInPercentRegex(lineRange: Range<Int>, close: UInt8, allowNesting: Bool, depth: Int) -> KEndState {
+        if lineRange.isEmpty { return .inRegexPercent(close: close, allowNesting: allowNesting, depth: depth) }
+
+        let r = scanPercentRegexBodyInLine(startIndex: lineRange.lowerBound, in: lineRange, close: close, allowNesting: allowNesting, depth: depth)
+
+        if !r.closed {
+            return .inRegexPercent(close: close, allowNesting: allowNesting, depth: r.endDepth)
+        }
+
+        let rest = r.nextIndex..<lineRange.upperBound
+        if rest.isEmpty { return .neutral }
+
         return scanLineForMultiLineState(lineRange: rest, startInDoubleQuote: false, startInSingleQuote: false)
     }
 
@@ -517,8 +581,21 @@ final class KSyntaxParserRuby: KSyntaxParser {
     // MARK: - Regex helpers
     
     private func isInRegex(_ state: KEndState) -> Bool {
-        if case .inRegexSlash = state { return true }
-        return false
+        switch state {
+        case .inRegexSlash: return true
+        case .inRegexPercent: return true
+        default: return false
+        }
+    }
+    
+    private func percentDelimiterInfo(for opener: UInt8) -> (close: UInt8, allowNesting: Bool, initialDepth: Int) {
+        switch opener {
+        case FC.leftParen:  return (close: FC.rightParen,  allowNesting: true,  initialDepth: 1)
+        case FC.leftBracket:return (close: FC.rightBracket,allowNesting: true,  initialDepth: 1)
+        case FC.leftBrace:  return (close: FC.rightBrace,  allowNesting: true,  initialDepth: 1)
+        case FC.lt:         return (close: FC.gt,         allowNesting: true,  initialDepth: 1)
+        default:            return (close: opener,         allowNesting: false, initialDepth: 1)
+        }
     }
 
     // /regex/ の直前文脈（超簡易）
@@ -652,6 +729,48 @@ final class KSyntaxParserRuby: KSyntaxParser {
         return (closed: false, closeIndex: nil, nextIndex: end, endInClass: cls)
     }
 
+    private func scanPercentRegexBodyInLine(
+        startIndex: Int,
+        in lineRange: Range<Int>,
+        close: UInt8,
+        allowNesting: Bool,
+        depth: Int
+    ) -> (closed: Bool, closeIndex: Int?, nextIndex: Int, endDepth: Int) {
+        let skeleton = storage.skeletonString
+        let end = lineRange.upperBound
+
+        var i = startIndex
+        var d = depth
+
+        while i < end {
+            let c = skeleton[i]
+
+            if c == close && !isEscaped(at: i, from: lineRange.lowerBound) {
+                d -= 1
+                if d == 0 {
+                    let closePos = i
+                    i += 1
+                    while i < end, skeleton[i].isAsciiAlpha { i += 1 } // flags
+                    return (closed: true, closeIndex: closePos, nextIndex: i, endDepth: 0)
+                }
+                i += 1
+                continue
+            }
+
+            if allowNesting {
+                // opener は close の対になるものだけネスト対象にする（{[(
+                if close == FC.rightParen, c == FC.leftParen, !isEscaped(at: i, from: lineRange.lowerBound) { d += 1; i += 1; continue }
+                if close == FC.rightBracket, c == FC.leftBracket, !isEscaped(at: i, from: lineRange.lowerBound) { d += 1; i += 1; continue }
+                if close == FC.rightBrace, c == FC.leftBrace, !isEscaped(at: i, from: lineRange.lowerBound) { d += 1; i += 1; continue }
+                if close == FC.gt, c == FC.lt, !isEscaped(at: i, from: lineRange.lowerBound) { d += 1; i += 1; continue }
+            }
+
+            i += 1
+        }
+
+        return (closed: false, closeIndex: nil, nextIndex: end, endDepth: d)
+    }
+
     // neutral 行内で「閉じない /regex/ の開始位置」を探す（見つかったら slash の index を返す）
     private func multiLineRegexSlashStartIndex(lineRange: Range<Int>) -> Int? {
         if lineRange.isEmpty { return nil }
@@ -709,6 +828,52 @@ final class KSyntaxParserRuby: KSyntaxParser {
             i += 1
         }
 
+        return nil
+    }
+
+    private func multiLineRegexPercentStartIndex(lineRange: Range<Int>) -> Int? {
+        if lineRange.isEmpty { return nil }
+
+        let skeleton = storage.skeletonString
+        let end = lineRange.upperBound
+        var i = lineRange.lowerBound
+
+        while i < end {
+            let b = skeleton[i]
+            if b == FC.numeric { break } // '#'
+
+            // quote は飛ばす
+            if b == FC.doubleQuote || b == FC.singleQuote {
+                switch skeleton.skipQuotedInLine(for: b, in: i..<end) {
+                case .found(let next): i = next; continue
+                case .stopped, .notFound: return nil
+                }
+            }
+
+            if b == FC.percent, i + 1 < end {
+                let c = skeleton[i + 1]
+                if c == 0x72 || c == 0x52 { // r/R
+                    let delimIndex = i + 2
+                    if delimIndex >= end { return i }
+                    let info = percentDelimiterInfo(for: skeleton[delimIndex])
+                    let bodyStart = delimIndex + 1
+                    let rr = scanPercentRegexBodyInLine(
+                        startIndex: bodyStart,
+                        in: bodyStart..<end,
+                        close: info.close,
+                        allowNesting: info.allowNesting,
+                        depth: info.initialDepth
+                    )
+                    if rr.closed {
+                        i = rr.nextIndex
+                        continue
+                    }
+                    return i
+                }
+            }
+
+            i += 1
+        }
         return nil
     }
 
