@@ -34,13 +34,23 @@ final class KSyntaxParserRuby: KSyntaxParser {
     private let _commentEndBytes   = Array("=end".utf8)
     
     private let _regexStartKeywordBytes: [[UInt8]] = [
+        Array("and".utf8),
+        Array("case".utf8),
+        Array("do".utf8),
         Array("elsif".utf8),
         Array("if".utf8),
+        Array("in".utf8),
+        Array("not".utf8),
+        Array("or".utf8),
+        Array("raise".utf8),
+        Array("return".utf8),
+        Array("then".utf8),
         Array("unless".utf8),
         Array("until".utf8),
         Array("when".utf8),
         Array("while".utf8),
     ]
+
 
 
 
