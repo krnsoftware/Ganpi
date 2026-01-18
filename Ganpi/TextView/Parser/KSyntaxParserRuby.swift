@@ -18,6 +18,7 @@ final class KSyntaxParserRuby: KSyntaxParser {
         case inHeredoc(label: [UInt8], allowIndent: Bool)
         case inDoubleQuote
         case inSingleQuote
+        case inRegexSlash(inClass: Int)
     }
 
     private struct KLineInfo {
@@ -172,6 +173,37 @@ final class KSyntaxParserRuby: KSyntaxParser {
 
                 return spans
             }
+            
+        case .inRegexSlash(let inClass):
+            // 行頭から閉じ / まで（無ければ行末まで）
+            let r = scanRegexBodyInLine(startIndex: lineRange.lowerBound, in: lineRange, inClass: inClass)
+            if !r.closed {
+                return [makeSpan(range: paintRange, role: .string)]
+            }
+
+            // 閉じ /（閉じ自身を含む）まで
+            let closeIndex = r.closeIndex ?? (r.nextIndex - 1)
+            var spans: [KAttributedSpan] = []
+
+            let firstRegexRange = lineRange.lowerBound..<(closeIndex + 1)
+            let paint1 = paintRange.clamped(to: firstRegexRange)
+            if !paint1.isEmpty {
+                spans.append(makeSpan(range: paint1, role: .string))
+            }
+
+            // 同一行の残りに、さらに multi-line regex の開始があるならそこから行末まで
+            if isInRegex(_lines[lineIndex].endState) {
+                let rest = r.nextIndex..<lineRange.upperBound
+                if let start = multiLineRegexSlashStartIndex(lineRange: rest) {
+                    let secondRegexRange = start..<lineRange.upperBound
+                    let paint2 = paintRange.clamped(to: secondRegexRange)
+                    if !paint2.isEmpty {
+                        spans.append(makeSpan(range: paint2, role: .string))
+                    }
+                }
+            }
+
+            return spans
 
 
         case .neutral:
@@ -195,7 +227,16 @@ final class KSyntaxParserRuby: KSyntaxParser {
                     }
                 }
             }
-
+            // この行が multi-line /regex/ の開始行なら、開始位置から行末まで string 色
+            if isInRegex(_lines[lineIndex].endState) {
+                if let start = multiLineRegexSlashStartIndex(lineRange: lineRange) {
+                    let stringRange = start..<lineRange.upperBound
+                    let paint = paintRange.clamped(to: stringRange)
+                    if !paint.isEmpty {
+                        return [makeSpan(range: paint, role: .string)]
+                    }
+                }
+            }
 
             return []
         }
@@ -244,6 +285,10 @@ final class KSyntaxParserRuby: KSyntaxParser {
             
         case .inSingleQuote:
             return scanLineForMultiLineState(lineRange: lineRange, startInDoubleQuote: false, startInSingleQuote: true)
+
+        case .inRegexSlash(let inClass):
+            return scanLineStartingInRegex(lineRange: lineRange, inClass: inClass)
+
 
         case .neutral:
             if isLineHeadDirective(lineRange: lineRange, directiveBytes: _commentBeginBytes) {
@@ -341,6 +386,19 @@ final class KSyntaxParserRuby: KSyntaxParser {
                     continue
                 }
             }
+            
+            // /regex/ : 除算と区別できる場合のみ開始扱いする
+            if b == FC.slash {
+                if isRegexLikelyAfterSlash(slashIndex: i, in: lineRange) {
+                    let rx = scanRegexLiteralInLine(slashIndex: i, in: lineRange)
+                    if rx.closed {
+                        i = rx.nextIndex
+                        continue
+                    } else {
+                        return .inRegexSlash(inClass: rx.endInClass)
+                    }
+                }
+            }
 
             // heredoc start candidate（クォート/正規表現/コメント外のみ）
             if b == FC.lt, i + 1 < end, skeleton[i + 1] == FC.lt {
@@ -354,6 +412,23 @@ final class KSyntaxParserRuby: KSyntaxParser {
 
         return .neutral
     }
+    
+    private func scanLineStartingInRegex(lineRange: Range<Int>, inClass: Int) -> KEndState {
+        if lineRange.isEmpty { return .inRegexSlash(inClass: inClass) }
+
+        let r = scanRegexBodyInLine(startIndex: lineRange.lowerBound, in: lineRange, inClass: inClass)
+
+        if !r.closed {
+            return .inRegexSlash(inClass: r.endInClass)
+        }
+
+        let rest = r.nextIndex..<lineRange.upperBound
+        if rest.isEmpty { return .neutral }
+
+        // 同一行の残りに、さらに複数行要素が始まる可能性があるので通常スキャンへ
+        return scanLineForMultiLineState(lineRange: rest, startInDoubleQuote: false, startInSingleQuote: false)
+    }
+
     
     // MARK: - Quote helpers
 
@@ -437,6 +512,204 @@ final class KSyntaxParserRuby: KSyntaxParser {
 
     private func multiLineSingleQuoteStartIndex(lineRange: Range<Int>) -> Int? {
         multiLineQuoteStartIndex(lineRange: lineRange, quote: FC.singleQuote)
+    }
+
+    // MARK: - Regex helpers
+    
+    private func isInRegex(_ state: KEndState) -> Bool {
+        if case .inRegexSlash = state { return true }
+        return false
+    }
+
+    // /regex/ の直前文脈（超簡易）
+    private func isRegexLikelyAfterSlash(slashIndex: Int, in lineRange: Range<Int>) -> Bool {
+        let skeleton = storage.skeletonString
+
+        var j = slashIndex - 1
+        while j >= lineRange.lowerBound {
+            let b = skeleton[j]
+            if b != FC.space && b != FC.tab { break }
+            j -= 1
+        }
+        if j < lineRange.lowerBound { return true }
+
+        switch skeleton[j] {
+        case FC.equals, FC.plus, FC.asterisk, FC.percent,
+             FC.caret, FC.pipe, FC.ampersand, FC.minus,
+             FC.exclamation, FC.question, FC.colon, FC.semicolon,
+             FC.comma, FC.leftParen, FC.leftBracket, FC.leftBrace,
+             FC.lt, FC.gt:
+            return true
+        default:
+            break
+        }
+
+        // 直前の英小文字連続が if / elsif なら regex とみなす（例: if /.../, elsif /.../）
+        if skeleton[j].isAsciiLower {
+            var k = j
+            while k >= lineRange.lowerBound, skeleton[k].isAsciiLower { k -= 1 }
+            let start = k + 1
+            let len = j - start + 1
+
+            if len == 2, skeleton[start] == 0x69, skeleton[start + 1] == 0x66 { // "if"
+                return true
+            }
+            if len == 5,
+               skeleton[start] == 0x65, skeleton[start + 1] == 0x6C, skeleton[start + 2] == 0x73,
+               skeleton[start + 3] == 0x69, skeleton[start + 4] == 0x66 {       // "elsif"
+                return true
+            }
+        }
+
+        let prev = skeleton[j]
+        if prev.isIdentStartAZ_ || prev.isAsciiDigit { return false }
+        if prev == FC.rightParen || prev == FC.rightBracket || prev == FC.rightBrace { return false }
+        return true
+    }
+
+    private func isEscaped(at index: Int, from lineStart: Int) -> Bool {
+        let skeleton = storage.skeletonString
+        var esc = 0
+        var k = index - 1
+        while k >= lineStart, skeleton[k] == FC.backSlash {
+            esc += 1
+            k -= 1
+        }
+        return (esc % 2) == 1
+    }
+
+    // opener '/' を含む（/.../flags）
+    private func scanRegexLiteralInLine(slashIndex: Int, in lineRange: Range<Int>) -> (closed: Bool, nextIndex: Int, endInClass: Int) {
+        let skeleton = storage.skeletonString
+        let end = lineRange.upperBound
+
+        var i = slashIndex + 1
+        var inClass = 0
+
+        while i < end {
+            let c = skeleton[i]
+
+            if c == FC.leftBracket {
+                if !isEscaped(at: i, from: lineRange.lowerBound) { inClass += 1 }
+                i += 1
+                continue
+            }
+            if c == FC.rightBracket, inClass > 0 {
+                if !isEscaped(at: i, from: lineRange.lowerBound) { inClass -= 1 }
+                i += 1
+                continue
+            }
+
+            if c == FC.slash, inClass == 0 {
+                if !isEscaped(at: i, from: lineRange.lowerBound) {
+                    i += 1
+                    // フラグをざっくり読み飛ばす
+                    while i < end, skeleton[i].isAsciiAlpha { i += 1 }
+                    return (closed: true, nextIndex: i, endInClass: 0)
+                }
+            }
+
+            i += 1
+        }
+
+        return (closed: false, nextIndex: end, endInClass: inClass)
+    }
+
+    // opener を含まない（前行から継続している regex 本体）
+    private func scanRegexBodyInLine(startIndex: Int, in lineRange: Range<Int>, inClass: Int) -> (closed: Bool, closeIndex: Int?, nextIndex: Int, endInClass: Int) {
+        let skeleton = storage.skeletonString
+        let end = lineRange.upperBound
+
+        var i = startIndex
+        var cls = inClass
+
+        while i < end {
+            let c = skeleton[i]
+
+            if c == FC.leftBracket {
+                if !isEscaped(at: i, from: lineRange.lowerBound) { cls += 1 }
+                i += 1
+                continue
+            }
+            if c == FC.rightBracket, cls > 0 {
+                if !isEscaped(at: i, from: lineRange.lowerBound) { cls -= 1 }
+                i += 1
+                continue
+            }
+
+            if c == FC.slash, cls == 0 {
+                if !isEscaped(at: i, from: lineRange.lowerBound) {
+                    let close = i
+                    i += 1
+                    while i < end, skeleton[i].isAsciiAlpha { i += 1 }
+                    return (closed: true, closeIndex: close, nextIndex: i, endInClass: 0)
+                }
+            }
+
+            i += 1
+        }
+
+        return (closed: false, closeIndex: nil, nextIndex: end, endInClass: cls)
+    }
+
+    // neutral 行内で「閉じない /regex/ の開始位置」を探す（見つかったら slash の index を返す）
+    private func multiLineRegexSlashStartIndex(lineRange: Range<Int>) -> Int? {
+        if lineRange.isEmpty { return nil }
+
+        let skeleton = storage.skeletonString
+        let end = lineRange.upperBound
+        var i = lineRange.lowerBound
+
+        while i < end {
+            let b = skeleton[i]
+
+            if b == FC.numeric { // '#'
+                break
+            }
+
+            // %r... は飛ばす（中の / を拾わない）
+            if b == FC.percent, i + 1 < end {
+                let c = skeleton[i + 1]
+                if c == 0x72 || c == 0x52 { // r/R
+                    let openerIndex = i + 2
+                    if openerIndex < end {
+                        switch skeleton.skipDelimitedInLine(in: openerIndex..<end, allowNesting: true, escape: FC.backSlash) {
+                        case .found(let next):
+                            i = next
+                        case .stopped, .notFound:
+                            return nil
+                        }
+                    } else {
+                        return nil
+                    }
+                    continue
+                }
+            }
+
+            // quote は飛ばす（中の / を拾わない）
+            if b == FC.doubleQuote || b == FC.singleQuote {
+                switch skeleton.skipQuotedInLine(for: b, in: i..<end) {
+                case .found(let next):
+                    i = next
+                    continue
+                case .stopped, .notFound:
+                    return nil
+                }
+            }
+
+            if b == FC.slash, isRegexLikelyAfterSlash(slashIndex: i, in: lineRange) {
+                let rx = scanRegexLiteralInLine(slashIndex: i, in: lineRange)
+                if rx.closed {
+                    i = rx.nextIndex
+                    continue
+                }
+                return i
+            }
+
+            i += 1
+        }
+
+        return nil
     }
 
 
