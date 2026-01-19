@@ -337,7 +337,7 @@ class KSyntaxParser {
         self.type = type
         
         // load keywords
-        keywords = []
+        keywords = Self.loadKeywords(type: type)
         
         // load theme.
         let prefs = KPreference.shared
@@ -448,6 +448,105 @@ class KSyntaxParser {
             return nil
         }
     }
+    
+    
+    // for keywords.
+    
+    private static func loadKeywords(type: KSyntaxType) -> [[UInt8]] {
+        // plain はキーワード無し（ファイルがあっても使わない方針ならここで返す）
+        if type == .plain { return [] }
+
+        let resourceBaseName = "keyword_\(type.settingName)"
+        let fileName = resourceBaseName + ".txt"
+
+        // 1) User (Application Support) を優先
+        if let userURL = userKeywordFileURL(fileName: fileName) {
+            if let words = readKeywordFile(from: userURL) {
+                return normalizeAndSortKeywords(words)
+            }
+        }
+
+        // 2) Bundle fallback
+        if let url = Bundle.main.url(forResource: resourceBaseName, withExtension: "txt") {
+            if let words = readKeywordFile(from: url) {
+                return normalizeAndSortKeywords(words)
+            }
+        }
+
+        return []
+    }
+
+    private static func userKeywordFileURL(fileName: String) -> URL? {
+        let fm = FileManager.default
+        guard let base = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            log("Failed to resolve Application Support directory")
+            return nil
+        }
+
+        let dir = base.appendingPathComponent("Ganpi/keywords", isDirectory: true)
+        do {
+            try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        } catch {
+            log("Failed to create Ganpi/keywords directory: \(error)")
+            return nil
+        }
+
+        let url = dir.appendingPathComponent(fileName)
+        if fm.fileExists(atPath: url.path) {
+            return url
+        }
+        return nil
+    }
+
+    private static func readKeywordFile(from url: URL) -> [String]? {
+        do {
+            let data = try Data(contentsOf: url)
+            guard let string = String(data: data, encoding: .utf8) else {
+                log("Keyword file is not UTF-8: \(url.lastPathComponent)")
+                return nil
+            }
+            let (normalized, _) = string.normalizeNewlinesAndDetect()
+
+            var lines: [String] = []
+            lines.reserveCapacity(256)
+
+            for raw in normalized.split(separator: "\n", omittingEmptySubsequences: false) {
+                let s = String(raw).trimmingCharacters(in: .whitespacesAndNewlines)
+                if s.isEmpty { continue }
+                if s.hasPrefix("#") { continue }
+                lines.append(s)
+            }
+            return lines
+        } catch {
+            log("Failed to read keyword file: \(url.lastPathComponent), \(error)")
+            return nil
+        }
+    }
+
+    private static func normalizeAndSortKeywords(_ words: [String]) -> [[UInt8]] {
+        var bytes: [[UInt8]] = []
+        bytes.reserveCapacity(words.count)
+
+        for w in words {
+            bytes.append(Array(w.utf8))
+        }
+
+        // sort（[[UInt8]] は sorted 前提）
+        bytes.sort { $0.lexicographicallyPrecedes($1) }
+
+        // unique（重複排除）
+        var unique: [[UInt8]] = []
+        unique.reserveCapacity(bytes.count)
+
+        var last: [UInt8]? = nil
+        for w in bytes {
+            if let l = last, l == w { continue }
+            unique.append(w)
+            last = w
+        }
+        return unique
+    }
+
 
 }
 
