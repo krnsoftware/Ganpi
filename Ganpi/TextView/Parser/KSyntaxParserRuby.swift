@@ -14,6 +14,7 @@ final class KSyntaxParserRuby: KSyntaxParser {
 
     private enum KEndState: Equatable {
         case neutral
+        case afterEnd
         case inMultiComment
         case inHeredoc(label: [UInt8], allowIndent: Bool)
         case inDoubleQuote
@@ -22,6 +23,7 @@ final class KSyntaxParserRuby: KSyntaxParser {
         case inRegexPercent(close: UInt8, allowNesting: Bool, depth: Int)
         case inPercentLiteral(close: UInt8, allowNesting: Bool, depth: Int)
     }
+
 
 
     private struct KLineInfo {
@@ -34,6 +36,7 @@ final class KSyntaxParserRuby: KSyntaxParser {
 
     private let _commentBeginBytes = Array("=begin".utf8)
     private let _commentEndBytes   = Array("=end".utf8)
+    private let _endDirectiveBytes = Array("__END__".utf8)
     
     private let _regexStartKeywordBytes: [[UInt8]] = [
         Array("and".utf8),
@@ -132,6 +135,9 @@ final class KSyntaxParserRuby: KSyntaxParser {
             if isLineHeadDirective(lineRange: lineRange, directiveBytes: _commentBeginBytes) {
                 return [makeSpan(range: paintRange, role: .comment)]
             }
+            if isLineHeadDirective(lineRange: lineRange, directiveBytes: _endDirectiveBytes) {
+                return [makeSpan(range: paintRange, role: .comment)]
+            }
         }
         if isLineHeadDirective(lineRange: lineRange, directiveBytes: _commentEndBytes) {
             if startState == .inMultiComment {
@@ -139,14 +145,16 @@ final class KSyntaxParserRuby: KSyntaxParser {
             }
         }
 
-
-
         switch startState {
+        case .afterEnd:
+            return [makeSpan(range: paintRange, role: .comment)]
+
         case .inMultiComment:
             return [makeSpan(range: paintRange, role: .comment)]
 
         case .inHeredoc:
             return [makeSpan(range: paintRange, role: .string)]
+
 
         case .inDoubleQuote:
             // 行頭から閉じ " まで（無ければ行末まで）
@@ -388,6 +396,9 @@ final class KSyntaxParserRuby: KSyntaxParser {
 
     private func scanOneLine(lineRange: Range<Int>, startState: KEndState) -> KEndState {
         switch startState {
+        case .afterEnd:
+            return .afterEnd
+
         case .inMultiComment:
             if isLineHeadDirective(lineRange: lineRange, directiveBytes: _commentEndBytes) {
                 return .neutral
@@ -417,12 +428,16 @@ final class KSyntaxParserRuby: KSyntaxParser {
             return scanLineStartingInPercentLiteral(lineRange: lineRange, close: close, allowNesting: allowNesting, depth: depth)
 
         case .neutral:
+            if isLineHeadDirective(lineRange: lineRange, directiveBytes: _endDirectiveBytes) {
+                return .afterEnd
+            }
             if isLineHeadDirective(lineRange: lineRange, directiveBytes: _commentBeginBytes) {
                 return .inMultiComment
             }
             return scanLineForMultiLineState(lineRange: lineRange, startInDoubleQuote: false, startInSingleQuote: false)
         }
     }
+
 
 
     // MARK: - Multi comment helpers
