@@ -110,6 +110,71 @@ final class KSyntaxParserRuby: KSyntaxParser {
         scanFrom(line: rebuilt ? 0 : startLine, minLine: minLine)
     }
 
+    override func wordRange(at index: Int) -> Range<Int>? {
+        let skeleton = storage.skeletonString
+        let n = skeleton.count
+
+        if index < 0 || index > n { return nil }
+        if n == 0 { return nil }
+
+        func isSuffix(_ b: UInt8) -> Bool {
+            b == FC.question || b == FC.exclamation || b == FC.equals
+        }
+
+        // 1) カーソル位置（index）または直前（index-1）が「単語に触れている」か判定
+        var p: Int? = nil
+
+        if index < n {
+            let b = skeleton[index]
+            if b.isIdentPartAZ09_ || isSuffix(b) {
+                p = index
+            }
+        }
+
+        if p == nil, index > 0 {
+            let b = skeleton[index - 1]
+            if b.isIdentPartAZ09_ || isSuffix(b) {
+                p = index - 1
+            }
+        }
+
+        guard let pos = p else { return nil }
+
+        // 2) pos が suffix の場合：直前が識別子本体でなければ単語ではない
+        var corePos = pos
+        if isSuffix(skeleton[pos]) {
+            if pos == 0 { return nil }
+            let prev = skeleton[pos - 1]
+            if !prev.isIdentPartAZ09_ { return nil }
+            corePos = pos - 1
+        }
+
+        // 3) 左へ：識別子本体（[A-Za-z0-9_]）を伸ばす
+        var left = corePos
+        while left > 0 {
+            let b = skeleton[left - 1]
+            if !b.isIdentPartAZ09_ { break }
+            left -= 1
+        }
+
+        // 先頭は [A-Za-z_] 必須
+        if !skeleton[left].isIdentStartAZ_ { return nil }
+
+        // 4) 右へ：識別子本体を伸ばす
+        var right = corePos + 1
+        while right < n {
+            let b = skeleton[right]
+            if !b.isIdentPartAZ09_ { break }
+            right += 1
+        }
+
+        // 5) 末尾に限り ? / ! / = を 0〜1 個だけ許す
+        if right < n, isSuffix(skeleton[right]) {
+            right += 1
+        }
+
+        return left..<right
+    }
 
 
     override func attributes(in range: Range<Int>, tabWidth: Int) -> [KAttributedSpan] {
