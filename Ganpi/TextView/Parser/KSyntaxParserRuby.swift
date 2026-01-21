@@ -424,6 +424,197 @@ final class KSyntaxParserRuby: KSyntaxParser {
         }
     }
 
+    override func outline(in range: Range<Int>?) -> [KOutlineItem] {     // range is ignored for now.
+        let skeleton = storage.skeletonString
+        let bytes = skeleton.bytes
+        let n = bytes.count
+        if n == 0 { return [] }
+
+        let newlineIndices = skeleton.newlineIndices
+
+        let classBytes = Array("class".utf8)
+        let moduleBytes = Array("module".utf8)
+        let defBytes = Array("def".utf8)
+
+        var items: [KOutlineItem] = []
+        items.reserveCapacity(128)
+
+        func isSpaceOrTab(_ b: UInt8) -> Bool { b == FC.space || b == FC.tab }
+
+        func skipSpaces(_ i: inout Int, _ end: Int) {
+            while i < end && isSpaceOrTab(bytes[i]) { i += 1 }
+        }
+
+        func matchBytes(_ target: [UInt8], at index: Int, end: Int) -> Bool {
+            let m = target.count
+            if index + m > end { return false }
+            var k = 0
+            while k < m {
+                if bytes[index + k] != target[k] { return false }
+                k += 1
+            }
+            return true
+        }
+
+        func isKeywordBoundary(_ index: Int, end: Int) -> Bool {
+            if index >= end { return true }
+            let b = bytes[index]
+            return isSpaceOrTab(b)
+        }
+
+        func parseConstLikeName(start: Int, end: Int) -> Range<Int>? {
+            var i = start
+            if i >= end { return nil }
+
+            // Ruby const/module name: Foo / Foo::Bar / Foo_Bar99
+            while i < end {
+                let b = bytes[i]
+                if b.isIdentPartAZ09_ || b == FC.colon {
+                    i += 1
+                    continue
+                }
+                break
+            }
+            if i == start { return nil }
+            return start..<i
+        }
+
+        func parseMethodName(start: Int, end: Int) -> Range<Int>? {
+            var i = start
+            if i >= end { return nil }
+
+            // special: [] / []=
+            if bytes[i] == FC.leftBracket {
+                i += 1
+                if i < end && bytes[i] == FC.rightBracket {
+                    i += 1
+                    if i < end && bytes[i] == FC.equals { i += 1 }
+                    return start..<i
+                }
+                return nil
+            }
+
+            // regular: [A-Za-z_][A-Za-z0-9_]*[?!=]?
+            if !bytes[i].isIdentStartAZ_ { return nil }
+            i += 1
+            while i < end && bytes[i].isIdentPartAZ09_ { i += 1 }
+            if i < end {
+                let b = bytes[i]
+                if b == FC.question || b == FC.exclamation || b == FC.equals { i += 1 }
+            }
+            return start..<i
+        }
+
+        func parseDefNameRange(from i0: Int, end: Int) -> (Range<Int>?, Bool) {
+            var i = i0
+            skipSpaces(&i, end)
+            if i >= end { return (nil, false) }
+
+            // def self.foo / def self::foo
+            let selfBytes = Array("self".utf8)
+            if matchBytes(selfBytes, at: i, end: end) {
+                var p = i + selfBytes.count
+                if p < end && bytes[p] == FC.period {
+                    p += 1
+                    let r = parseMethodName(start: p, end: end)
+                    return (r, true)
+                }
+                if p + 1 < end && bytes[p] == FC.colon && bytes[p + 1] == FC.colon {
+                    p += 2
+                    let r = parseMethodName(start: p, end: end)
+                    return (r, true)
+                }
+                // "def self" only: treat as instance-ish (ignore)
+                return (nil, true)
+            }
+
+            // def Klass.foo / def Klass::foo (rough detection)
+            if bytes[i].isAsciiUpper {
+                if let ownerRange = parseConstLikeName(start: i, end: end) {
+                    var p = ownerRange.upperBound
+                    if p < end && bytes[p] == FC.period {
+                        p += 1
+                        let r = parseMethodName(start: p, end: end)
+                        return (r, true)
+                    }
+                    if p + 1 < end && bytes[p] == FC.colon && bytes[p + 1] == FC.colon {
+                        p += 2
+                        let r = parseMethodName(start: p, end: end)
+                        return (r, true)
+                    }
+                }
+            }
+
+            // def foo
+            let r = parseMethodName(start: i, end: end)
+            return (r, false)
+        }
+
+        var lineStart = 0
+        var lineIndex = 0
+
+        func processLine(_ start: Int, _ end: Int) -> Bool {
+            var i = start
+            skipSpaces(&i, end)
+            if i >= end { return true }
+
+            // comment line
+            if bytes[i] == FC.numeric { return true }
+
+            // __END__ directive (line-head)
+            if matchBytes(_endDirectiveBytes, at: i, end: end), isKeywordBoundary(i + _endDirectiveBytes.count, end: end) {
+                return false
+            }
+
+            // class
+            if matchBytes(classBytes, at: i, end: end), isKeywordBoundary(i + classBytes.count, end: end) {
+                var p = i + classBytes.count
+                skipSpaces(&p, end)
+
+                if let nameRange = parseConstLikeName(start: p, end: end) {
+                    items.append(KOutlineItem(kind: .class, nameRange: nameRange, level: 0, isSingleton: false))
+                }
+                return true
+            }
+
+            // module
+            if matchBytes(moduleBytes, at: i, end: end), isKeywordBoundary(i + moduleBytes.count, end: end) {
+                var p = i + moduleBytes.count
+                skipSpaces(&p, end)
+
+                if let nameRange = parseConstLikeName(start: p, end: end) {
+                    items.append(KOutlineItem(kind: .module, nameRange: nameRange, level: 0, isSingleton: false))
+                }
+                return true
+            }
+
+            // def
+            if matchBytes(defBytes, at: i, end: end), isKeywordBoundary(i + defBytes.count, end: end) {
+                let p = i + defBytes.count
+                let (nameRange, isSingleton) = parseDefNameRange(from: p, end: end)
+                if let nameRange {
+                    items.append(KOutlineItem(kind: .method, nameRange: nameRange, level: 1, isSingleton: isSingleton))
+                }
+                return true
+            }
+
+            return true
+        }
+
+        for lfIndex in newlineIndices {
+            if !processLine(lineStart, lfIndex) { break }
+            lineStart = lfIndex + 1
+            lineIndex += 1
+        }
+
+        if lineStart < n {
+            _ = processLine(lineStart, n)
+        }
+
+        return items
+    }
+
+    
     // MARK: - Line scan
 
     private func scanFrom(line startLine: Int, minLine: Int) {

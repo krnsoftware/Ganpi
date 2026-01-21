@@ -137,15 +137,11 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
 struct KOutlineItem {
     enum Kind { case `class`, module, method }
     let kind: Kind
-    let name: String                 // 表示名（例: "Foo::Bar", "#empty?", ".new"）
-    let containerPath: [String]      // 例: ["Foo","Bar"]
     let nameRange: Range<Int>        // 名前シンボルのみ
-    let headerRange: Range<Int>      // "def foo ..."(行末まで)
-    let bodyRange: Range<Int>?       // 対応 end の直前まで（未確定なら nil）
-    let lineIndex: Int               // nameRange.lowerBound の行番号
     let level: Int                   // ネスト深さ（UI用）
     let isSingleton: Bool            // def self.foo / def Klass.bar
 }
+
 
 // MARK: - Completion Common Types
 

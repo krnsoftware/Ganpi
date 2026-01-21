@@ -401,6 +401,7 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         _funcMenuButton.setContentHuggingPriority(.defaultLow, for: .horizontal)
         
         _funcMenuButton.contentTintColor = .secondaryLabelColor
+        //_funcMenuButton.contentInsets = NSEdgeInsets(top: 2, left: 6, bottom: 2, right: 6)
         
 
         // 左：Encoding / EOL / Syntax（クリックでメニュー）
@@ -492,24 +493,72 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
     
     @objc private func openFunctionMenuFromButton(_ sender: NSButton) {
         guard let doc = _document else { return }
+        guard let textView = activeTextView() else { return }
+
         let parser = doc.textStorage.parser
         let outlineItems = parser.outline(in: nil)
+
         let menu = NSMenu()
-        guard let textView = activeTextView() else { return }
-        for outlineItem in outlineItems {
-            let menuItem = NSMenuItem(title: outlineItem.name, action: #selector(textView.selectRange(_:)), keyEquivalent: "")
-            switch outlineItem.kind {
-            case .class: menuItem.image = KOutlineBadgeFactory.shared.classBadge()
-            case .module: menuItem.image = KOutlineBadgeFactory.shared.moduleBadge()
+
+        var currentContainerMenu: NSMenu? = nil
+
+        func makeTitle(for item: KOutlineItem) -> String {
+            let symbol = doc.textStorage.string(in: item.nameRange)
+            switch item.kind {
+            case .class, .module:
+                return symbol
             case .method:
-                menuItem.image = KOutlineBadgeFactory.shared.methodBadge(isSingleton: outlineItem.isSingleton)
-                menuItem.indentationLevel = 1
+                return (item.isSingleton ? "." : "#") + symbol
             }
-            menuItem.representedObject = outlineItem.nameRange
-            menu.addItem(menuItem)
         }
+
+        func makeImage(for item: KOutlineItem) -> NSImage? {
+            switch item.kind {
+            case .class:
+                return KOutlineBadgeFactory.shared.classBadge()
+            case .module:
+                return KOutlineBadgeFactory.shared.moduleBadge()
+            case .method:
+                return KOutlineBadgeFactory.shared.methodBadge(isSingleton: item.isSingleton)
+            }
+        }
+
+        for item in outlineItems {
+            if item.level == 0 && (item.kind == .class || item.kind == .module) {
+                // 親（class/module）
+                let containerTitle = makeTitle(for: item)
+
+                let sub = NSMenu()
+                currentContainerMenu = sub
+
+                let parent = NSMenuItem(title: containerTitle, action: nil, keyEquivalent: "")
+                parent.image = makeImage(for: item)
+                parent.submenu = sub
+                menu.addItem(parent)
+
+                // サブメニュー先頭に「定義へジャンプ」項目を置く
+                let jump = NSMenuItem(title: containerTitle, action: #selector(textView.selectRange(_:)), keyEquivalent: "")
+                jump.image = makeImage(for: item)
+                jump.representedObject = item.nameRange
+                sub.addItem(jump)
+
+                continue
+            }
+
+            // method等：直近のclass/module配下へ。無ければトップへ。
+            let targetMenu = currentContainerMenu ?? menu
+
+            let title = makeTitle(for: item)
+            let menuItem = NSMenuItem(title: title, action: #selector(textView.selectRange(_:)), keyEquivalent: "")
+            menuItem.image = makeImage(for: item)
+            menuItem.representedObject = item.nameRange
+            targetMenu.addItem(menuItem)
+        }
+
         popUp(menu, from: sender)
     }
+
+
     
     @objc private func toggleEditModeFromButton(_ sender: NSButton) {
         guard let textView = activeTextView() else { log("activeTextView() is nil.", from: self); return }
@@ -755,6 +804,8 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
             let parser = textView.textStorage.parser
             let ctx = parser.currentContext(at: caret)
             
+            _funcMenuButton.title = "Outline"
+            _funcMenuButton.toolTip = "Show outline menu"
             /* 一時的にカット
             let (display, tooltip) = makeStatusTitle(from: ctx)
             _funcMenuButton.title = display
@@ -813,66 +864,6 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         return _panes.first?.textView
     }
     
-    /// ステータスバー左側の関数名表示とツールチップ用文字列を生成
-    /// - Parameters:
-    ///   - context: parser.currentContext(at:) の結果（外→内）
-    ///   - containerTailCount: コンテナ（Class/Module）の末尾セグメントをいくつ付けるか（0=メソッド名のみ）
-    /// - Returns: (display, tooltip) 文字列タプル
-    private func makeStatusTitle(from context: [KOutlineItem],
-                                 containerTailCount: Int = 1) -> (display: String, tooltip: String)
-    {
-        // 最内側の method / class/module を拾う
-        let method = context.last(where: { $0.kind == .method })
-        let containerChain = context.filter { $0.kind == .class || $0.kind == .module }
-
-        // フルパス（ツールチップ用）
-        let fullContainerPath: String = {
-            if containerChain.isEmpty { return "" }
-            // containerPath は親たち、各 OutlineItem.name は自分の表示名（"Foo::Bar" もあり得る）
-            // ツールチップは読みやすさ優先で chain の name を "Foo::Bar" 連結
-            return containerChain.map { $0.name }.joined(separator: "::")
-        }()
-
-        // 行番号（1-origin）
-        let lineForTooltip: Int? = {
-            if let m = method { return m.lineIndex + 1 }
-            if let lastC = containerChain.last { return lastC.lineIndex + 1 }
-            return nil
-        }()
-
-        // --- 表示（短い方） ---
-        let methodLabel: String = {
-            if let m = method { return m.name }          // 例: "#parse" / ".build" / "#[]="
-            if let lastC = containerChain.last { return lastC.name } // メソッドが無い場合はコンテナ名
-            return "(top)"
-        }()
-
-        let containerTail: String = {
-            guard containerTailCount > 0, !containerChain.isEmpty else { return "" }
-            // 末尾から指定個数だけ取り出して "Outer::Inner" 形式に
-            let names = containerChain.map { $0.name }
-            let tail = names.suffix(containerTailCount)
-            return tail.joined(separator: "::")
-        }()
-
-        let display: String = {
-            if containerTail.isEmpty {
-                return methodLabel                         // 例: "#parse"
-            } else {
-                return "'\(containerTail)·\(methodLabel)'" // 例: "Parser · #parse"
-            }
-        }()
-
-        // --- ツールチップ（フル情報） ---
-        var tooltipParts: [String] = []
-        if !fullContainerPath.isEmpty { tooltipParts.append(fullContainerPath) }
-        tooltipParts.append(methodLabel)
-        if let ln = lineForTooltip { tooltipParts.append("(L\(ln))") }
-        let tooltip = tooltipParts.joined(separator: " ")
-
-        return (display, tooltip)
-    }
-
 }
 
 // MARK: - Popover ViewControllers
