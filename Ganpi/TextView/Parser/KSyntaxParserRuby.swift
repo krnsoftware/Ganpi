@@ -213,30 +213,30 @@ final class KSyntaxParserRuby: KSyntaxParser {
         switch startState {
         case .afterEnd:
             return [makeSpan(range: paintRange, role: .comment)]
-
+            
         case .inMultiComment:
             return [makeSpan(range: paintRange, role: .comment)]
-
+            
         case .inHeredoc:
             return [makeSpan(range: paintRange, role: .string)]
-
-
+            
+            
         case .inDoubleQuote:
             // 行頭から閉じ " まで（無ければ行末まで）
             switch skeleton.scan(in: lineRange, targets: [FC.doubleQuote], escape: FC.backSlash) {
             case .notFound:
                 return [makeSpan(range: paintRange, role: .string)]
-
+                
             case .hit(let closeIndex, _):
                 var spans: [KAttributedSpan] = []
-
+                
                 // 行頭〜閉じ"（閉じ自身を含む）
                 let firstStringRange = lineRange.lowerBound..<(closeIndex + 1)
                 let paint1 = paintRange.clamped(to: firstStringRange)
                 if !paint1.isEmpty {
                     spans.append(makeSpan(range: paint1, role: .string))
                 }
-
+                
                 // この行の残りに、さらに複数行 " の開始があるならそこから行末まで
                 if _lines[lineIndex].endState == .inDoubleQuote {
                     let rest = (closeIndex + 1)..<lineRange.upperBound
@@ -248,7 +248,7 @@ final class KSyntaxParserRuby: KSyntaxParser {
                         }
                     }
                 }
-
+                
                 return spans
             }
             
@@ -257,17 +257,17 @@ final class KSyntaxParserRuby: KSyntaxParser {
             switch skeleton.scan(in: lineRange, targets: [FC.singleQuote], escape: FC.backSlash) {
             case .notFound:
                 return [makeSpan(range: paintRange, role: .string)]
-
+                
             case .hit(let closeIndex, _):
                 var spans: [KAttributedSpan] = []
-
+                
                 // 行頭〜閉じ'（閉じ自身を含む）
                 let firstStringRange = lineRange.lowerBound..<(closeIndex + 1)
                 let paint1 = paintRange.clamped(to: firstStringRange)
                 if !paint1.isEmpty {
                     spans.append(makeSpan(range: paint1, role: .string))
                 }
-
+                
                 // この行の残りに、さらに複数行 ' の開始があるならそこから行末まで
                 if _lines[lineIndex].endState == .inSingleQuote {
                     let rest = (closeIndex + 1)..<lineRange.upperBound
@@ -279,7 +279,7 @@ final class KSyntaxParserRuby: KSyntaxParser {
                         }
                     }
                 }
-
+                
                 return spans
             }
             
@@ -289,17 +289,17 @@ final class KSyntaxParserRuby: KSyntaxParser {
             if !r.closed {
                 return [makeSpan(range: paintRange, role: .string)]
             }
-
+            
             // 閉じ /（閉じ自身を含む）まで
             let closeIndex = r.closeIndex ?? (r.nextIndex - 1)
             var spans: [KAttributedSpan] = []
-
+            
             let firstRegexRange = lineRange.lowerBound..<(closeIndex + 1)
             let paint1 = paintRange.clamped(to: firstRegexRange)
             if !paint1.isEmpty {
                 spans.append(makeSpan(range: paint1, role: .string))
             }
-
+            
             // 同一行の残りに、さらに multi-line regex の開始があるならそこから行末まで
             if isInRegex(_lines[lineIndex].endState) {
                 let rest = r.nextIndex..<lineRange.upperBound
@@ -311,9 +311,9 @@ final class KSyntaxParserRuby: KSyntaxParser {
                     }
                 }
             }
-
+            
             return spans
-
+            
         case .inRegexPercent(let close, let allowNesting, let depth):
             let r = scanPercentRegexBodyInLine(
                 startIndex: lineRange.lowerBound,
@@ -325,13 +325,13 @@ final class KSyntaxParserRuby: KSyntaxParser {
             if !r.closed {
                 return [makeSpan(range: paintRange, role: .string)]
             }
-
+            
             var spans: [KAttributedSpan] = []
             let closeIndex = r.closeIndex ?? (r.nextIndex - 1)
             let firstRange = lineRange.lowerBound..<(closeIndex + 1)
             let paint1 = paintRange.clamped(to: firstRange)
             if !paint1.isEmpty { spans.append(makeSpan(range: paint1, role: .string)) }
-
+            
             if isInRegex(_lines[lineIndex].endState) {
                 let rest = r.nextIndex..<lineRange.upperBound
                 if let start = multiLineRegexPercentStartIndex(lineRange: rest) {
@@ -340,7 +340,7 @@ final class KSyntaxParserRuby: KSyntaxParser {
                 }
             }
             return spans
-        
+            
         case .inPercentLiteral(let close, let allowNesting, let depth):
             let r = scanPercentLiteralBodyInLine(
                 startIndex: lineRange.lowerBound,
@@ -349,20 +349,20 @@ final class KSyntaxParserRuby: KSyntaxParser {
                 allowNesting: allowNesting,
                 depth: depth
             )
-
+            
             if !r.closed {
                 return [makeSpan(range: paintRange, role: .string)]
             }
-
+            
             var spans: [KAttributedSpan] = []
-
+            
             let closeIndex = r.closeIndex ?? (r.nextIndex - 1)
             let firstRange = lineRange.lowerBound..<(closeIndex + 1)
             let paint1 = paintRange.clamped(to: firstRange)
             if !paint1.isEmpty {
                 spans.append(makeSpan(range: paint1, role: .string))
             }
-
+            
             // この行で percent literal を閉じた後、同一行の残りに別の multi-line 開始がある場合も塗る
             let rest = r.nextIndex..<lineRange.upperBound
             if !rest.isEmpty {
@@ -376,11 +376,21 @@ final class KSyntaxParserRuby: KSyntaxParser {
                     }
                 }
             }
-
+            
             return spans
-
-
+            
+            
         case .neutral:
+            // heredoc の開始行なら、「<<...LABEL」部分だけ string 色で塗る
+            if case .inHeredoc = _lines[lineIndex].endState {
+                if let introducerRange = heredocIntroducerRangeInLine(lineRange: lineRange) {
+                    let paint = paintRange.clamped(to: introducerRange)
+                    if !paint.isEmpty {
+                        return [makeSpan(range: paint, role: .string)]
+                    }
+                }
+            }
+            
             // この行が multi-line の開始行なら、開始位置から行末まで string 色
             if _lines[lineIndex].endState == .inDoubleQuote {
                 if let start = multiLineDoubleQuoteStartIndex(lineRange: lineRange) {
@@ -405,14 +415,14 @@ final class KSyntaxParserRuby: KSyntaxParser {
             if isInRegex(_lines[lineIndex].endState) {
                 let slashStart = multiLineRegexSlashStartIndex(lineRange: lineRange)
                 let percentStart = multiLineRegexPercentStartIndex(lineRange: lineRange)
-
+                
                 let start: Int?
                 if let s0 = slashStart, let s1 = percentStart {
                     start = min(s0, s1)
                 } else {
                     start = slashStart ?? percentStart
                 }
-
+                
                 if let start {
                     let stringRange = start..<lineRange.upperBound
                     let paint = paintRange.clamped(to: stringRange)
@@ -430,8 +440,7 @@ final class KSyntaxParserRuby: KSyntaxParser {
                     }
                 }
             }
-
-
+            
             return []
         }
     }
@@ -1238,6 +1247,76 @@ final class KSyntaxParserRuby: KSyntaxParser {
 
 
     // MARK: - Heredoc parsing
+    
+    private func heredocIntroducerRangeInLine(lineRange: Range<Int>) -> Range<Int>? {
+        if lineRange.isEmpty { return nil }
+
+        let skeleton = storage.skeletonString
+        let end = lineRange.upperBound
+
+        var i = lineRange.lowerBound
+        while i < end {
+            let b = skeleton[i]
+
+            // # comment: 以降は無視
+            if b == FC.numeric { // '#'
+                break
+            }
+
+            // %... は飛ばす（中の << を拾わない）
+            if b == FC.percent, i + 1 < end {
+                let type = skeleton[i + 1]
+                if _percentAllTypeBytes.contains(type) {
+                    let openerIndex = i + 2
+                    if openerIndex < end {
+                        switch skeleton.skipDelimitedInLine(in: openerIndex..<end, allowNesting: true, escape: FC.backSlash) {
+                        case .found(let next):
+                            i = next
+                            continue
+                        case .stopped(_), .notFound:
+                            return nil
+                        }
+                    }
+                    return nil
+                }
+            }
+
+            // quote は飛ばす（中の << を拾わない）
+            if b == FC.doubleQuote || b == FC.singleQuote {
+                switch skeleton.skipQuotedInLine(for: b, in: i..<end) {
+                case .found(let next):
+                    i = next
+                    continue
+                case .stopped(_), .notFound:
+                    return nil
+                }
+            }
+
+            // /regex/ は飛ばす（中の << を拾わない）
+            if b == FC.slash {
+                if isRegexLikelyAfterSlash(slashIndex: i, in: lineRange) {
+                    let rx = scanRegexLiteralInLine(slashIndex: i, in: lineRange)
+                    if rx.closed {
+                        i = rx.nextIndex
+                        continue
+                    }
+                    return nil
+                }
+            }
+
+            // heredoc introducer
+            if b == FC.lt, i + 1 < end, skeleton[i + 1] == FC.lt {
+                if let hd = parseHeredocAtIntroducer(introducerStart: i, in: lineRange) {
+                    return hd.introducerRange
+                }
+            }
+
+            i += 1
+        }
+
+        return nil
+    }
+
 
     private func parseHeredocAtIntroducer(
         introducerStart: Int,
