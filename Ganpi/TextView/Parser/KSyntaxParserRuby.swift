@@ -1491,9 +1491,12 @@ final class KSyntaxParserRuby: KSyntaxParser {
         func isSuffix(_ b: UInt8) -> Bool {
             b == FC.question || b == FC.exclamation || b == FC.equals
         }
+        func isDigitOrUnderscore(_ b: UInt8) -> Bool {
+            b.isAsciiDigit || b == FC.underscore
+        }
 
         var spans: [KAttributedSpan] = []
-        spans.reserveCapacity(6)
+        spans.reserveCapacity(8)
 
         var i = lineRange.lowerBound
         while i < end {
@@ -1609,6 +1612,116 @@ final class KSyntaxParserRuby: KSyntaxParser {
                 }
             }
 
+            // 数値（簡易）：digits/underscore、少数は ".<digit>" を含める
+            if b.isAsciiDigit {
+                let start = i
+                i += 1
+                while i < end, isDigitOrUnderscore(skeleton[i]) { i += 1 }
+
+                // 小数部（"." の次が数字なら採用）
+                if i + 1 < end, skeleton[i] == FC.period, skeleton[i + 1].isAsciiDigit {
+                    i += 1 // '.'
+                    i += 1 // digit
+                    while i < end, isDigitOrUnderscore(skeleton[i]) { i += 1 }
+                }
+
+                let numberRange = start..<i
+                let p = paintRange.clamped(to: numberRange)
+                if !p.isEmpty {
+                    spans.append(makeSpan(range: p, role: .number))
+                }
+                continue
+            }
+            
+            // "::"（定数/名前空間参照）の後半 ':' はシンボル開始ではない
+            if b == FC.colon, i > lineRange.lowerBound, skeleton[i - 1] == FC.colon {
+                i += 1
+                continue
+            }
+
+            // シンボル :foo / :foo? など（簡易）→ variable 色に合わせる
+            if b == FC.colon, i + 1 < end {
+                let next = skeleton[i + 1]
+
+                // :"..."/:'...'
+                if next == FC.doubleQuote || next == FC.singleQuote {
+                    let start = i
+                    // 直後の quote を通常の quote スキャンで処理させるため、ここでは ':' だけ進める
+                    i += 1
+                    let p = paintRange.clamped(to: start..<(start + 1))
+                    if !p.isEmpty {
+                        spans.append(makeSpan(range: p, role: .variable))
+                    }
+                    continue
+                }
+
+                // :ident
+                if next.isIdentStartAZ_ {
+                    let start = i
+                    i += 2
+                    while i < end, skeleton[i].isIdentPartAZ09_ { i += 1 }
+                    if i < end, isSuffix(skeleton[i]) { i += 1 }
+
+                    let symRange = start..<i
+                    let p = paintRange.clamped(to: symRange)
+                    if !p.isEmpty {
+                        spans.append(makeSpan(range: p, role: .variable))
+                    }
+                    continue
+                }
+            }
+
+            // 変数：@foo / @@foo
+            if b == FC.at {
+                let start = i
+                if i + 1 < end, skeleton[i + 1] == FC.at {
+                    i += 2
+                } else {
+                    i += 1
+                }
+
+                if i < end, skeleton[i].isIdentStartAZ_ {
+                    i += 1
+                    while i < end, skeleton[i].isIdentPartAZ09_ { i += 1 }
+
+                    let varRange = start..<i
+                    let p = paintRange.clamped(to: varRange)
+                    if !p.isEmpty {
+                        spans.append(makeSpan(range: p, role: .variable))
+                    }
+                    continue
+                } else {
+                    // '@' 単体などは戻して通常処理
+                    i = start + 1
+                    continue
+                }
+            }
+
+            // 変数：$foo / $1 / $! など（簡易）
+            if b == FC.dollar, i + 1 < end {
+                let start = i
+                i += 1
+                let c = skeleton[i]
+
+                if c.isAsciiDigit {
+                    i += 1
+                    while i < end, skeleton[i].isAsciiDigit { i += 1 }
+                } else if c.isIdentStartAZ_ {
+                    i += 1
+                    while i < end, skeleton[i].isIdentPartAZ09_ { i += 1 }
+                } else {
+                    // $! $@ $? など：次の1文字を含める
+                    i += 1
+                }
+
+                let varRange = start..<i
+                let p = paintRange.clamped(to: varRange)
+                if !p.isEmpty {
+                    spans.append(makeSpan(range: p, role: .variable))
+                }
+                continue
+            }
+
             // keyword（識別子）: [A-Za-z_][A-Za-z0-9_]*[?!＝]?（末尾は 0〜1 個）
             if b.isIdentStartAZ_ {
                 let start = i
@@ -1638,6 +1751,5 @@ final class KSyntaxParserRuby: KSyntaxParser {
 
         return spans
     }
-
 
 }
