@@ -1493,7 +1493,7 @@ final class KSyntaxParserRuby: KSyntaxParser {
         }
 
         var spans: [KAttributedSpan] = []
-        spans.reserveCapacity(4)
+        spans.reserveCapacity(6)
 
         var i = lineRange.lowerBound
         while i < end {
@@ -1591,13 +1591,11 @@ final class KSyntaxParserRuby: KSyntaxParser {
                             let r = i..<next
                             let p = paintRange.clamped(to: r)
                             if !p.isEmpty {
-                                // %r/%R は regex（ここでは string 色で統一）
                                 spans.append(makeSpan(range: p, role: .string))
                             }
                             i = next
                             continue
                         case .stopped(_), .notFound:
-                            // 行内で閉じない → 以降は multi-line 側が効くのでここでは終了
                             let r = i..<end
                             let p = paintRange.clamped(to: r)
                             if !p.isEmpty { spans.append(makeSpan(range: p, role: .string)) }
@@ -1605,11 +1603,33 @@ final class KSyntaxParserRuby: KSyntaxParser {
                             break
                         }
                     } else {
-                        // "%q" で行終端など
                         i = end
                     }
                     continue
                 }
+            }
+
+            // keyword（識別子）: [A-Za-z_][A-Za-z0-9_]*[?!＝]?（末尾は 0〜1 個）
+            if b.isIdentStartAZ_ {
+                let start = i
+                i += 1
+                while i < end {
+                    let c = skeleton[i]
+                    if !c.isIdentPartAZ09_ { break }
+                    i += 1
+                }
+                if i < end, isSuffix(skeleton[i]) {
+                    i += 1
+                }
+
+                let wordRange = start..<i
+                if !keywords.isEmpty, skeleton.matches(words: keywords, in: wordRange) {
+                    let p = paintRange.clamped(to: wordRange)
+                    if !p.isEmpty {
+                        spans.append(makeSpan(range: p, role: .keyword))
+                    }
+                }
+                continue
             }
 
             // 通常文字
@@ -1618,5 +1638,6 @@ final class KSyntaxParserRuby: KSyntaxParser {
 
         return spans
     }
+
 
 }
