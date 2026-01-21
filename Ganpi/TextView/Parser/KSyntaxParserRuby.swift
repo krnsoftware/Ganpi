@@ -226,20 +226,26 @@ final class KSyntaxParserRuby: KSyntaxParser {
             switch skeleton.scan(in: lineRange, targets: [FC.doubleQuote], escape: FC.backSlash) {
             case .notFound:
                 return [makeSpan(range: paintRange, role: .string)]
-                
+
             case .hit(let closeIndex, _):
                 var spans: [KAttributedSpan] = []
-                
+
                 // 行頭〜閉じ"（閉じ自身を含む）
                 let firstStringRange = lineRange.lowerBound..<(closeIndex + 1)
                 let paint1 = paintRange.clamped(to: firstStringRange)
                 if !paint1.isEmpty {
                     spans.append(makeSpan(range: paint1, role: .string))
                 }
-                
+
+                // 閉じた後の残り（コメントを追加し、comment手前までを次走査範囲にする）
+                let restAll = (closeIndex + 1)..<lineRange.upperBound
+                let rest = appendTrailingComment(spans: &spans,
+                                                 rest: restAll,
+                                                 paintRange: paintRange,
+                                                 lineEnd: lineRange.upperBound)
+
                 // この行の残りに、さらに複数行 " の開始があるならそこから行末まで
                 if _lines[lineIndex].endState == .inDoubleQuote {
-                    let rest = (closeIndex + 1)..<lineRange.upperBound
                     if let start = multiLineDoubleQuoteStartIndex(lineRange: rest) {
                         let secondStringRange = start..<lineRange.upperBound
                         let paint2 = paintRange.clamped(to: secondStringRange)
@@ -248,29 +254,35 @@ final class KSyntaxParserRuby: KSyntaxParser {
                         }
                     }
                 }
-                
+
                 return spans
             }
-            
+
         case .inSingleQuote:
             // 行頭から閉じ ' まで（無ければ行末まで）
             switch skeleton.scan(in: lineRange, targets: [FC.singleQuote], escape: FC.backSlash) {
             case .notFound:
                 return [makeSpan(range: paintRange, role: .string)]
-                
+
             case .hit(let closeIndex, _):
                 var spans: [KAttributedSpan] = []
-                
+
                 // 行頭〜閉じ'（閉じ自身を含む）
                 let firstStringRange = lineRange.lowerBound..<(closeIndex + 1)
                 let paint1 = paintRange.clamped(to: firstStringRange)
                 if !paint1.isEmpty {
                     spans.append(makeSpan(range: paint1, role: .string))
                 }
-                
+
+                // 閉じた後の残り
+                let restAll = (closeIndex + 1)..<lineRange.upperBound
+                let rest = appendTrailingComment(spans: &spans,
+                                                 rest: restAll,
+                                                 paintRange: paintRange,
+                                                 lineEnd: lineRange.upperBound)
+
                 // この行の残りに、さらに複数行 ' の開始があるならそこから行末まで
                 if _lines[lineIndex].endState == .inSingleQuote {
-                    let rest = (closeIndex + 1)..<lineRange.upperBound
                     if let start = multiLineSingleQuoteStartIndex(lineRange: rest) {
                         let secondStringRange = start..<lineRange.upperBound
                         let paint2 = paintRange.clamped(to: secondStringRange)
@@ -279,30 +291,33 @@ final class KSyntaxParserRuby: KSyntaxParser {
                         }
                     }
                 }
-                
+
                 return spans
             }
             
         case .inRegexSlash(let inClass):
-            // 行頭から閉じ / まで（無ければ行末まで）
             let r = scanRegexBodyInLine(startIndex: lineRange.lowerBound, in: lineRange, inClass: inClass)
             if !r.closed {
                 return [makeSpan(range: paintRange, role: .string)]
             }
-            
-            // 閉じ /（閉じ自身を含む）まで
-            let closeIndex = r.closeIndex ?? (r.nextIndex - 1)
+
             var spans: [KAttributedSpan] = []
-            
+
+            let closeIndex = r.closeIndex ?? (r.nextIndex - 1)
             let firstRegexRange = lineRange.lowerBound..<(closeIndex + 1)
             let paint1 = paintRange.clamped(to: firstRegexRange)
             if !paint1.isEmpty {
                 spans.append(makeSpan(range: paint1, role: .string))
             }
-            
+
+            let restAll = r.nextIndex..<lineRange.upperBound
+            let rest = appendTrailingComment(spans: &spans,
+                                             rest: restAll,
+                                             paintRange: paintRange,
+                                             lineEnd: lineRange.upperBound)
+
             // 同一行の残りに、さらに multi-line regex の開始があるならそこから行末まで
             if isInRegex(_lines[lineIndex].endState) {
-                let rest = r.nextIndex..<lineRange.upperBound
                 if let start = multiLineRegexSlashStartIndex(lineRange: rest) {
                     let secondRegexRange = start..<lineRange.upperBound
                     let paint2 = paintRange.clamped(to: secondRegexRange)
@@ -311,9 +326,9 @@ final class KSyntaxParserRuby: KSyntaxParser {
                     }
                 }
             }
-            
+
             return spans
-            
+
         case .inRegexPercent(let close, let allowNesting, let depth):
             let r = scanPercentRegexBodyInLine(
                 startIndex: lineRange.lowerBound,
@@ -325,20 +340,30 @@ final class KSyntaxParserRuby: KSyntaxParser {
             if !r.closed {
                 return [makeSpan(range: paintRange, role: .string)]
             }
-            
+
             var spans: [KAttributedSpan] = []
             let closeIndex = r.closeIndex ?? (r.nextIndex - 1)
             let firstRange = lineRange.lowerBound..<(closeIndex + 1)
             let paint1 = paintRange.clamped(to: firstRange)
-            if !paint1.isEmpty { spans.append(makeSpan(range: paint1, role: .string)) }
-            
+            if !paint1.isEmpty {
+                spans.append(makeSpan(range: paint1, role: .string))
+            }
+
+            let restAll = r.nextIndex..<lineRange.upperBound
+            let rest = appendTrailingComment(spans: &spans,
+                                             rest: restAll,
+                                             paintRange: paintRange,
+                                             lineEnd: lineRange.upperBound)
+
             if isInRegex(_lines[lineIndex].endState) {
-                let rest = r.nextIndex..<lineRange.upperBound
                 if let start = multiLineRegexPercentStartIndex(lineRange: rest) {
                     let paint2 = paintRange.clamped(to: start..<lineRange.upperBound)
-                    if !paint2.isEmpty { spans.append(makeSpan(range: paint2, role: .string)) }
+                    if !paint2.isEmpty {
+                        spans.append(makeSpan(range: paint2, role: .string))
+                    }
                 }
             }
+
             return spans
             
         case .inPercentLiteral(let close, let allowNesting, let depth):
@@ -349,99 +374,53 @@ final class KSyntaxParserRuby: KSyntaxParser {
                 allowNesting: allowNesting,
                 depth: depth
             )
-            
             if !r.closed {
                 return [makeSpan(range: paintRange, role: .string)]
             }
-            
+
             var spans: [KAttributedSpan] = []
-            
+
             let closeIndex = r.closeIndex ?? (r.nextIndex - 1)
             let firstRange = lineRange.lowerBound..<(closeIndex + 1)
             let paint1 = paintRange.clamped(to: firstRange)
             if !paint1.isEmpty {
                 spans.append(makeSpan(range: paint1, role: .string))
             }
-            
-            // この行で percent literal を閉じた後、同一行の残りに別の multi-line 開始がある場合も塗る
-            let rest = r.nextIndex..<lineRange.upperBound
-            if !rest.isEmpty {
-                // 次行継続の percent literal 開始がこの残りにあるなら、その開始位置から行末まで string 色
-                if case .inPercentLiteral = _lines[lineIndex].endState {
-                    if let start = multiLinePercentLiteralStartIndex(lineRange: rest) {
-                        let paint2 = paintRange.clamped(to: start..<lineRange.upperBound)
-                        if !paint2.isEmpty {
-                            spans.append(makeSpan(range: paint2, role: .string))
-                        }
+
+            let restAll = r.nextIndex..<lineRange.upperBound
+            let rest = appendTrailingComment(spans: &spans,
+                                             rest: restAll,
+                                             paintRange: paintRange,
+                                             lineEnd: lineRange.upperBound)
+
+            // 同一行の残りに、さらに multi-line percent literal の開始があるならそこから行末まで
+            if case .inPercentLiteral = _lines[lineIndex].endState {
+                if let start = multiLinePercentLiteralStartIndex(lineRange: rest) {
+                    let paint2 = paintRange.clamped(to: start..<lineRange.upperBound)
+                    if !paint2.isEmpty {
+                        spans.append(makeSpan(range: paint2, role: .string))
                     }
                 }
             }
-            
+
             return spans
             
-            
         case .neutral:
-            // heredoc の開始行なら、「<<...LABEL」部分だけ string 色で塗る
+            // まず neutral 行の中の "..." / '...' / /.../ / %... / #comment を span 化
+            var spans = neutralLineSpans(lineRange: lineRange, paintRange: paintRange)
+
+            // heredoc の開始行なら、「<<...LABEL」部分だけ string 色で追加
             if case .inHeredoc = _lines[lineIndex].endState {
                 if let introducerRange = heredocIntroducerRangeInLine(lineRange: lineRange) {
                     let paint = paintRange.clamped(to: introducerRange)
                     if !paint.isEmpty {
-                        return [makeSpan(range: paint, role: .string)]
+                        spans.append(makeSpan(range: paint, role: .string))
                     }
                 }
             }
-            
-            // この行が multi-line の開始行なら、開始位置から行末まで string 色
-            if _lines[lineIndex].endState == .inDoubleQuote {
-                if let start = multiLineDoubleQuoteStartIndex(lineRange: lineRange) {
-                    let stringRange = start..<lineRange.upperBound
-                    let paint = paintRange.clamped(to: stringRange)
-                    if !paint.isEmpty {
-                        return [makeSpan(range: paint, role: .string)]
-                    }
-                }
-            }
-            // この行が multi-line ' の開始行なら、開始位置から行末まで string 色
-            if _lines[lineIndex].endState == .inSingleQuote {
-                if let start = multiLineSingleQuoteStartIndex(lineRange: lineRange) {
-                    let stringRange = start..<lineRange.upperBound
-                    let paint = paintRange.clamped(to: stringRange)
-                    if !paint.isEmpty {
-                        return [makeSpan(range: paint, role: .string)]
-                    }
-                }
-            }
-            // この行が multi-line regex の開始行なら、開始位置から行末まで string 色
-            if isInRegex(_lines[lineIndex].endState) {
-                let slashStart = multiLineRegexSlashStartIndex(lineRange: lineRange)
-                let percentStart = multiLineRegexPercentStartIndex(lineRange: lineRange)
-                
-                let start: Int?
-                if let s0 = slashStart, let s1 = percentStart {
-                    start = min(s0, s1)
-                } else {
-                    start = slashStart ?? percentStart
-                }
-                
-                if let start {
-                    let stringRange = start..<lineRange.upperBound
-                    let paint = paintRange.clamped(to: stringRange)
-                    if !paint.isEmpty {
-                        return [makeSpan(range: paint, role: .string)]
-                    }
-                }
-            }
-            // この行が multi-line percent literal の開始行なら、開始位置から行末まで string 色
-            if case .inPercentLiteral = _lines[lineIndex].endState {
-                if let start = multiLinePercentLiteralStartIndex(lineRange: lineRange) {
-                    let paint = paintRange.clamped(to: start..<lineRange.upperBound)
-                    if !paint.isEmpty {
-                        return [makeSpan(range: paint, role: .string)]
-                    }
-                }
-            }
-            
-            return []
+
+            return spans
+
         }
     }
 
@@ -794,6 +773,84 @@ final class KSyntaxParserRuby: KSyntaxParser {
     private func multiLineSingleQuoteStartIndex(lineRange: Range<Int>) -> Int? {
         multiLineQuoteStartIndex(lineRange: lineRange, quote: FC.singleQuote)
     }
+    
+    private func commentStartIndexInLine(lineRange: Range<Int>) -> Int? {
+        if lineRange.isEmpty { return nil }
+
+        let skeleton = storage.skeletonString
+        let end = lineRange.upperBound
+        var i = lineRange.lowerBound
+
+        while i < end {
+            let b = skeleton[i]
+
+            // '#' 以降はコメント
+            if b == FC.numeric { // '#'
+                return i
+            }
+
+            // %... は飛ばす（中の # を拾わない）
+            if b == FC.percent, i + 1 < end {
+                let type = skeleton[i + 1]
+                if _percentAllTypeBytes.contains(type) {
+                    let delimIndex = i + 2
+                    if delimIndex >= end { return nil }
+
+                    switch skeleton.skipDelimitedInLine(in: delimIndex..<end, allowNesting: true, escape: FC.backSlash) {
+                    case .found(let next):
+                        i = next
+                        continue
+                    case .stopped, .notFound:
+                        return nil
+                    }
+                }
+            }
+
+            // quote は飛ばす（中の # を拾わない）
+            if b == FC.doubleQuote || b == FC.singleQuote {
+                switch skeleton.skipQuotedInLine(for: b, in: i..<end) {
+                case .found(let next):
+                    i = next
+                    continue
+                case .stopped, .notFound:
+                    return nil
+                }
+            }
+
+            // /regex/ は飛ばす（中の # を拾わない）
+            if b == FC.slash, isRegexLikelyAfterSlash(slashIndex: i, in: lineRange) {
+                let rx = scanRegexLiteralInLine(slashIndex: i, in: lineRange)
+                if rx.closed {
+                    i = rx.nextIndex
+                    continue
+                }
+                return nil
+            }
+
+            i += 1
+        }
+
+        return nil
+    }
+    
+    private func appendTrailingComment(spans: inout [KAttributedSpan],
+                                       rest: Range<Int>,
+                                       paintRange: Range<Int>,
+                                       lineEnd: Int) -> Range<Int> {
+        if rest.isEmpty { return rest }
+
+        if let commentStart = commentStartIndexInLine(lineRange: rest) {
+            let commentRange = commentStart..<lineEnd
+            let paintC = paintRange.clamped(to: commentRange)
+            if !paintC.isEmpty {
+                spans.append(makeSpan(range: paintC, role: .comment))
+            }
+            return rest.lowerBound..<commentStart
+        }
+        return rest
+    }
+
+
 
     // MARK: - Regex helpers
     
@@ -1423,4 +1480,143 @@ final class KSyntaxParserRuby: KSyntaxParser {
         let b = skeleton[next]
         return b == FC.space || b == FC.tab
     }
+    
+    
+    private func neutralLineSpans(lineRange: Range<Int>, paintRange: Range<Int>) -> [KAttributedSpan] {
+        if lineRange.isEmpty || paintRange.isEmpty { return [] }
+
+        let skeleton = storage.skeletonString
+        let end = lineRange.upperBound
+
+        func isSuffix(_ b: UInt8) -> Bool {
+            b == FC.question || b == FC.exclamation || b == FC.equals
+        }
+
+        var spans: [KAttributedSpan] = []
+        spans.reserveCapacity(4)
+
+        var i = lineRange.lowerBound
+        while i < end {
+            let b = skeleton[i]
+
+            // コメント開始
+            if b == FC.numeric { // '#'
+                let r = i..<end
+                let p = paintRange.clamped(to: r)
+                if !p.isEmpty {
+                    spans.append(makeSpan(range: p, role: .comment))
+                }
+                break
+            }
+
+            // "..."
+            if b == FC.doubleQuote {
+                let start = i
+                i += 1
+                while i < end {
+                    let c = skeleton[i]
+                    if c == FC.backSlash {
+                        i += 1
+                        if i < end { i += 1 }
+                        continue
+                    }
+                    if c == FC.doubleQuote {
+                        i += 1
+                        let r = start..<i
+                        let p = paintRange.clamped(to: r)
+                        if !p.isEmpty { spans.append(makeSpan(range: p, role: .string)) }
+                        break
+                    }
+                    i += 1
+                }
+                if i >= end {
+                    let r = start..<end
+                    let p = paintRange.clamped(to: r)
+                    if !p.isEmpty { spans.append(makeSpan(range: p, role: .string)) }
+                    break
+                }
+                continue
+            }
+
+            // '...'
+            if b == FC.singleQuote {
+                let start = i
+                i += 1
+                while i < end {
+                    let c = skeleton[i]
+                    if c == FC.backSlash {
+                        i += 1
+                        if i < end { i += 1 }
+                        continue
+                    }
+                    if c == FC.singleQuote {
+                        i += 1
+                        let r = start..<i
+                        let p = paintRange.clamped(to: r)
+                        if !p.isEmpty { spans.append(makeSpan(range: p, role: .string)) }
+                        break
+                    }
+                    i += 1
+                }
+                if i >= end {
+                    let r = start..<end
+                    let p = paintRange.clamped(to: r)
+                    if !p.isEmpty { spans.append(makeSpan(range: p, role: .string)) }
+                    break
+                }
+                continue
+            }
+
+            // /.../（割り算との誤爆は isRegexLikelyAfterSlash で抑える）
+            if b == FC.slash {
+                if isRegexLikelyAfterSlash(slashIndex: i, in: lineRange) {
+                    let start = i
+                    let rx = scanRegexLiteralInLine(slashIndex: i, in: lineRange)
+                    let r = start..<(rx.closed ? rx.nextIndex : end)
+                    let p = paintRange.clamped(to: r)
+                    if !p.isEmpty { spans.append(makeSpan(range: p, role: .string)) }
+                    i = rx.closed ? rx.nextIndex : end
+                    continue
+                }
+            }
+
+            // %q/%Q/%w/%W/%i/%I/%s/%S/%x/%X/%r/%R（単行で閉じるものは丸ごと塗る）
+            if b == FC.percent, i + 1 < end {
+                let type = skeleton[i + 1]
+                if _percentAllTypeBytes.contains(type) {
+                    let openerIndex = i + 2
+                    if openerIndex < end {
+                        switch skeleton.skipDelimitedInLine(in: openerIndex..<end, allowNesting: true, escape: FC.backSlash) {
+                        case .found(let next):
+                            let r = i..<next
+                            let p = paintRange.clamped(to: r)
+                            if !p.isEmpty {
+                                // %r/%R は regex（ここでは string 色で統一）
+                                spans.append(makeSpan(range: p, role: .string))
+                            }
+                            i = next
+                            continue
+                        case .stopped(_), .notFound:
+                            // 行内で閉じない → 以降は multi-line 側が効くのでここでは終了
+                            let r = i..<end
+                            let p = paintRange.clamped(to: r)
+                            if !p.isEmpty { spans.append(makeSpan(range: p, role: .string)) }
+                            i = end
+                            break
+                        }
+                    } else {
+                        // "%q" で行終端など
+                        i = end
+                    }
+                    continue
+                }
+            }
+
+            // 通常文字
+            i += 1
+        }
+
+        return spans
+    }
+
 }
