@@ -613,6 +613,151 @@ final class KSyntaxParserRuby: KSyntaxParser {
 
         return items
     }
+    
+    override func currentContext(at index: Int) -> (outer: String?, inner: String?) {
+        let skeleton = storage.skeletonString
+        let n = skeleton.count
+        if n == 0 { return (nil, nil) }
+
+        let clamped = max(0, min(index, n))
+        let ensureUpper = min(clamped + 1, n)
+        if clamped < ensureUpper {
+            ensureUpToDate(for: clamped..<ensureUpper)
+        } else {
+            // index == n の場合は末尾行として扱う
+            ensureUpToDate(for: max(0, n - 1)..<n)
+        }
+
+        // caret が __END__ より後ろなら「範囲外」扱い
+        let caretLine = skeleton.lineIndex(at: clamped)
+        if caretLine > 0, caretLine - 1 < _lines.count {
+            if _lines[caretLine - 1].endState == .afterEnd { return (nil, nil) }
+        }
+
+        let bytes = skeleton.bytes
+        let maxBackLines = 1000
+
+        var outer: String? = nil   // class / module
+        var inner: String? = nil   // method (#foo / .bar)
+
+        func isSpaceOrTab(_ b: UInt8) -> Bool {
+            b == FC.space || b == FC.tab
+        }
+
+        func startsWithDef(at p: Int, end: Int) -> Bool {
+            if p + 3 > end { return false }
+            return bytes[p] == 0x64 && bytes[p + 1] == 0x65 && bytes[p + 2] == 0x66
+                && (p + 3 == end || isSpaceOrTab(bytes[p + 3]))
+        }
+
+        func startsWithClass(at p: Int, end: Int) -> Bool {
+            if p + 5 > end { return false }
+            return bytes[p] == 0x63 && bytes[p + 1] == 0x6C && bytes[p + 2] == 0x61 && bytes[p + 3] == 0x73 && bytes[p + 4] == 0x73
+                && (p + 5 == end || isSpaceOrTab(bytes[p + 5]))
+        }
+
+        func startsWithModule(at p: Int, end: Int) -> Bool {
+            if p + 6 > end { return false }
+            return bytes[p] == 0x6D && bytes[p + 1] == 0x6F && bytes[p + 2] == 0x64 && bytes[p + 3] == 0x75 && bytes[p + 4] == 0x6C && bytes[p + 5] == 0x65
+                && (p + 6 == end || isSpaceOrTab(bytes[p + 6]))
+        }
+
+        func decode(_ r: Range<Int>) -> String {
+            String(decoding: bytes[r], as: UTF8.self)
+        }
+
+        func parseMethodName(afterDefAt p: Int, end: Int) -> String? {
+            var q = p + 3
+            while q < end, isSpaceOrTab(bytes[q]) { q += 1 }
+            if q >= end { return nil }
+
+            // トークン末尾（空白 or '(' まで）
+            let tokenStart = q
+            var tokenEnd = q
+            var lastPeriod: Int? = nil
+            while tokenEnd < end {
+                let b = bytes[tokenEnd]
+                if isSpaceOrTab(b) || b == FC.leftParen { break }
+                if b == FC.period { lastPeriod = tokenEnd }   // FC.dot は無い。FC.period を使う。
+                tokenEnd += 1
+            }
+            if tokenStart >= tokenEnd { return nil }
+
+            let nameStart: Int
+            let isSingleton: Bool
+            if let dot = lastPeriod, dot + 1 < tokenEnd {
+                isSingleton = true
+                nameStart = dot + 1
+            } else {
+                isSingleton = false
+                nameStart = tokenStart
+            }
+
+            if nameStart >= tokenEnd { return nil }
+            let name = decode(nameStart..<tokenEnd)
+            return (isSingleton ? "." : "#") + name
+        }
+
+        func parseContainerName(afterKeywordAt p: Int, kwLen: Int, end: Int) -> String? {
+            var q = p + kwLen
+            while q < end, isSpaceOrTab(bytes[q]) { q += 1 }
+            if q >= end { return nil }
+
+            let start = q
+            while q < end {
+                let b = bytes[q]
+                if isSpaceOrTab(b) || b == FC.lt { break } // "class Foo < Bar"
+                q += 1
+            }
+            if start >= q { return nil }
+            return decode(start..<q)
+        }
+
+        // 行単位で最大 1000 行だけ遡る
+        var line = caretLine
+        var scanned = 0
+        while line >= 0 && scanned < maxBackLines && (outer == nil || inner == nil) {
+            let startState: KEndState = {
+                if line == 0 { return .neutral }
+                let prev = line - 1
+                if prev >= 0 && prev < _lines.count { return _lines[prev].endState }
+                return .neutral
+            }()
+
+            if startState == .afterEnd {
+                // __END__ 以降は Ruby としてはソースではない
+                return (nil, nil)
+            }
+
+            if startState == .neutral {
+                let lr = skeleton.lineRange(at: line)
+                let start = lr.lowerBound
+                let end = lr.upperBound
+
+                // 行頭の空白を飛ばしてから判定
+                var p = start
+                while p < end, isSpaceOrTab(bytes[p]) { p += 1 }
+
+                if p < end, bytes[p] != FC.numeric {
+                    if inner == nil, startsWithDef(at: p, end: end) {
+                        inner = parseMethodName(afterDefAt: p, end: end)
+                    } else if outer == nil {
+                        if startsWithClass(at: p, end: end) {
+                            outer = parseContainerName(afterKeywordAt: p, kwLen: 5, end: end)
+                        } else if startsWithModule(at: p, end: end) {
+                            outer = parseContainerName(afterKeywordAt: p, kwLen: 6, end: end)
+                        }
+                    }
+                }
+            }
+
+            line -= 1
+            scanned += 1
+        }
+
+        return (outer: outer, inner: inner)
+    }
+
 
     
     // MARK: - Line scan

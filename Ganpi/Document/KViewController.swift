@@ -778,43 +778,44 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         if let textView = activeTextView() {
             let ts = textView.textStorage
             let caret = textView.caretIndex
-            
+
             let m = ts.lineAndColumnNumber(at: caret)
-            
+
             let totalLineCount = ts.hardLineCount.formatted(.number.locale(.init(identifier: "en_US")))
             let totalCharacterCount = ts.count.formatted(.number.locale(.init(identifier: "en_US")))
             let currentLineNumber = m.line.formatted(.number.locale(.init(identifier: "en_US")))
             let currentLineColumn = m.column.formatted(.number.locale(.init(identifier: "en_US")))
             _caretButton.title = "Line: \(currentLineNumber):\(currentLineColumn)  [ch:\(totalCharacterCount) ln:\(totalLineCount)]"
-            
+
             _editModeButton.wantsLayer = true
             _editModeButton.isBordered = false
             _editModeButton.layer?.masksToBounds = true
             let bgGray = NSColor.windowBackgroundColor.blended(withFraction: 0.5, of: .black) ?? .darkGray
-            //let bgGray = NSColor.darkGray
             _editModeButton.layer?.backgroundColor = bgGray.cgColor
             updateEditModeButton(textView)
             _editModeButton.sizeToFit()
             _editModeButton.layoutSubtreeIfNeeded()
             let height = max(_editModeButton.bounds.height, 14)
             _editModeButton.layer?.cornerRadius = height / 4
-            
-            //ここのparser.currentContext()が13万行のファイルで400ms以上かかってしまう。
-            // 今後改善予定。
+
             let parser = textView.textStorage.parser
             let ctx = parser.currentContext(at: caret)
-            
-            _funcMenuButton.title = "Outline"
-            _funcMenuButton.toolTip = "Show outline menu"
-            /* 一時的にカット
-            let (display, tooltip) = makeStatusTitle(from: ctx)
-            _funcMenuButton.title = display
-            _funcMenuButton.toolTip = tooltip
-             */
-            
+
+            let title: String = {
+                if let o = ctx.outer, let i = ctx.inner { return o + i }
+                if let i = ctx.inner { return i }
+                if let o = ctx.outer { return o }
+                return "Out of range"
+            }()
+
+            _funcMenuButton.title = title
+            _funcMenuButton.toolTip = title
+
         } else {
             _caretButton.title = ""
             _editModeButton.title = ""
+            _funcMenuButton.title = ""
+            _funcMenuButton.toolTip = nil
         }
 
         if let fs = _document?.textStorage.fontSize {
@@ -830,6 +831,7 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
             _lineSpacingButton.title = "LS:—"
         }
     }
+
     
     private func updateEditModeButton(_ textView: KTextView) {
         let font = NSFont.monospacedSystemFont(ofSize: 12, weight: .bold)
