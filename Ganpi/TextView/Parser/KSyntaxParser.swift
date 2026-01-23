@@ -143,102 +143,7 @@ struct KOutlineItem {
 }
 
 
-// MARK: - Completion Common Types
-
-
-struct KCompletionEntry {
-    let text: String
-}
-/*
-/// 候補の種類（共通）
-enum KCompletionKind {
-    case keyword
-    case typeClass
-    case typeModule
-    case methodInstance
-    case methodClass
-    case constant
-    case variableLocal
-    case variableInstance
-    case variableClass
-    case variableGlobal
-    case symbol
-}
-
-/// 1件の候補
-struct KCompletionEntry {
-    let text: String          // 挿入文字列（例: "to_i"）
-    let kind: KCompletionKind
-    let detail: String?       // 表示用ラベル（例: "String · #to_i"）
-    let score: Int            // 並べ替え用（ポリシーがアルファベットなら 0 のままでOK）
-}
-
-/// 並べ替えポリシー（拡張用）。現段階では .alphabetical のみ使用
-enum KCompletionPolicy {
-    case alphabetical
-    case heuristic(KCompletionWeights) // 今回は未使用（将来用）
-}
-
-/// 重み（将来のヒューリスティック用）
-struct KCompletionWeights {
-    var baseByKind: [KCompletionKind: Int] = [:]
-    var nearBoostMax: Int = 0
-    var scopeBoost: Int = 0
-    var freqUnit: Int = 0
-    var recentHit: Int = 0
-}
-*/
-
-
-
-// MARK: - Parser protocol
-
-/*
-protocol KSyntaxParserProtocol: AnyObject {
-    // 対象とするKTextStorageの参照。
-    var storage: KTextStorageReadable { get }
-    
-    var type: KSyntaxType { get }
-    
-    // パース用メソッド TextStorageから呼び出す。
-    func noteEdit(oldRange: Range<Int>, newCount: Int)
-    func ensureUpToDate(for range: Range<Int>)
-    
-    // Optional: 必要時に全体パース
-    func parse(range: Range<Int>)
-    
-    // 現在のテキストの範囲rangeについてattributesを取り出す。
-    // Painter hook: attribute spans (font is applied by TextStorage)
-    func attributes(in range: Range<Int>, tabWidth: Int) -> [KAttributedSpan]
-    
-    // 文字色の設定など
-    var baseTextColor: NSColor { get }
-    var backgroundColor: NSColor { get }
-    func setTheme(_ theme: [KFunctionalColor: NSColor])
-    func reloadTheme() //reloading all colors.
-    
-    // caretのindex:iに於いてそれに属すると思われる単語の領域。
-    func wordRange(at index: Int) -> Range<Int>?
-    
-    // 文書の構造をパースする。
-    func outline(in range: Range<Int>?) -> [KOutlineItem]     // if nil, in whole text.
-    func currentContext(at index: Int) -> [KOutlineItem]      // outer -> inner.
-    
-    // Word Completionに関するメソッド。
-    func rebuildCompletionsIfNeeded(dirtyRange: Range<Int>?)
-    func completionEntries(prefix: String,
-                           around index: Int,
-                           limit: Int,
-                           policy: KCompletionPolicy) -> [KCompletionEntry]
-    
-    // コメント用のプロパティ
-    var lineCommentPrefix: String? { get }
-    
-    // ランタイムでキーワードを差し替える（語彙は [String] で供給）
-    func setKeywords(_ words: [String])
-    
-}
-*/
+// MARK: - KSyntaxParser
 
 class KSyntaxParser {
     // Properties
@@ -250,6 +155,17 @@ class KSyntaxParser {
     private var _lastSkeletonLineCount: Int = 0
     private var _pendingLineDelta: Int = 0
     private var _pendingSpliceIndex: Int = 0
+    
+    // Word completion. 言語差にしにくい設計値なので、基底クラスの定数として持つ。
+    let completionMinPrefixLength: Int = 2
+    let completionMaxCandidates: Int = 32
+    let completionMaxWordLength: Int = 128
+
+    private let _completionQueue = DispatchQueue(label: "Ganpi.completion.catalog", qos: .utility)
+    private var _completionIsBuilding: Bool = false
+    private var _completionIsDirty: Bool = true
+    private var _completionCatalog: [String] = []
+
 
     
     var baseTextColor: NSColor { return color(.base) }
@@ -258,6 +174,8 @@ class KSyntaxParser {
     var lineCommentPrefix: String? { return nil }
     
     func noteEdit(oldRange: Range<Int>, newCount: Int) {
+        markCompletionDirty()
+
         let skeleton = storage.skeletonString
         let currentLineCount = skeletonLineCount()
 
@@ -325,7 +243,40 @@ class KSyntaxParser {
     // get outline of structures. for 'jump' menu.
     func outline(in range: Range<Int>?) -> [KOutlineItem] { return [] }
     // get completion words.
-    func completionEntries(prefix: String) -> [String] { return [] }
+    // get completion words (alphabetical / prefix match)
+    
+    // get completion words (alphabetical / prefix match)
+    func completionEntries(prefix: String) -> [String] {
+        guard prefix.count >= completionMinPrefixLength else { return [] }
+
+        startCompletionCatalogBuildIfNeeded()
+
+        let words = _completionCatalog
+        guard !words.isEmpty else { return [] }
+
+        let start = lowerBoundIndex(in: words, key: prefix)
+        if start >= words.count { return [] }
+
+        var res: [String] = []
+        res.reserveCapacity(completionMaxCandidates)
+
+        var i = start
+        while i < words.count && res.count < completionMaxCandidates {
+            let w = words[i]
+            if !w.hasPrefix(prefix) { break }
+
+            // prefix と完全一致する語彙は「補完で伸びない」のでスキップする
+            if w != prefix {
+                res.append(w)
+            }
+
+            i += 1
+        }
+
+        return res
+    }
+
+
     
     
     init(storage: KTextStorageReadable, type:KSyntaxType){
@@ -543,6 +494,92 @@ class KSyntaxParser {
         return unique
     }
 
+    
+    // Completion helpers.
+    
+    private func markCompletionDirty() {
+        _completionIsDirty = true
+    }
+
+    private func startCompletionCatalogBuildIfNeeded() {
+        if !_completionIsDirty { return }
+        if _completionIsBuilding { return }
+
+        // KSkeletonString はスレッドセーフではない前提で、メインスレッドでコピーを確定させる。
+        let skeleton = storage.skeletonString
+        let slice = skeleton.bytes(in: 0..<skeleton.count)
+        let bytes = Array(slice)
+
+        _completionIsBuilding = true
+        _completionIsDirty = false
+
+        let minLen = completionMinPrefixLength
+        let maxLen = completionMaxWordLength
+
+        _completionQueue.async { [weak self] in
+            guard let self else { return }
+
+            let catalog = buildCompletionCatalog(bytes: bytes, minWordLength: minLen, maxWordLength: maxLen)
+
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+
+                _completionCatalog = catalog
+                _completionIsBuilding = false
+                // 生成中に編集が入ってdirty化していても、次回呼び出し時に再生成される
+            }
+        }
+    }
+
+    private func lowerBoundIndex(in words: [String], key: String) -> Int {
+        var low = 0
+        var high = words.count
+
+        while low < high {
+            let mid = (low + high) / 2
+            if words[mid] < key {
+                low = mid + 1
+            } else {
+                high = mid
+            }
+        }
+        return low
+    }
+
+    private func buildCompletionCatalog(bytes: [UInt8], minWordLength: Int, maxWordLength: Int) -> [String] {
+        if bytes.isEmpty { return [] }
+
+        var set: Set<String> = Set<String>()
+        set.reserveCapacity(4096)
+
+        var i = 0
+        while i < bytes.count {
+            let b = bytes[i]
+
+            if b.isIdentStartAZ_ {
+                var j = i + 1
+                while j < bytes.count && bytes[j].isIdentPartAZ09_ {
+                    j += 1
+                }
+
+                let len = j - i
+                if len >= minWordLength && len <= maxWordLength {
+                    let wordBytes = bytes[i..<j]
+                    let w = String(decoding: wordBytes, as: UTF8.self)
+                    set.insert(w)
+                }
+
+                i = j
+                continue
+            }
+
+            i += 1
+        }
+
+        var catalog = Array(set)
+        catalog.sort()
+        return catalog
+    }
 
 }
 
