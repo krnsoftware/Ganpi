@@ -36,6 +36,7 @@ final class KSyntaxParserHtml: KSyntaxParser {
     // MARK: - Properties
 
     private var _lines: [KLineInfo] = []
+    private var _hasScanned = false
 
     private let _commentBeginBytes = Array("<!--".utf8)
     private let _commentEndBytes   = Array("-->".utf8)
@@ -85,7 +86,19 @@ final class KSyntaxParserHtml: KSyntaxParser {
         var minLine = plan.minLine
         minLine = max(0, min(minLine, maxLine))
 
+        let skeleton = storage.skeletonString
+        let clamped = min(range.lowerBound, skeleton.count)
+        let requestedLine = skeleton.lineIndex(at: clamped)
+
+        // 初回は、状態連鎖を作るため必ず先頭から requestedLine までは走査する
+        if !_hasScanned {
+            startLine = 0
+            minLine = max(minLine, requestedLine)
+        }
+
+        // rebuilt で行バッファを作り直した場合も、先頭からやり直す
         scanFrom(line: rebuilt ? 0 : startLine, minLine: minLine)
+        _hasScanned = true
     }
 
     override func attributes(in range: Range<Int>, tabWidth: Int) -> [KAttributedSpan] {
@@ -279,6 +292,8 @@ final class KSyntaxParserHtml: KSyntaxParser {
             }
         }
 
+        var isCloseTag = false
+
         // startWithLt の場合は '<' から始まる
         if startWithLt {
             appendSpan(start: i, end: min(i + 1, lineEnd), role: .tag,
@@ -286,8 +301,11 @@ final class KSyntaxParserHtml: KSyntaxParser {
             i += 1
             if i >= lineEnd { return (.inTag(kind: kind, quote: nil), lineEnd) }
 
-            // '</' / '<!' / '<?' の記号は .tag
+            // '</' / '<!' / '<?' の記号は .tag（閉じタグ判定もここで取る）
             if skeleton[i] == FC.slash || skeleton[i] == FC.exclamation || skeleton[i] == FC.question {
+                if skeleton[i] == FC.slash {
+                    isCloseTag = true
+                }
                 appendSpan(start: i, end: min(i + 1, lineEnd), role: .tag,
                            emitSpans: emitSpans, limitRange: limitRange, spans: &spans)
                 i += 1
@@ -305,12 +323,16 @@ final class KSyntaxParserHtml: KSyntaxParser {
                 appendSpan(start: nameStart, end: nameEnd, role: .tag,
                            emitSpans: emitSpans, limitRange: limitRange, spans: &spans)
 
-                // script/style open 判定（close tag の場合は slash で弾かれているのでここは open のみ）
-                let nameLen = nameEnd - nameStart
-                if nameLen == _scriptLowerBytes.count && matchesLowerWord(_scriptLowerBytes, at: nameStart) {
-                    kind = .scriptOpen
-                } else if nameLen == _styleLowerBytes.count && matchesLowerWord(_styleLowerBytes, at: nameStart) {
-                    kind = .styleOpen
+                // script/style open 判定は「開きタグのみ」
+                if !isCloseTag {
+                    let nameLen = nameEnd - nameStart
+                    if nameLen == _scriptLowerBytes.count && matchesLowerWord(_scriptLowerBytes, at: nameStart) {
+                        kind = .scriptOpen
+                    } else if nameLen == _styleLowerBytes.count && matchesLowerWord(_styleLowerBytes, at: nameStart) {
+                        kind = .styleOpen
+                    } else {
+                        kind = .normal
+                    }
                 } else {
                     kind = .normal
                 }
@@ -333,6 +355,11 @@ final class KSyntaxParserHtml: KSyntaxParser {
                            emitSpans: emitSpans, limitRange: limitRange, spans: &spans)
                 i += 1
 
+                // 閉じタグは常に neutral に戻す
+                if isCloseTag {
+                    return (.neutral, i)
+                }
+
                 switch kind {
                 case .scriptOpen: return (.inScript, i)
                 case .styleOpen:  return (.inStyle, i)
@@ -340,10 +367,16 @@ final class KSyntaxParserHtml: KSyntaxParser {
                 }
             }
 
-            // "/>" の '/' は .tag
+            // "/>" の '/' は .tag（self close は script/style に入らない）
             if b == FC.slash {
                 appendSpan(start: i, end: min(i + 1, lineEnd), role: .tag,
                            emitSpans: emitSpans, limitRange: limitRange, spans: &spans)
+
+                // 直後が '>' なら self-closing。script/style でも neutral 扱いにする。
+                if i + 1 < lineEnd && skeleton[i + 1] == FC.gt {
+                    kind = .normal
+                }
+
                 i += 1
                 continue
             }
@@ -422,6 +455,7 @@ final class KSyntaxParserHtml: KSyntaxParser {
         return (.inTag(kind: kind, quote: nil), lineEnd)
     }
 
+
     // MARK: - Helpers (span)
 
     private func appendSpan(
@@ -472,6 +506,7 @@ final class KSyntaxParserHtml: KSyntaxParser {
             let slashIndex = p + 1
             if slashIndex >= end { return nil }
 
+            // "</" でなければ閉じタグ候補ではない
             if skeleton[slashIndex] != FC.slash {
                 i = p + 1
                 continue
@@ -480,14 +515,28 @@ final class KSyntaxParserHtml: KSyntaxParser {
             let nameStart = slashIndex + 1
             if nameStart + nameLower.count > end { return nil }
 
+            // "</script" の一致（大小無視）
             if matchesLowerWord(nameLower, at: nameStart) {
-                // 境界確認（直後が名前継続文字なら別物）
-                let after = nameStart + nameLower.count
-                if after < end && isHtmlNamePart(skeleton[after]) {
+                let afterName = nameStart + nameLower.count
+
+                // 直後が名前継続文字なら別タグ（例: </scriptx）
+                if afterName < end && isHtmlNamePart(skeleton[afterName]) {
                     i = p + 1
                     continue
                 }
-                return p
+
+                // HTMLの end tag は属性を持てない：空白(任意)の後に '>' が必要
+                var j = afterName
+                while j < end && (skeleton[j] == FC.space || skeleton[j] == FC.tab) {
+                    j += 1
+                }
+                if j < end && skeleton[j] == FC.gt {
+                    return p
+                }
+
+                // "</script not ...>" のようなケースは閉じタグではない
+                i = p + 1
+                continue
             }
 
             i = p + 1
@@ -495,6 +544,7 @@ final class KSyntaxParserHtml: KSyntaxParser {
 
         return nil
     }
+
 
     private func matchesLowerWord(_ lowerBytes: [UInt8], at index: Int) -> Bool {
         let skeleton = storage.skeletonString
