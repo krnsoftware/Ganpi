@@ -19,6 +19,8 @@
 			<array>
 				<string>public.plain-text</string>
 				<string>public.source-code</string>
+				<string>public.html</string>
+				<string>public.xhtml</string>
 			</array>
 			<key>NSDocumentClass</key>
 			<string>$(PRODUCT_MODULE_NAME).Document</string>

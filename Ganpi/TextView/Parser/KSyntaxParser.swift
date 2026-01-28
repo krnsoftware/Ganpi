@@ -101,11 +101,13 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
     func makeParser(storage:KTextStorageReadable) -> KSyntaxParser {
         switch self {
         case .plain: return KSyntaxParserPlain(storage: storage)
-        case .ruby: return KSyntaxParserRuby(storage: storage)
-        case .ini: return KSyntaxParserIni(storage: storage)
-        default: return KSyntaxParserPlain(storage: storage)
+        case .ruby:  return KSyntaxParserRuby(storage: storage)
+        case .html:  return KSyntaxParserHtml(storage: storage)
+        case .ini:   return KSyntaxParserIni(storage: storage)
+        default:     return KSyntaxParserPlain(storage: storage)
         }
     }
+
     
     static func detect(fromTypeName typeName: String?, orExtension ext: String?) -> Self {
         // 1) typeName が UTI として一致するか
