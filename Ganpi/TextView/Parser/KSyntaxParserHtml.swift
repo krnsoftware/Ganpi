@@ -348,6 +348,26 @@ final class KSyntaxParserHtml: KSyntaxParser {
             if i >= lineEnd { return (.inTag(kind: kind, quote: nil), lineEnd) }
 
             let b = skeleton[i]
+            
+            // '=' を伴わないクオート文字列（DOCTYPE の PUBLIC "..." "..." など）も .string 扱い
+            if b == FC.singleQuote || b == FC.doubleQuote {
+                let q = b
+                let valueStart = i
+                i += 1
+
+                if let close = firstIndex(ofByte: q, in: i..<lineEnd) {
+                    let valueEnd = min(close + 1, lineEnd)
+                    appendSpan(start: valueStart, end: valueEnd, role: .string,
+                               emitSpans: emitSpans, limitRange: limitRange, spans: &spans)
+                    i = valueEnd
+                    continue
+                } else {
+                    appendSpan(start: valueStart, end: lineEnd, role: .string,
+                               emitSpans: emitSpans, limitRange: limitRange, spans: &spans)
+                    return (.inTag(kind: kind, quote: q), lineEnd)
+                }
+            }
+
 
             // '>' でタグ終了
             if b == FC.gt {
