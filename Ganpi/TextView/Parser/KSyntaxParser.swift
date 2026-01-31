@@ -96,15 +96,12 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
     }
     
     // KSyntaxType.plain.makeParser(storage:self)...といった形で生成する。
-    // 最終的にはdefault節なしとする。
-    //func makeParser(storage:KTextStorageReadable) -> KSyntaxParserProtocol {
     func makeParser(storage:KTextStorageReadable) -> KSyntaxParser {
         switch self {
         case .plain: return KSyntaxParserPlain(storage: storage)
         case .ruby:  return KSyntaxParserRuby(storage: storage)
         case .html:  return KSyntaxParserHtml(storage: storage)
         case .ini:   return KSyntaxParserIni(storage: storage)
-        default:     return KSyntaxParserPlain(storage: storage)
         }
     }
 
@@ -126,8 +123,6 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         return .plain
     }
     
-    
-    
     var description: String {
         return "KSyntaxType: \(self.string)"
     }
@@ -138,9 +133,10 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
 /// 言語アウトライン1項目
 struct KOutlineItem {
     enum Kind { case `class`, module, method }
+    
     let kind: Kind
-    let nameRange: Range<Int>        // 名前シンボルのみ
-    let level: Int                   // ネスト深さ（UI用）
+    let nameRange: Range<Int>        // range of name-symbol.
+    let level: Int                   // nest depth.
     let isSingleton: Bool            // def self.foo / def Klass.bar
 }
 
@@ -168,12 +164,12 @@ class KSyntaxParser {
     private var _completionIsDirty: Bool = true
     private var _completionCatalog: [String] = []
 
-
     
     var baseTextColor: NSColor { return color(.base) }
     var backgroundColor: NSColor { return color(.background) }
     
     var lineCommentPrefix: String? { return nil }
+    
     
     func noteEdit(oldRange: Range<Int>, newCount: Int) {
         markCompletionDirty()
@@ -224,7 +220,6 @@ class KSyntaxParser {
 
     }
 
-
     
     // ensure internal state is valid for given range
     func ensureUpToDate(for range: Range<Int>) { /* no-op */ }
@@ -244,8 +239,6 @@ class KSyntaxParser {
     func currentContext(at index: Int) -> (outer: String?, inner: String?) { return (nil, nil) }
     // get outline of structures. for 'jump' menu.
     func outline(in range: Range<Int>?) -> [KOutlineItem] { return [] }
-    // get completion words.
-    // get completion words (alphabetical / prefix match)
     
     // get completion words (alphabetical / prefix match)
     func completionEntries(prefix: String) -> [String] {
