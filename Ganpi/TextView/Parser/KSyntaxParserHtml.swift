@@ -1,11 +1,9 @@
 //
 //  KSyntaxParserHtml.swift
+//  Ganpi
 //
-//  Ganpi - macOS Text Editor
-//
-//  Created by KARINO Masatsugu for Ganpi Project on 2026/01/29,
+//  Created by KARINO Masatsugu,
 //  with architectural assistance by Sebastian, his loyal AI butler.
-//  All rights reserved.
 //
 
 import AppKit
@@ -14,19 +12,19 @@ final class KSyntaxParserHtml: KSyntaxParser {
 
     // MARK: - Types
 
-    private enum KTagKind: Equatable {
+    private enum KTagOpenKind: Equatable {
         case normal
-        case scriptOpen
-        case styleOpen
+        case script
+        case style
     }
 
     private enum KEndState: Equatable {
         case neutral
         case inComment
-        case inCData
         case inScript
         case inStyle
-        case inTag(kind: KTagKind, quote: UInt8?)
+        case inTag(kind: KTagOpenKind)
+        case inTagQuote(kind: KTagOpenKind, quote: UInt8)
     }
 
     private struct KLineInfo {
@@ -36,16 +34,12 @@ final class KSyntaxParserHtml: KSyntaxParser {
     // MARK: - Properties
 
     private var _lines: [KLineInfo] = []
-    private var _hasScanned = false
 
-    private let _commentBeginBytes = Array("<!--".utf8)
-    private let _commentEndBytes   = Array("-->".utf8)
+    private let _commentStartBytes: [UInt8] = [FC.lt, FC.exclamation, FC.minus, FC.minus] // <!--
+    private let _commentEndBytes:   [UInt8] = [FC.minus, FC.minus, FC.gt]                // -->
 
-    private let _cdataBeginBytes   = Array("<![CDATA[".utf8)
-    private let _cdataEndBytes     = Array("]]>".utf8)
-
-    private let _scriptLowerBytes  = Array("script".utf8)
-    private let _styleLowerBytes   = Array("style".utf8)
+    private let _scriptLower: [UInt8] = Array("script".utf8)
+    private let _styleLower:  [UInt8] = Array("style".utf8)
 
     // MARK: - Init
 
@@ -63,16 +57,13 @@ final class KSyntaxParserHtml: KSyntaxParser {
 
         let plan = consumeRescanPlan(for: range)
 
-        // まず差分（改行増減）を splice で反映
         if plan.lineDelta != 0 {
             applyLineDelta(lines: &_lines,
                            spliceIndex: plan.spliceIndex,
                            lineDelta: plan.lineDelta) { KLineInfo(endState: .neutral) }
         }
 
-        // 安全弁：それでも行数が合わなければ全再構築
         let rebuilt = syncLineBuffer(lines: &_lines) { KLineInfo(endState: .neutral) }
-        if rebuilt { log("Line counts do not match.", from: self) }
         if _lines.isEmpty { return }
 
         var startLine = plan.startLine
@@ -86,498 +77,463 @@ final class KSyntaxParserHtml: KSyntaxParser {
         var minLine = plan.minLine
         minLine = max(0, min(minLine, maxLine))
 
-        let skeleton = storage.skeletonString
-        let clamped = min(range.lowerBound, skeleton.count)
-        let requestedLine = skeleton.lineIndex(at: clamped)
-
-        // 初回は、状態連鎖を作るため必ず先頭から requestedLine までは走査する
-        if !_hasScanned {
-            startLine = 0
-            minLine = max(minLine, requestedLine)
-        }
-
-        // rebuilt で行バッファを作り直した場合も、先頭からやり直す
         scanFrom(line: rebuilt ? 0 : startLine, minLine: minLine)
-        _hasScanned = true
     }
 
     override func attributes(in range: Range<Int>, tabWidth: Int) -> [KAttributedSpan] {
-        ensureUpToDate(for: range)
-        if range.isEmpty { return [] }
+        guard range.count > 0 else { return [] }
 
         let skeleton = storage.skeletonString
-        let lineIndex = skeleton.lineIndex(at: range.lowerBound)
+        let lineRange = skeleton.lineRange(contains: range)
+        guard !lineRange.isEmpty else { return [] }
 
-        if lineIndex < 0 || lineIndex >= _lines.count { return [] }
-
-        let lineRange = skeleton.lineRange(at: lineIndex)
-        let startState: KEndState = (lineIndex > 0) ? _lines[lineIndex - 1].endState : .neutral
+        let lineIndex = skeleton.lineIndex(at: lineRange.lowerBound)
+        let startState: KEndState = (lineIndex > 0 && lineIndex - 1 < _lines.count) ? _lines[lineIndex - 1].endState : .neutral
 
         var spans: [KAttributedSpan] = []
-        let _ = scanLine(lineRange: lineRange,
-                         startState: startState,
-                         emitSpans: true,
-                         limitRange: range,
-                         spans: &spans)
+        spans.reserveCapacity(8)
+
+        _ = parseLine(lineRange: lineRange, clampTo: range, startState: startState, collectSpans: true, spans: &spans)
         return spans
     }
 
-    // MARK: - Line scan (endState chain)
+    // MARK: - Scanning
 
     private func scanFrom(line startLine: Int, minLine: Int) {
         let skeleton = storage.skeletonString
+        if _lines.isEmpty { return }
+
         var state: KEndState = (startLine > 0) ? _lines[startLine - 1].endState : .neutral
 
-        for line in startLine..<_lines.count {
+        var line = startLine
+        while line < _lines.count {
             let lineRange = skeleton.lineRange(at: line)
 
-            let oldEndState = _lines[line].endState
-            let newEndState = scanOneLine(lineRange: lineRange, startState: state)
+            let old = _lines[line].endState
+            var dummySpans: [KAttributedSpan] = []
+            let new = parseLine(lineRange: lineRange, clampTo: lineRange, startState: state, collectSpans: false, spans: &dummySpans)
 
-            _lines[line].endState = newEndState
-            state = newEndState
 
-            // 連鎖が止まっても、minLine までは必ず走査する
-            if oldEndState == newEndState && line >= minLine {
+            _lines[line].endState = new
+            state = new
+
+            if line >= minLine && new == old {
                 break
             }
+
+            line += 1
         }
     }
 
-    private func scanOneLine(lineRange: Range<Int>, startState: KEndState) -> KEndState {
-        var dummy: [KAttributedSpan] = []
-        return scanLine(lineRange: lineRange,
-                        startState: startState,
-                        emitSpans: false,
-                        limitRange: 0..<0,
-                        spans: &dummy)
-    }
-
-    // MARK: - Core scanner (optionally emit spans)
-
-    private func scanLine(
-        lineRange: Range<Int>,
-        startState: KEndState,
-        emitSpans: Bool,
-        limitRange: Range<Int>,
-        spans: inout [KAttributedSpan]
-    ) -> KEndState {
-        if lineRange.isEmpty { return startState }
+    @discardableResult
+    private func parseLine(lineRange: Range<Int>,
+                           clampTo requested: Range<Int>,
+                           startState: KEndState,
+                           collectSpans: Bool,
+                           spans: inout [KAttributedSpan]) -> KEndState {
 
         let skeleton = storage.skeletonString
-        let end = lineRange.upperBound
+        let end = min(lineRange.upperBound, skeleton.count)
+        var i = max(lineRange.lowerBound, 0)
 
-        var i = lineRange.lowerBound
         var state = startState
 
+        @inline(__always)
+        func addSpan(_ r: Range<Int>, _ role: KFunctionalColor) {
+            if !collectSpans { return }
+            if r.isEmpty { return }
+
+            let lower = max(r.lowerBound, requested.lowerBound)
+            let upper = min(r.upperBound, requested.upperBound)
+            if lower >= upper { return }
+
+            spans.append(makeSpan(range: lower..<upper, role: role))
+        }
+
         while i < end {
+
             switch state {
-            case .neutral:
-                while i < end && skeleton[i] != FC.lt {
-                    i += 1
-                }
-                if i >= end { return .neutral }
-
-                if skeleton.matchesPrefix(_commentBeginBytes, at: i) {
-                    state = .inComment
-                    continue
-                }
-
-                if skeleton.matchesPrefix(_cdataBeginBytes, at: i) {
-                    state = .inCData
-                    continue
-                }
-
-                let (nextState, nextIndex) = scanTag(from: i,
-                                                     lineEnd: end,
-                                                     startWithLt: true,
-                                                     tagKindHint: .normal,
-                                                     quoteHint: nil,
-                                                     emitSpans: emitSpans,
-                                                     limitRange: limitRange,
-                                                     spans: &spans)
-                state = nextState
-                i = nextIndex
 
             case .inComment:
-                if let close = skeleton.firstIndex(ofSequence: _commentEndBytes, in: i..<end) {
-                    appendSpan(start: i, end: min(close + _commentEndBytes.count, end), role: .comment,
-                               emitSpans: emitSpans, limitRange: limitRange, spans: &spans)
-                    i = close + _commentEndBytes.count
+                if let close = findSequence(_commentEndBytes, from: i, to: end, skeleton: skeleton) {
+                    let closeEnd = min(close + _commentEndBytes.count, end)
+                    addSpan(i..<closeEnd, .comment)
+                    i = closeEnd
                     state = .neutral
                 } else {
-                    appendSpan(start: i, end: end, role: .comment,
-                               emitSpans: emitSpans, limitRange: limitRange, spans: &spans)
-                    return .inComment
-                }
-
-            case .inCData:
-                if let close = skeleton.firstIndex(ofSequence: _cdataEndBytes, in: i..<end) {
-                    appendSpan(start: i, end: min(close + _cdataEndBytes.count, end), role: .string,
-                               emitSpans: emitSpans, limitRange: limitRange, spans: &spans)
-                    i = close + _cdataEndBytes.count
-                    state = .neutral
-                } else {
-                    appendSpan(start: i, end: end, role: .string,
-                               emitSpans: emitSpans, limitRange: limitRange, spans: &spans)
-                    return .inCData
+                    addSpan(i..<end, .comment)
+                    i = end
                 }
 
             case .inScript:
-                if let closeLt = findClosingTagStart(nameLower: _scriptLowerBytes, in: i..<end) {
-                    // 本文は span を出さない（.base）
-                    i = closeLt
+                if let closeTagStart = findCloseTagStart(nameLower: _scriptLower, from: i, to: end, skeleton: skeleton) {
+                    i = closeTagStart
                     state = .neutral
                 } else {
-                    return .inScript
+                    i = end
                 }
 
             case .inStyle:
-                if let closeLt = findClosingTagStart(nameLower: _styleLowerBytes, in: i..<end) {
-                    i = closeLt
+                if let closeTagStart = findCloseTagStart(nameLower: _styleLower, from: i, to: end, skeleton: skeleton) {
+                    i = closeTagStart
                     state = .neutral
                 } else {
-                    return .inStyle
+                    i = end
                 }
 
-            case .inTag(let kind, let quote):
-                let (nextState, nextIndex) = scanTag(from: i,
-                                                     lineEnd: end,
-                                                     startWithLt: false,
-                                                     tagKindHint: kind,
-                                                     quoteHint: quote,
-                                                     emitSpans: emitSpans,
-                                                     limitRange: limitRange,
-                                                     spans: &spans)
-                state = nextState
-                i = nextIndex
-                if case .inTag = state {
-                    return state
+            case .inTagQuote(let kind, let quote):
+                if let q = findByte(quote, from: i, to: end, skeleton: skeleton) {
+                    let qEnd = min(q + 1, end)
+                    addSpan(i..<qEnd, .string)
+                    i = qEnd
+                    state = .inTag(kind: kind)
+                } else {
+                    addSpan(i..<end, .string)
+                    i = end
                 }
+
+            case .inTag(let kind):
+                let result = parseTagBody(from: i,
+                                          to: end,
+                                          skeleton: skeleton,
+                                          clampTo: requested,
+                                          kind: kind,
+                                          collectSpans: collectSpans,
+                                          addSpan: { r, role in addSpan(r, role) })
+                i = result.nextIndex
+                state = result.endState
+
+            case .neutral:
+                let b = skeleton[i]
+
+                if b == FC.ampersand {
+                    if let entityEnd = parseEntity(from: i, to: end, skeleton: skeleton) {
+                        addSpan(i..<entityEnd, .number)
+                        i = entityEnd
+                    } else {
+                        i += 1
+                    }
+                    continue
+                }
+
+                if b == FC.lt {
+                    // comment
+                    if i + _commentStartBytes.count <= end,
+                       matchesPrefixIgnoreCase(_commentStartBytes, at: i, skeleton: skeleton, to: end) {
+
+                        if let close = findSequence(_commentEndBytes,
+                                                   from: i + _commentStartBytes.count,
+                                                   to: end,
+                                                   skeleton: skeleton) {
+                            let closeEnd = min(close + _commentEndBytes.count, end)
+                            addSpan(i..<closeEnd, .comment)
+                            i = closeEnd
+                            state = .neutral
+                        } else {
+                            addSpan(i..<end, .comment)
+                            i = end
+                            state = .inComment
+                        }
+                        continue
+                    }
+
+                    // tag / declaration
+                    let parsed = parseTag(from: i,
+                                          to: end,
+                                          skeleton: skeleton,
+                                          clampTo: requested,
+                                          collectSpans: collectSpans,
+                                          addSpan: { r, role in addSpan(r, role) })
+                    i = parsed.nextIndex
+                    state = parsed.endState
+                    continue
+                }
+
+                i += 1
             }
         }
 
         return state
     }
 
-    // MARK: - Tag scan
+    // MARK: - Tag parsing
 
-    private func scanTag(
-        from start: Int,
-        lineEnd: Int,
-        startWithLt: Bool,
-        tagKindHint: KTagKind,
-        quoteHint: UInt8?,
-        emitSpans: Bool,
-        limitRange: Range<Int>,
-        spans: inout [KAttributedSpan]
-    ) -> (state: KEndState, nextIndex: Int) {
-        let skeleton = storage.skeletonString
+    private func parseTag(from index: Int,
+                          to end: Int,
+                          skeleton: KSkeletonString,
+                          clampTo requested: Range<Int>,
+                          collectSpans: Bool,
+                          addSpan: (Range<Int>, KFunctionalColor) -> Void) -> (nextIndex: Int, endState: KEndState) {
 
-        var i = start
-        var kind = tagKindHint
-        var quote = quoteHint
+        var i = index
+        let tagStart = i
 
-        // 既にクオート継続中なら、まず閉じを探す（クオート自体も .string に含める）
-        if let q = quote {
-            if let close = firstIndex(ofByte: q, in: i..<lineEnd) {
-                appendSpan(start: i, end: min(close + 1, lineEnd), role: .string,
-                           emitSpans: emitSpans, limitRange: limitRange, spans: &spans)
-                i = close + 1
-                quote = nil
-            } else {
-                appendSpan(start: i, end: lineEnd, role: .string,
-                           emitSpans: emitSpans, limitRange: limitRange, spans: &spans)
-                return (.inTag(kind: kind, quote: q), lineEnd)
+        // '<'
+        i += 1
+
+        // '</' / '<!' / '<?'
+        var prefix: UInt8? = nil
+        if i < end {
+            let p = skeleton[i]
+            if p == FC.slash || p == FC.exclamation || p == FC.question {
+                prefix = p
+                i += 1
             }
         }
 
-        var isCloseTag = false
+        addSpan(tagStart..<i, .tag)
 
-        // startWithLt の場合は '<' から始まる
-        if startWithLt {
-            appendSpan(start: i, end: min(i + 1, lineEnd), role: .tag,
-                       emitSpans: emitSpans, limitRange: limitRange, spans: &spans)
+        let nameStart = i
+        if i < end, isHtmlNameStart(skeleton[i]) {
             i += 1
-            if i >= lineEnd { return (.inTag(kind: kind, quote: nil), lineEnd) }
-
-            // '</' / '<!' / '<?' の記号は .tag（閉じタグ判定もここで取る）
-            if skeleton[i] == FC.slash || skeleton[i] == FC.exclamation || skeleton[i] == FC.question {
-                if skeleton[i] == FC.slash {
-                    isCloseTag = true
-                }
-                appendSpan(start: i, end: min(i + 1, lineEnd), role: .tag,
-                           emitSpans: emitSpans, limitRange: limitRange, spans: &spans)
+            while i < end, isHtmlNamePart(skeleton[i]) {
                 i += 1
-                if i >= lineEnd { return (.inTag(kind: kind, quote: nil), lineEnd) }
-            }
-
-            // タグ名
-            let nameStart = i
-            if isHtmlNameStart(skeleton[i]) {
-                i += 1
-                while i < lineEnd && isHtmlNamePart(skeleton[i]) {
-                    i += 1
-                }
-                let nameEnd = i
-                appendSpan(start: nameStart, end: nameEnd, role: .tag,
-                           emitSpans: emitSpans, limitRange: limitRange, spans: &spans)
-
-                // script/style open 判定は「開きタグのみ」
-                if !isCloseTag {
-                    let nameLen = nameEnd - nameStart
-                    if nameLen == _scriptLowerBytes.count && matchesLowerWord(_scriptLowerBytes, at: nameStart) {
-                        kind = .scriptOpen
-                    } else if nameLen == _styleLowerBytes.count && matchesLowerWord(_styleLowerBytes, at: nameStart) {
-                        kind = .styleOpen
-                    } else {
-                        kind = .normal
-                    }
-                } else {
-                    kind = .normal
-                }
             }
         }
 
-        // タグ内部：属性列を走査
-        while i < lineEnd {
-            // 空白スキップ
-            while i < lineEnd && (skeleton[i] == FC.space || skeleton[i] == FC.tab) {
-                i += 1
-            }
-            if i >= lineEnd { return (.inTag(kind: kind, quote: nil), lineEnd) }
-
-            let b = skeleton[i]
-            
-            // '=' を伴わないクオート文字列（DOCTYPE の PUBLIC "..." "..." など）も .string 扱い
-            if b == FC.singleQuote || b == FC.doubleQuote {
-                let q = b
-                let valueStart = i
-                i += 1
-
-                if let close = firstIndex(ofByte: q, in: i..<lineEnd) {
-                    let valueEnd = min(close + 1, lineEnd)
-                    appendSpan(start: valueStart, end: valueEnd, role: .string,
-                               emitSpans: emitSpans, limitRange: limitRange, spans: &spans)
-                    i = valueEnd
-                    continue
-                } else {
-                    appendSpan(start: valueStart, end: lineEnd, role: .string,
-                               emitSpans: emitSpans, limitRange: limitRange, spans: &spans)
-                    return (.inTag(kind: kind, quote: q), lineEnd)
-                }
-            }
-
-
-            // '>' でタグ終了
-            if b == FC.gt {
-                appendSpan(start: i, end: min(i + 1, lineEnd), role: .tag,
-                           emitSpans: emitSpans, limitRange: limitRange, spans: &spans)
-                i += 1
-
-                // 閉じタグは常に neutral に戻す
-                if isCloseTag {
-                    return (.neutral, i)
-                }
-
-                switch kind {
-                case .scriptOpen: return (.inScript, i)
-                case .styleOpen:  return (.inStyle, i)
-                case .normal:     return (.neutral, i)
-                }
-            }
-
-            // "/>" の '/' は .tag（self close は script/style に入らない）
-            if b == FC.slash {
-                appendSpan(start: i, end: min(i + 1, lineEnd), role: .tag,
-                           emitSpans: emitSpans, limitRange: limitRange, spans: &spans)
-
-                // 直後が '>' なら self-closing。script/style でも neutral 扱いにする。
-                if i + 1 < lineEnd && skeleton[i + 1] == FC.gt {
-                    kind = .normal
-                }
-
-                i += 1
-                continue
-            }
-
-            // 属性名
-            if isHtmlNameStart(b) {
-                let attrStart = i
-                i += 1
-                while i < lineEnd && isHtmlNamePart(skeleton[i]) {
-                    i += 1
-                }
-                let attrEnd = i
-                appendSpan(start: attrStart, end: attrEnd, role: .variable,
-                           emitSpans: emitSpans, limitRange: limitRange, spans: &spans)
-
-                // 空白スキップ
-                while i < lineEnd && (skeleton[i] == FC.space || skeleton[i] == FC.tab) {
-                    i += 1
-                }
-                if i >= lineEnd { return (.inTag(kind: kind, quote: nil), lineEnd) }
-
-                // '=' があれば属性値
-                if skeleton[i] == FC.equals {
-                    appendSpan(start: i, end: min(i + 1, lineEnd), role: .tag,
-                               emitSpans: emitSpans, limitRange: limitRange, spans: &spans)
-                    i += 1
-
-                    while i < lineEnd && (skeleton[i] == FC.space || skeleton[i] == FC.tab) {
-                        i += 1
-                    }
-                    if i >= lineEnd { return (.inTag(kind: kind, quote: nil), lineEnd) }
-
-                    let vb = skeleton[i]
-
-                    // クオート有り
-                    if vb == FC.singleQuote || vb == FC.doubleQuote {
-                        let q = vb
-                        let valueStart = i
-                        i += 1
-
-                        if let close = firstIndex(ofByte: q, in: i..<lineEnd) {
-                            let valueEnd = min(close + 1, lineEnd)
-                            appendSpan(start: valueStart, end: valueEnd, role: .string,
-                                       emitSpans: emitSpans, limitRange: limitRange, spans: &spans)
-                            i = valueEnd
-                            continue
-                        } else {
-                            appendSpan(start: valueStart, end: lineEnd, role: .string,
-                                       emitSpans: emitSpans, limitRange: limitRange, spans: &spans)
-                            return (.inTag(kind: kind, quote: q), lineEnd)
-                        }
-                    }
-
-                    // クオート無し属性値：空白または '>' までを .string
-                    let valueStart = i
-                    while i < lineEnd {
-                        let cb = skeleton[i]
-                        if cb == FC.space || cb == FC.tab || cb == FC.gt { break }
-                        i += 1
-                    }
-                    if valueStart < i {
-                        appendSpan(start: valueStart, end: i, role: .string,
-                                   emitSpans: emitSpans, limitRange: limitRange, spans: &spans)
-                    }
-                    continue
-                }
-
-                // '=' が無い boolean attribute はここで終了（名前のみ色付け）
-                continue
-            }
-
-            // その他の文字は黙って進める（破綻を避ける）
-            i += 1
+        if i > nameStart {
+            // 要素名・宣言名は .keyword
+            addSpan(nameStart..<i, .keyword)
         }
 
-        return (.inTag(kind: kind, quote: nil), lineEnd)
+        // 開きタグのみ script/style を判定（閉じタグや <! ... は除外）
+        var kind: KTagOpenKind = .normal
+        if prefix != FC.slash, prefix != FC.exclamation {
+            if isWordIgnoreCase(_scriptLower, in: nameStart..<i, skeleton: skeleton) {
+                kind = .script
+            } else if isWordIgnoreCase(_styleLower, in: nameStart..<i, skeleton: skeleton) {
+                kind = .style
+            }
+        }
+
+        // タグ本文へ
+        let body = parseTagBody(from: i,
+                                to: end,
+                                skeleton: skeleton,
+                                clampTo: requested,
+                                kind: kind,
+                                collectSpans: collectSpans,
+                                addSpan: addSpan)
+
+        return (nextIndex: body.nextIndex, endState: body.endState)
     }
 
+    private func parseTagBody(from index: Int,
+                              to end: Int,
+                              skeleton: KSkeletonString,
+                              clampTo requested: Range<Int>,
+                              kind: KTagOpenKind,
+                              collectSpans: Bool,
+                              addSpan: (Range<Int>, KFunctionalColor) -> Void) -> (nextIndex: Int, endState: KEndState) {
 
-    // MARK: - Helpers (span)
+        var i = index
+        var state: KEndState = .inTag(kind: kind)
 
-    private func appendSpan(
-        start: Int,
-        end: Int,
-        role: KFunctionalColor,
-        emitSpans: Bool,
-        limitRange: Range<Int>,
-        spans: inout [KAttributedSpan]
-    ) {
-        if !emitSpans { return }
-        if start >= end { return }
-
-        // limitRange との交差を手動で取る（Range.clamped は使わない）
-        let lower = max(start, limitRange.lowerBound)
-        let upper = min(end, limitRange.upperBound)
-        if lower >= upper { return }
-
-        spans.append(makeSpan(range: lower..<upper, role: role))
-    }
-
-    // MARK: - Helpers (search)
-
-    private func firstIndex(ofByte target: UInt8, in range: Range<Int>) -> Int? {
-        let skeleton = storage.skeletonString
-        var i = range.lowerBound
-        let end = range.upperBound
         while i < end {
-            if skeleton[i] == target { return i }
+            let b = skeleton[i]
+
+            if b == FC.gt {
+                addSpan(i..<min(i + 1, end), .tag)
+                i += 1
+                switch kind {
+                case .script: return (i, .inScript)
+                case .style: return (i, .inStyle)
+                case .normal: return (i, .neutral)
+                }
+            }
+
+            // '=' を伴わないクオート文字列（DOCTYPE の PUBLIC "..." "..." など）も .string 扱い
+            if b == FC.doubleQuote || b == FC.singleQuote {
+                let quote = b
+                let start = i
+                i += 1
+                while i < end, skeleton[i] != quote {
+                    i += 1
+                }
+                if i < end {
+                    i += 1
+                    addSpan(start..<i, .string)
+                    continue
+                } else {
+                    addSpan(start..<end, .string)
+                    state = .inTagQuote(kind: kind, quote: quote)
+                    return (end, state)
+                }
+            }
+
+            if b == FC.equals {
+                addSpan(i..<min(i + 1, end), .tag)
+                i += 1
+
+                i = skeleton.skipSpaces(from: i, to: end)
+                if i >= end { break }
+
+                let v = skeleton[i]
+                if v == FC.doubleQuote || v == FC.singleQuote {
+                    let quote = v
+                    let start = i
+                    i += 1
+                    while i < end, skeleton[i] != quote {
+                        i += 1
+                    }
+                    if i < end {
+                        i += 1
+                        addSpan(start..<i, .string)
+                        continue
+                    } else {
+                        addSpan(start..<end, .string)
+                        state = .inTagQuote(kind: kind, quote: quote)
+                        return (end, state)
+                    }
+                }
+
+                // クオート無し属性値
+                let start = i
+                while i < end {
+                    let c = skeleton[i]
+                    if c == FC.space || c == FC.tab || c == FC.gt { break }
+                    i += 1
+                }
+                if i > start {
+                    addSpan(start..<i, .string)
+                }
+
+                continue
+            }
+
+            // 属性名や宣言中の名前相当（ここでは .tag に寄せる）
+            if isHtmlNameStart(b) {
+                let start = i
+                i += 1
+                while i < end, isHtmlNamePart(skeleton[i]) {
+                    i += 1
+                }
+                addSpan(start..<i, .tag)
+                continue
+            }
+
+            if b == FC.slash || b == FC.exclamation || b == FC.question {
+                addSpan(i..<min(i + 1, end), .tag)
+            }
+
             i += 1
         }
+
+        return (end, state)
+    }
+
+    // MARK: - Entity
+
+    private func parseEntity(from index: Int, to end: Int, skeleton: KSkeletonString) -> Int? {
+        // &name;  /  &#123;  /  &#x1A2B;
+        var i = index
+        if skeleton[i] != FC.ampersand { return nil }
+        i += 1
+        if i >= end { return nil }
+
+        var seenOne = false
+
+        while i < end {
+            let b = skeleton[i]
+
+            if b == FC.semicolon {
+                if !seenOne { return nil }
+                return i + 1
+            }
+
+            if b == FC.numeric { // '#'
+                if seenOne { return nil }
+                seenOne = true
+                i += 1
+                continue
+            }
+
+            if b.isAsciiAlpha || b.isAsciiDigit || b == FC.underscore {
+                seenOne = true
+                i += 1
+                continue
+            }
+
+            if b == 0x78 || b == 0x58 { // x / X (hex)
+                seenOne = true
+                i += 1
+                continue
+            }
+
+            return nil
+        }
+
         return nil
     }
 
-    private func findClosingTagStart(nameLower: [UInt8], in range: Range<Int>) -> Int? {
-        let skeleton = storage.skeletonString
-        var i = range.lowerBound
-        let end = range.upperBound
+    // MARK: - Close tag detection (script/style)
 
+    private func findCloseTagStart(nameLower: [UInt8], from index: Int, to end: Int, skeleton: KSkeletonString) -> Int? {
+        // </name>  または </name   > の形だけを閉じタグとして認める。
+        // ("</name not really>" のような文字列内パターンを誤検出しないため)
+
+        var i = index
         while i < end {
-            // '<' を探す
-            while i < end && skeleton[i] != FC.lt {
+            if skeleton[i] != FC.lt {
                 i += 1
+                continue
             }
-            if i >= end { return nil }
 
-            let p = i
-            let slashIndex = p + 1
-            if slashIndex >= end { return nil }
-
-            // "</" でなければ閉じタグ候補ではない
+            let slashIndex = i + 1
+            if slashIndex >= end {
+                return nil
+            }
             if skeleton[slashIndex] != FC.slash {
-                i = p + 1
+                i += 1
                 continue
             }
 
             let nameStart = slashIndex + 1
-            if nameStart + nameLower.count > end { return nil }
+            let nameEnd = nameStart + nameLower.count
+            if nameEnd > end {
+                return nil
+            }
 
-            // "</script" の一致（大小無視）
-            if matchesLowerWord(nameLower, at: nameStart) {
-                let afterName = nameStart + nameLower.count
-
-                // 直後が名前継続文字なら別タグ（例: </scriptx）
-                if afterName < end && isHtmlNamePart(skeleton[afterName]) {
-                    i = p + 1
-                    continue
-                }
-
-                // HTMLの end tag は属性を持てない：空白(任意)の後に '>' が必要
-                var j = afterName
-                while j < end && (skeleton[j] == FC.space || skeleton[j] == FC.tab) {
-                    j += 1
-                }
-                if j < end && skeleton[j] == FC.gt {
-                    return p
-                }
-
-                // "</script not ...>" のようなケースは閉じタグではない
-                i = p + 1
+            if !isWordIgnoreCase(nameLower, in: nameStart..<nameEnd, skeleton: skeleton) {
+                i += 1
                 continue
             }
 
-            i = p + 1
-        }
+            // "</scriptx" のようなケースを排除
+            if nameEnd < end, isHtmlNamePart(skeleton[nameEnd]) {
+                i += 1
+                continue
+            }
 
+            var j = nameEnd
+            while j < end {
+                let b = skeleton[j]
+                if b == FC.space || b == FC.tab {
+                    j += 1
+                    continue
+                }
+                break
+            }
+
+            if j < end, skeleton[j] == FC.gt {
+                return i
+            }
+
+            i += 1
+        }
         return nil
     }
 
+    // MARK: - Utilities
 
-    private func matchesLowerWord(_ lowerBytes: [UInt8], at index: Int) -> Bool {
-        let skeleton = storage.skeletonString
-        if index < 0 { return false }
-        if index + lowerBytes.count > skeleton.count { return false }
+    private func isHtmlNameStart(_ b: UInt8) -> Bool {
+        // HTML/XML 風: A-Z a-z _ :
+        return b.isAsciiAlpha || b == FC.underscore || b == FC.colon
+    }
 
-        var i = 0
-        while i < lowerBytes.count {
-            let b = skeleton[index + i]
-            if lowerAscii(b) != lowerBytes[i] { return false }
-            i += 1
-        }
-        return true
+    private func isHtmlNamePart(_ b: UInt8) -> Bool {
+        // start + 0-9 -
+        return isHtmlNameStart(b) || b.isAsciiDigit || b == FC.minus
     }
 
     private func lowerAscii(_ b: UInt8) -> UInt8 {
@@ -585,18 +541,55 @@ final class KSyntaxParserHtml: KSyntaxParser {
         return b
     }
 
-    // MARK: - Helpers (HTML name char)
-
-    private func isHtmlNameStart(_ b: UInt8) -> Bool {
-        // ':' は先頭不可（XML系の慣習に合わせる）
-        if b == FC.colon { return false }
-        return b.isAsciiAlpha || b == FC.underscore
+    private func isWordIgnoreCase(_ wordLower: [UInt8], in range: Range<Int>, skeleton: KSkeletonString) -> Bool {
+        if range.count != wordLower.count { return false }
+        var i = 0
+        while i < wordLower.count {
+            if lowerAscii(skeleton[range.lowerBound + i]) != wordLower[i] { return false }
+            i += 1
+        }
+        return true
     }
 
-    private func isHtmlNamePart(_ b: UInt8) -> Bool {
-        if b.isIdentPartAZ09_ { return true }
-        if b == FC.minus { return true }
-        if b == FC.colon { return true }
-        return false
+    private func matchesPrefixIgnoreCase(_ word: [UInt8], at index: Int, skeleton: KSkeletonString, to end: Int) -> Bool {
+        if word.isEmpty { return true }
+        if index < 0 { return false }
+        if index + word.count > end { return false }
+
+        var i = 0
+        while i < word.count {
+            if lowerAscii(skeleton[index + i]) != lowerAscii(word[i]) { return false }
+            i += 1
+        }
+        return true
+    }
+
+    private func findSequence(_ seq: [UInt8], from index: Int, to end: Int, skeleton: KSkeletonString) -> Int? {
+        if seq.isEmpty { return index }
+        if index < 0 { return nil }
+        if index >= end { return nil }
+        if seq.count > (end - index) { return nil }
+
+        var i = index
+        let last = end - seq.count
+        while i <= last {
+            var j = 0
+            while j < seq.count {
+                if skeleton[i + j] != seq[j] { break }
+                j += 1
+            }
+            if j == seq.count { return i }
+            i += 1
+        }
+        return nil
+    }
+
+    private func findByte(_ b: UInt8, from index: Int, to end: Int, skeleton: KSkeletonString) -> Int? {
+        var i = index
+        while i < end {
+            if skeleton[i] == b { return i }
+            i += 1
+        }
+        return nil
     }
 }
