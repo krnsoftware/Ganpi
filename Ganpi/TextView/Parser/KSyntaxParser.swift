@@ -42,7 +42,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         switch self {
         case .plain: return ["txt", "text", "md"]
         case .ruby:  return ["rb", "rake", "ru", "erb"]
-        case .html:  return ["html", "htm"]
+        case .html:  return ["html", "htm", "xhtml", "xml", "plist"]
         case .ini:   return ["ini", "cfg", "conf"]
         }
     }
@@ -62,7 +62,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         switch self {
         case .plain: return "Plain"
         case .ruby: return "Ruby"
-        case .html: return "HTML"
+        case .html: return "HTML/XML"
         case .ini: return "INI"
         }
     }
