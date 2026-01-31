@@ -252,7 +252,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = NO;
+				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Ganpi/Resources/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Ganpi;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
@@ -282,7 +282,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = NO;
+				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Ganpi/Resources/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Ganpi;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
