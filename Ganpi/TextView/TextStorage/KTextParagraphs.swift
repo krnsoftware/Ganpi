@@ -130,7 +130,7 @@ class KTextParagraph {
     
 }
 
-class KTextSnapShot {
+class KTextParagraphs {
     private unowned let _storage: KTextStorageReadable
     var paragraphs: [KTextParagraph]
     

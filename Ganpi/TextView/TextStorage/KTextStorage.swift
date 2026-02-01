@@ -88,7 +88,7 @@ protocol KTextStorageCommon: AnyObject {
 protocol KTextStorageReadable: KTextStorageCommon {
     var string: String { get }
     var skeletonString: KSkeletonString { get }
-    var snapshot: KTextSnapShot { get }
+    var snapshot: KTextParagraphs { get }
     var hardLineCount: Int { get } // if _character is empty, return 1. if end of chars is '\n', add 1.
     var invisibleCharacters: KInvisibleCharacters? { get }
     var spaceAdvance: CGFloat { get }
@@ -176,7 +176,7 @@ final class KTextStorage: KTextStorageProtocol {
     private var _hardLineCount: Int?
     private var _invisibleCharacters: KInvisibleCharacters?
     private var _lineNumberCharacterMaxWidth: CGFloat?
-    private var _snapshot: KTextSnapShot?
+    private var _snapshot: KTextParagraphs?
     
     // for undo.
     private lazy var _undoManager: KUndoManager = .init(with: self)
@@ -321,10 +321,10 @@ final class KTextStorage: KTextStorageProtocol {
         }
     }
     
-    var snapshot: KTextSnapShot {
+    var snapshot: KTextParagraphs {
         if let cache = _snapshot { return cache }
         
-        let snapshot = KTextSnapShot(storage: self)
+        let snapshot = KTextParagraphs(storage: self)
         _snapshot = snapshot
         return snapshot
     }
