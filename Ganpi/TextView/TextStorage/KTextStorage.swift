@@ -88,7 +88,7 @@ protocol KTextStorageCommon: AnyObject {
 protocol KTextStorageReadable: KTextStorageCommon {
     var string: String { get }
     var skeletonString: KSkeletonString { get }
-    var snapshot: KTextParagraphs { get }
+    var paragraphs: KTextParagraphs { get }
     var hardLineCount: Int { get } // if _character is empty, return 1. if end of chars is '\n', add 1.
     var invisibleCharacters: KInvisibleCharacters? { get }
     var spaceAdvance: CGFloat { get }
@@ -159,7 +159,6 @@ final class KTextStorage: KTextStorageProtocol {
     // data.
     private(set) var _characters: [Character] = []
     private var _observers: [_ObserverEntry] = []
-    //private lazy var _parser: KSyntaxParserProtocol = KSyntaxParserPlain(storage: self)
     private lazy var _parser: KSyntaxParser = KSyntaxParserPlain(storage: self)
     private var _skeletonString: KSkeletonString = .init()
     
@@ -176,7 +175,7 @@ final class KTextStorage: KTextStorageProtocol {
     private var _hardLineCount: Int?
     private var _invisibleCharacters: KInvisibleCharacters?
     private var _lineNumberCharacterMaxWidth: CGFloat?
-    private var _snapshot: KTextParagraphs?
+    private var _paragraphs: KTextParagraphs?
     
     // for undo.
     private lazy var _undoManager: KUndoManager = .init(with: self)
@@ -321,12 +320,12 @@ final class KTextStorage: KTextStorageProtocol {
         }
     }
     
-    var snapshot: KTextParagraphs {
-        if let cache = _snapshot { return cache }
+    var paragraphs: KTextParagraphs {
+        if let cache = _paragraphs { return cache }
         
-        let snapshot = KTextParagraphs(storage: self)
-        _snapshot = snapshot
-        return snapshot
+        let parags = KTextParagraphs(storage: self)
+        _paragraphs = parags
+        return parags
     }
     
     
@@ -355,7 +354,7 @@ final class KTextStorage: KTextStorageProtocol {
         if oldReturnCount != newReturnCount {
             _hardLineCount = nil
         }
-        _snapshot = nil
+        _paragraphs = nil
         
         // replacement.
         _characters.replaceSubrange(range, with: newCharacters)

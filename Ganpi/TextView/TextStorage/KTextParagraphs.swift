@@ -1,5 +1,5 @@
 //
-//  KTextSnapShot.swift
+//  KTextParagraphs.swift
 //
 //  Ganpi - macOS Text Editor
 //
@@ -132,48 +132,56 @@ class KTextParagraph {
 
 class KTextParagraphs {
     private unowned let _storage: KTextStorageReadable
-    var paragraphs: [KTextParagraph]
-    
+
     init(storage: KTextStorageReadable) {
         _storage = storage
-        
-        var parags:[KTextParagraph] = []
-        var lower = 0
-        for (i, ch) in _storage.skeletonString.bytes.enumerated() {
-            if ch == FC.lf {
-                parags += [KTextParagraph(storage: _storage, range: lower..<i)]
-                lower = i + 1
-            }
-        }
-        parags += [KTextParagraph(storage: _storage, range: lower..<_storage.count)]
-        paragraphs = parags
     }
-    
+
+    // 段落（=行）数。"" は 1 行、"\n" は 2 行。
+    var count: Int {
+        _storage.skeletonString.newlineIndices.count + 1
+    }
+
+    // i行目(0始まり)のKTextParagraphをオンデマンド生成して返す（LFは含まない）
+    subscript(_ index: Int) -> KTextParagraph {
+        let newlines = _storage.skeletonString.newlineIndices
+        let totalCount = newlines.count + 1
+
+        precondition(index >= 0 && index < totalCount)
+
+        let start: Int = (index == 0) ? 0 : (newlines[index - 1] + 1)
+        let end: Int = (index < newlines.count) ? newlines[index] : _storage.count
+        return KTextParagraph(storage: _storage, range: start..<end)
+    }
+
     func paragraphIndex(containing index: Int) -> Int? {
-        // 許容範囲：0...count（count は文末直後）
-        guard index >= 0, index <= _storage.count else { log("out of range.", from: self); return nil }
-        if paragraphs.isEmpty { log("empty.", from: self); return nil }
+        guard index >= 0 && index <= _storage.count else {
+            log("out of range.", from: self)
+            return nil
+        }
+
+        let newlines = _storage.skeletonString.newlineIndices
 
         // 文末（index == count）は最後の段落
-        if index == _storage.count { return paragraphs.count - 1 }
+        if index == _storage.count {
+            return newlines.count // = (newlines.count + 1) - 1
+        }
 
+        // lowerBound: first newlineIndex >= index
         var lo = 0
-        var hi = paragraphs.count  // 半開区間
+        var hi = newlines.count
         while lo < hi {
             let mid = (lo + hi) >> 1
-            let range = paragraphs[mid].range // [lower, upper)
-            if index < range.lowerBound {
-                hi = mid
-            } else if index >= range.upperBound {
+            if newlines[mid] < index {
                 lo = mid + 1
             } else {
-                return mid // lower <= index < upper
+                hi = mid
             }
         }
-        // ここに来るのは “境界ジャスト（= upperBound）”
-        return lo > 0 ? (lo - 1) : 0
+        // index が LF 上の場合も lo はその LF の位置を指すため、結果は直前の段落（従来挙動）
+        return lo
     }
-    
+
     // rangeを含むparagraphのindexの範囲を返す。
     func paragraphIndexRange(containing range: Range<Int>) -> Range<Int>? {
         if range.isEmpty {
@@ -185,7 +193,7 @@ class KTextParagraphs {
             let hi: Int
             if range.upperBound == _storage.count {
                 // 文末まで選択されている場合：最終段落を含める（末尾が空段落でも漏らさない）
-                hi = paragraphs.count - 1
+                hi = count - 1
             } else {
                 guard let hiIndex = paragraphIndex(containing: range.upperBound - 1) else { return nil }
                 hi = hiIndex
@@ -193,12 +201,14 @@ class KTextParagraphs {
             return lo..<(hi + 1) // 半開区間に揃える
         }
     }
-    
+
     // indexの範囲で表されるパラグラフの範囲を返す。最後の行の行末の改行は含まない。
     func paragraphRange(indexRange: Range<Int>) -> Range<Int> {
         precondition(!indexRange.isEmpty)
-        let lower = paragraphs[indexRange.lowerBound].range.lowerBound
-        let upper = paragraphs[indexRange.upperBound - 1].range.upperBound
+        precondition(indexRange.lowerBound >= 0 && indexRange.upperBound <= count)
+
+        let lower = self[indexRange.lowerBound].range.lowerBound
+        let upper = self[indexRange.upperBound - 1].range.upperBound
         return lower..<upper
     }
 }

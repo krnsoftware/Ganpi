@@ -189,15 +189,15 @@ extension KTextView {
     // MARK: - Delete Lines / Duplicate Lines
     
     @IBAction func deleteLines(_ sender: Any?) {
-        let snapshot = textStorage.snapshot
-        guard let indexRange = snapshot.paragraphIndexRange(containing: selectionRange),
+        let parags = textStorage.paragraphs
+        guard let indexRange = parags.paragraphIndexRange(containing: selectionRange),
               !indexRange.isEmpty else { log("1", from: self); return }
         
         // 段落本体の文字範囲（[lower, upper)）
-        var deleteRange = snapshot.paragraphRange(indexRange: indexRange)
+        var deleteRange = parags.paragraphRange(indexRange: indexRange)
         
         // 最終段落を含まない場合は、後続の改行（1文字）も一緒に削除して繰り上げる
-        if indexRange.upperBound < snapshot.paragraphs.count {
+        if indexRange.upperBound < parags.count {
             if deleteRange.upperBound < textStorage.count {
                 deleteRange = deleteRange.lowerBound ..< (deleteRange.upperBound + 1)
             }
@@ -209,12 +209,12 @@ extension KTextView {
     }
     
     @IBAction func duplicateLines(_ sender: Any?) {
-        let snapshot = textStorage.snapshot
-        guard let indexRange = snapshot.paragraphIndexRange(containing: selectionRange),
+        let parags = textStorage.paragraphs
+        guard let indexRange = parags.paragraphIndexRange(containing: selectionRange),
               !indexRange.isEmpty else { log("1", from: self); return }
         
         // 対象段落の文字範囲と内容（段落はLFを含まない仕様）
-        let totalRange = snapshot.paragraphRange(indexRange: indexRange)
+        let totalRange = parags.paragraphRange(indexRange: indexRange)
         let block = textStorage.string(in: totalRange)
         
         // 直下に複製する：挿入位置は対象ブロックの末尾
@@ -264,36 +264,39 @@ extension KTextView {
     }
     
     func sortSelectedLines(options: String.CompareOptions = [], ascending: Bool = true) {
-        let snapshot = textStorage.snapshot
+        let parags = textStorage.paragraphs
         let sel = selectionRange
-        
-        guard var paraRange = snapshot.paragraphIndexRange(containing: sel),
+
+        guard var paraRange = parags.paragraphIndexRange(containing: sel),
               !paraRange.isEmpty else { return }
-        
-        // 全文選択で末尾LFがあるなら、空段落を含める
+
+        // 全文選択で末尾LFがあるなら、空段落を含める（ただし既に含まれている場合は増やさない）
+        let last = parags[parags.count - 1]
         if sel.lowerBound == 0, sel.upperBound == textStorage.count,
-           let last = snapshot.paragraphs.last, last.range.isEmpty {
+           last.range.isEmpty,
+           paraRange.upperBound < parags.count {
             paraRange = paraRange.lowerBound ..< (paraRange.upperBound + 1)
         }
-        
+
         var lines: [String] = []
         lines.reserveCapacity(paraRange.count)
-        for i in paraRange { lines.append(snapshot.paragraphs[i].string) }
-        
+        for i in paraRange { lines.append(parags[i].string) }
+
         let locale = Locale.current
         lines.sort {
             let cmp = $0.compare($1, options: options, range: nil, locale: locale)
             return ascending ? (cmp == .orderedAscending) : (cmp == .orderedDescending)
         }
-        
-        let lower = snapshot.paragraphs[paraRange.lowerBound].range.lowerBound
-        let upper = snapshot.paragraphs[paraRange.upperBound - 1].range.upperBound
+
+        let lower = parags[paraRange.lowerBound].range.lowerBound
+        let upper = parags[paraRange.upperBound - 1].range.upperBound
         let replaceRange = lower..<upper
-        
+
         let newBlock = lines.joined(separator: "\n")
         textStorage.replaceString(in: replaceRange, with: newBlock)
         selectionRange = replaceRange.lowerBound ..< (replaceRange.lowerBound + newBlock.count)
     }
+
     
     
     // MARK: - Unique Lines
@@ -311,15 +314,15 @@ extension KTextView {
     // 選択範囲にかかる段落の重複を削除する（順序は維持）
     // - Parameter keepLast: true で最後の出現を残す（後勝ち）、false で最初（先勝ち）
     func uniqueSelectedLines(keepLast: Bool) {
-        let snapshot = textStorage.snapshot
+        let parags = textStorage.paragraphs
         let sel = selectionRange
         
         // 空選択は全文対象／それ以外は選択にかかる段落範囲
         let paraRange: Range<Int>
         if sel.isEmpty {
-            paraRange = 0 ..< snapshot.paragraphs.count
+            paraRange = 0 ..< parags.count
         } else {
-            guard let r = snapshot.paragraphIndexRange(containing: sel), !r.isEmpty else { return }
+            guard let r = parags.paragraphIndexRange(containing: sel), !r.isEmpty else { return }
             paraRange = r
         }
         
@@ -331,7 +334,7 @@ extension KTextView {
         if keepLast {
             // 後勝ち：逆順に走査して新規だけを前詰め
             for idx in paraRange.reversed() {
-                let pr = snapshot.paragraphs[idx].range
+                let pr = parags[idx].range
                 let key = TextRangeRef(storage: textStorage, range: pr)
                 if seen.insert(key).inserted {
                     keptRanges.insert(pr, at: 0)
@@ -340,7 +343,7 @@ extension KTextView {
         } else {
             // 先勝ち：通常順に走査して新規だけを追加
             for idx in paraRange {
-                let pr = snapshot.paragraphs[idx].range
+                let pr = parags[idx].range
                 let key = TextRangeRef(storage: textStorage, range: pr)
                 if seen.insert(key).inserted {
                     keptRanges.append(pr)
@@ -349,8 +352,8 @@ extension KTextView {
         }
         
         // 置換範囲（文字範囲）を構成
-        let lower = snapshot.paragraphs[paraRange.lowerBound].range.lowerBound
-        let upper = snapshot.paragraphs[paraRange.upperBound - 1].range.upperBound
+        let lower = parags[paraRange.lowerBound].range.lowerBound
+        let upper = parags[paraRange.upperBound - 1].range.upperBound
         let replaceRange = lower ..< upper
         
         // 最後にだけ文字列化（コピーはここ1回）
@@ -369,24 +372,24 @@ extension KTextView {
     // MARK: - Join Lines
     
     @IBAction func joinLines(_ sender: Any?) {
-        let snapshot = textStorage.snapshot
+        let parags = textStorage.paragraphs
         let idxRange: Range<Int>
         
         if selectionRange.isEmpty {
-            idxRange = 0..<snapshot.paragraphs.count
+            idxRange = 0..<parags.count
         } else {
-            guard let r = snapshot.paragraphIndexRange(containing: selectionRange),
+            guard let r = parags.paragraphIndexRange(containing: selectionRange),
                   !r.isEmpty else { return }
             idxRange = r
         }
         if idxRange.count <= 1 { return }
         
-        let totalRange = snapshot.paragraphRange(indexRange: idxRange)
+        let totalRange = parags.paragraphRange(indexRange: idxRange)
         
         var parts: [String] = []
         parts.reserveCapacity(idxRange.count)
         for i in idxRange {
-            parts.append(snapshot.paragraphs[i].string)
+            parts.append(parags[i].string)
         }
         let joined = parts.joined()
         
@@ -399,11 +402,11 @@ extension KTextView {
     // MARK: - Trim Lines
     
     @IBAction func trimTrailingSpaces(_ sender: Any?) {
-        let snapshot = textStorage.snapshot
+        let parags = textStorage.paragraphs
         let sel = selectionRange
         
         // 対象段落を決定
-        guard let idxRange = snapshot.paragraphIndexRange(containing: sel) else {
+        guard let idxRange = parags.paragraphIndexRange(containing: sel) else {
             log("idx nil",from:self)
             return
         }
@@ -414,7 +417,7 @@ extension KTextView {
         resultLines.reserveCapacity(idxRange.count)
         
         for i in idxRange {
-            let para = snapshot.paragraphs[i]
+            let para = parags[i]
             if para.range.isEmpty {
                 // 空行はそのまま
                 resultLines.append("")
@@ -428,7 +431,7 @@ extension KTextView {
         }
         
         // 置換範囲を確定
-        let totalRange = snapshot.paragraphRange(indexRange: idxRange)
+        let totalRange = parags.paragraphRange(indexRange: idxRange)
         let newBlock = resultLines.joined(separator: "\n")
         
         textStorage.replaceString(in: totalRange, with: newBlock)
@@ -439,8 +442,8 @@ extension KTextView {
     // MARK: - Collapse Empty Lines / Remove Empty Lines
     
     @IBAction func collapseEmptyLines(_ sender: Any?) {
-        let snapshot = textStorage.snapshot
-        guard let idxRange = snapshot.paragraphIndexRange(containing: selectionRange),
+        let parags = textStorage.paragraphs
+        guard let idxRange = parags.paragraphIndexRange(containing: selectionRange),
               !idxRange.isEmpty else { return }
         
         var result: [String] = []
@@ -448,7 +451,7 @@ extension KTextView {
         var prevEmpty = false
         
         for i in idxRange {
-            let p = snapshot.paragraphs[i]
+            let p = parags[i]
             if p.range.isEmpty {
                 if !prevEmpty { result.append("") }   // 連続空行を1行に圧縮
                 prevEmpty = true
@@ -458,11 +461,11 @@ extension KTextView {
             }
         }
         
-        let total = snapshot.paragraphRange(indexRange: idxRange)
+        let total = parags.paragraphRange(indexRange: idxRange)
         var newBlock = result.joined(separator: "\n")
         
         // 末尾まで選択が届いており、最後が空行なら LF を1つ保持
-        if idxRange.upperBound == snapshot.paragraphs.count, result.last == "" {
+        if idxRange.upperBound == parags.count, result.last == "" {
             newBlock.append("\n")
         }
         
@@ -471,8 +474,8 @@ extension KTextView {
     }
     
     @IBAction func removeEmptyLines(_ sender: Any?) {
-        let snapshot = textStorage.snapshot
-        guard let indexRange = snapshot.paragraphIndexRange(containing: selectionRange),
+        let parags = textStorage.paragraphs
+        guard let indexRange = parags.paragraphIndexRange(containing: selectionRange),
               !indexRange.isEmpty else {
             log("1", from: self)
             return
@@ -482,18 +485,18 @@ extension KTextView {
         result.reserveCapacity(indexRange.count)
         
         for i in indexRange {
-            let paragraph = snapshot.paragraphs[i]
+            let paragraph = parags[i]
             // 空行でなければ残す（Collapseの逆）
             if !paragraph.range.isEmpty {
                 result.append(paragraph.string)
             }
         }
         
-        let totalRange = snapshot.paragraphRange(indexRange: indexRange)
+        let totalRange = parags.paragraphRange(indexRange: indexRange)
         var newBlock = result.joined(separator: "\n")
         
         // 文末まで選択されている場合は、末尾LFを調整（必要なら付ける）
-        if indexRange.upperBound == snapshot.paragraphs.count {
+        if indexRange.upperBound == parags.count {
             newBlock.append("\n")
         }
         
@@ -504,8 +507,8 @@ extension KTextView {
     // MARK: - Comment
     
     @IBAction func toggleLineComment(_ sender: Any?) {
-        let snapshot = textStorage.snapshot
-        guard let indexRange = snapshot.paragraphIndexRange(containing: selectionRange),
+        let parags = textStorage.paragraphs
+        guard let indexRange = parags.paragraphIndexRange(containing: selectionRange),
               !indexRange.isEmpty else { log("1", from: self); return }
         guard let head = textStorage.parser.lineCommentPrefix, !head.isEmpty else { log("2", from: self); return }
         
@@ -513,7 +516,7 @@ extension KTextView {
         var lines: [String] = []
         lines.reserveCapacity(indexRange.count)
         for i in indexRange {
-            lines.append(snapshot.paragraphs[i].string)
+            lines.append(parags[i].string)
         }
         
         // 非空行がすべてコメント済みなら「解除」、そうでなければ「付与」
@@ -559,7 +562,7 @@ extension KTextView {
         }
         
         // 一括置換（Undo 1 回）
-        let replaceRange = snapshot.paragraphRange(indexRange: indexRange)
+        let replaceRange = parags.paragraphRange(indexRange: indexRange)
         let newBlock = result.joined(separator: "\n")
         textStorage.replaceString(in: replaceRange, with: newBlock)
         selectionRange = replaceRange.lowerBound ..< (replaceRange.lowerBound + newBlock.count)
@@ -576,12 +579,12 @@ extension KTextView {
     /// - columnLimit: 列の上限（72/80/100 など）
     /// - tabWidth: タブ幅（Ganpi 既定に合わせる）
     private func reflowSelectedParagraphs(columnLimit: Int, tabWidth: Int = 8) {
-        let snapshot = textStorage.snapshot
-        guard let indexRange = snapshot.paragraphIndexRange(containing: selectionRange),
+        let parags = textStorage.paragraphs
+        guard let indexRange = parags.paragraphIndexRange(containing: selectionRange),
               !indexRange.isEmpty else { log("1", from: self); return }
         
         // 段落ブロック全体の置換範囲（[lower, upper)）
-        let replaceRange = snapshot.paragraphRange(indexRange: indexRange)
+        let replaceRange = parags.paragraphRange(indexRange: indexRange)
         
         // 「空行で段落を区切る」：非空行の塊ごとに reflow し、空行はそのまま出力
         var outLines: [String] = []
@@ -589,7 +592,7 @@ extension KTextView {
         
         var buffer = "" // 非空行の塊を 1 行（英語: 空白1で連結 / 日本語: そのまま連結）に畳む
         for i in indexRange {
-            let para = snapshot.paragraphs[i]
+            let para = parags[i]
             if para.range.isEmpty {
                 // 空行に遭遇：直前の塊をフラッシュして空行を出力
                 if !buffer.isEmpty {
@@ -762,8 +765,8 @@ extension KTextView {
     @IBAction func alignAssignmentColons(_ sender: Any?) { alignOperator(":") }
     
     private func alignOperator(_ symbol: Character) {
-        let snapshot = textStorage.snapshot
-        guard let indexRange = snapshot.paragraphIndexRange(containing: selectionRange),
+        let parags = textStorage.paragraphs
+        guard let indexRange = parags.paragraphIndexRange(containing: selectionRange),
               !indexRange.isEmpty else { log("#01",from:self); return }
 
         guard let opr = symbol.singleByteValue else { log("#02",from:self); return }
@@ -778,7 +781,7 @@ extension KTextView {
 
         // --- 1) 各行で左部分と右部分の Range を取得 ---
         for i in indexRange {
-            let paragraph = snapshot.paragraphs[i]
+            let paragraph = parags[i]
             var leftRange: Range<Int>? = nil
             var rightRange: Range<Int>? = nil
 
@@ -839,7 +842,7 @@ extension KTextView {
             // 演算子がない行は元のテキストをそのまま出力
             guard let lr = lr, let rr = rr else {
                 // snapshot から元行を復元
-                let paragraph = snapshot.paragraphs[out.count + indexRange.lowerBound]
+                let paragraph = parags[out.count + indexRange.lowerBound]
                 let originalLine = String(textStorage.string(in: paragraph.range))
                 out.append(originalLine)
                 continue
@@ -857,7 +860,7 @@ extension KTextView {
         }
 
         // --- 3) テキスト全体を置換 ---
-        let replaceRange = snapshot.paragraphRange(indexRange: indexRange)
+        let replaceRange = parags.paragraphRange(indexRange: indexRange)
         let newBlock = out.joined(separator: "\n")
 
         textStorage.replaceString(in: replaceRange, with: newBlock)

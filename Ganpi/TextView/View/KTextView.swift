@@ -2551,9 +2551,9 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     // 単行の場合は選択範囲を削除した上で、行頭の空白(space|tab混合)内ならtab stop相当までspaceを入力、
     // そうでなければ1文字のspaceを入力する。
     @IBAction override func insertTab(_ sender: Any?) {
-        let snapshot = textStorage.snapshot
+        let parags = textStorage.paragraphs
         
-        if let indexRange = snapshot.paragraphIndexRange(containing: selectionRange),
+        if let indexRange = parags.paragraphIndexRange(containing: selectionRange),
                 indexRange.count > 1 {
             shiftRight(self)
             return
@@ -2569,8 +2569,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         let tabWidth = layoutManager.tabWidth
         
-        guard let pIndex = snapshot.paragraphIndex(containing: selection.lowerBound) else { log("0"); return }
-        let width = snapshot.paragraphs[pIndex].tabStopDeltaInIndent(at: selection.lowerBound, tabWidth: tabWidth, direction: .forward)
+        guard let pIndex = parags.paragraphIndex(containing: selection.lowerBound) else { log("0"); return }
+        let width = parags[pIndex].tabStopDeltaInIndent(at: selection.lowerBound, tabWidth: tabWidth, direction: .forward)
         textStorage.replaceString(in: selection, with: String(repeating: " ", count: max(1, width)))
     }
     
@@ -2584,9 +2584,9 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     // そうでなければ直前の1文字のspaceを削除するか、なにもしない。
     @IBAction override func insertBacktab(_ sender: Any?) {
         let tabWidth = layoutManager.tabWidth
-        let snapshot = textStorage.snapshot
+        let parags = textStorage.paragraphs
 
-        if let idxRange = snapshot.paragraphIndexRange(containing: selectionRange),
+        if let idxRange = parags.paragraphIndexRange(containing: selectionRange),
            idxRange.count > 1 {
             shiftLeft(self)
             return
@@ -2598,8 +2598,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
 
         let caret = selectionRange.lowerBound
-        guard let pIndex = snapshot.paragraphIndex(containing: caret) else { log("paragraphIndex: nil", from: self); return }
-        let paragraph = snapshot.paragraphs[pIndex]
+        guard let pIndex = parags.paragraphIndex(containing: caret) else { log("paragraphIndex: nil", from: self); return }
+        let paragraph = parags[pIndex]
 
         let head = paragraph.leadingWhitespaceRange
         let isInIndent = head.contains(caret) || caret == head.upperBound
