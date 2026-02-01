@@ -93,7 +93,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     private var _useStandardKeyAssign: Bool = false
     
     // live resize 時に大きな文書のレイアウト更新を止めるためのプロパティ
-    private var _prevContentViewBoundsForLayout: CGRect = .zero
+    private var _prevContentViewWidthForLayout: CGFloat = 0.0
     private let _liveResizeFreezeThreshold: Int = 100_000
 
     private var _isFrozenDuringLiveResize: Bool {
@@ -404,7 +404,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             // 初回の比較基準をここで確定させる。
             if let contentBounds = enclosingScrollView?.contentView.bounds {
                 _prevContentViewBounds = contentBounds
-                _prevContentViewBoundsForLayout = contentBounds
+                //_prevContentViewBoundsForLayout = contentBounds
+                _prevContentViewWidthForLayout = contentBounds.width
             }
 
             _needsInitialReload = false
@@ -413,9 +414,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         // ソフトラップの場合、visibleRectに合わせて行の横幅を変更する必要があるが、
         // scrollview.clipViewでの変更がないため通知含めvisibleRectの変更を知るすべがない。
         // このため、viewWillDraw()でdraw()される直前に毎回チェックを行なうことにした。
-
-        guard let currentContentViewBounds = enclosingScrollView?.contentView.bounds
-        else { log("currentContentViewBounds=nil", from: self); return }
+        guard let currentContentViewWidth = enclosingScrollView?.contentView.bounds.width
+        else { log("enclosingScrollVie: nil", from: self); return }
 
         // 10万文字以上のときは live resize 中のレイアウト更新を完全に止める。
         // 旧レイアウトのまま描画を継続し、終了時にまとめて1回更新する。
@@ -423,8 +423,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             return
         }
 
-        if currentContentViewBounds != _prevContentViewBoundsForLayout {
-            _prevContentViewBoundsForLayout = currentContentViewBounds
+        if currentContentViewWidth != _prevContentViewWidthForLayout {
+            _prevContentViewWidthForLayout = currentContentViewWidth
             _layoutManager.textViewFrameInvalidated()
             updateFrameSizeToFitContent()
             updateCaretPosition()
@@ -439,7 +439,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         guard _textStorageRef.count >= _liveResizeFreezeThreshold else { return }
         guard let contentBounds = enclosingScrollView?.contentView.bounds else { return }
 
-        _prevContentViewBoundsForLayout = contentBounds
+        _prevContentViewWidthForLayout = contentBounds.width
         _layoutManager.textViewFrameInvalidated()
         updateFrameSizeToFitContent()
         updateCaretPosition()
