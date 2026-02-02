@@ -170,25 +170,11 @@ class Document: NSDocument {
     override func read(from data: Data, ofType typeName: String) throws {
         let prefs = KPreference.shared
         
-        // 文字コードの推定 → 文字列化
-        let encoding = String.estimateCharacterCode(from: data) ?? .utf8
-        guard var decodedString = String(bytes: data, encoding: encoding) else {
-            throw NSError(domain: NSCocoaErrorDomain,
-                          code: NSFileReadUnknownStringEncodingError,
-                          userInfo: [NSLocalizedDescriptionKey: "Unsupported text encoding"])
-        }
-        
-        // 先頭にBOM(FEFF)がある場合は先頭一文字を落とす。
-        if decodedString.unicodeScalars.first == "\u{FEFF}" {
-            decodedString.removeFirst()
-        }
-        
-        // 改行の正規化（内部は常に LF）、最初に見つかった外部改行を記録
-        let normalizedInfo = decodedString.normalizeNewlinesAndDetect()
-        characterCode = KTextEncoding.normalized(from: encoding) ?? .utf8
-        returnCode = normalizedInfo.detected ?? .lf
-        
-        let normalizedString = normalizedInfo.normalized
+        // ファイルからの得られたDataから変換後の文字列・推定された文字コード・推定された改行コードを得る。
+        let info = try Self.normalizeRawData(from: data)
+        let normalizedString = info.normalizedString
+        characterCode = info.detectedEncoding
+        returnCode = info.detectedReturnCharacter
         
         // 本文を TextStorage へ投入（全文置換）
         textStorage.replaceString(in: 0..<_textStorage.count, with: normalizedString)
@@ -223,6 +209,31 @@ class Document: NSDocument {
         updateChangeCount(.changeCleared)
         close()
     }
+    
+
+    static func normalizeRawData(from data: Data) throws -> (normalizedString: String, detectedEncoding: KTextEncoding, detectedReturnCharacter: String.ReturnCharacter) {
+        // 文字コードの推定 → 文字列化
+        let encoding = String.estimateCharacterCode(from: data) ?? .utf8
+        guard var decodedString = String(bytes: data, encoding: encoding) else {
+            throw NSError(domain: NSCocoaErrorDomain,
+                          code: NSFileReadUnknownStringEncodingError,
+                          userInfo: [NSLocalizedDescriptionKey: "Unsupported text encoding"])
+        }
+        
+        // 先頭にBOM(FEFF)がある場合は先頭一文字を落とす。
+        if decodedString.unicodeScalars.first == "\u{FEFF}" {
+            decodedString.removeFirst()
+        }
+        
+        // 改行の正規化（内部は常に LF）、最初に見つかった外部改行を記録
+        let normalizedInfo = decodedString.normalizeNewlinesAndDetect()
+        let characterCode = KTextEncoding.normalized(from: encoding) ?? .utf8
+        let returnCode = normalizedInfo.detected ?? .lf
+        let normalizedString = normalizedInfo.normalized
+        
+        return (normalizedString, characterCode, returnCode)
+    }
+    
     
     private func loadDefaultSettings() {
         let prefs = KPreference.shared
