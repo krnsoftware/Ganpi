@@ -226,9 +226,10 @@ class Document: NSDocument {
         }
         
         // 改行の正規化（内部は常に LF）、最初に見つかった外部改行を記録
+        let prefs = KPreference.shared
         let normalizedInfo = decodedString.normalizeNewlinesAndDetect()
         let characterCode = KTextEncoding.normalized(from: encoding) ?? .utf8
-        let returnCode = normalizedInfo.detected ?? .lf
+        let returnCode = normalizedInfo.detected ?? prefs.newlineType()
         let normalizedString = normalizedInfo.normalized
         
         return (normalizedString, characterCode, returnCode)
