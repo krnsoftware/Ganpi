@@ -1749,6 +1749,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             
             sendEditedToDocument()
             updateFrameSizeToFitContent()
+            resetCaretControllProperties()
             needsDisplay = true
             
         case .colorChanged(_):
@@ -1761,6 +1762,13 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             log("parserChanged:",from:self)
         }
         
+    }
+    
+    private func resetCaretControllProperties() {
+        _verticalCaretX = nil
+        _verticalSelectionBase = nil
+        _horizontalSelectionBase = nil
+        _currentLineIndex = nil
     }
 
     // 別のKTextViewインスタンスから下記の設定を複製する。
