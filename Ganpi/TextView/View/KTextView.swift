@@ -334,7 +334,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         _layoutManager.textView = self
         
-        registerForDraggedTypes([.string])
+        registerForDraggedTypes([.string, .fileURL])
     }
     
     func loadPreferences() {
@@ -400,11 +400,14 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         // 短かい文章だけのviewをsplitする際に行の横幅が極端に短かくなる問題を解決。
         if _needsInitialReload {
             layoutManager.rebuildLayout()
+            
+            // frameのサイズは正しいがhitTestに反応しない不具合を回避するため、frameのサイズを再設定する。
+            frame.size = NSSize(width: frame.size.width,height: frame.size.height)
 
             // 初回の比較基準をここで確定させる。
             if let contentBounds = enclosingScrollView?.contentView.bounds {
+                
                 _prevContentViewBounds = contentBounds
-                //_prevContentViewBoundsForLayout = contentBounds
                 _prevContentViewWidthForLayout = contentBounds.width
             }
 
@@ -492,8 +495,9 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
 
     override func hitTest(_ point: NSPoint) -> NSView? {
         let localPoint = convert(point, from: superview)
-        let width = frame.size.width
-        frame.size = NSSize(width: width+10, height: frame.size.height)
+        // 意味不明のため一度comment out.
+        //let width = frame.size.width
+        //frame.size = NSSize(width: width+10, height: frame.size.height)
         if bounds.contains(localPoint) {
             //print("✅ Returning self")
             return self
@@ -1137,54 +1141,76 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     // MARK: - DraggingDestination methods
     
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
-        if sender.draggingPasteboard.canReadObject(forClasses: [NSString.self], options: nil) {
+        let pb = sender.draggingPasteboard
+
+        // Finder 等からのファイルURL
+        if pb.canReadObject(forClasses: [NSURL.self], options: [
+            .urlReadingFileURLsOnly: true
+        ]) {
             return .copy
         }
+
+        // 文字列
+        if pb.canReadObject(forClasses: [NSString.self], options: nil) {
+            return .copy
+        }
+
         return []
     }
+
     
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
         let pasteboard = sender.draggingPasteboard
+
+        let locationInView = convert(sender.draggingLocation, from: nil)
+        guard let layoutRects = _layoutManager.makeLayoutRects() else { log("layoutRects is nil", from: self); return false }
+
+        // ドロップ先インデックスを確定（テキスト領域以外は拒否）
+        let dropIndex: Int
+        switch layoutRects.regionType(for: locationInView) {
+        case .text(let index, _):
+            dropIndex = index
+        default:
+            return false
+        }
+
+        // ---- 1) Finder等からのファイルURLドロップ（優先） ----
+        if let urls = readDroppedFileURLs(from: pasteboard), !urls.isEmpty {
+            return insertDroppedFileURLs(urls, at: dropIndex, modifiers: NSEvent.modifierFlags)
+        }
+
+        // ---- 2) 既存：文字列ドロップ ----
         guard let items = pasteboard.readObjects(forClasses: [NSString.self], options: nil) as? [String],
               let rawDroppedString = items.first else {
             log("items is nil", from: self)
             return false
         }
-        
+
         let droppedString = rawDroppedString.normalizedString
-        
-        let locationInView = convert(sender.draggingLocation, from: nil)
-        guard let layoutRects = _layoutManager.makeLayoutRects() else { log("layoutRects is nil", from: self); return false }
-        
-        switch layoutRects.regionType(for: locationInView) {
-        case .text(let index, _):
-            let isSenderMyself = sender.draggingSource as AnyObject? === self
-            let isOptionKeyPressed = NSEvent.modifierFlags.contains(.option)
-            
-            // 自身のdrag and dropで現在の選択範囲内部をポイントした場合は無効。
-            if isSenderMyself && selectionRange.contains(index) { return false }
-            
-            if isOptionKeyPressed || !isSenderMyself { // .copy  オプションキーが押下されているか外部からのdrag and drop.
-                //log(".copy: ", from: self)
-                textStorage.replaceCharacters(in: index..<index, with: Array(droppedString))
-                selectionRange = index..<index + droppedString.count
-            } else  { // .move
-                if isSenderMyself { // 自分自身からのdrag and drop
-                    if index < selectionRange.lowerBound {
-                        textStorage.replaceCharacters(in: selectionRange, with: Array(""))
-                        textStorage.replaceCharacters(in: index..<index, with: Array(droppedString))
-                    } else {
-                        let selectionLengh = selectionRange.upperBound - selectionRange.lowerBound
-                        textStorage.replaceCharacters(in: selectionRange, with: Array(""))
-                        textStorage.replaceCharacters(in: index - selectionLengh..<index - selectionLengh, with: Array(droppedString))
-                        selectionRange = index - selectionLengh..<index - selectionLengh + droppedString.count
-                    }
+
+        let isSenderMyself = sender.draggingSource as AnyObject? === self
+        let isOptionKeyPressed = NSEvent.modifierFlags.contains(.option)
+
+        // 自身のdrag and dropで現在の選択範囲内部をポイントした場合は無効。
+        if isSenderMyself && selectionRange.contains(dropIndex) { return false }
+
+        if isOptionKeyPressed || !isSenderMyself { // .copy
+            textStorage.replaceCharacters(in: dropIndex..<dropIndex, with: Array(droppedString))
+            selectionRange = dropIndex..<dropIndex + droppedString.count
+        } else { // .move
+            if isSenderMyself {
+                if dropIndex < selectionRange.lowerBound {
+                    textStorage.replaceCharacters(in: selectionRange, with: Array(""))
+                    textStorage.replaceCharacters(in: dropIndex..<dropIndex, with: Array(droppedString))
+                } else {
+                    let selectionLengh = selectionRange.upperBound - selectionRange.lowerBound
+                    textStorage.replaceCharacters(in: selectionRange, with: Array(""))
+                    textStorage.replaceCharacters(in: dropIndex - selectionLengh..<dropIndex - selectionLengh, with: Array(droppedString))
+                    selectionRange = dropIndex - selectionLengh..<dropIndex - selectionLengh + droppedString.count
                 }
             }
-            return true
-        default:
-            return false
         }
+        return true
     }
     
     override func prepareForDragOperation(_ sender: NSDraggingInfo) -> Bool {
@@ -1231,6 +1257,114 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     private func hideDropCaret() {
         _caretView.isHidden = true
     }
+    
+    // Finder 等からドロップされた fileURL を読む
+    private func readDroppedFileURLs(from pasteboard: NSPasteboard) -> [URL]? {
+        let options: [NSPasteboard.ReadingOptionKey: Any] = [
+            .urlReadingFileURLsOnly: true
+        ]
+        guard let objs = pasteboard.readObjects(forClasses: [NSURL.self], options: options) as? [URL] else {
+            return nil
+        }
+        return objs
+    }
+
+    // 現在ドキュメントの基準ディレクトリ（相対パス用）を取得
+    private func documentBaseDirectoryURL() -> URL? {
+        guard let doc = window?.windowController?.document else { return nil }
+        guard let fileURL = doc.fileURL ?? nil else { return nil }
+        return fileURL.deletingLastPathComponent()
+    }
+
+
+    // baseDir配下なら相対、それ以外はnil
+    private func makeRelativePathIfPossible(fileURL: URL, baseDir: URL) -> String? {
+        let basePath = baseDir.standardizedFileURL.path
+        let filePath = fileURL.standardizedFileURL.path
+
+        guard filePath.hasPrefix(basePath) else { return nil }
+
+        var rel = String(filePath.dropFirst(basePath.count))
+        if rel.hasPrefix("/") { rel.removeFirst() }
+        return rel
+    }
+
+    // file drop の挿入本体
+    private func insertDroppedFileURLs(_ urls: [URL], at index: Int, modifiers: NSEvent.ModifierFlags) -> Bool {
+        // モード判定：
+        //  - cmd+opt : 内容挿入
+        //  - opt     : 絶対パス
+        //  - none    : 相対パス（可能なら）/ できなければ絶対パス
+        let isInsertContents = modifiers.contains(.command) && modifiers.contains(.option)
+        let isAbsolutePath = modifiers.contains(.option) && !isInsertContents
+
+        if isInsertContents {
+            return insertDroppedFileContents(urls, at: index)
+        } else {
+            return insertDroppedFilePaths(urls, at: index, absolute: isAbsolutePath)
+        }
+    }
+
+    private func insertDroppedFilePaths(_ urls: [URL], at index: Int, absolute: Bool) -> Bool {
+        let baseDir = documentBaseDirectoryURL()
+
+        // 複数は改行区切り（実用性優先）
+        let paths: [String] = urls.map { url in
+            if !absolute, let baseDir, let rel = makeRelativePathIfPossible(fileURL: url, baseDir: baseDir) {
+                return rel
+            }
+            return url.path
+        }
+        let joined = paths.joined(separator: "\n")
+
+        textStorage.replaceString(in: index..<index, with: joined)
+
+        // パスは全体選択
+        selectionRange = index..<index + joined.count
+
+        return true
+    }
+
+    private func insertDroppedFileContents(_ urls: [URL], at index: Int) -> Bool {
+        // 複数の連結規則（現時点は「区切りなし」固定。後でpref化するならここだけ差し替え）
+        let separator = ""
+
+        var inserted = ""
+        var detectedLogs: [(path: String, enc: KTextEncoding, ret: String.ReturnCharacter)] = []
+
+        for (i, url) in urls.enumerated() {
+            do {
+                let data = try Data(contentsOf: url)
+                let info = try Document.normalizeRawData(from: data)
+
+                if i > 0 { inserted += separator }
+                inserted += info.normalizedString
+
+                detectedLogs.append((url.path, info.detectedEncoding, info.detectedReturnCharacter))
+            } catch {
+                log("File drop read failed: \(url.path), error: \(error)", from: self)
+                NSSound.beep()
+                return false
+            }
+        }
+
+        textStorage.replaceString(in: index..<index, with: inserted)
+
+        // 内容は後端にキャレット
+        let end = index + inserted.count
+        selectionRange = end..<end
+
+        // 検出結果をユーザログに出す（KLogがある前提。なければ log() に寄せてください）
+        for item in detectedLogs {
+            KLog.shared.log(
+                id: "TextView:Drop",
+                message: "Dropped file decoded: \(item.path) (encoding: \(item.enc), newline: \(item.ret))"
+            )
+        }
+
+        return true
+    }
+
     
     
     // MARK: - Search Functions
