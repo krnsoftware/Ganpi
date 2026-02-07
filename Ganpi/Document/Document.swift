@@ -183,7 +183,7 @@ class Document: NSDocument {
         if prefs.bool(.systemAutoDetectionFileType) {
             // シンタックスタイプを推定
             let fileExt = fileURL?.pathExtension
-            syntaxType = KSyntaxType.detect(fromTypeName: typeName, orExtension: fileExt)
+            syntaxType = KSyntaxType.detect(fromTypeName: typeName, orExtension: fileExt, content: normalizedString)
             textStorage.replaceParser(for: syntaxType)
         }
         

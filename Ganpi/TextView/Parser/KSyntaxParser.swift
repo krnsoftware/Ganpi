@@ -35,8 +35,9 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
     case plain = "public.plain-text"
     case ruby  = "public.ruby-script"
     case html  = "public.html"
-    case ini = "public.ini-text"
-    
+    case ini   = "public.ini-text"
+    case sh    = "public.shell-script"
+
     // extensions for every type.
     var extensions: [String] {
         switch self {
@@ -44,40 +45,42 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         case .ruby:  return ["rb", "rake", "ru", "erb"]
         case .html:  return ["html", "htm", "xhtml", "xml", "plist"]
         case .ini:   return ["ini", "cfg", "conf"]
+        case .sh:    return ["sh", "bash", "zsh", "ksh"]
         }
     }
-    
+
     // ext is extension only (without '.')
     static func fromExtension(_ ext: String) -> Self? {
         let key = ext.lowercased()
-        
+
         for type in Self.allCases {
             if type.extensions.contains(key) { return type }
         }
         return nil
     }
-    
+
     // メニュー表示用の文字列
     var string: String {
         switch self {
         case .plain: return "Plain"
-        case .ruby: return "Ruby"
-        case .html: return "HTML/XML"
-        case .ini: return "INI"
+        case .ruby:  return "Ruby"
+        case .html:  return "HTML/XML"
+        case .ini:   return "INI"
+        case .sh:    return "Shell Script"
         }
     }
-    
+
     // 設定ファイルに記述された文字列をenumに変換する。
     static func fromSetting(_ raw: String) -> Self? {
         let key = raw.lowercased()
         return KSyntaxMeta.reverse[key]
     }
-    
+
     // enumを設定ファイルに記述される文字列に変換する。
     var settingName: String {
         return KSyntaxMeta.map[self]!
     }
-    
+
     // enumと設定名の対応を示す構造体。
     private struct KSyntaxMeta {
         // enum → 設定名
@@ -85,7 +88,8 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
             .plain : "plain",
             .ruby  : "ruby",
             .html  : "html",
-            .ini   : "ini"
+            .ini   : "ini",
+            .sh    : "sh"
         ]
         // 設定名 → enum
         static let reverse: [String : KSyntaxType] = {
@@ -94,7 +98,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
             return r
         }()
     }
-    
+
     // KSyntaxType.plain.makeParser(storage:self)...といった形で生成する。
     func makeParser(storage:KTextStorageReadable) -> KSyntaxParser {
         switch self {
@@ -102,29 +106,102 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         case .ruby:  return KSyntaxParserRuby(storage: storage)
         case .html:  return KSyntaxParserHtml(storage: storage)
         case .ini:   return KSyntaxParserIni(storage: storage)
+        case .sh:    return KSyntaxParserSh(storage: storage)
         }
     }
 
-    
-    static func detect(fromTypeName typeName: String?, orExtension ext: String?) -> Self {
+    static func detect(fromTypeName typeName: String?, orExtension ext: String?, content: String) -> Self {
         // 1) typeName が UTI として一致するか
         if let type = typeName, let knownType = KSyntaxType(rawValue: type) {
             return knownType
         }
-        
-        // 2) 拡張子から推定
-        if let fileExtensioin = ext?.lowercased() {
-            if let type = Self.fromExtension(fileExtensioin) {
-                return type
+
+        // 2) 拡張子から推定（拡張子優先。ただし plain系拡張子は確定にしない）
+        if let fileExtension = ext?.lowercased(), !fileExtension.isEmpty {
+            if let type = Self.fromExtension(fileExtension) {
+                // .txt などは plain 確定にせず、内容判定に回す
+                if type != .plain {
+                    return type
+                }
+
+                // plain拡張子でも「曖昧」なものは確定しない
+                // （必要ならここに追加する）
+                let ambiguousPlainExtensions: Set<String> = ["txt", "text", "md"]
+                if !ambiguousPlainExtensions.contains(fileExtension) {
+                    return .plain
+                }
+                // fallthrough: 内容判定へ
+            } else {
+                // 未登録の拡張子 → 内容判定へ
             }
         }
-        
-        // 3) デフォルトはプレーンテキスト
+
+        // 3) 拡張子が無い場合だけ内容判定（当面は shebang）
+        if let detected = detectFromShebang(content) {
+            return detected
+        }
+
         return .plain
     }
-    
+
+    private static func detectFromShebang(_ content: String) -> Self? {
+        if content.isEmpty { return nil }
+
+        // 先頭行のみ（shebang）
+        let firstLine: Substring
+        if let newline = content.firstIndex(of: "\n") {
+            firstLine = content[..<newline]
+        } else {
+            firstLine = content[...]
+        }
+
+        var line = firstLine
+        if line.first == "\u{FEFF}" { // BOM
+            line = line.dropFirst()
+        }
+
+        guard line.hasPrefix("#!") else { return nil }
+
+        var rest = line.dropFirst(2)
+        while rest.first == " " || rest.first == "\t" { rest = rest.dropFirst() }
+        if rest.isEmpty { return nil }
+
+        // token 化（空白区切り）
+        let parts = rest.split(whereSeparator: { $0 == " " || $0 == "\t" })
+        if parts.isEmpty { return nil }
+
+        // /usr/bin/env 形式
+        var interpreter: Substring? = nil
+        if parts[0].hasSuffix("/env") || parts[0] == "env" {
+            // env の次の「オプションっぽくない」トークンを interpreter とみなす
+            for p in parts.dropFirst() {
+                if p.hasPrefix("-") { continue }
+                interpreter = p
+                break
+            }
+        } else {
+            interpreter = parts[0]
+        }
+
+        guard var interp = interpreter, !interp.isEmpty else { return nil }
+
+        // パスの末尾だけ（/bin/bash → bash）
+        if let slash = interp.lastIndex(of: "/") {
+            interp = interp[interp.index(after: slash)...]
+        }
+
+        switch interp.lowercased() {
+        case "sh", "bash", "zsh", "ksh":
+            return .sh
+        case "ruby":
+            return .ruby
+        default:
+            return nil
+        }
+    }
+
     var description: String {
-        return "KSyntaxType: \(self.string)"
+        return "KSyntaxType: \(string)"
     }
 }
 
