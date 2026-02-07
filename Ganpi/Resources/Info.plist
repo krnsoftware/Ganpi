@@ -7,49 +7,130 @@
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleDocumentTypes</key>
-	<array>
-		<dict>
-			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>1</integer>
-			<key>CFBundleTypeName</key>
-			<string>Plain Text</string>
-			<key>CFBundleTypeRole</key>
-			<string>Editor</string>
-			<key>LSHandlerRank</key>
-			<string>Default</string>
-			<key>LSItemContentTypes</key>
-			<array>
-				<string>public.plain-text</string>
-				<string>public.source-code</string>
-				<string>public.html</string>
-				<string>public.xhtml</string>
-				<string>public.xml</string>
-				<string>com.apple.property-list</string>
-				<string>com.apple.xml-property-list</string>
-			</array>
-			<key>NSDocumentClass</key>
-			<string>$(PRODUCT_MODULE_NAME).Document</string>
-		</dict>
+    <array>
+    
+        <!-- 1) Plain Text -->
         <dict>
             <key>CFBundleTypeName</key>
-            <string>Property List (XML)</string>
+            <string>Plain Text</string>
             <key>CFBundleTypeRole</key>
             <string>Editor</string>
             <key>LSHandlerRank</key>
             <string>Default</string>
+            <key>CFBundleTypeIconSystemGenerated</key>
+            <integer>1</integer>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>txt</string>
+                <string>text</string>
+                <string>md</string>
+            </array>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>public.plain-text</string>
+            </array>
+            <key>NSDocumentClass</key>
+            <string>$(PRODUCT_MODULE_NAME).Document</string>
+        </dict>
+    
+        <!-- 2) HTML / XML -->
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>HTML/XML</string>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>LSHandlerRank</key>
+            <string>Default</string>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>html</string>
+                <string>htm</string>
+                <string>xhtml</string>
+                <string>xml</string>
+            </array>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>public.html</string>
+                <string>public.xhtml</string>
+                <string>public.xml</string>
+            </array>
+            <key>NSDocumentClass</key>
+            <string>$(PRODUCT_MODULE_NAME).Document</string>
+        </dict>
+    
+        <!-- 3) Property List -->
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Property List</string>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>LSHandlerRank</key>
+            <string>Default</string>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>plist</string>
+            </array>
             <key>LSItemContentTypes</key>
             <array>
                 <string>com.apple.property-list</string>
                 <string>com.apple.xml-property-list</string>
             </array>
+            <key>NSDocumentClass</key>
+            <string>$(PRODUCT_MODULE_NAME).Document</string>
+        </dict>
+    
+        <!-- 4) Shell Script -->
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Shell Script</string>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>LSHandlerRank</key>
+            <string>Default</string>
             <key>CFBundleTypeExtensions</key>
             <array>
-                <string>plist</string>
+                <string>sh</string>
+                <string>bash</string>
+                <string>zsh</string>
+                <string>ksh</string>
+            </array>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>com.apple.terminal.shell-script</string>
+                <string>public.shell-script</string>
+                <string>public.script</string>
             </array>
             <key>NSDocumentClass</key>
             <string>$(PRODUCT_MODULE_NAME).Document</string>
         </dict>
-	</array>
+    
+        <!-- 5) .command (keep Alternate) -->
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Command Script</string>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+        
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>command</string>
+            </array>
+        
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>com.apple.terminal.shell-script</string>
+                <string>public.shell-script</string>
+                <string>public.script</string>
+                <string>public.text</string>
+            </array>
+        
+            <key>NSDocumentClass</key>
+            <string>$(PRODUCT_MODULE_NAME).Document</string>
+        </dict>
+    
+    </array>
 	<key>NSMainNibFile</key>
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
