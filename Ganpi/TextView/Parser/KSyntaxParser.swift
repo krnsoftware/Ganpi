@@ -310,6 +310,7 @@ class KSyntaxParser {
     }
     
     // Additional functions.
+    // language-specific range of word. needed by completion system.
     func wordRange(at index: Int) -> Range<Int>? { return nil }
     // where the caret is. Outer: class/struct, Inner: var/func.
     func currentContext(at index: Int) -> (outer: String?, inner: String?) { return (nil, nil) }
@@ -317,6 +318,7 @@ class KSyntaxParser {
     func outline(in range: Range<Int>?) -> [KOutlineItem] { return [] }
     
     // get completion words (alphabetical / prefix match)
+    // completion system needs implementaion of wordRange(at:).
     func completionEntries(prefixBytes: [UInt8]) -> [[UInt8]] {
         guard prefixBytes.count >= completionMinPrefixLength else { return [] }
 

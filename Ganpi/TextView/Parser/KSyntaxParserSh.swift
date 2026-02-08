@@ -100,6 +100,49 @@ final class KSyntaxParserSh: KSyntaxParser {
         return spans
     }
     
+    override func wordRange(at index: Int) -> Range<Int>? {
+        let skeleton = storage.skeletonString
+        let count = skeleton.count
+        if count == 0 { return nil }
+
+        // index は skeleton と同一スケールの前提。安全に clamp。
+        var i = index
+        if i < 0 { i = 0 }
+        if i > count { i = count }
+
+        func isIdentStart(_ b: UInt8) -> Bool { b.isIdentStartAZ_ }
+        func isIdentPart(_ b: UInt8) -> Bool { b.isIdentPartAZ09_ }
+
+        // CompletionController は「単語末尾（=区切り文字側）」で呼ばれるので、
+        // まず index-1 を基準にする。
+        if i == 0 { return nil }
+
+        let probe = i - 1
+        let b0 = skeleton[probe]
+        if !isIdentPart(b0) { return nil }
+
+        // 左へ伸ばす
+        var start = probe
+        while start > 0 {
+            let b = skeleton[start - 1]
+            if isIdentPart(b) {
+                start -= 1
+                continue
+            }
+            break
+        }
+
+        // 先頭文字が start 条件を満たさないなら無効（例: "9abc" を単語にしない）
+        if !isIdentStart(skeleton[start]) { return nil }
+
+        // 右端は「元の index（カーソル位置）」を採用する
+        // （probe は index-1 なので probe+1 でも同じだが、意図を明確にする）
+        let end = i
+        if start >= end { return nil }
+
+        return start..<end
+    }
+    
     override func outline(in range: Range<Int>?) -> [KOutlineItem] {     // range is ignored for now.
         let skeleton = storage.skeletonString
         let bytes = skeleton.bytes
