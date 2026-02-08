@@ -601,6 +601,46 @@ class KSyntaxParser {
             }
         }
     }
+    
+    private func mergeSortedUniqueCatalogs(doc: [[UInt8]], keywords: [[UInt8]]) -> [[UInt8]] {
+        if doc.isEmpty { return keywords }
+        if keywords.isEmpty { return doc }
+
+        var res: [[UInt8]] = []
+        res.reserveCapacity(doc.count + keywords.count)
+
+        var i = 0
+        var j = 0
+
+        while i < doc.count && j < keywords.count {
+            let a = doc[i]
+            let b = keywords[j]
+            let c = compareBytes(a, b)
+
+            if c == 0 {
+                res.append(a)
+                i += 1
+                j += 1
+            } else if c < 0 {
+                res.append(a)
+                i += 1
+            } else {
+                res.append(b)
+                j += 1
+            }
+        }
+
+        while i < doc.count {
+            res.append(doc[i])
+            i += 1
+        }
+        while j < keywords.count {
+            res.append(keywords[j])
+            j += 1
+        }
+
+        return res
+    }
 
     private func compareBytes(_ a: [UInt8], _ b: [UInt8]) -> Int {
         let n = min(a.count, b.count)
@@ -651,9 +691,8 @@ class KSyntaxParser {
     private func buildCompletionCatalog(bytes: [UInt8], minWordLength: Int, maxWordLength: Int) -> [[UInt8]] {
         if bytes.isEmpty { return [] }
 
-        // Array は Hashable でないので Data で集合化する（bytes は ASCII 識別子のみ）
-        var set: Set<Data> = Set<Data>()
-        set.reserveCapacity(4096)
+        var catalog: [[UInt8]] = []
+        catalog.reserveCapacity(4096)
 
         var i = 0
         while i < bytes.count {
@@ -667,8 +706,7 @@ class KSyntaxParser {
 
                 let len = j - i
                 if len >= minWordLength && len <= maxWordLength {
-                    let w = Array(bytes[i..<j])
-                    set.insert(Data(w))
+                    catalog.append(Array(bytes[i..<j]))
                 }
 
                 i = j
@@ -678,56 +716,26 @@ class KSyntaxParser {
             i += 1
         }
 
-        var catalog: [[UInt8]] = []
-        catalog.reserveCapacity(set.count)
-
-        for d in set {
-            catalog.append(Array(d))
-        }
+        if catalog.isEmpty { return [] }
 
         catalog.sort { compareBytes($0, $1) < 0 }
-        return catalog
-    }
 
-    private func mergeSortedUniqueCatalogs(doc: [[UInt8]], keywords: [[UInt8]]) -> [[UInt8]] {
-        if doc.isEmpty { return keywords }
-        if keywords.isEmpty { return doc }
+        // unique（隣接重複を除去）
+        var uniqueCatalog: [[UInt8]] = []
+        uniqueCatalog.reserveCapacity(catalog.count)
 
-        var res: [[UInt8]] = []
-        res.reserveCapacity(doc.count + keywords.count)
-
-        var i = 0
-        var j = 0
-
-        while i < doc.count && j < keywords.count {
-            let a = doc[i]
-            let b = keywords[j]
-            let c = compareBytes(a, b)
-
-            if c == 0 {
-                res.append(a)
-                i += 1
-                j += 1
-            } else if c < 0 {
-                res.append(a)
-                i += 1
-            } else {
-                res.append(b)
-                j += 1
+        var prev: [UInt8]? = nil
+        for w in catalog {
+            if let prev {
+                if compareBytes(prev, w) == 0 { continue }
             }
+            uniqueCatalog.append(w)
+            prev = w
         }
 
-        while i < doc.count {
-            res.append(doc[i])
-            i += 1
-        }
-        while j < keywords.count {
-            res.append(keywords[j])
-            j += 1
-        }
-
-        return res
+        return uniqueCatalog
     }
+
 
 }
 
