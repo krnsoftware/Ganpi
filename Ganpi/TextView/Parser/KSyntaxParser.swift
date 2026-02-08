@@ -66,7 +66,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         case .ruby:  return "Ruby"
         case .html:  return "HTML/XML"
         case .ini:   return "INI"
-        case .sh:    return "Shell Script"
+        case .sh:    return "Shell"
         }
     }
 
