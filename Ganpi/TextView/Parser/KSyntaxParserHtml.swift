@@ -197,7 +197,7 @@ final class KSyntaxParserHtml: KSyntaxParser {
                 }
 
                 if let hit = collectHeadingUnlimited(from: i, headingLevel: level, target: target) {
-                    items.append(KOutlineItem(kind: .module,
+                    items.append(KOutlineItem(kind: .heading,
                                               nameRange: hit.titleRange,
                                               level: level,
                                               isSingleton: false))

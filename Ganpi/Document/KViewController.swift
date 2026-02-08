@@ -500,8 +500,6 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
 
         let menu = NSMenu()
 
-        var currentContainerMenu: NSMenu? = nil
-
         func makeTitle(for item: KOutlineItem) -> String {
             let symbol = doc.textStorage.string(in: item.nameRange)
             switch item.kind {
@@ -509,6 +507,8 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
                 return symbol
             case .method:
                 return (item.isSingleton ? "." : "#") + symbol
+            case .heading:
+                return symbol
             }
         }
 
@@ -520,41 +520,108 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
                 return KOutlineBadgeFactory.shared.moduleBadge()
             case .method:
                 return KOutlineBadgeFactory.shared.methodBadge(isSingleton: item.isSingleton)
+            case .heading:
+                return KOutlineBadgeFactory.shared.headingBadge()
             }
         }
+
+        // outline の level は言語によって意味が違い得るので、ここでメニュー用の深さに正規化する。
+        // - HTML: h1..h6 を 1..6 として返す想定 → そのまま
+        // - Ruby等: class/module が 0 の場合がある → 1 に寄せる
+        // - method が 0 の場合があっても、最低 2 に寄せる（トップにぶら下がりにくくする）
+        func semanticLevel(for item: KOutlineItem) -> Int {
+            if item.level <= 0 {
+                switch item.kind {
+                case .class, .module:
+                    return 1
+                case .method:
+                    return 2
+                case .heading:
+                    return 1
+                }
+            }
+            return item.level
+        }
+
+        final class OutlineNode {
+            let title: String
+            let image: NSImage?
+            let range: Range<Int>?
+            var children: [OutlineNode] = []
+
+            init(title: String, image: NSImage?, range: Range<Int>?) {
+                self.title = title
+                self.image = image
+                self.range = range
+            }
+        }
+
+        let root = OutlineNode(title: "", image: nil, range: nil)
+
+        // stack: (level, node). root は level = 0
+        var stack: [(level: Int, node: OutlineNode)] = [(0, root)]
 
         for item in outlineItems {
-            if item.level == 0 && (item.kind == .class || item.kind == .module) {
-                // 親（class/module）
-                let containerTitle = makeTitle(for: item)
+            let title = makeTitle(for: item)
+            let image = makeImage(for: item)
+            var level = semanticLevel(for: item)
+            if level < 1 { level = 1 }
 
-                let sub = NSMenu()
-                currentContainerMenu = sub
-
-                let parent = NSMenuItem(title: containerTitle, action: nil, keyEquivalent: "")
-                parent.image = makeImage(for: item)
-                parent.submenu = sub
-                menu.addItem(parent)
-
-                // サブメニュー先頭に「定義へジャンプ」項目を置く
-                let jump = NSMenuItem(title: containerTitle, action: #selector(textView.selectRange(_:)), keyEquivalent: "")
-                jump.image = makeImage(for: item)
-                jump.representedObject = item.nameRange
-                sub.addItem(jump)
-
-                continue
+            // 同レベルは兄弟：親へ戻す（>= で戻す）
+            while let last = stack.last, last.level >= level {
+                stack.removeLast()
             }
 
-            // method等：直近のclass/module配下へ。無ければトップへ。
-            let targetMenu = currentContainerMenu ?? menu
+            // 欠けた階層を "-" で補完（完全階層化）
+            let parentLevel = stack.last?.level ?? 0
+            if level > parentLevel + 1 {
+                for missing in (parentLevel + 1)..<level {
+                    let dummy = OutlineNode(title: "-", image: nil, range: nil)
+                    stack.last!.node.children.append(dummy)
+                    stack.append((missing, dummy))
+                }
+            }
 
-            let title = makeTitle(for: item)
-            let menuItem = NSMenuItem(title: title, action: #selector(textView.selectRange(_:)), keyEquivalent: "")
-            menuItem.image = makeImage(for: item)
-            menuItem.representedObject = item.nameRange
-            targetMenu.addItem(menuItem)
+            let node = OutlineNode(title: title, image: image, range: item.nameRange)
+            stack.last!.node.children.append(node)
+            stack.append((level, node))
         }
 
+        func buildMenu(from nodes: [OutlineNode], into targetMenu: NSMenu) {
+            for node in nodes {
+                if node.children.isEmpty {
+                    // leaf
+                    let leaf = NSMenuItem(title: node.title, action: nil, keyEquivalent: "")
+                    leaf.image = node.image
+                    if let range = node.range {
+                        leaf.action = #selector(textView.selectRange(_:))
+                        leaf.representedObject = range
+                    }
+                    targetMenu.addItem(leaf)
+                    continue
+                }
+
+                // container
+                let sub = NSMenu()
+                let parent = NSMenuItem(title: node.title, action: nil, keyEquivalent: "")
+                parent.image = node.image
+                parent.submenu = sub
+                targetMenu.addItem(parent)
+
+                // 実ノードだけ、先頭に "Jump to ..." を置く（ダミー "-" には置かない）
+                if let range = node.range {
+                    let jumpTitle = "Jump to \(node.title)"
+                    let jump = NSMenuItem(title: jumpTitle, action: #selector(textView.selectRange(_:)), keyEquivalent: "")
+                    jump.representedObject = range
+                    sub.addItem(jump)
+                    //sub.addItem(NSMenuItem.separator())
+                }
+
+                buildMenu(from: node.children, into: sub)
+            }
+        }
+
+        buildMenu(from: root.children, into: menu)
         popUp(menu, from: sender)
     }
 

@@ -100,6 +100,12 @@ final class KOutlineBadgeFactory {
         let spec = spec(letter: letter, accent: accent ?? fallback, size: size)
         return badge(with: spec)
     }
+    
+    /// HTMLのヘッディング用（H）
+    func headingBadge(accent: KBadgeAccent = .blue, size: CGFloat? = nil) -> NSImage {
+        let spec = spec(letter: "H", accent: accent, size: size)
+        return badge(with: spec)
+    }
 
     // MARK: コア描画（spec -> NSImage）
 

@@ -209,8 +209,8 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
 
 /// 言語アウトライン1項目
 struct KOutlineItem {
-    enum Kind { case `class`, module, method }
-    
+    enum Kind { case `class`, module, method, heading }
+
     let kind: Kind
     let nameRange: Range<Int>        // range of name-symbol.
     let level: Int                   // nest depth.
