@@ -99,6 +99,137 @@ final class KSyntaxParserSh: KSyntaxParser {
 
         return spans
     }
+    
+    override func outline(in range: Range<Int>?) -> [KOutlineItem] {     // range is ignored for now.
+        let skeleton = storage.skeletonString
+        let bytes = skeleton.bytes
+        let n = bytes.count
+        if n == 0 { return [] }
+
+        // endState を参照するため、全文を一度 up-to-date にしておく
+        ensureUpToDate(for: 0..<n)
+
+        let newlineIndices = skeleton.newlineIndices
+
+        let functionBytes = Array("function".utf8)
+
+        var items: [KOutlineItem] = []
+        items.reserveCapacity(128)
+
+        func isSpaceOrTab(_ b: UInt8) -> Bool { b == FC.space || b == FC.tab }
+
+        func skipSpaces(_ i: inout Int, _ end: Int) {
+            while i < end && isSpaceOrTab(bytes[i]) { i += 1 }
+        }
+
+        func matchBytes(_ target: [UInt8], at index: Int, end: Int) -> Bool {
+            let m = target.count
+            if index + m > end { return false }
+            var k = 0
+            while k < m {
+                if bytes[index + k] != target[k] { return false }
+                k += 1
+            }
+            return true
+        }
+
+        func isKeywordBoundary(_ index: Int, end: Int) -> Bool {
+            if index >= end { return true }
+            return isSpaceOrTab(bytes[index])
+        }
+
+        func parseIdentName(start: Int, end: Int) -> Range<Int>? {
+            var i = start
+            if i >= end { return nil }
+            if !bytes[i].isIdentStartAZ_ { return nil }
+            i += 1
+            while i < end && bytes[i].isIdentPartAZ09_ { i += 1 }
+            return start..<i
+        }
+
+        func matchParenPair(_ i: inout Int, _ end: Int) -> Bool {
+            // allow: "()" or "(   )" or " ( ) " etc
+            skipSpaces(&i, end)
+            if i >= end || bytes[i] != FC.leftParen { return false }
+            i += 1
+            skipSpaces(&i, end)
+            if i >= end || bytes[i] != FC.rightParen { return false }
+            i += 1
+            return true
+        }
+
+        func hasBraceHereOrNextLine(after index0: Int, lineIndex: Int, lineEnd: Int) -> Bool {
+            var i = index0
+            skipSpaces(&i, lineEnd)
+            if i < lineEnd && bytes[i] == FC.leftBrace { return true }
+            if i < lineEnd { return false } // other tokens exist on same line
+
+            // next line: "{" alone (allow spaces + optional trailing comment)
+            let nextLine = lineIndex + 1
+            let lineCount = newlineIndices.count + 1
+            if nextLine >= lineCount { return false }
+
+            let nextStart = (nextLine == 0) ? 0 : (newlineIndices[nextLine - 1] + 1)
+            let nextEnd = (nextLine < newlineIndices.count) ? newlineIndices[nextLine] : n
+
+            var p = nextStart
+            skipSpaces(&p, nextEnd)
+            if p >= nextEnd || bytes[p] != FC.leftBrace { return false }
+            p += 1
+            skipSpaces(&p, nextEnd)
+            if p >= nextEnd { return true }
+            // allow "{   # comment"
+            if bytes[p] == FC.numeric { return true }   // '#' is FC.numeric
+            return false
+        }
+
+        let lineCount = newlineIndices.count + 1
+
+        for lineIndex in 0..<lineCount {
+            let lineStart = (lineIndex == 0) ? 0 : (newlineIndices[lineIndex - 1] + 1)
+            let lineEnd = (lineIndex < newlineIndices.count) ? newlineIndices[lineIndex] : n
+            if lineStart >= lineEnd { continue }
+
+            let startState: KEndState = (lineIndex == 0) ? .neutral : _lines[lineIndex - 1].endState
+            if startState != .neutral { continue }
+
+            var i = lineStart
+            skipSpaces(&i, lineEnd)
+            if i >= lineEnd { continue }
+
+            // comment line
+            if bytes[i] == FC.numeric { continue } // '#'
+
+            // ---- pattern A: function NAME [()] [{ or nextline {] ----
+            if matchBytes(functionBytes, at: i, end: lineEnd),
+               isKeywordBoundary(i + functionBytes.count, end: lineEnd) {
+
+                i += functionBytes.count
+                skipSpaces(&i, lineEnd)
+
+                guard let nameRange = parseIdentName(start: i, end: lineEnd) else { continue }
+                i = nameRange.upperBound
+
+                var p = i
+                _ = matchParenPair(&p, lineEnd) // optional "()"
+                if hasBraceHereOrNextLine(after: p, lineIndex: lineIndex, lineEnd: lineEnd) {
+                    items.append(KOutlineItem(kind: .method, nameRange: nameRange, level: 0, isSingleton: false))
+                }
+                continue
+            }
+
+            // ---- pattern B: NAME () [{ or nextline {] ----
+            guard let nameRange = parseIdentName(start: i, end: lineEnd) else { continue }
+            var p = nameRange.upperBound
+            if !matchParenPair(&p, lineEnd) { continue }
+
+            if hasBraceHereOrNextLine(after: p, lineIndex: lineIndex, lineEnd: lineEnd) {
+                items.append(KOutlineItem(kind: .method, nameRange: nameRange, level: 0, isSingleton: false))
+            }
+        }
+
+        return items
+    }
 
     // MARK: - Scanning
 

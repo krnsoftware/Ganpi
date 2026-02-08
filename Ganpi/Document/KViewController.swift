@@ -534,17 +534,14 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         // - Ruby等: class/module が 0 の場合がある → 1 に寄せる
         // - method が 0 の場合があっても、最低 2 に寄せる（トップにぶら下がりにくくする）
         func semanticLevel(for item: KOutlineItem) -> Int {
-            if item.level <= 0 {
-                switch item.kind {
-                case .class, .module:
-                    return 1
-                case .method:
-                    return 2
-                case .heading:
-                    return 1
-                }
+            // HTML の heading は h1..h6 を 1..6 で返す想定なので、そのまま使う。
+            if item.kind == .heading {
+                return max(1, item.level)
             }
-            return item.level
+
+            // Ruby / sh などは、構造（class/module 等）を 0 起点で返すことがある。
+            // メニューの root(level=0) と衝突しないよう、1 段持ち上げて使う。
+            return max(1, item.level + 1)
         }
 
         final class OutlineNode {
@@ -576,13 +573,17 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
                 stack.removeLast()
             }
 
-            // 欠けた階層を "-" で補完（完全階層化）
+            // 欠けた階層の扱い：heading は "-" で補完、それ以外は親+1 に丸める
             let parentLevel = stack.last?.level ?? 0
             if level > parentLevel + 1 {
-                for missing in (parentLevel + 1)..<level {
-                    let dummy = OutlineNode(title: "-", image: nil, range: nil)
-                    stack.last!.node.children.append(dummy)
-                    stack.append((missing, dummy))
+                if item.kind == .heading {
+                    for missing in (parentLevel + 1)..<level {
+                        let dummy = OutlineNode(title: "-", image: nil, range: nil)
+                        stack.last!.node.children.append(dummy)
+                        stack.append((missing, dummy))
+                    }
+                } else {
+                    level = parentLevel + 1
                 }
             }
 
