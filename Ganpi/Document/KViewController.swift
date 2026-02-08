@@ -198,6 +198,10 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         panel.orderFront(self)
     }
     
+    @IBAction func openFunctionMenu(_ sender: Any?) {
+        openFunctionMenuFromButton(_funcMenuButton)
+    }
+    
     @IBAction func changeFont(_ sender: Any?) {
         guard let manager = sender as? NSFontManager else { log("Font manager is nil.", from:self); return }
         guard let storage = document?.textStorage else { log("document is nil.", from:self); return }
