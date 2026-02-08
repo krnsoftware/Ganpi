@@ -11,10 +11,10 @@
 import AppKit
 
 final class KCompletionController {
-    private var _entries: [String] = []
+    private var _entries: [[UInt8]] = []
     private var _entryIndex: Int = 0
     private var _caretIndex: Int = 0
-    private var _currentPrefix: String = ""
+    private var _currentPrefixLength: Int = 0
     private weak var _textView: KTextView?
 
     var currentWordTail: NSAttributedString?
@@ -39,7 +39,7 @@ final class KCompletionController {
         _entries.removeAll()
         _entryIndex = 0
         _caretIndex = 0
-        _currentPrefix = ""
+        _currentPrefixLength = 0
         currentWordTail = nil
     }
 
@@ -50,15 +50,15 @@ final class KCompletionController {
             return
         }
 
-        let word = _entries[_entryIndex]
-        let wordArray = Array(word)
+        let wordBytes = _entries[_entryIndex]
 
-        guard _currentPrefix.count < wordArray.count else {
+        guard _currentPrefixLength < wordBytes.count else {
             currentWordTail = nil
             return
         }
 
-        let tail = String(wordArray[_currentPrefix.count..<wordArray.count])
+        let tailBytes = Array(wordBytes[_currentPrefixLength..<wordBytes.count])
+        let tail = String(decoding: tailBytes, as: UTF8.self)
         currentWordTail = NSAttributedString(string: tail)
     }
 
@@ -79,14 +79,15 @@ final class KCompletionController {
 
         // キャレットの位置が単語の最後である場合のみ動作する。
         if let range = parser.wordRange(at: _caretIndex), range.upperBound == _caretIndex {
-            let prefix = storage.string(in: range)
+            let prefixSlice = storage.skeletonString.bytes(in: range)
+            let prefixBytes = Array(prefixSlice)
 
-            guard prefix.count >= parser.completionMinPrefixLength else { return }
+            guard prefixBytes.count >= parser.completionMinPrefixLength else { return }
 
-            _entries = parser.completionEntries(prefix: prefix)
+            _entries = parser.completionEntries(prefixBytes: prefixBytes)
             guard !_entries.isEmpty else { return }
 
-            _currentPrefix = prefix
+            _currentPrefixLength = prefixBytes.count
             _entryIndex = 0
             setCurrentWordTail()
         }

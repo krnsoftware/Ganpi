@@ -239,8 +239,7 @@ class KSyntaxParser {
     private let _completionQueue = DispatchQueue(label: "Ganpi.completion.catalog", qos: .utility)
     private var _completionIsBuilding: Bool = false
     private var _completionIsDirty: Bool = true
-    private var _completionCatalog: [String] = []
-
+    private var _completionCatalog: [[UInt8]] = []
     
     var baseTextColor: NSColor { return color(.base) }
     var backgroundColor: NSColor { return color(.background) }
@@ -318,27 +317,27 @@ class KSyntaxParser {
     func outline(in range: Range<Int>?) -> [KOutlineItem] { return [] }
     
     // get completion words (alphabetical / prefix match)
-    func completionEntries(prefix: String) -> [String] {
-        guard prefix.count >= completionMinPrefixLength else { return [] }
+    func completionEntries(prefixBytes: [UInt8]) -> [[UInt8]] {
+        guard prefixBytes.count >= completionMinPrefixLength else { return [] }
 
         startCompletionCatalogBuildIfNeeded()
 
         let words = _completionCatalog
         guard !words.isEmpty else { return [] }
 
-        let start = lowerBoundIndex(in: words, key: prefix)
+        let start = lowerBoundIndex(in: words, key: prefixBytes)
         if start >= words.count { return [] }
 
-        var res: [String] = []
+        var res: [[UInt8]] = []
         res.reserveCapacity(completionMaxCandidates)
 
         var i = start
         while i < words.count && res.count < completionMaxCandidates {
             let w = words[i]
-            if !w.hasPrefix(prefix) { break }
+            if !hasPrefixBytes(w, prefixBytes) { break }
 
             // prefix と完全一致する語彙は「補完で伸びない」のでスキップする
-            if w != prefix {
+            if !equalBytes(w, prefixBytes) {
                 res.append(w)
             }
 
@@ -587,29 +586,60 @@ class KSyntaxParser {
 
         let minLen = completionMinPrefixLength
         let maxLen = completionMaxWordLength
+        let keywordCatalog = keywords   // [[UInt8]]（loadKeywordsで正規化済み）
 
         _completionQueue.async { [weak self] in
             guard let self else { return }
 
-            let catalog = buildCompletionCatalog(bytes: bytes, minWordLength: minLen, maxWordLength: maxLen)
+            let docCatalog = buildCompletionCatalog(bytes: bytes, minWordLength: minLen, maxWordLength: maxLen)
+            let mergedCatalog = mergeSortedUniqueCatalogs(doc: docCatalog, keywords: keywordCatalog)
 
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
-
-                _completionCatalog = catalog
+                _completionCatalog = mergedCatalog
                 _completionIsBuilding = false
-                // 生成中に編集が入ってdirty化していても、次回呼び出し時に再生成される
             }
         }
     }
 
-    private func lowerBoundIndex(in words: [String], key: String) -> Int {
+    private func compareBytes(_ a: [UInt8], _ b: [UInt8]) -> Int {
+        let n = min(a.count, b.count)
+        if n > 0 {
+            for k in 0..<n {
+                let x = a[k]
+                let y = b[k]
+                if x != y { return (x < y) ? -1 : 1 }
+            }
+        }
+        if a.count == b.count { return 0 }
+        return (a.count < b.count) ? -1 : 1
+    }
+
+    private func equalBytes(_ a: [UInt8], _ b: [UInt8]) -> Bool {
+        if a.count != b.count { return false }
+        if a.isEmpty { return true }
+        for k in 0..<a.count {
+            if a[k] != b[k] { return false }
+        }
+        return true
+    }
+
+    private func hasPrefixBytes(_ word: [UInt8], _ prefix: [UInt8]) -> Bool {
+        if prefix.count > word.count { return false }
+        if prefix.isEmpty { return true }
+        for k in 0..<prefix.count {
+            if word[k] != prefix[k] { return false }
+        }
+        return true
+    }
+
+    private func lowerBoundIndex(in words: [[UInt8]], key: [UInt8]) -> Int {
         var low = 0
         var high = words.count
 
         while low < high {
             let mid = (low + high) / 2
-            if words[mid] < key {
+            if compareBytes(words[mid], key) < 0 {
                 low = mid + 1
             } else {
                 high = mid
@@ -618,10 +648,11 @@ class KSyntaxParser {
         return low
     }
 
-    private func buildCompletionCatalog(bytes: [UInt8], minWordLength: Int, maxWordLength: Int) -> [String] {
+    private func buildCompletionCatalog(bytes: [UInt8], minWordLength: Int, maxWordLength: Int) -> [[UInt8]] {
         if bytes.isEmpty { return [] }
 
-        var set: Set<String> = Set<String>()
+        // Array は Hashable でないので Data で集合化する（bytes は ASCII 識別子のみ）
+        var set: Set<Data> = Set<Data>()
         set.reserveCapacity(4096)
 
         var i = 0
@@ -636,9 +667,8 @@ class KSyntaxParser {
 
                 let len = j - i
                 if len >= minWordLength && len <= maxWordLength {
-                    let wordBytes = bytes[i..<j]
-                    let w = String(decoding: wordBytes, as: UTF8.self)
-                    set.insert(w)
+                    let w = Array(bytes[i..<j])
+                    set.insert(Data(w))
                 }
 
                 i = j
@@ -648,9 +678,55 @@ class KSyntaxParser {
             i += 1
         }
 
-        var catalog = Array(set)
-        catalog.sort()
+        var catalog: [[UInt8]] = []
+        catalog.reserveCapacity(set.count)
+
+        for d in set {
+            catalog.append(Array(d))
+        }
+
+        catalog.sort { compareBytes($0, $1) < 0 }
         return catalog
+    }
+
+    private func mergeSortedUniqueCatalogs(doc: [[UInt8]], keywords: [[UInt8]]) -> [[UInt8]] {
+        if doc.isEmpty { return keywords }
+        if keywords.isEmpty { return doc }
+
+        var res: [[UInt8]] = []
+        res.reserveCapacity(doc.count + keywords.count)
+
+        var i = 0
+        var j = 0
+
+        while i < doc.count && j < keywords.count {
+            let a = doc[i]
+            let b = keywords[j]
+            let c = compareBytes(a, b)
+
+            if c == 0 {
+                res.append(a)
+                i += 1
+                j += 1
+            } else if c < 0 {
+                res.append(a)
+                i += 1
+            } else {
+                res.append(b)
+                j += 1
+            }
+        }
+
+        while i < doc.count {
+            res.append(doc[i])
+            i += 1
+        }
+        while j < keywords.count {
+            res.append(keywords[j])
+            j += 1
+        }
+
+        return res
     }
 
 }
