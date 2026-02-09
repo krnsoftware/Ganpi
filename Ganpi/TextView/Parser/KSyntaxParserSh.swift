@@ -11,6 +11,11 @@
 import AppKit
 
 final class KSyntaxParserSh: KSyntaxParser {
+    
+    // MARK: - Properties
+
+    private let _tokenCase = Array("case".utf8)
+    private let _tokenIn = Array("in".utf8)
 
     // MARK: - Types
 
@@ -553,16 +558,16 @@ final class KSyntaxParserSh: KSyntaxParser {
                 while k < end, skeleton[k].isIdentPartAZ09_ { k += 1 }
 
                 // "case"
-                if (k - j) == 4,
-                   skeleton[j] == 99, skeleton[j + 1] == 97, skeleton[j + 2] == 115, skeleton[j + 3] == 101 {
+                if (k - j) == _tokenCase.count,
+                   skeleton.compare(word: _tokenCase, in: j..<k) == 0 {
                     sawCase = true
                     j = k
                     continue
                 }
 
                 // "in"（case の後だけ）
-                if sawCase, (k - j) == 2,
-                   skeleton[j] == 105, skeleton[j + 1] == 110 {
+                if sawCase, (k - j) == _tokenIn.count,
+                   skeleton.compare(word: _tokenIn, in: j..<k) == 0 {
                     sawInAfterCase = true
                     j = k
                     continue
@@ -860,8 +865,8 @@ final class KSyntaxParserSh: KSyntaxParser {
                     addSpan(wordRange, .keyword)
                 }
                 // "case" を見たら、この行内に "in" があるか探す（簡易）
-                if (j - i) == 4,
-                   skeleton[i] == 99, skeleton[i + 1] == 97, skeleton[i + 2] == 115, skeleton[i + 3] == 101 {
+                if (j - i) == _tokenCase.count,
+                   skeleton.compare(word: _tokenCase, in: i..<j) == 0 {
 
                     var p = j
                     while p < end {
@@ -869,10 +874,13 @@ final class KSyntaxParserSh: KSyntaxParser {
                         if cc.isIdentStartAZ_ {
                             var q = p + 1
                             while q < end, skeleton[q].isIdentPartAZ09_ { q += 1 }
-                            if (q - p) == 2, skeleton[p] == 105, skeleton[p + 1] == 110 {
+
+                            if (q - p) == _tokenIn.count,
+                               skeleton.compare(word: _tokenIn, in: p..<q) == 0 {
                                 nextStateFromCase = .inCasePattern
                                 break
                             }
+
                             p = q
                             continue
                         }

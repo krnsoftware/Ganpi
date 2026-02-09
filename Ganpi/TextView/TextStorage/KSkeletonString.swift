@@ -432,7 +432,7 @@ final class KSkeletonString {
     // return <0 : range < word
     //         0 : equal
     //        >0 : range > word
-    private func compare(word: [UInt8], in range: Range<Int>) -> Int {
+    func compare(word: [UInt8], in range: Range<Int>) -> Int {
         let rlen = range.count
         let wlen = word.count
         let minLen = (rlen < wlen) ? rlen : wlen
