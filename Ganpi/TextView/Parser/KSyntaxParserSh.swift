@@ -640,38 +640,81 @@ final class KSyntaxParserSh: KSyntaxParser {
         }
         
         // case pattern 中：パターン部は解析しない。
-        // ただし "esac" 行に来たらこの行で neutral に戻す（後方まで塗り続けないため）
+        // pattern は最初の ')' まで。')' を踏んだら以降を通常解析に戻す。
         if startState == .inCasePattern {
 
-            // 行内に "esac" があるかだけを見る（識別子として検出）
-            var foundEsac = false
+            let startIndex = i
+
+            var inSingleQuote = false
+            var inDoubleQuote = false
+            var doubleEscaped = false
+
             var j = i
             while j < end {
-                let bb = skeleton[j]
-                if bb.isIdentStartAZ_ {
-                    var k = j + 1
-                    while k < end, skeleton[k].isIdentPartAZ09_ { k += 1 }
+                let b = skeleton[j]
 
-                    if (k - j) == 4,
-                       skeleton[j] == 101, skeleton[j + 1] == 115, skeleton[j + 2] == 97, skeleton[j + 3] == 99 {
-                        foundEsac = true
-                        break
-                    }
+                // comment（クォート外）
+                if !inSingleQuote, !inDoubleQuote, b == FC.numeric {
+                    break
+                }
 
-                    j = k
+                if inSingleQuote {
+                    if b == FC.singleQuote { inSingleQuote = false }
+                    j += 1
                     continue
                 }
+
+                if inDoubleQuote {
+                    if doubleEscaped {
+                        doubleEscaped = false
+                        j += 1
+                        continue
+                    }
+                    if b == FC.backSlash {
+                        doubleEscaped = true
+                        j += 1
+                        continue
+                    }
+                    if b == FC.doubleQuote {
+                        inDoubleQuote = false
+                        j += 1
+                        continue
+                    }
+                    j += 1
+                    continue
+                }
+
+                // クォート開始
+                if b == FC.singleQuote { inSingleQuote = true; j += 1; continue }
+                if b == FC.doubleQuote { inDoubleQuote = true; j += 1; continue }
+
+                // エスケープ（クォート外）
+                if b == FC.backSlash {
+                    j = min(j + 2, end)
+                    continue
+                }
+
+                // pattern 終端
+                if b == FC.rightParen {
+                    // ')' までを base で正規化して、以降は通常解析へ
+                    addSpan(startIndex..<(j + 1), .base)
+                    i = j + 1
+                    break
+                }
+
                 j += 1
             }
 
-            if !foundEsac {
-                // 解析はしないが、属性を正規化するため base で必ず塗る
-                addSpan(i..<end, .base)
+            // ')' が見つからなかった（またはコメントで打ち切り）→行末まで base で正規化して pattern 継続
+            if i == startIndex {
+                addSpan(startIndex..<end, .base)
                 return .inCasePattern
             }
 
-            // "esac" 行：この行は以降を通常解析に任せる（ここで return しない）
-            // ＝後方まで .inCasePattern が伝播しない
+            // ')' が行末だった場合はこの行で終わり
+            if i >= end {
+                return .neutral
+            }
         }
         
         // $(...) 継続：parse 側は中身を深追いしないが、quote 継続は反映する
