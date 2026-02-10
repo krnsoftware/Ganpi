@@ -299,6 +299,177 @@ final class KSyntaxParserPython: KSyntaxParser {
 
         return items
     }
+    
+    
+    override func currentContext(at index: Int) -> (outer: String?, inner: String?) {
+        let skeleton = storage.skeletonString
+        let bytes = skeleton.bytes
+        let n = bytes.count
+        if n == 0 { return (nil, nil) }
+        if index < 0 || index > n { return (nil, nil) }
+
+        // index が末尾の場合は直前を参照（lineIndex計算のため）
+        let safeIndex = min(max(0, index), max(0, n - 1))
+        ensureUpToDate(for: safeIndex..<(safeIndex + 1))
+
+        let caretLine = skeleton.lineIndex(at: safeIndex)
+        if _lines.isEmpty { return (nil, nil) }
+
+        let maxBackLines = 1000
+
+        @inline(__always)
+        func isSpaceOrTab(_ b: UInt8) -> Bool { b == FC.space || b == FC.tab }
+
+        @inline(__always)
+        func skipSpaces(_ i: inout Int, end: Int) {
+            while i < end && isSpaceOrTab(bytes[i]) { i += 1 }
+        }
+
+        // スペース4=1レベル、TABは4扱い
+        @inline(__always)
+        func indentColumn(lineStart: Int, end: Int) -> Int {
+            var col = 0
+            var i = lineStart
+            while i < end {
+                let b = bytes[i]
+                if b == FC.space {
+                    col += 1
+                    i += 1
+                    continue
+                }
+                if b == FC.tab {
+                    col += 4
+                    i += 1
+                    continue
+                }
+                break
+            }
+            return col
+        }
+
+        @inline(__always)
+        func matchBytes(_ target: [UInt8], at index: Int, end: Int) -> Bool {
+            if index < 0 { return false }
+            if index + target.count > end { return false }
+            if target.isEmpty { return true }
+
+            var j = 0
+            while j < target.count {
+                if bytes[index + j] != target[j] { return false }
+                j += 1
+            }
+            return true
+        }
+
+        @inline(__always)
+        func parseName(afterKeywordAt p: Int, kwLen: Int, end: Int) -> Range<Int>? {
+            var i = p + kwLen
+            skipSpaces(&i, end: end)
+            if i >= end { return nil }
+
+            // name
+            if !bytes[i].isIdentStartAZ_ { return nil }
+            let nameStart = i
+            i += 1
+            while i < end && bytes[i].isIdentPartAZ09_ { i += 1 }
+            if nameStart >= i { return nil }
+            return nameStart..<i
+        }
+
+        // caret行の indent を基準に「包含」っぽいものだけ拾う
+        let caretLineRange = skeleton.lineRange(at: caretLine)
+        let caretIndent = indentColumn(lineStart: caretLineRange.lowerBound, end: caretLineRange.upperBound)
+
+        var innerRange: Range<Int>? = nil
+        var outerRange: Range<Int>? = nil
+
+        // まず inner(def) を探すための閾値
+        var innerIndentLimit = caretIndent
+        // outer(class) は inner が見つかったらさらに浅い indent に絞る
+        var outerIndentLimit: Int? = nil
+
+        var line = caretLine
+        var scanned = 0
+
+        while line >= 0 && scanned < maxBackLines && (innerRange == nil || outerRange == nil) {
+            // 行頭状態：triple-quote 継続中の行はスキップ
+            let startState: KEndState = {
+                if line == 0 { return .neutral }
+                let prev = line - 1
+                if prev >= 0 && prev < _lines.count { return _lines[prev].endState }
+                return .neutral
+            }()
+
+            if startState == .neutral {
+                let lr = skeleton.lineRange(at: line)
+                let start = lr.lowerBound
+                let end = lr.upperBound
+
+                // caret行だけは caret より後を見ない（def/class が後ろにあっても拾わない）
+                let limit = (line == caretLine) ? safeIndex : end
+                if start < limit {
+                    // インデントと行頭トークン
+                    let ind = indentColumn(lineStart: start, end: limit)
+
+                    // 閾値に合わないものは候補から外す
+                    let allowInner = (innerRange == nil) && (ind <= innerIndentLimit)
+                    let allowOuter = (outerRange == nil) && {
+                        if let lim = outerIndentLimit { return ind <= lim }
+                        return ind <= innerIndentLimit
+                    }()
+
+                    var p = start
+                    skipSpaces(&p, end: limit)
+                    if p < limit {
+                        let head = bytes[p]
+
+                        // コメント/デコレータ行は無視
+                        if head != FC.numeric && head != FC.at {
+                            // async def
+                            var q = p
+                            var isAsync = false
+                            if matchBytes(_tokenAsync, at: q, end: limit) {
+                                let afterAsync = q + _tokenAsync.count
+                                if afterAsync < limit && isSpaceOrTab(bytes[afterAsync]) {
+                                    q = afterAsync
+                                    skipSpaces(&q, end: limit)
+                                    isAsync = true
+                                }
+                            }
+
+                            if allowInner && matchBytes(_tokenDef, at: q, end: limit) {
+                                let afterDef = q + _tokenDef.count
+                                if afterDef < limit && isSpaceOrTab(bytes[afterDef]) {
+                                    if let r = parseName(afterKeywordAt: q, kwLen: _tokenDef.count, end: limit) {
+                                        innerRange = r
+                                        // outer は def より浅い indent に絞る
+                                        outerIndentLimit = max(0, ind - 1)
+                                        // さらに外側の def を拾わないため limit を更新
+                                        innerIndentLimit = max(0, ind - 1)
+                                        _ = isAsync // 将来表示を変えたければここで使える
+                                    }
+                                }
+                            } else if allowOuter && matchBytes(_tokenClass, at: p, end: limit) {
+                                let afterClass = p + _tokenClass.count
+                                if afterClass < limit && isSpaceOrTab(bytes[afterClass]) {
+                                    if let r = parseName(afterKeywordAt: p, kwLen: _tokenClass.count, end: limit) {
+                                        outerRange = r
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            line -= 1
+            scanned += 1
+        }
+
+        let outer = outerRange.map { storage.string(in: $0) }
+        let inner = innerRange.map { storage.string(in: $0) }
+        return (outer, inner)
+    }
 
     // MARK: - Private (scan)
 
