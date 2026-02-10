@@ -523,7 +523,9 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
     }
 
     @objc private func openFunctionMenuFromButton(_ sender: NSButton) {
-        if NSApp.currentEvent?.modifierFlags.contains(.control) == true {
+        if let event = NSApp.currentEvent,
+           event.type == .leftMouseDown,
+           event.modifierFlags.contains(.control) {
             presentFunctionMenu(order: .sorted, from: sender)
             return
         }
