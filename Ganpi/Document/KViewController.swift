@@ -213,8 +213,20 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         panel.orderFront(self)
     }
     
+    @IBAction func openEncodingMenu(_ sender: Any?) {
+        openEncodingMenuFromButton(_encButton)
+    }
+    
+    @IBAction func openEndOfLineMenu(_ sender: Any?) {
+        openEOLMenuFromButton(_eolButton)
+    }
+    
     @IBAction func openFunctionMenu(_ sender: Any?) {
         openFunctionMenuFromButton(_funcMenuButton)
+    }
+    
+    @IBAction func openSortedFunctionMenu(_ sender: Any?) {
+        presentFunctionMenu(order: .sorted, from: _funcMenuButton)
     }
     
     @IBAction func changeFont(_ sender: Any?) {
@@ -512,10 +524,6 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
             menu.addItem(item)
         }
         popUp(menu, from: sender)
-    }
-    
-    @IBAction func openSortedFunctionMenu(_ sender: Any?) {
-        presentFunctionMenu(order: .sorted, from: _funcMenuButton)
     }
 
     @objc private func openSortedFunctionMenuFromButton(_ sender: Any?) {
