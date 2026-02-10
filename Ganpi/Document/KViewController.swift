@@ -8,8 +8,23 @@
 import Cocoa
 import Carbon
 
-final class KViewController: NSViewController, NSUserInterfaceValidations, NSSplitViewDelegate {
+final class KViewController: NSViewController, NSUserInterfaceValidations, NSSplitViewDelegate, NSMenuDelegate {
+    
+    // MARK: - Structures
+    
+    private final class OutlineNode {
+        let title: String
+        let image: NSImage?
+        let range: Range<Int>?
+        var children: [OutlineNode] = []
 
+        init(title: String, image: NSImage?, range: Range<Int>?) {
+            self.title = title
+            self.image = image
+            self.range = range
+        }
+    }
+    
     // MARK: - Private properties
 
     private weak var _document: Document?
@@ -39,6 +54,9 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
     private let _caretButton  = NSButton(title: "", target: nil, action: nil)
     private let _fontSizeButton   = NSButton(title: "", target: nil, action: nil)   // "FS: <val>"
     private let _lineSpacingButton = NSButton(title: "", target: nil, action: nil)  // "LS: <val>"
+    
+    // Menus
+    private let _funcMenuContextMenu: NSMenu = NSMenu()
 
     // Popovers
     private var _jumpPopover: NSPopover?
@@ -414,6 +432,10 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         _syntaxButton.target = self; _syntaxButton.action = #selector(openSyntaxMenuFromButton(_:))
         _editModeButton.target = self; _editModeButton.action = #selector(toggleEditModeFromButton(_:))
         _funcMenuButton.target = self; _funcMenuButton.action = #selector(openFunctionMenuFromButton(_:))
+        
+        // Function menu: 右クリック（/ ctrl+クリック）はソート版を出す
+        _funcMenuContextMenu.delegate = self
+        _funcMenuButton.menu = _funcMenuContextMenu
 
         // 右：Caret（行ジャンプ）/ FS / LS（ポップオーバ）
         _caretButton.target = self;        _caretButton.action = #selector(showCaretPopover(_:))
@@ -495,25 +517,58 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         popUp(menu, from: sender)
     }
     
+    @IBAction func openSortedFunctionMenu(_ sender: Any?) {
+        presentFunctionMenu(order: .sorted, from: _funcMenuButton)
+    }
+
     @objc private func openFunctionMenuFromButton(_ sender: NSButton) {
+        presentFunctionMenu(order: .documentOrder, from: sender)
+    }
+
+    private enum KFunctionMenuOrder {
+        case documentOrder
+        case sorted
+    }
+
+    private func presentFunctionMenu(order: KFunctionMenuOrder, from sender: NSButton) {
         guard let doc = _document else { return }
         guard let textView = activeTextView() else { return }
 
+        let menu = makeFunctionMenu(document: doc, textView: textView, order: order)
+        popUp(menu, from: sender)
+    }
+
+    // 右クリック（/ ctrl+クリック）で呼ばれるコンテキストメニューを、開く直前に更新
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        guard menu === _funcMenuContextMenu else { return }
+        guard let doc = _document else { return }
+        guard let textView = activeTextView() else { return }
+
+        menu.removeAllItems()
+
+        let rebuilt = makeFunctionMenu(document: doc, textView: textView, order: .sorted)
+
+        // rebuilt の item を “移植” する（そのまま add でOK）
+        for item in rebuilt.items {
+            rebuilt.removeItem(item)
+            menu.addItem(item)
+        }
+    }
+
+    private func makeFunctionMenu(document doc: Document, textView: KTextView, order: KFunctionMenuOrder) -> NSMenu {
         let parser = doc.textStorage.parser
         let outlineItems = parser.outline(in: nil)
 
+        // 先頭に 1 行だけヒント（常設・ソート対象外）
         let menu = NSMenu()
+        let hint = NSMenuItem(title: "Option: Jump to group", action: nil, keyEquivalent: "")
+        hint.isEnabled = false
+        menu.addItem(hint)
+        menu.addItem(.separator())
 
         func makeTitle(for item: KOutlineItem) -> String {
-            let symbol = doc.textStorage.string(in: item.nameRange)
-            switch item.kind {
-            case .class, .module:
-                return symbol
-            case .method:
-                return (item.isSingleton ? "." : "#") + symbol
-            case .heading:
-                return symbol
-            }
+            // 表示からは # / . を外す（キーボード選択を邪魔しない）
+            return doc.textStorage.string(in: item.nameRange)
         }
 
         func makeImage(for item: KOutlineItem) -> NSImage? {
@@ -530,31 +585,11 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         }
 
         // outline の level は言語によって意味が違い得るので、ここでメニュー用の深さに正規化する。
-        // - HTML: h1..h6 を 1..6 として返す想定 → そのまま
-        // - Ruby等: class/module が 0 の場合がある → 1 に寄せる
-        // - method が 0 の場合があっても、最低 2 に寄せる（トップにぶら下がりにくくする）
         func semanticLevel(for item: KOutlineItem) -> Int {
-            // HTML の heading は h1..h6 を 1..6 で返す想定なので、そのまま使う。
             if item.kind == .heading {
                 return max(1, item.level)
             }
-
-            // Ruby / sh などは、構造（class/module 等）を 0 起点で返すことがある。
-            // メニューの root(level=0) と衝突しないよう、1 段持ち上げて使う。
             return max(1, item.level + 1)
-        }
-
-        final class OutlineNode {
-            let title: String
-            let image: NSImage?
-            let range: Range<Int>?
-            var children: [OutlineNode] = []
-
-            init(title: String, image: NSImage?, range: Range<Int>?) {
-                self.title = title
-                self.image = image
-                self.range = range
-            }
         }
 
         let root = OutlineNode(title: "", image: nil, range: nil)
@@ -592,42 +627,66 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
             stack.append((level, node))
         }
 
-        func buildMenu(from nodes: [OutlineNode], into targetMenu: NSMenu) {
-            for node in nodes {
-                if node.children.isEmpty {
-                    // leaf
-                    let leaf = NSMenuItem(title: node.title, action: nil, keyEquivalent: "")
-                    leaf.image = node.image
-                    if let range = node.range {
-                        leaf.action = #selector(textView.selectRange(_:))
-                        leaf.representedObject = range
-                    }
-                    targetMenu.addItem(leaf)
-                    continue
-                }
-
-                // container
-                let sub = NSMenu()
-                let parent = NSMenuItem(title: node.title, action: nil, keyEquivalent: "")
-                parent.image = node.image
-                parent.submenu = sub
-                targetMenu.addItem(parent)
-
-                // 実ノードだけ、先頭に "Jump to ..." を置く（ダミー "-" には置かない）
-                if let range = node.range {
-                    let jumpTitle = "Jump to \(node.title)"
-                    let jump = NSMenuItem(title: jumpTitle, action: #selector(textView.selectRange(_:)), keyEquivalent: "")
-                    jump.representedObject = range
-                    sub.addItem(jump)
-                    //sub.addItem(NSMenuItem.separator())
-                }
-
-                buildMenu(from: node.children, into: sub)
-            }
+        if order == .sorted {
+            sortOutlineNodesRecursively(&root.children)
         }
 
-        buildMenu(from: root.children, into: menu)
-        popUp(menu, from: sender)
+        buildMenu(from: root.children, into: menu, textView: textView)
+        return menu
+    }
+
+    private func sortOutlineNodesRecursively(_ nodes: inout [OutlineNode]) {
+        // "-"（ダミー）は並べ替え対象にすると不自然になりやすいので末尾へ寄せる
+        nodes.sort {
+            let aDummy = ($0.title == "-")
+            let bDummy = ($1.title == "-")
+            if aDummy != bDummy { return bDummy } // dummy は後ろ
+
+            return $0.title.localizedStandardCompare($1.title) == .orderedAscending
+        }
+
+        for i in nodes.indices {
+            if !nodes[i].children.isEmpty {
+                var children = nodes[i].children
+                sortOutlineNodesRecursively(&children)
+                nodes[i].children = children
+            }
+        }
+    }
+
+    private func buildMenu(from nodes: [OutlineNode], into targetMenu: NSMenu, textView: KTextView) {
+        for node in nodes {
+            if node.children.isEmpty {
+                let leaf = NSMenuItem(title: node.title, action: nil, keyEquivalent: "")
+                leaf.image = node.image
+                if let range = node.range {
+                    leaf.action = #selector(textView.selectRange(_:))
+                    leaf.representedObject = range
+                }
+                targetMenu.addItem(leaf)
+                continue
+            }
+
+            // container（通常はサブメニューを開く）
+            let sub = NSMenu()
+            let parent = NSMenuItem(title: node.title, action: nil, keyEquivalent: "")
+            parent.image = node.image
+            parent.submenu = sub
+            targetMenu.addItem(parent)
+
+            // ここが要点：
+            // サブメニュー先頭の "Jump to ..." は廃止し、親項目の Alternate として「Optionでジャンプ」を提供する
+            if let range = node.range {
+                let alt = NSMenuItem(title: node.title, action: #selector(textView.selectRange(_:)), keyEquivalent: "")
+                alt.image = node.image
+                alt.representedObject = range
+                alt.isAlternate = true
+                alt.keyEquivalentModifierMask = [.option]
+                targetMenu.addItem(alt)
+            }
+
+            buildMenu(from: node.children, into: sub, textView: textView)
+        }
     }
 
 
