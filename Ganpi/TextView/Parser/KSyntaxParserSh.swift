@@ -129,45 +129,50 @@ final class KSyntaxParserSh: KSyntaxParser {
     
     override func wordRange(at index: Int) -> Range<Int>? {
         let skeleton = storage.skeletonString
-        let count = skeleton.count
-        if count == 0 { return nil }
+        let n = skeleton.count
 
-        // index は skeleton と同一スケールの前提。安全に clamp。
-        var i = index
-        if i < 0 { i = 0 }
-        if i > count { i = count }
+        if index < 0 || index > n { return nil }
+        if n == 0 { return nil }
 
-        func isIdentStart(_ b: UInt8) -> Bool { b.isIdentStartAZ_ }
-        func isIdentPart(_ b: UInt8) -> Bool { b.isIdentPartAZ09_ }
+        // 1) カーソル位置（index）または直前（index-1）が「単語に触れている」か判定
+        var p: Int? = nil
 
-        // CompletionController は「単語末尾（=区切り文字側）」で呼ばれるので、
-        // まず index-1 を基準にする。
-        if i == 0 { return nil }
-
-        let probe = i - 1
-        let b0 = skeleton[probe]
-        if !isIdentPart(b0) { return nil }
-
-        // 左へ伸ばす
-        var start = probe
-        while start > 0 {
-            let b = skeleton[start - 1]
-            if isIdentPart(b) {
-                start -= 1
-                continue
+        if index < n {
+            let b = skeleton[index]
+            if b.isIdentPartAZ09_ {
+                p = index
             }
-            break
         }
 
-        // 先頭文字が start 条件を満たさないなら無効（例: "9abc" を単語にしない）
-        if !isIdentStart(skeleton[start]) { return nil }
+        if p == nil, index > 0 {
+            let b = skeleton[index - 1]
+            if b.isIdentPartAZ09_ {
+                p = index - 1
+            }
+        }
 
-        // 右端は「元の index（カーソル位置）」を採用する
-        // （probe は index-1 なので probe+1 でも同じだが、意図を明確にする）
-        let end = i
-        if start >= end { return nil }
+        guard let pos = p else { return nil }
 
-        return start..<end
+        // 2) 左へ伸ばす
+        var left = pos
+        while left > 0 {
+            let b = skeleton[left - 1]
+            if !b.isIdentPartAZ09_ { break }
+            left -= 1
+        }
+
+        // 先頭は [A-Za-z_] 必須（数字開始は単語と見なさない）
+        if !skeleton[left].isIdentStartAZ_ { return nil }
+
+        // 3) 右へ伸ばす
+        var right = pos + 1
+        while right < n {
+            let b = skeleton[right]
+            if !b.isIdentPartAZ09_ { break }
+            right += 1
+        }
+
+        return left..<right
     }
     
     override func outline(in range: Range<Int>?) -> [KOutlineItem] {     // range is ignored for now.
