@@ -37,6 +37,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
     case html  = "public.html"
     case ini   = "public.ini-text"
     case sh    = "public.shell-script"
+    case python = "public.python-script"
 
     // extensions for every type.
     var extensions: [String] {
@@ -46,6 +47,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         case .html:  return ["html", "htm", "xhtml", "xml", "plist"]
         case .ini:   return ["ini", "cfg", "conf"]
         case .sh:    return ["sh", "bash", "zsh", "ksh"]
+        case .python: return ["py", "pyw"]
         }
     }
 
@@ -67,6 +69,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         case .html:  return "HTML/XML"
         case .ini:   return "INI"
         case .sh:    return "Shell"
+        case .python: return "Python"
         }
     }
 
@@ -89,7 +92,8 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
             .ruby  : "ruby",
             .html  : "html",
             .ini   : "ini",
-            .sh    : "sh"
+            .sh    : "sh",
+            .python : "python",
         ]
         // 設定名 → enum
         static let reverse: [String : KSyntaxType] = {
@@ -107,6 +111,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         case .html:  return KSyntaxParserHtml(storage: storage)
         case .ini:   return KSyntaxParserIni(storage: storage)
         case .sh:    return KSyntaxParserSh(storage: storage)
+        case .python: return KSyntaxParserPython(storage: storage)
         }
     }
 
@@ -195,6 +200,8 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
             return .sh
         case "ruby":
             return .ruby
+        case "python", "python3", "python2":
+            return .python
         default:
             return nil
         }
