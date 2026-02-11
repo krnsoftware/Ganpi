@@ -221,6 +221,10 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         openEOLMenuFromButton(_eolButton)
     }
     
+    @IBAction func openSyntaxMenu(_ sender: Any?) {
+        openSyntaxMenuFromButton(_syntaxButton)
+    }
+    
     @IBAction func openFunctionMenu(_ sender: Any?) {
         openFunctionMenuFromButton(_funcMenuButton)
     }
@@ -490,8 +494,18 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
     @objc private func openEncodingMenuFromButton(_ sender: NSButton) {
         guard let doc = _document else { return }
         let menu = NSMenu()
+        /*
         for enc in KTextEncoding.allCases {
             let item = NSMenuItem(title: enc.string, action: #selector(didChooseEncoding(_:)), keyEquivalent: "")
+            item.target = self
+            item.state = (enc == doc.characterCode) ? .on : .off
+            item.representedObject = enc
+            menu.addItem(item)
+        }
+        */
+        for (i, enc) in KTextEncoding.allCases.enumerated() {
+            let title = "\(i + 1). \(enc.string)"
+            let item  = NSMenuItem(title: title, action: #selector(didChooseEncoding(_:)), keyEquivalent: "")
             item.target = self
             item.state = (enc == doc.characterCode) ? .on : .off
             item.representedObject = enc
@@ -503,8 +517,18 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
     @objc private func openEOLMenuFromButton(_ sender: NSButton) {
         guard let doc = _document else { return }
         let menu = NSMenu()
+        /*
         for eol in String.ReturnCharacter.allCases {
             let item = NSMenuItem(title: eol.string, action: #selector(didChooseEOL(_:)), keyEquivalent: "")
+            item.target = self
+            item.state = (eol == doc.returnCode) ? .on : .off
+            item.representedObject = eol
+            menu.addItem(item)
+        }
+         */
+        for (i, eol) in String.ReturnCharacter.allCases.enumerated() {
+            let title = "\(i + 1). \(eol.string)"
+            let item  = NSMenuItem(title: title, action: #selector(didChooseEncoding(_:)), keyEquivalent: "")
             item.target = self
             item.state = (eol == doc.returnCode) ? .on : .off
             item.representedObject = eol
