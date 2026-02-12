@@ -90,14 +90,8 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
 
     // キーワードファイルのベース名（拡張子なし）
     // - 既存仕様: keyword_<settingName>.txt
-    // - TypeScript は統合モードのため keywords_typescript.txt
     var keywordFileBaseName: String {
-        switch self {
-        case .typescript:
-            return "keywords_typescript"
-        default:
-            return "keyword_\(settingName)"
-        }
+        return "keyword_\(settingName)"
     }
 
 
