@@ -38,6 +38,8 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
     case ini   = "public.ini-text"
     case sh    = "public.shell-script"
     case python = "public.python-script"
+    case typescript = "com.microsoft.typescript"
+
 
     // extensions for every type.
     var extensions: [String] {
@@ -48,6 +50,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         case .ini:   return ["ini", "cfg", "conf"]
         case .sh:    return ["sh", "bash", "zsh", "ksh"]
         case .python: return ["py", "pyw"]
+        case .typescript: return ["js", "jsx", "mjs", "cjs", "ts", "tsx", "mts", "cts"]
         }
     }
 
@@ -70,6 +73,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         case .ini:   return "INI"
         case .sh:    return "Shell"
         case .python: return "Python"
+        case .typescript: return "TypeScript"
         }
     }
 
@@ -84,6 +88,19 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         return KSyntaxMeta.map[self]!
     }
 
+    // キーワードファイルのベース名（拡張子なし）
+    // - 既存仕様: keyword_<settingName>.txt
+    // - TypeScript は統合モードのため keywords_typescript.txt
+    var keywordFileBaseName: String {
+        switch self {
+        case .typescript:
+            return "keywords_typescript"
+        default:
+            return "keyword_\(settingName)"
+        }
+    }
+
+
     // enumと設定名の対応を示す構造体。
     private struct KSyntaxMeta {
         // enum → 設定名
@@ -94,6 +111,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
             .ini   : "ini",
             .sh    : "sh",
             .python : "python",
+            .typescript : "typescript",
         ]
         // 設定名 → enum
         static let reverse: [String : KSyntaxType] = {
@@ -112,6 +130,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         case .ini:   return KSyntaxParserIni(storage: storage)
         case .sh:    return KSyntaxParserSh(storage: storage)
         case .python: return KSyntaxParserPython(storage: storage)
+        case .typescript: return KSyntaxParserTypeScript(storage: storage)
         }
     }
 
@@ -119,6 +138,18 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         // 1) typeName が UTI として一致するか
         if let type = typeName, let knownType = KSyntaxType(rawValue: type) {
             return knownType
+        }
+
+        if let type = typeName?.lowercased() {
+            switch type {
+            case "public.javascript",
+                 "com.netscape.javascript-source",
+                 "com.netscape.javascript",
+                 "com.microsoft.typescript":
+                return .typescript
+            default:
+                break
+            }
         }
 
         // 2) 拡張子から推定（拡張子優先。ただし plain系拡張子は確定にしない）
@@ -202,6 +233,8 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
             return .ruby
         case "python", "python3", "python2":
             return .python
+        case "node", "nodejs", "deno", "bun":
+            return .typescript
         default:
             return nil
         }
@@ -483,7 +516,7 @@ class KSyntaxParser {
         // plain はキーワード無し（ファイルがあっても使わない方針ならここで返す）
         if type == .plain { return [] }
 
-        let resourceBaseName = "keyword_\(type.settingName)"
+        let resourceBaseName = type.keywordFileBaseName
         let fileName = resourceBaseName + ".txt"
 
         // 1) User (Application Support) を優先
