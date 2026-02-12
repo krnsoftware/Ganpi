@@ -583,12 +583,6 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
 
         let menu = NSMenu()
 
-        // 先頭に 1 行だけヒント（常設）
-        let hint = NSMenuItem(title: "Option: Jump to group", action: nil, keyEquivalent: "")
-        hint.isEnabled = false
-        menu.addItem(hint)
-        menu.addItem(.separator())
-
         func makeTitle(for item: KOutlineItem) -> String {
             // 表示からは # / . を外す（キーボード選択の邪魔になるため）
             return doc.textStorage.string(in: item.nameRange)
@@ -693,14 +687,12 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
             parent.submenu = sub
             targetMenu.addItem(parent)
 
-            // 親を選択できるように：Jump to をサブに置かず、Alternate を同階層に追加
+            // サブメニュー先頭に "Open Parent"（ダミー "-" には付けない）
             if let range = node.range {
-                let alt = NSMenuItem(title: node.title, action: #selector(textView.selectRange(_:)), keyEquivalent: "")
-                alt.image = node.image
-                alt.representedObject = range
-                alt.isAlternate = true
-                alt.keyEquivalentModifierMask = [.option]
-                targetMenu.addItem(alt)
+                let openParent = NSMenuItem(title: "Open Parent", action: #selector(textView.selectRange(_:)), keyEquivalent: "")
+                openParent.representedObject = range
+                sub.addItem(openParent)
+                sub.addItem(.separator())
             }
 
             buildMenu(from: node.children, into: sub, textView: textView)
