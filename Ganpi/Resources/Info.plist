@@ -129,6 +129,29 @@
             <key>NSDocumentClass</key>
             <string>$(PRODUCT_MODULE_NAME).Document</string>
         </dict>
+        
+        <!-- 6) TypeScript / JavaScript -->
+        <dict>
+          <key>CFBundleTypeExtensions</key>
+          <array>
+            <string>js</string>
+            <string>jsx</string>
+            <string>mjs</string>
+            <string>cjs</string>
+            <string>ts</string>
+            <string>tsx</string>
+            <string>mts</string>
+            <string>cts</string>
+          </array>
+          <key>CFBundleTypeName</key>
+          <string>TypeScript/JavaScript</string>
+          <key>CFBundleTypeRole</key>
+          <string>Editor</string>
+          <key>LSHandlerRank</key>
+          <string>Default</string>
+          <key>NSDocumentClass</key>
+          <string>$(PRODUCT_MODULE_NAME).Document</string>
+        </dict>
     
     </array>
 	<key>NSMainNibFile</key>
