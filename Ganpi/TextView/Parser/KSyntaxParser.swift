@@ -134,18 +134,6 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
             return knownType
         }
 
-        if let type = typeName?.lowercased() {
-            switch type {
-            case "public.javascript",
-                 "com.netscape.javascript-source",
-                 "com.netscape.javascript",
-                 "com.microsoft.typescript":
-                return .typescript
-            default:
-                break
-            }
-        }
-
         // 2) 拡張子から推定（拡張子優先。ただし plain系拡張子は確定にしない）
         if let fileExtension = ext?.lowercased(), !fileExtension.isEmpty {
             if let type = Self.fromExtension(fileExtension) {
