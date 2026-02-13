@@ -550,6 +550,25 @@ final class KSyntaxParserCss: KSyntaxParser {
                     continue
                 }
             }
+            
+            // unicode-range の "U+xxxx-xxxx" 等は数値として扱わない（誤認識回避）
+            if b == 85 /* 'U' */ {
+                let next = i + 1
+                if next < end, bytes[next] == FC.plus {
+                    // "U+" を見たら、このトークン（識別子相当）を飛ばす
+                    // 例: U+0000-00FF, U+0131
+                    var j = next + 1
+                    while j < end {
+                        let c = bytes[j]
+                        if c == FC.space || c == FC.tab || c == FC.comma || c == FC.semicolon || c == FC.rightParen {
+                            break
+                        }
+                        j += 1
+                    }
+                    i = j
+                    continue
+                }
+            }
 
             // -20px / -0.5rem などの先頭 '-' を数値として扱う
             if b == FC.minus {
