@@ -1,0 +1,27 @@
+# CSS keywords / at-rules (UTF-8, LF)
+
+@charset
+@color-profile
+@container
+@counter-style
+@custom-media
+@document
+@font-face
+@font-feature-values
+@import
+@keyframes
+@layer
+@media
+@namespace
+@page
+@property
+@scope
+@starting-style
+@supports
+and
+from
+important
+not
+only
+or
+to

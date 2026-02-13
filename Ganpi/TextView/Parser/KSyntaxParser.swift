@@ -39,6 +39,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
     case sh    = "public.shell-script"
     case python = "public.python-script"
     case typescript = "com.microsoft.typescript"
+    case css   = "public.css"
 
 
     // extensions for every type.
@@ -51,6 +52,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         case .sh:    return ["sh", "bash", "zsh", "ksh"]
         case .python: return ["py", "pyw"]
         case .typescript: return ["js", "jsx", "mjs", "cjs", "ts", "tsx", "mts", "cts"]
+        case .css:   return ["css"]
         }
     }
 
@@ -74,6 +76,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         case .sh:    return "Shell"
         case .python: return "Python"
         case .typescript: return "TypeScript"
+        case .css:   return "CSS"
         }
     }
 
@@ -106,6 +109,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
             .sh    : "sh",
             .python : "python",
             .typescript : "typescript",
+            .css   : "css",
         ]
         // 設定名 → enum
         static let reverse: [String : KSyntaxType] = {
@@ -125,6 +129,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         case .sh:    return KSyntaxParserSh(storage: storage)
         case .python: return KSyntaxParserPython(storage: storage)
         case .typescript: return KSyntaxParserTypeScript(storage: storage)
+        case .css:   return KSyntaxParserCss(storage: storage)
         }
     }
 
