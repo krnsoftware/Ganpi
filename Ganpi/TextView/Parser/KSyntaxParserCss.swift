@@ -149,118 +149,619 @@ final class KSyntaxParserCss: KSyntaxParser {
         return left..<right
     }
 
+    override func outline(in range: Range<Int>?) -> [KOutlineItem] {     // range is ignored for now.
+        let skeleton = storage.skeletonString
+        let bytes = skeleton.bytes
+        let n = bytes.count
+        if n == 0 { return [] }
 
+        // endState を参照するため、全文を一度 up-to-date にしておく
+        ensureUpToDate(for: 0..<n)
+        if _lines.isEmpty { return [] }
+
+        let lineCount = skeletonLineCount()
+        if lineCount <= 0 { return [] }
+
+        var items: [KOutlineItem] = []
+        items.reserveCapacity(128)
+
+        func isSpaceOrTab(_ b: UInt8) -> Bool { b == FC.space || b == FC.tab }
+
+        func trimmedRange(_ lineRange: Range<Int>) -> Range<Int>? {
+            var a = lineRange.lowerBound
+            var b = lineRange.upperBound
+            while a < b && isSpaceOrTab(bytes[a]) { a += 1 }
+            while b > a && isSpaceOrTab(bytes[b - 1]) { b -= 1 }
+            if a >= b { return nil }
+            return a..<b
+        }
+
+        func firstOpenBraceIndex(in lineRange: Range<Int>, startState: KEndState, limit: Int?) -> Int? {
+            let end = min(lineRange.upperBound, limit ?? lineRange.upperBound)
+            if lineRange.lowerBound >= end { return nil }
+
+            @inline(__always)
+            func isEscaped(at index: Int, lineStart: Int) -> Bool {
+                if index <= lineStart { return false }
+                var backslashCount = 0
+                var j = index - 1
+                while j >= lineStart && bytes[j] == FC.backSlash {
+                    backslashCount += 1
+                    if j == 0 { break }
+                    j -= 1
+                }
+                return (backslashCount & 1) == 1
+            }
+
+            @inline(__always)
+            func findBlockCommentEnd(from i0: Int) -> Int? {
+                var i = i0
+                while i + 1 < end {
+                    if bytes[i] == FC.asterisk && bytes[i + 1] == FC.slash { return i }
+                    i += 1
+                }
+                return nil
+            }
+
+            var i = lineRange.lowerBound
+            var state = startState
+
+            // 行頭で継続している block comment / string を処理してから走査を開始
+            switch state {
+            case .inBlockComment:
+                if let close = findBlockCommentEnd(from: i) {
+                    i = close + 2
+                    state = .neutral(braceDepth: state.braceDepth)
+                } else {
+                    return nil
+                }
+
+            case .inSingleQuote:
+                var j = i
+                while j < end {
+                    if bytes[j] == FC.singleQuote && !isEscaped(at: j, lineStart: lineRange.lowerBound) {
+                        i = j + 1
+                        state = .neutral(braceDepth: state.braceDepth)
+                        break
+                    }
+                    j += 1
+                }
+                if j >= end { return nil }
+
+            case .inDoubleQuote:
+                var j = i
+                while j < end {
+                    if bytes[j] == FC.doubleQuote && !isEscaped(at: j, lineStart: lineRange.lowerBound) {
+                        i = j + 1
+                        state = .neutral(braceDepth: state.braceDepth)
+                        break
+                    }
+                    j += 1
+                }
+                if j >= end { return nil }
+
+            case .neutral:
+                break
+            }
+
+            while i < end {
+                let b = bytes[i]
+
+                if b == FC.slash && (i + 1) < end && bytes[i + 1] == FC.asterisk {
+                    if let close = findBlockCommentEnd(from: i + 2) {
+                        i = close + 2
+                        continue
+                    } else {
+                        return nil
+                    }
+                }
+
+                if b == FC.singleQuote {
+                    var j = i + 1
+                    while j < end {
+                        if bytes[j] == FC.singleQuote && !isEscaped(at: j, lineStart: lineRange.lowerBound) {
+                            i = j + 1
+                            break
+                        }
+                        j += 1
+                    }
+                    if j >= end { return nil }
+                    continue
+                }
+
+                if b == FC.doubleQuote {
+                    var j = i + 1
+                    while j < end {
+                        if bytes[j] == FC.doubleQuote && !isEscaped(at: j, lineStart: lineRange.lowerBound) {
+                            i = j + 1
+                            break
+                        }
+                        j += 1
+                    }
+                    if j >= end { return nil }
+                    continue
+                }
+
+                if b == FC.leftBrace {
+                    return i
+                }
+
+                i += 1
+            }
+
+            return nil
+        }
+
+        func headerNameRangeFromSameLine(_ lineRange: Range<Int>, braceIndex: Int) -> Range<Int>? {
+            guard let t = trimmedRange(lineRange) else { return nil }
+            var end = min(braceIndex, t.upperBound)
+            while end > t.lowerBound && isSpaceOrTab(bytes[end - 1]) { end -= 1 }
+            if end <= t.lowerBound { return nil }
+
+            // 末尾の ',' は selector list 用に落とす
+            if bytes[end - 1] == FC.comma {
+                end -= 1
+                while end > t.lowerBound && isSpaceOrTab(bytes[end - 1]) { end -= 1 }
+            }
+
+            if end <= t.lowerBound { return nil }
+            return t.lowerBound..<end
+        }
+
+        func headerNameRangeFromWholeLine(_ lineRange: Range<Int>) -> Range<Int>? {
+            guard var t = trimmedRange(lineRange) else { return nil }
+
+            // 末尾の ',' は selector list 用に落とす
+            if bytes[t.upperBound - 1] == FC.comma {
+                var e = t.upperBound - 1
+                while e > t.lowerBound && isSpaceOrTab(bytes[e - 1]) { e -= 1 }
+                if e <= t.lowerBound { return nil }
+                t = t.lowerBound..<e
+            }
+
+            return t
+        }
+
+        func isAtRule(_ nameRange: Range<Int>) -> Bool {
+            let i = nameRange.lowerBound
+            if i < 0 || i >= n { return false }
+            return bytes[i] == FC.at
+        }
+
+        var line = 0
+        while line < lineCount {
+            let lineRange = skeleton.lineRange(at: line)
+            let startState: KEndState = (line > 0 && (line - 1) < _lines.count) ? _lines[line - 1].endState : .neutral(braceDepth: 0)
+            let enteringDepth = startState.braceDepth
+
+            // 1) 同一行に '{' があるケース
+            if let braceIndex = firstOpenBraceIndex(in: lineRange, startState: startState, limit: nil) {
+                if let nameRange = headerNameRangeFromSameLine(lineRange, braceIndex: braceIndex) {
+
+                    // selector list の改行継続（末尾 ','）を拾う：
+                    // 例: "body," の次行に "html {" が来るケース
+                    var headerLines: [Int] = []
+                    var prev = line - 1
+                    while prev >= 0 {
+                        let prevRange = skeleton.lineRange(at: prev)
+                        if let tr = trimmedRange(prevRange) {
+                            // 空行でなければ対象。ただし "}" 単独行は無視。
+                            if tr.count == 1, bytes[tr.lowerBound] == FC.rightBrace {
+                                prev -= 1
+                                continue
+                            }
+
+                            // 末尾 ',' の行だけを selector list とみなして拾う
+                            if bytes[tr.upperBound - 1] == FC.comma {
+                                headerLines.append(prev)
+                                prev -= 1
+                                continue
+                            }
+                        }
+                        break
+                    }
+
+                    if !headerLines.isEmpty {
+                        for h in headerLines.reversed() {
+                            let hr = skeleton.lineRange(at: h)
+                            if let r = headerNameRangeFromWholeLine(hr) {
+                                let k: KOutlineItem.Kind = isAtRule(r) ? .module : .class
+                                items.append(KOutlineItem(kind: k, nameRange: r, level: enteringDepth, isSingleton: false))
+                            }
+                        }
+                    }
+
+                    let kind: KOutlineItem.Kind = isAtRule(nameRange) ? .module : .class
+                    items.append(KOutlineItem(kind: kind, nameRange: nameRange, level: enteringDepth, isSingleton: false))
+
+                } else {
+                    // 2) '{' 単独行（前行の selector / @rule を拾う）
+                    if let t = trimmedRange(lineRange),
+                       t.count == 1,
+                       bytes[t.lowerBound] == FC.leftBrace {
+
+                        var headerLines: [Int] = []
+                        var prev = line - 1
+                        while prev >= 0 {
+                            let prevRange = skeleton.lineRange(at: prev)
+                            if let tr = trimmedRange(prevRange) {
+                                // 空行でなければ採用（ただし閉じ brace のみ行は無視）
+                                if tr.count == 1, bytes[tr.lowerBound] == FC.rightBrace {
+                                    prev -= 1
+                                    continue
+                                }
+                                headerLines.append(prev)
+                                // selector list 継続（末尾 ','）ならさらに上へ
+                                if bytes[tr.upperBound - 1] == FC.comma {
+                                    prev -= 1
+                                    continue
+                                }
+                                break
+                            }
+                            prev -= 1
+                        }
+
+                        if !headerLines.isEmpty {
+                            // 上から順に追加（文書順）
+                            for h in headerLines.reversed() {
+                                let hr = skeleton.lineRange(at: h)
+                                if let nameRange = headerNameRangeFromWholeLine(hr) {
+                                    let kind: KOutlineItem.Kind = isAtRule(nameRange) ? .module : .class
+                                    items.append(KOutlineItem(kind: kind, nameRange: nameRange, level: enteringDepth, isSingleton: false))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            line += 1
+        }
+
+        return items
+    }
 
     override func currentContext(at index: Int) -> (outer: String?, inner: String?) {
         let skeleton = storage.skeletonString
-        if skeleton.count == 0 { return (nil, nil) }
-        if index < 0 || index > skeleton.count { return (nil, nil) }
+        let bytes = skeleton.bytes
+        let n = bytes.count
+        if n == 0 { return (nil, nil) }
 
-        let safeIndex = min(max(0, index), max(0, skeleton.count - 1))
+        let clamped = max(0, min(index, n))
+        let safeIndex = min(clamped, max(0, n - 1))
+
         ensureUpToDate(for: safeIndex..<(safeIndex + 1))
         if _lines.isEmpty { return (nil, nil) }
 
         let lineIndex = skeleton.lineIndex(at: safeIndex)
         if lineIndex < 0 { return (nil, nil) }
 
+        func isSpaceOrTab(_ b: UInt8) -> Bool { b == FC.space || b == FC.tab }
+
+        func trimmedRange(_ lineRange: Range<Int>) -> Range<Int>? {
+            var a = lineRange.lowerBound
+            var b = lineRange.upperBound
+            while a < b && isSpaceOrTab(bytes[a]) { a += 1 }
+            while b > a && isSpaceOrTab(bytes[b - 1]) { b -= 1 }
+            if a >= b { return nil }
+            return a..<b
+        }
+
+        func firstOpenBraceIndex(in lineRange: Range<Int>, startState: KEndState, limit: Int?) -> Int? {
+            let end = min(lineRange.upperBound, limit ?? lineRange.upperBound)
+            if lineRange.lowerBound >= end { return nil }
+
+            @inline(__always)
+            func isEscaped(at index: Int, lineStart: Int) -> Bool {
+                if index <= lineStart { return false }
+                var backslashCount = 0
+                var j = index - 1
+                while j >= lineStart && bytes[j] == FC.backSlash {
+                    backslashCount += 1
+                    if j == 0 { break }
+                    j -= 1
+                }
+                return (backslashCount & 1) == 1
+            }
+
+            @inline(__always)
+            func findBlockCommentEnd(from i0: Int) -> Int? {
+                var i = i0
+                while i + 1 < end {
+                    if bytes[i] == FC.asterisk && bytes[i + 1] == FC.slash { return i }
+                    i += 1
+                }
+                return nil
+            }
+
+            var i = lineRange.lowerBound
+            var state = startState
+
+            switch state {
+            case .inBlockComment:
+                if let close = findBlockCommentEnd(from: i) {
+                    i = close + 2
+                    state = .neutral(braceDepth: state.braceDepth)
+                } else {
+                    return nil
+                }
+
+            case .inSingleQuote:
+                var j = i
+                while j < end {
+                    if bytes[j] == FC.singleQuote && !isEscaped(at: j, lineStart: lineRange.lowerBound) {
+                        i = j + 1
+                        state = .neutral(braceDepth: state.braceDepth)
+                        break
+                    }
+                    j += 1
+                }
+                if j >= end { return nil }
+
+            case .inDoubleQuote:
+                var j = i
+                while j < end {
+                    if bytes[j] == FC.doubleQuote && !isEscaped(at: j, lineStart: lineRange.lowerBound) {
+                        i = j + 1
+                        state = .neutral(braceDepth: state.braceDepth)
+                        break
+                    }
+                    j += 1
+                }
+                if j >= end { return nil }
+
+            case .neutral:
+                break
+            }
+
+            while i < end {
+                let b = bytes[i]
+
+                if b == FC.slash && (i + 1) < end && bytes[i + 1] == FC.asterisk {
+                    if let close = findBlockCommentEnd(from: i + 2) {
+                        i = close + 2
+                        continue
+                    } else {
+                        return nil
+                    }
+                }
+
+                if b == FC.singleQuote {
+                    var j = i + 1
+                    while j < end {
+                        if bytes[j] == FC.singleQuote && !isEscaped(at: j, lineStart: lineRange.lowerBound) {
+                            i = j + 1
+                            break
+                        }
+                        j += 1
+                    }
+                    if j >= end { return nil }
+                    continue
+                }
+
+                if b == FC.doubleQuote {
+                    var j = i + 1
+                    while j < end {
+                        if bytes[j] == FC.doubleQuote && !isEscaped(at: j, lineStart: lineRange.lowerBound) {
+                            i = j + 1
+                            break
+                        }
+                        j += 1
+                    }
+                    if j >= end { return nil }
+                    continue
+                }
+
+                if b == FC.leftBrace {
+                    return i
+                }
+
+                i += 1
+            }
+
+            return nil
+        }
+
+        func headerNameRangeFromSameLine(_ lineRange: Range<Int>, braceIndex: Int) -> Range<Int>? {
+            guard let t = trimmedRange(lineRange) else { return nil }
+            var end = min(braceIndex, t.upperBound)
+            while end > t.lowerBound && isSpaceOrTab(bytes[end - 1]) { end -= 1 }
+            if end <= t.lowerBound { return nil }
+
+            if bytes[end - 1] == FC.comma {
+                end -= 1
+                while end > t.lowerBound && isSpaceOrTab(bytes[end - 1]) { end -= 1 }
+            }
+
+            if end <= t.lowerBound { return nil }
+            return t.lowerBound..<end
+        }
+
+        func headerNameRangeFromWholeLine(_ lineRange: Range<Int>) -> Range<Int>? {
+            guard var t = trimmedRange(lineRange) else { return nil }
+
+            if bytes[t.upperBound - 1] == FC.comma {
+                var e = t.upperBound - 1
+                while e > t.lowerBound && isSpaceOrTab(bytes[e - 1]) { e -= 1 }
+                if e <= t.lowerBound { return nil }
+                t = t.lowerBound..<e
+            }
+
+            return t
+        }
+
+        func nameString(_ r: Range<Int>) -> String {
+            return storage.string(in: r).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        func isAtRule(_ r: Range<Int>) -> Bool {
+            let i = r.lowerBound
+            if i < 0 || i >= n { return false }
+            return bytes[i] == FC.at
+        }
+
+        // caret 行までの braceDepth を概算（行前半は _lines の endState を使う）
+        let baseDepth: Int = (lineIndex > 0 && (lineIndex - 1) < _lines.count) ? _lines[lineIndex - 1].endState.braceDepth : 0
+
+        // 行内で caret まで走査し、braceDepth を補正（文字列/コメント内の brace は無視）
         let lineRange = skeleton.lineRange(at: lineIndex)
         let startState: KEndState = (lineIndex > 0 && (lineIndex - 1) < _lines.count) ? _lines[lineIndex - 1].endState : .neutral(braceDepth: 0)
-        let caretDepth = braceDepthAt(index: safeIndex, lineRange: lineRange, startState: startState)
+        let limit = min(max(lineRange.lowerBound, safeIndex), lineRange.upperBound)
 
-        if caretDepth <= 0 { return (nil, nil) }
+        var depthAtCaret = baseDepth
 
-        // まず inner（最内）を探す：level == caretDepth-1 のブロックヘッダ
-        var innerHeader: Range<Int>? = nil
-        var innerIsAtRule = false
-        var innerLevel = caretDepth - 1
+        // braceDepth のみを追い、文字列/コメントを避ける
+        if let _ = firstOpenBraceIndex(in: lineRange, startState: startState, limit: limit) {
+            // 同一行で '{' を跨いでいる可能性があるので、簡易スキャンで数える
+            var i = lineRange.lowerBound
+            var state = startState
 
-        var line = min(lineIndex, max(0, _lines.count - 1))
-        while line >= 0 {
-            if let hit = blockHeaderRange(at: line, limit: (line == lineIndex) ? safeIndex : nil) {
-                if hit.level == innerLevel {
-                    innerHeader = hit.headerRange
-                    innerIsAtRule = hit.isAtRule
+            @inline(__always)
+            func isEscaped(at index: Int, lineStart: Int) -> Bool {
+                if index <= lineStart { return false }
+                var backslashCount = 0
+                var j = index - 1
+                while j >= lineStart && bytes[j] == FC.backSlash {
+                    backslashCount += 1
+                    if j == 0 { break }
+                    j -= 1
+                }
+                return (backslashCount & 1) == 1
+            }
+
+            while i < limit {
+                let b = bytes[i]
+
+                if case .inBlockComment = state {
+                    if (i + 1) < limit, bytes[i] == FC.asterisk, bytes[i + 1] == FC.slash {
+                        state = .neutral(braceDepth: depthAtCaret)
+                        i += 2
+                        continue
+                    }
+                    i += 1
+                    continue
+                }
+
+                if b == FC.slash && (i + 1) < limit && bytes[i + 1] == FC.asterisk {
+                    state = .inBlockComment(braceDepth: depthAtCaret)
+                    i += 2
+                    continue
+                }
+
+                if case .inSingleQuote = state {
+                    if b == FC.singleQuote && !isEscaped(at: i, lineStart: lineRange.lowerBound) {
+                        state = .neutral(braceDepth: depthAtCaret)
+                    }
+                    i += 1
+                    continue
+                }
+
+                if case .inDoubleQuote = state {
+                    if b == FC.doubleQuote && !isEscaped(at: i, lineStart: lineRange.lowerBound) {
+                        state = .neutral(braceDepth: depthAtCaret)
+                    }
+                    i += 1
+                    continue
+                }
+
+                if b == FC.singleQuote {
+                    state = .inSingleQuote(braceDepth: depthAtCaret)
+                    i += 1
+                    continue
+                }
+                if b == FC.doubleQuote {
+                    state = .inDoubleQuote(braceDepth: depthAtCaret)
+                    i += 1
+                    continue
+                }
+
+                if b == FC.leftBrace { depthAtCaret += 1 }
+                if b == FC.rightBrace { depthAtCaret = max(0, depthAtCaret - 1) }
+
+                i += 1
+            }
+        }
+
+        if depthAtCaret <= 0 { return (nil, nil) }
+
+        let wantDepthForInner = depthAtCaret - 1
+
+        var inner: String? = nil
+        var outer: String? = nil
+
+        // inner（selector）を探す：brace を開くヘッダで、@ で始まらないもの
+        var foundInnerLine: Int? = nil
+        var searchLine = lineIndex
+        while searchLine >= 0 {
+            let lr = skeleton.lineRange(at: searchLine)
+            let ss: KEndState = (searchLine > 0 && (searchLine - 1) < _lines.count) ? _lines[searchLine - 1].endState : .neutral(braceDepth: 0)
+            let enteringDepth = ss.braceDepth
+
+            let lim = (searchLine == lineIndex) ? limit : nil
+            if enteringDepth == wantDepthForInner, let braceIndex = firstOpenBraceIndex(in: lr, startState: ss, limit: lim) {
+                var nameRange: Range<Int>? = headerNameRangeFromSameLine(lr, braceIndex: braceIndex)
+
+                if nameRange == nil {
+                    if let t = trimmedRange(lr),
+                       t.count == 1,
+                       bytes[t.lowerBound] == FC.leftBrace {
+                        let prevLine = searchLine - 1
+                        if prevLine >= 0 {
+                            let pr = skeleton.lineRange(at: prevLine)
+                            nameRange = headerNameRangeFromWholeLine(pr)
+                        }
+                    }
+                }
+
+                if let nr = nameRange, !isAtRule(nr) {
+                    inner = nameString(nr)
+                    foundInnerLine = searchLine
                     break
                 }
             }
-            line -= 1
+
+            searchLine -= 1
         }
 
-        if innerHeader == nil { return (nil, nil) }
+        // outer（@rule）を探す：inner が見つかった行（または caret 行）から上へ、最初の @ ヘッダ
+        var searchOuterLine = foundInnerLine ?? lineIndex
+        while searchOuterLine >= 0 {
+            let lr = skeleton.lineRange(at: searchOuterLine)
+            let ss: KEndState = (searchOuterLine > 0 && (searchOuterLine - 1) < _lines.count) ? _lines[searchOuterLine - 1].endState : .neutral(braceDepth: 0)
+            let enteringDepth = ss.braceDepth
 
-        // inner が @rule の場合は outer として返して終了（selector は無し）
-        if innerIsAtRule {
-            let outer = trimmedString(in: innerHeader!)
-            return (outer.isEmpty ? nil : outer, nil)
-        }
+            // inner ブロックより外側に限定
+            if enteringDepth < depthAtCaret {
+                let lim = (searchOuterLine == lineIndex) ? limit : nil
+                if let braceIndex = firstOpenBraceIndex(in: lr, startState: ss, limit: lim) {
+                    var nameRange: Range<Int>? = headerNameRangeFromSameLine(lr, braceIndex: braceIndex)
 
-        let inner = trimmedString(in: innerHeader!)
-        if innerLevel == 0 {
-            return (nil, inner.isEmpty ? nil : inner)
-        }
+                    if nameRange == nil {
+                        if let t = trimmedRange(lr),
+                           t.count == 1,
+                           bytes[t.lowerBound] == FC.leftBrace {
+                            let prevLine = searchOuterLine - 1
+                            if prevLine >= 0 {
+                                let pr = skeleton.lineRange(at: prevLine)
+                                nameRange = headerNameRangeFromWholeLine(pr)
+                            }
+                        }
+                    }
 
-        // outer：inner を包む @rule（level == innerLevel-1）を後方から探す
-        var outerHeader: Range<Int>? = nil
-        line = min(lineIndex, max(0, _lines.count - 1))
-        while line >= 0 {
-            if let hit = blockHeaderRange(at: line, limit: nil) {
-                if hit.level == (innerLevel - 1) && hit.isAtRule {
-                    outerHeader = hit.headerRange
-                    break
+                    if let nr = nameRange, isAtRule(nr) {
+                        outer = nameString(nr)
+                        break
+                    }
                 }
             }
-            line -= 1
+
+            searchOuterLine -= 1
         }
 
-        let outer = outerHeader != nil ? trimmedString(in: outerHeader!) : ""
-        return (outer.isEmpty ? nil : outer, inner.isEmpty ? nil : inner)
+        return (outer, inner)
     }
 
-    override func outline(in range: Range<Int>?) -> [KOutlineItem] {
-        let skeleton = storage.skeletonString
-        if skeleton.count == 0 { return [] }
 
-        let target: Range<Int> = {
-            if let r = range {
-                let lower = max(0, min(r.lowerBound, skeleton.count))
-                let upper = max(0, min(r.upperBound, skeleton.count))
-                if lower >= upper { return 0..<0 }
-                return lower..<upper
-            }
-            return 0..<skeleton.count
-        }()
-
-        if target.isEmpty { return [] }
-
-        ensureUpToDate(for: target)
-        if _lines.isEmpty { return [] }
-
-        let startLine = skeleton.lineIndex(at: target.lowerBound)
-        let endLine = skeleton.lineIndex(at: min(max(target.lowerBound, target.upperBound - 1), skeleton.count - 1))
-
-        let maxLine = max(0, _lines.count - 1)
-        let fromLine = max(0, min(startLine, maxLine))
-        let toLine = max(0, min(endLine, maxLine))
-        if fromLine > toLine { return [] }
-
-        var items: [KOutlineItem] = []
-        items.reserveCapacity(128)
-
-        for line in fromLine...toLine {
-            if let hit = blockHeaderRange(at: line, limit: nil) {
-                let headerRange = hit.headerRange.clamped(to: target)
-                if headerRange.isEmpty { continue }
-
-                let kind: KOutlineItem.Kind = hit.isAtRule ? .module : .class
-                items.append(KOutlineItem(kind: kind,
-                                          nameRange: headerRange,
-                                          level: hit.level,
-                                          isSingleton: false))
-            }
-        }
-
-        return items
-    }
 
     // MARK: - Private
 
@@ -754,224 +1255,4 @@ final class KSyntaxParserCss: KSyntaxParser {
 
         return .neutral(braceDepth: braceDepth)
     }
-    private struct KBlockHeaderHit {
-        let headerRange: Range<Int>
-        let level: Int
-        let isAtRule: Bool
-    }
-
-    private func trimmedString(in range: Range<Int>) -> String {
-        return storage.string(in: range).trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private func braceDepthAt(index: Int, lineRange: Range<Int>, startState: KEndState) -> Int {
-        let skeleton = storage.skeletonString
-        let bytes = skeleton.bytes
-
-        var depth = startState.braceDepth
-        var i = lineRange.lowerBound
-        let end = min(index, lineRange.upperBound)
-
-        enum Mode { case neutral, inBlockComment, inSingleQuote, inDoubleQuote }
-        var mode: Mode = {
-            switch startState {
-            case .inBlockComment: return .inBlockComment
-            case .inSingleQuote: return .inSingleQuote
-            case .inDoubleQuote: return .inDoubleQuote
-            case .neutral: return .neutral
-            }
-        }()
-
-        @inline(__always)
-        func isEscaped(_ j: Int) -> Bool {
-            if j <= lineRange.lowerBound { return false }
-            var count = 0
-            var k = j - 1
-            while k >= lineRange.lowerBound && bytes[k] == FC.backSlash {
-                count += 1
-                if k == 0 { break }
-                k -= 1
-            }
-            return (count & 1) == 1
-        }
-
-        while i < end {
-            let b = bytes[i]
-
-            switch mode {
-            case .neutral:
-                if b == FC.slash, (i + 1) < end, bytes[i + 1] == FC.asterisk {
-                    mode = .inBlockComment
-                    i += 2
-                    continue
-                }
-                if b == FC.singleQuote {
-                    mode = .inSingleQuote
-                    i += 1
-                    continue
-                }
-                if b == FC.doubleQuote {
-                    mode = .inDoubleQuote
-                    i += 1
-                    continue
-                }
-                if b == FC.leftBrace { depth += 1; i += 1; continue }
-                if b == FC.rightBrace { depth = max(0, depth - 1); i += 1; continue }
-
-            case .inBlockComment:
-                if b == FC.asterisk, (i + 1) < end, bytes[i + 1] == FC.slash {
-                    mode = .neutral
-                    i += 2
-                    continue
-                }
-
-            case .inSingleQuote:
-                if b == FC.singleQuote && !isEscaped(i) {
-                    mode = .neutral
-                    i += 1
-                    continue
-                }
-
-            case .inDoubleQuote:
-                if b == FC.doubleQuote && !isEscaped(i) {
-                    mode = .neutral
-                    i += 1
-                    continue
-                }
-            }
-
-            i += 1
-        }
-
-        return depth
-    }
-
-    private func blockHeaderRange(at lineIndex: Int, limit: Int?) -> KBlockHeaderHit? {
-        let skeleton = storage.skeletonString
-        let bytes = skeleton.bytes
-        let n = bytes.count
-        if n == 0 { return nil }
-        if lineIndex < 0 || lineIndex >= skeletonLineCount() { return nil }
-
-        let lineRange = skeleton.lineRange(at: lineIndex)
-        if lineRange.isEmpty { return nil }
-
-        let startState: KEndState = (lineIndex > 0 && (lineIndex - 1) < _lines.count) ? _lines[lineIndex - 1].endState : .neutral(braceDepth: 0)
-
-        // 文字列/コメント継続行はヘッダとして扱わない
-        switch startState {
-        case .inBlockComment, .inSingleQuote, .inDoubleQuote:
-            return nil
-        case .neutral:
-            break
-        }
-
-        let level = startState.braceDepth
-        let scanEnd = min(limit ?? lineRange.upperBound, lineRange.upperBound)
-
-        enum Mode { case neutral, inBlockComment, inSingleQuote, inDoubleQuote }
-        var mode: Mode = .neutral
-
-        @inline(__always)
-        func isEscaped(_ j: Int) -> Bool {
-            if j <= lineRange.lowerBound { return false }
-            var count = 0
-            var k = j - 1
-            while k >= lineRange.lowerBound && bytes[k] == FC.backSlash {
-                count += 1
-                if k == 0 { break }
-                k -= 1
-            }
-            return (count & 1) == 1
-        }
-
-        func trimHeader(_ r: Range<Int>) -> Range<Int>? {
-            var l = r.lowerBound
-            var u = r.upperBound
-
-            while l < u {
-                let b = bytes[l]
-                if b == FC.space || b == FC.tab { l += 1; continue }
-                break
-            }
-            while u > l {
-                let b = bytes[u - 1]
-                if b == FC.space || b == FC.tab { u -= 1; continue }
-                break
-            }
-            if l >= u { return nil }
-            return l..<u
-        }
-
-        // 同一行の '{' を探す（文字列/コメント中は無視）
-        var i = lineRange.lowerBound
-        while i < scanEnd {
-            let b = bytes[i]
-
-            switch mode {
-            case .neutral:
-                if b == FC.slash, (i + 1) < scanEnd, bytes[i + 1] == FC.asterisk {
-                    mode = .inBlockComment
-                    i += 2
-                    continue
-                }
-                if b == FC.singleQuote { mode = .inSingleQuote; i += 1; continue }
-                if b == FC.doubleQuote { mode = .inDoubleQuote; i += 1; continue }
-
-                if b == FC.leftBrace {
-                    if let header = trimHeader(lineRange.lowerBound..<i) {
-                        let isAtRule = bytes[header.lowerBound] == FC.at
-                        return KBlockHeaderHit(headerRange: header, level: level, isAtRule: isAtRule)
-                    }
-                    return nil
-                }
-
-            case .inBlockComment:
-                if b == FC.asterisk, (i + 1) < scanEnd, bytes[i + 1] == FC.slash {
-                    mode = .neutral
-                    i += 2
-                    continue
-                }
-
-            case .inSingleQuote:
-                if b == FC.singleQuote && !isEscaped(i) { mode = .neutral; i += 1; continue }
-
-            case .inDoubleQuote:
-                if b == FC.doubleQuote && !isEscaped(i) { mode = .neutral; i += 1; continue }
-            }
-
-            i += 1
-        }
-
-        // 次行が「{」単独（スペース＋任意コメント）なら、現行行をヘッダ扱い
-        let nextLine = lineIndex + 1
-        let lineCount = skeletonLineCount()
-        if nextLine < lineCount {
-            let nextRange = skeleton.lineRange(at: nextLine)
-            if !nextRange.isEmpty {
-                var p = nextRange.lowerBound
-                while p < nextRange.upperBound && (bytes[p] == FC.space || bytes[p] == FC.tab) { p += 1 }
-                if p < nextRange.upperBound && bytes[p] == FC.leftBrace {
-                    p += 1
-                    while p < nextRange.upperBound && (bytes[p] == FC.space || bytes[p] == FC.tab) { p += 1 }
-
-                    // allow empty or comment only
-                    var ok = false
-                    if p >= nextRange.upperBound {
-                        ok = true
-                    } else if (p + 1) < nextRange.upperBound, bytes[p] == FC.slash, bytes[p + 1] == FC.asterisk {
-                        ok = true
-                    }
-
-                    if ok, let header = trimHeader(lineRange) {
-                        let isAtRule = bytes[header.lowerBound] == FC.at
-                        return KBlockHeaderHit(headerRange: header, level: level, isAtRule: isAtRule)
-                    }
-                }
-            }
-        }
-
-        return nil
-    }
-
 }
