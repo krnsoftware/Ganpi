@@ -30,7 +30,7 @@ struct KCommandResult {
     let options: KCommandOptions
 }
 
-struct KCommandOptions {
+struct KCommandOptions {    
     var caret: KPostProcessingCaretPosition = .right
     var target: KTextEditingTarget = .selection
     var timeout: Float = 5.0
@@ -71,134 +71,253 @@ enum KUserCommand {
     }
     
     private func estimateCommand(_ command: String) -> (command: String, options: KCommandOptions) {
-        var opts = KCommandOptions()
-        var optText = ""
-        var payloadText = ""
-
-        // [] 内の文字を抽出
-        let trimmed = command.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty {
-            return ("", opts)
-        }
-
-        // 区切り '-' の探索（クォート外で ':' を左に含む最初の '-'）
-        var inQuote = false
-        var escape = false
-        var splitIndex: String.Index? = nil
-        var hasColon = false
-
-        for i in trimmed.indices {
-            let c = trimmed[i]
-            if escape {
-                escape = false
-                continue
-            }
-            switch c {
-            case "\\":
-                escape = true
-            case "\"":
-                inQuote.toggle()
-            case ":":
-                if !inQuote { hasColon = true }
-            case "-":
-                if !inQuote && hasColon {
-                    splitIndex = i
-                    break
+        func unescapePayload(_ raw: String) -> String {
+            var result = ""
+            var escape = false
+            for c in raw {
+                if escape {
+                    switch c {
+                    case "n": result.append("\n")
+                    case "t": result.append("\t")
+                    case "r": result.append("\r")
+                    case "\\": result.append("\\")
+                    case "\"": result.append("\"")
+                    case "'": result.append("'")
+                    default: result.append(c)
+                    }
+                    escape = false
+                    continue
                 }
-            default:
-                break
+
+                if c == "\\" {
+                    escape = true
+                    continue
+                }
+                result.append(c)
             }
+            // 末尾が "\" で終わった場合は "\" をそのまま残す
+            if escape { result.append("\\") }
+            return result
         }
 
-        if let idx = splitIndex {
-            optText = String(trimmed[..<idx]).trimmingCharacters(in: .whitespaces)
-            payloadText = String(trimmed[trimmed.index(after: idx)...]).trimmingCharacters(in: .whitespaces)
-        } else {
-            payloadText = trimmed
-        }
+        func commitOption(key: String, value: String, opts: inout KCommandOptions) {
+            let k = key.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            let v = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !k.isEmpty else { return }
 
-        // オプション解析
-        if !optText.isEmpty {
-            var key = ""
-            var value = ""
-            var inQuoteOpt = false
-            var escapeOpt = false
-            var buffer = ""
-            var parsingValue = false
-
-            func commitOption() {
-                let k = key.trimmingCharacters(in: .whitespaces)
-                let v = value.trimmingCharacters(in: .whitespaces)
-                guard !k.isEmpty, !v.isEmpty else { return }
-
-                switch k.lowercased() {
-                case "caret":
-                    switch v.lowercased() {
-                    case "left":   opts.caret = .left
-                    case "right":  opts.caret = .right
-                    case "select": opts.caret = .select
-                    default: break
-                    }
-
-                case "target":
-                    switch v.lowercased() {
-                    case "all":        opts.target = .all
-                    case "selection":  opts.target = .selection
-                    default: break
-                    }
-
-                case "timeout":
-                    if let f = Float(v) { opts.timeout = f }
-
+            switch k {
+            case "caret":
+                switch v.lowercased() {
+                case "left": opts.caret = .left
+                case "right": opts.caret = .right
+                case "select": opts.caret = .select
                 default:
                     opts.extras[k] = v
                 }
-
+            case "target":
+                switch v.lowercased() {
+                case "all": opts.target = .all
+                case "selection": opts.target = .selection
+                default:
+                    opts.extras[k] = v
+                }
+            case "timeout":
+                if let f = Float(v) {
+                    opts.timeout = f
+                } else {
+                    opts.extras[k] = v
+                }
+            default:
+                opts.extras[k] = v
             }
+        }
 
-            for c in optText {
-                if escapeOpt {
-                    buffer.append(c)
-                    escapeOpt = false
+        var opts = KCommandOptions()
+
+        let trimmed = command.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            log("Invalid command: empty payload")
+            return ("", opts)
+        }
+
+        var index = trimmed.startIndex
+
+        func skipSpaces() {
+            while index < trimmed.endIndex, trimmed[index].isWhitespace {
+                index = trimmed.index(after: index)
+            }
+        }
+
+        // 1) options ブロック { ... } を読む（任意）
+        skipSpaces()
+        if index < trimmed.endIndex, trimmed[index] == "{" {
+            var braceDepth = 0
+            var quote: Character? = nil
+            var escape = false
+            index = trimmed.index(after: index) // skip '{'
+            braceDepth = 1
+
+            var optionText = ""
+
+            while index < trimmed.endIndex {
+                let c = trimmed[index]
+
+                if let q = quote {
+                    optionText.append(c)
+                    if escape {
+                        escape = false
+                    } else if c == "\\" {
+                        escape = true
+                    } else if c == q {
+                        quote = nil
+                    }
+                    index = trimmed.index(after: index)
                     continue
                 }
-                switch c {
-                case "\\":
-                    escapeOpt = true
-                case "\"":
-                    inQuoteOpt.toggle()
-                case ":" where !inQuoteOpt && !parsingValue:
-                    key = buffer
-                    buffer = ""
-                    parsingValue = true
-                case "," where !inQuoteOpt:
-                    value = buffer
-                    commitOption()
-                    key = ""
-                    value = ""
-                    buffer = ""
-                    parsingValue = false
-                default:
-                    buffer.append(c)
+
+                if c == "\"" || c == "'" {
+                    quote = c
+                    optionText.append(c)
+                    index = trimmed.index(after: index)
+                    continue
                 }
+
+                if c == "{" {
+                    braceDepth += 1
+                    optionText.append(c)
+                    index = trimmed.index(after: index)
+                    continue
+                }
+                if c == "}" {
+                    braceDepth -= 1
+                    if braceDepth == 0 {
+                        index = trimmed.index(after: index) // skip '}'
+                        break
+                    }
+                    optionText.append(c)
+                    index = trimmed.index(after: index)
+                    continue
+                }
+
+                optionText.append(c)
+                index = trimmed.index(after: index)
             }
 
-            // 最後の要素を登録
-            if parsingValue {
-                value = buffer
-                commitOption()
+            if braceDepth != 0 {
+                log("Invalid command: options block not closed")
+                return ("", opts)
+            }
+
+            // options を解析： key:value を , 区切り（クォート保護）
+            var currentKey = ""
+            var currentValue = ""
+            var readingValue = false
+            var optQuote: Character? = nil
+            var optEscape = false
+
+            func commitPair() {
+                if !currentKey.isEmpty || !currentValue.isEmpty {
+                    commitOption(key: currentKey, value: currentValue, opts: &opts)
+                }
+                currentKey = ""
+                currentValue = ""
+                readingValue = false
+            }
+
+            for c in optionText {
+                if let q = optQuote {
+                    if readingValue { currentValue.append(c) } else { currentKey.append(c) }
+
+                    if optEscape {
+                        optEscape = false
+                    } else if c == "\\" {
+                        optEscape = true
+                    } else if c == q {
+                        optQuote = nil
+                    }
+                    continue
+                }
+
+                if c == "\"" || c == "'" {
+                    optQuote = c
+                    if readingValue { currentValue.append(c) } else { currentKey.append(c) }
+                    continue
+                }
+
+                if c == ":" && !readingValue {
+                    readingValue = true
+                    continue
+                }
+
+                if c == "," {
+                    commitPair()
+                    continue
+                }
+
+                if readingValue { currentValue.append(c) } else { currentKey.append(c) }
+            }
+            commitPair()
+
+            skipSpaces()
+        }
+
+        // 2) payload は必ずクォート必須（"..." または '...'）
+        skipSpaces()
+        guard index < trimmed.endIndex else {
+            log("Invalid command: missing quoted payload")
+            return ("", opts)
+        }
+
+        let quoteChar = trimmed[index]
+        guard quoteChar == "\"" || quoteChar == "'" else {
+            log("Invalid command: payload must be quoted with \"...\" or '...'")
+            return ("", opts)
+        }
+
+        index = trimmed.index(after: index) // skip opening quote
+
+        var rawPayload = ""
+        var escape = false
+        while index < trimmed.endIndex {
+            let c = trimmed[index]
+            if escape {
+                rawPayload.append("\\")
+                rawPayload.append(c)
+                escape = false
+                index = trimmed.index(after: index)
+                continue
+            }
+            if c == "\\" {
+                escape = true
+                index = trimmed.index(after: index)
+                continue
+            }
+            if c == quoteChar {
+                index = trimmed.index(after: index) // skip closing quote
+                break
+            }
+            rawPayload.append(c)
+            index = trimmed.index(after: index)
+        }
+
+        // 閉じクォートが無い
+        if index <= trimmed.endIndex, (index == trimmed.endIndex && (trimmed.last != quoteChar)) {
+            // 末尾まで到達しているのに閉じていないケースを拾う
+            // （上のループは quoteChar で break するため）
+            if trimmed.last != quoteChar {
+                log("Invalid command: quoted payload not closed")
+                return ("", opts)
             }
         }
 
-        // 後節（payload）解析
-        let payload: String
-        if payloadText.hasPrefix("\"") && payloadText.hasSuffix("\"") && payloadText.count >= 2 {
-            let inner = payloadText.dropFirst().dropLast()
-            payload = inner.cUnescaped
-        } else {
-            payload = payloadText
+        skipSpaces()
+        if index < trimmed.endIndex {
+            // 余剰文字は不正（破壊的変更なので厳格）
+            log("Invalid command: trailing characters after payload")
+            return ("", opts)
         }
 
+        let payload = unescapePayload(rawPayload)
         return (payload, opts)
     }
 
@@ -243,68 +362,6 @@ enum KUserCommand {
     /// UTF-8/LF 文字列を標準入出力でやり取りする。
     /// - Parameter relativePath: scripts/ 以下の相対パス
     /// - Returns: コマンドの標準出力 (UTF-8/LF) 。失敗時は nil。
-    /*
-    private func readFromStream(from relativePath: String, string: String) -> String? {
-        // --- パス安全性チェック ---
-        guard !relativePath.hasPrefix("/") else {
-            log("Absolute path not allowed in execute command: \(relativePath)")
-            return nil
-        }
-
-        let fm = FileManager.default
-        guard let base = fm.urls(for: .applicationSupportDirectory,
-                                 in: .userDomainMask).first else {
-            log("Failed to resolve Application Support directory")
-            return nil
-        }
-
-        // --- ~/Library/Application Support/Ganpi/scripts/... ---
-        let scriptsDir = base.appendingPathComponent("Ganpi/scripts", isDirectory: true)
-        let fileURL = scriptsDir.appendingPathComponent(relativePath)
-
-        // --- ファイルの存在確認 ---
-        guard fm.isExecutableFile(atPath: fileURL.path) else {
-            log("Script not found or not executable: \(fileURL.path)")
-            return nil
-        }
-
-        // --- 外部プロセス実行 ---
-        let process = Process()
-        process.executableURL = fileURL
-
-        let inputPipe = Pipe()
-        let outputPipe = Pipe()
-        process.standardInput = inputPipe
-        process.standardOutput = outputPipe
-        process.standardError = Pipe()
-
-        do {
-            try process.run()
-        } catch {
-            log("Failed to launch process: \(error)")
-            return nil
-        }
-
-        // --- 入力をUTF-8で送る ---
-        if let data = string.data(using: .utf8) {
-            inputPipe.fileHandleForWriting.write(data)
-        }
-        inputPipe.fileHandleForWriting.closeFile()
-
-        // --- 出力をUTF-8で受け取る ---
-        let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-
-        guard let output = String(data: outputData, encoding: .utf8) else {
-            log("Failed to decode command output (non-UTF8)")
-            return nil
-        }
-        
-        let (normalizedString, _) = output.normalizeNewlinesAndDetect()
-        return normalizedString
-    }
-    }*/
-    
 
     private func readFromStream(from relativePath: String, string: String) -> String? {
         let fm = FileManager.default

@@ -98,60 +98,95 @@ struct KKeymapLoader {
     }
 
     // MARK: - Parse right-hand actions into [KAction]
-    private static func parseActions(from rightSide: String) -> [KUserAction] {
+    static func parseActions(from rightSide: String) -> [KUserAction] {
         var tokens: [String] = []
         var current = ""
-        var bracketDepth = 0
-        var inQuotes = false
+
+        var bracketDepth = 0   // [...]
+        var braceDepth = 0     // {...}
+        var quote: Character? = nil
+        var escape = false
 
         for c in rightSide {
-            if c == "\"" {
-                inQuotes.toggle()
+            if let q = quote {
+                current.append(c)
+
+                if escape {
+                    escape = false
+                    continue
+                }
+                if c == "\\" {
+                    escape = true
+                    continue
+                }
+                if c == q {
+                    quote = nil
+                }
+                continue
+            }
+
+            if c == "\"" || c == "'" {
+                quote = c
                 current.append(c)
                 continue
             }
-            if !inQuotes {
-                switch c {
-                case "[":
-                    bracketDepth += 1
-                case "]":
-                    bracketDepth = max(bracketDepth - 1, 0)
-                case ",":
-                    if bracketDepth == 0 {
-                        // トップレベルのカンマで区切る
-                        tokens.append(current.trimmingCharacters(in: .whitespacesAndNewlines))
-                        current = ""
-                        continue
-                    }
-                case "\t", " ":
-                    if bracketDepth == 0 && current.last == " " {
-                        // 連続空白を無視
-                        continue
-                    }
-                default: break
+
+            switch c {
+            case "[":
+                bracketDepth += 1
+            case "]":
+                bracketDepth = max(bracketDepth - 1, 0)
+            case "{":
+                braceDepth += 1
+            case "}":
+                braceDepth = max(braceDepth - 1, 0)
+            case ",":
+                if bracketDepth == 0 && braceDepth == 0 {
+                    tokens.append(current.trimmingCharacters(in: .whitespacesAndNewlines))
+                    current = ""
+                    continue
                 }
+            case "\t", " ":
+                if bracketDepth == 0 && braceDepth == 0 && current.last == " " {
+                    continue
+                }
+            default:
+                break
             }
+
             current.append(c)
         }
+
         if !current.isEmpty {
             tokens.append(current.trimmingCharacters(in: .whitespacesAndNewlines))
         }
 
         var result: [KUserAction] = []
         for tok in tokens {
-            if let open = tok.firstIndex(of: "["), let close = tok.lastIndex(of: "]"), close > open {
-                let head = String(tok[..<open]).lowercased()
+            if let open = tok.firstIndex(of: "["),
+               let close = tok.lastIndex(of: "]"),
+               close > open {
+
+                let head = String(tok[..<open]).trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
                 let body = String(tok[tok.index(after: open)..<close])
+
                 switch head {
-                case "insert": result.append(.command(.insert(body)))
-                case "execute": result.append(.command(.execute(body)))
-                case "load", "": result.append(.command(.load(body)))
-                default: log("Unknown command '\(head)' ignored")
+                case "insert":
+                    result.append(.command(.insert(body)))
+                case "execute":
+                    result.append(.command(.execute(body)))
+                case "load":
+                    result.append(.command(.load(body)))
+                default:
+                    // 破壊的変更： ""（head省略）も含めて不正扱い
+                    log("Unknown command '\(head)' ignored")
                 }
             } else {
+                // selector
                 result.append(.selector(tok.hasSuffix(":") ? String(tok.dropLast()) : tok))
             }
         }
+
         return result
     }
 
