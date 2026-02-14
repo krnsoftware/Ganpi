@@ -366,6 +366,14 @@ enum KUserCommand {
     /// - Returns: コマンドの標準出力 (UTF-8/LF) 。失敗時は nil。
 
     private func readFromStream(from relativePath: String, string: String, timeout: Float) -> String? {
+        func makeLogSnippet(from data: Data, limit: Int) -> String {
+            guard !data.isEmpty else { return "(no output)" }
+            let text = String(data: data, encoding: .utf8) ?? String(decoding: data, as: UTF8.self)
+            if text.count <= limit { return text }
+            let prefix = text.prefix(limit)
+            return "\(prefix)…"
+        }
+
         let fm = FileManager.default
         guard let base = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { log("#01"); return nil }
 
@@ -390,13 +398,15 @@ enum KUserCommand {
             return nil
         }
 
-        // 入力
+        let pid = process.processIdentifier
+
+        // 入力（UTF-8）
         if let data = string.data(using: .utf8) {
             inputPipe.fileHandleForWriting.write(data)
         }
         inputPipe.fileHandleForWriting.closeFile()
 
-        // 非同期読み込み
+        // 非同期読み込み（stdout/stderr をまとめて回収）
         var resultData = Data()
         let group = DispatchGroup()
         group.enter()
@@ -408,22 +418,51 @@ enum KUserCommand {
                 resultData.append(chunk)
             }
 
-            // 終了後の残りも回収
             let tail = outputPipe.fileHandleForReading.availableData
             if !tail.isEmpty { resultData.append(tail) }
 
             group.leave()
         }
 
-        // timeout 秒で待つ（最低 0.1 秒は待つ）
+        // timeout 秒で待つ（最低 0.1 秒）
         let timeoutSeconds = max(0.1, Double(timeout))
         let deadline = DispatchTime.now() + .milliseconds(Int(timeoutSeconds * 1000.0))
 
         let waitResult = group.wait(timeout: deadline)
         if waitResult == .timedOut {
-            // 意味のある timeout：プロセスを終了させる
+            let snippetBefore = makeLogSnippet(from: resultData, limit: 500)
+
+            // 1) まずは穏当終了要求
             process.terminate()
-            KLog.shared.log(id: "execute", message: "Process timed out (\(timeoutSeconds)s): \(relativePath)")
+
+            // 2) 少しだけ猶予（TERMで止まるならここで止まる）
+            let graceSeconds = 0.3
+            let graceDeadline = DispatchTime.now() + .milliseconds(Int(graceSeconds * 1000.0))
+            _ = group.wait(timeout: graceDeadline)
+
+            var killed = false
+
+            // 3) まだ生きていたら SIGKILL
+            if process.isRunning {
+                _ = kill(pid, SIGKILL)
+                killed = true
+            }
+
+            // 4) 後始末（短時間だけ待つ）
+            let finalWaitSeconds = 0.2
+            let finalDeadline = DispatchTime.now() + .milliseconds(Int(finalWaitSeconds * 1000.0))
+            _ = group.wait(timeout: finalDeadline)
+
+            // タイムアウト時は「どこまでやったか」＋「途中出力」を通知
+            let action = killed ? "terminate+kill" : "terminate"
+            KLog.shared.log(
+                id: "execute",
+                message: """
+                Process timed out (\(timeoutSeconds)s) [\(action)] pid=\(pid) script="\(relativePath)"
+                Output (partial):
+                \(snippetBefore)
+                """
+            )
             return nil
         }
 
