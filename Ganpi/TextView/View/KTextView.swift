@@ -1297,15 +1297,16 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         //  - none    : 相対パス（可能なら）/ できなければ絶対パス
         let isInsertContents = modifiers.contains(.command) && modifiers.contains(.option)
         let isAbsolutePath = modifiers.contains(.option) && !isInsertContents
+        let isInHtmlMode = modifiers.contains(.shift)
 
         if isInsertContents {
             return insertDroppedFileContents(urls, at: index)
         } else {
-            return insertDroppedFilePaths(urls, at: index, absolute: isAbsolutePath)
+            return insertDroppedFilePaths(urls, at: index, absolute: isAbsolutePath, tagMode: isInHtmlMode)
         }
     }
 
-    private func insertDroppedFilePaths(_ urls: [URL], at index: Int, absolute: Bool) -> Bool {
+    private func insertDroppedFilePaths(_ urls: [URL], at index: Int, absolute: Bool, tagMode: Bool) -> Bool {
         let baseDir = documentBaseDirectoryURL()
 
         // 複数は改行区切り（実用性優先）
@@ -1315,6 +1316,19 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             }
             return url.path
         }
+        
+        // HTMLモードで、pathが1つでかつshift keyが押下されている場合はaタグを挿入する。
+        // 絶対パスの冒頭はfile:になるのが本来だが、今のところ実装していない。
+        if paths.count == 1, tagMode, textStorage.parser.type == .html {
+            let selection = selectionRange
+            let fileName = urls[0].lastPathComponent
+            let selectedString = selection.count == 0 ? fileName : textStorage.string(in: selection)
+            let tagString = "<a href=\"\(paths[0])\">\(selectedString)</a>"
+            textStorage.replaceString(in: selection, with: tagString)
+            return true
+        }
+        
+        // 複数ある場合は改行(lf)区切りとする。
         let joined = paths.joined(separator: "\n")
 
         textStorage.replaceString(in: index..<index, with: joined)
