@@ -1277,16 +1277,51 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     }
 
 
-    // baseDir配下なら相対、それ以外はnil
-    private func makeRelativePathIfPossible(fileURL: URL, baseDir: URL) -> String? {
+    // baseDir から見た相対パスを可能な限り生成する。
+    // - 同一ボリューム上なら ../ を使って相対化する
+    // - ルート（例: /Volumes/XXX）が異なる等で相対化が破綻する場合のみ absolute を返す
+    private func makeRelativePathIfPossible(fileURL: URL, baseDir: URL) -> String {
         let basePath = baseDir.standardizedFileURL.path
         let filePath = fileURL.standardizedFileURL.path
 
-        guard filePath.hasPrefix(basePath) else { return nil }
+        let baseComps = (basePath as NSString).pathComponents
+        let fileComps = (filePath as NSString).pathComponents
 
-        var rel = String(filePath.dropFirst(basePath.count))
-        if rel.hasPrefix("/") { rel.removeFirst() }
-        return rel
+        if baseComps.isEmpty || fileComps.isEmpty {
+            return filePath
+        }
+
+        // 共通プレフィックス長を求める
+        var commonCount = 0
+        while commonCount < baseComps.count && commonCount < fileComps.count {
+            if baseComps[commonCount] != fileComps[commonCount] { break }
+            commonCount += 1
+        }
+
+        // ルートが一致しない（例: /Volumes/A と /Volumes/B）場合は相対化が破綻するので absolute
+        // 目安として先頭（"/"）に続くトップレベルまで一致しない場合は諦める
+        if commonCount < 2 {
+            return filePath
+        }
+
+        // baseDir から共通部まで戻る分の ".."
+        let upCount = max(0, baseComps.count - commonCount)
+        var relComps: [String] = []
+        relComps.reserveCapacity(upCount + (fileComps.count - commonCount))
+
+        for _ in 0..<upCount {
+            relComps.append("..")
+        }
+
+        // 目的地側の残り
+        relComps.append(contentsOf: fileComps.dropFirst(commonCount))
+
+        // 同一ディレクトリなどで空になった場合は "." にする（ここでは起きにくいが保険）
+        if relComps.isEmpty {
+            return "."
+        }
+
+        return relComps.joined(separator: "/")
     }
 
     // file drop の挿入本体
@@ -1295,6 +1330,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         //  - cmd+opt : 内容挿入
         //  - opt     : 絶対パス
         //  - none    : 相対パス（可能なら）/ できなければ絶対パス
+        //  - shift   : パスについて.htmlの場合のみaタグ挿入とする。
         let isInsertContents = modifiers.contains(.command) && modifiers.contains(.option)
         let isAbsolutePath = modifiers.contains(.option) && !isInsertContents
         let isInHtmlMode = modifiers.contains(.shift)
@@ -1311,8 +1347,9 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
 
         // 複数は改行区切り（実用性優先）
         let paths: [String] = urls.map { url in
-            if !absolute, let baseDir, let rel = makeRelativePathIfPossible(fileURL: url, baseDir: baseDir) {
-                return rel
+            //if !absolute, let baseDir, let rel = makeRelativePathIfPossible(fileURL: url, baseDir: baseDir) {
+            if !absolute, let baseDir {
+                return makeRelativePathIfPossible(fileURL: url, baseDir: baseDir)
             }
             return url.path
         }
