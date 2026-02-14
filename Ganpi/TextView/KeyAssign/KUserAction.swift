@@ -63,7 +63,9 @@ enum KUserCommand {
             let result = estimateCommand(command)
             options = result.options
             let targetRange = options.target == .selection ? range : 0..<storage.count
-            guard let content = readFromStream(from:result.command, string:storage.string(in: targetRange)) else { log("#02"); return nil }
+            guard let content = readFromStream(from: result.command,
+                                               string: storage.string(in: targetRange),
+                                               timeout: options.timeout) else { log("#02"); return nil }
             resultString = content
         }
         
@@ -363,7 +365,7 @@ enum KUserCommand {
     /// - Parameter relativePath: scripts/ 以下の相対パス
     /// - Returns: コマンドの標準出力 (UTF-8/LF) 。失敗時は nil。
 
-    private func readFromStream(from relativePath: String, string: String) -> String? {
+    private func readFromStream(from relativePath: String, string: String, timeout: Float) -> String? {
         let fm = FileManager.default
         guard let base = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { log("#01"); return nil }
 
@@ -381,7 +383,12 @@ enum KUserCommand {
         process.standardOutput = outputPipe
         process.standardError = outputPipe
 
-        try? process.run()
+        do {
+            try process.run()
+        } catch {
+            KLog.shared.log(id: "execute", message: "Failed to launch process: \(relativePath) (\(error))")
+            return nil
+        }
 
         // 入力
         if let data = string.data(using: .utf8) {
@@ -400,13 +407,23 @@ enum KUserCommand {
                 if chunk.isEmpty { break }
                 resultData.append(chunk)
             }
+
+            // 終了後の残りも回収
+            let tail = outputPipe.fileHandleForReading.availableData
+            if !tail.isEmpty { resultData.append(tail) }
+
             group.leave()
         }
 
-        // タイムアウトでdetach（killしない）
-        let waitResult = group.wait(timeout: .now() + 5)
+        // timeout 秒で待つ（最低 0.1 秒は待つ）
+        let timeoutSeconds = max(0.1, Double(timeout))
+        let deadline = DispatchTime.now() + .milliseconds(Int(timeoutSeconds * 1000.0))
+
+        let waitResult = group.wait(timeout: deadline)
         if waitResult == .timedOut {
-            KLog.shared.log(id: "execute", message: "Process did not finish in time: \(relativePath)")
+            // 意味のある timeout：プロセスを終了させる
+            process.terminate()
+            KLog.shared.log(id: "execute", message: "Process timed out (\(timeoutSeconds)s): \(relativePath)")
             return nil
         }
 
@@ -414,9 +431,5 @@ enum KUserCommand {
         let (convertedString, _) = result.normalizeNewlinesAndDetect()
         return convertedString
     }
-
-
-
-
 
 }
