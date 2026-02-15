@@ -58,6 +58,76 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSWorkspace.shared.open(url)
     }
     
+    private func openUserIniFile() {
+        let fm = FileManager.default
+
+        guard let userIniURL = KAppPaths.preferenceFileURL(fileName: "user.ini", createDirectoryIfNeeded: true) else {
+            KLog.shared.log(id: "preferences", message: "Preferences directory is not available.")
+            return
+        }
+
+        if fm.fileExists(atPath: userIniURL.path) {
+            NSWorkspace.shared.open(userIniURL)
+            return
+        }
+
+        guard let templateURL = Bundle.main.url(forResource: "default", withExtension: "ini") else {
+            KLog.shared.log(id: "preferences", message: "default.ini is missing in app bundle.")
+            return
+        }
+
+        guard let templateString = try? String(contentsOf: templateURL, encoding: .utf8) else {
+            KLog.shared.log(id: "preferences", message: "Failed to read default.ini.")
+            return
+        }
+
+        let content = makeCommentedUserIni(from: templateString)
+
+        do {
+            try content.write(to: userIniURL, atomically: true, encoding: .utf8)
+        } catch {
+            KLog.shared.log(id: "preferences", message: "Failed to create user.ini: \(userIniURL.path)")
+            return
+        }
+
+        NSWorkspace.shared.open(userIniURL)
+    }
+    
+    private func makeCommentedUserIni(from template: String) -> String {
+        let lines = template.components(separatedBy: "\n")
+
+        var outLines: [String] = []
+        outLines.reserveCapacity(lines.count)
+
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+
+            // 空行はそのまま
+            if trimmed.isEmpty {
+                outLines.append(line)
+                continue
+            }
+
+            // 既存コメントはそのまま
+            if trimmed.hasPrefix("#") || trimmed.hasPrefix(";") {
+                outLines.append(line)
+                continue
+            }
+
+            // セクション（カテゴリ）はそのまま
+            if trimmed.hasPrefix("[") && trimmed.contains("]") {
+                outLines.append(line)
+                continue
+            }
+
+            // それ以外はすべてコメントアウト（元の行を保持したまま先頭に "# "）
+            outLines.append("# " + line)
+        }
+
+        // UTF-8/LF に統一（末尾改行は付ける）
+        return outLines.joined(separator: "\n") + "\n"
+    }
+    
     // delete buffer
     var deleteBuffer: String = ""
     
@@ -129,6 +199,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @IBAction func openApplicationSupportFolder(_ sender: Any?) {
         openFolder(.applicationSupportRoot)
+    }
+    
+    @IBAction func openPreferences(_ sender: Any?) {
+        openUserIniFile()
     }
     
     // MARK: - Dock menu
