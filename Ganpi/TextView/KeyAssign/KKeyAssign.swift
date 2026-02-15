@@ -108,33 +108,42 @@ class KKeyAssign {
     
     func load() {
         let assign = KPreference.shared.keyAssign()
-        
-        let support = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library")
-            .appendingPathComponent("Application Support")
-            .appendingPathComponent("Ganpi")
-            .appendingPathComponent("keymap_user")
-            .appendingPathExtension("ini")
-        
+
         let url: URL?
         switch assign {
-        case .ganpi: url = Bundle.main.url(forResource: "keymap_ganpi", withExtension: "ini")
-        case .emacs: url = Bundle.main.url(forResource: "keymap_emacs", withExtension: "ini")
-        case .vi: url = Bundle.main.url(forResource: "keymap_vi", withExtension: "ini")
-        case .user: url = support
-        case .system: url = nil
+        case .ganpi:
+            url = Bundle.main.url(forResource: "keymap_ganpi", withExtension: "ini")
+        case .emacs:
+            url = Bundle.main.url(forResource: "keymap_emacs", withExtension: "ini")
+        case .vi:
+            url = Bundle.main.url(forResource: "keymap_vi", withExtension: "ini")
+
+        case .user:
+            guard let keymapURL = KAppPaths.preferenceFileURL(fileName: "keymap.ini", createDirectoryIfNeeded: true) else {
+                KLog.shared.log(id: "keymap", message: "Preferences directory not available.")
+                url = nil
+                break
+            }
+
+            if FileManager.default.fileExists(atPath: keymapURL.path) {
+                url = keymapURL
+            } else {
+                // keymap.ini は「全置換」なので、自動生成はしない。無ければデフォルト運用。
+                url = nil
+            }
+
+        case .system:
+            url = nil
         }
-        
+
         _normalmodeShortcuts.removeAll()
         _editmodeShortcuts.removeAll()
-        
+
         if let url = url {
-            log("url is not nil. \(url)")
             loadUserKeymap(at: url)
         }
-        
+
         reset()
-        
     }
     
     func setShortcuts(with shortcuts:[KShortCut], for mode:KEditMode = .normal) {
