@@ -1178,8 +1178,13 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         if let urls = readDroppedFileURLs(from: pasteboard), !urls.isEmpty {
             return insertDroppedFileURLs(urls, at: dropIndex, modifiers: NSEvent.modifierFlags)
         }
+        
+        // ---- 2) ブラウザ等からのWeb URLドロップ ----
+        if let urls = readDroppedWebURLs(from: pasteboard), !urls.isEmpty {
+            return insertDroppedWebURLs(urls, at: dropIndex, modifiers: NSEvent.modifierFlags)
+        }
 
-        // ---- 2) 既存：文字列ドロップ ----
+        // ---- 3) 既存：文字列ドロップ ----
         guard let items = pasteboard.readObjects(forClasses: [NSString.self], options: nil) as? [String],
               let rawDroppedString = items.first else {
             log("items is nil", from: self)
@@ -1268,6 +1273,25 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
         return objs
     }
+    
+    // ブラウザ等からドロップされたURLを読む（file:// は除外）
+    private func readDroppedWebURLs(from pasteboard: NSPasteboard) -> [URL]? {
+        guard let objs = pasteboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL] else {
+            return nil
+        }
+
+        let webURLs = objs.filter { url in
+            guard !url.isFileURL else { return false }
+            guard let scheme = url.scheme?.lowercased() else { return false }
+            
+            let permittedSchemes = ["http", "https", "ftp", "mailto", "tel"]
+            
+            //return scheme == "http" || scheme == "https"
+            return permittedSchemes.contains(scheme)
+        }
+
+        return webURLs.isEmpty ? nil : webURLs
+    }
 
     // 現在ドキュメントの基準ディレクトリ（相対パス用）を取得
     private func documentBaseDirectoryURL() -> URL? {
@@ -1340,6 +1364,29 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         } else {
             return insertDroppedFilePaths(urls, at: index, absolute: isAbsolutePath, tagMode: isInHtmlMode)
         }
+    }
+    
+    private func insertDroppedWebURLs(_ urls: [URL], at index: Int, modifiers: NSEvent.ModifierFlags) -> Bool {
+        // モード判定：
+        //  - shift   : パスについて.htmlの場合のみaタグ挿入とする。
+        
+        let webURLString = urls[0].absoluteString
+        
+        if textStorage.parser.type == .html, modifiers.contains(.shift) {
+            let selection = selectionRange
+            
+            let selectedString = selection.count == 0 ? webURLString : textStorage.string(in: selection)
+            let tagString = "<a href=\"\(webURLString)\">\(selectedString)</a>"
+            textStorage.replaceString(in: selection, with: tagString)
+            selectionRange = selection.lowerBound..<selection.lowerBound + tagString.count
+            return true
+        }
+        
+        textStorage.insertString(webURLString, at: index)
+        selectionRange = index..<index + webURLString.count
+        
+        return true
+        
     }
 
     private func insertDroppedFilePaths(_ urls: [URL], at index: Int, absolute: Bool, tagMode: Bool) -> Bool {
