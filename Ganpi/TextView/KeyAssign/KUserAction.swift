@@ -50,17 +50,28 @@ enum KUserCommand {
         let resultString: String
         switch self {
         case .insert(let command):
-            let result = estimateCommand(command)
+            guard let result = estimateCommand(command) else {
+                KLog.shared.log(id: "useraction", message: "Invalid insert command: \(command)")
+                return nil
+            }
             options = result.options
             log(".insert: command:\(result.command), options:\(result.options)")
             resultString = result.command
-        case .load(let command): log(".load: \(command)")
-            let result = estimateCommand(command)
+
+        case .load(let command):
+            guard let result = estimateCommand(command) else {
+                KLog.shared.log(id: "useraction", message: "Invalid load command: \(command)")
+                return nil
+            }
             options = result.options
             guard let content = readFromApplicationSupport(result.command) else { log("#01"); return nil }
             resultString = content
-        case .execute(let command): log(".execute: \(command)")
-            let result = estimateCommand(command)
+
+        case .execute(let command):
+            guard let result = estimateCommand(command) else {
+                KLog.shared.log(id: "useraction", message: "Invalid execute command: \(command)")
+                return nil
+            }
             options = result.options
             let targetRange = options.target == .selection ? range : 0..<storage.count
             guard let content = readFromStream(from: result.command,
@@ -72,7 +83,7 @@ enum KUserCommand {
         return .init(string: resultString, options: options)
     }
     
-    private func estimateCommand(_ command: String) -> (command: String, options: KCommandOptions) {
+    private func estimateCommand(_ command: String) -> (command: String, options: KCommandOptions)? {
         func unescapePayload(_ raw: String) -> String {
             var result = ""
             var escape = false
@@ -97,7 +108,6 @@ enum KUserCommand {
                 }
                 result.append(c)
             }
-            // 末尾が "\" で終わった場合は "\" をそのまま残す
             if escape { result.append("\\") }
             return result
         }
@@ -124,22 +134,17 @@ enum KUserCommand {
                     opts.extras[k] = v
                 }
             case "timeout":
-                if let f = Float(v) {
-                    opts.timeout = f
-                } else {
-                    opts.extras[k] = v
-                }
+                if let f = Float(v) { opts.timeout = f } else { opts.extras[k] = v }
             default:
                 opts.extras[k] = v
             }
         }
 
         var opts = KCommandOptions()
-
         let trimmed = command.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty {
-            log("Invalid command: empty payload")
-            return ("", opts)
+            KLog.shared.log(id: "useraction", message: "Invalid command: empty payload")
+            return nil
         }
 
         var index = trimmed.startIndex
@@ -150,17 +155,15 @@ enum KUserCommand {
             }
         }
 
-        // 1) options ブロック { ... } を読む（任意）
+        // 1) options ブロック { ... }（任意）
         skipSpaces()
         if index < trimmed.endIndex, trimmed[index] == "{" {
-            var braceDepth = 0
+            var braceDepth = 1
             var quote: Character? = nil
             var escape = false
             index = trimmed.index(after: index) // skip '{'
-            braceDepth = 1
 
             var optionText = ""
-
             while index < trimmed.endIndex {
                 let c = trimmed[index]
 
@@ -190,6 +193,7 @@ enum KUserCommand {
                     index = trimmed.index(after: index)
                     continue
                 }
+
                 if c == "}" {
                     braceDepth -= 1
                     if braceDepth == 0 {
@@ -206,11 +210,11 @@ enum KUserCommand {
             }
 
             if braceDepth != 0 {
-                log("Invalid command: options block not closed")
-                return ("", opts)
+                KLog.shared.log(id: "useraction", message: "Invalid command: options block not closed: \(command)")
+                return nil
             }
 
-            // options を解析： key:value を , 区切り（クォート保護）
+            // options 解析（key:value を , 区切り。クォート保護）
             var currentKey = ""
             var currentValue = ""
             var readingValue = false
@@ -229,7 +233,6 @@ enum KUserCommand {
             for c in optionText {
                 if let q = optQuote {
                     if readingValue { currentValue.append(c) } else { currentKey.append(c) }
-
                     if optEscape {
                         optEscape = false
                     } else if c == "\\" {
@@ -263,60 +266,61 @@ enum KUserCommand {
             skipSpaces()
         }
 
-        // 2) payload は必ずクォート必須（"..." または '...'）
+        // 2) payload はクォート必須
         skipSpaces()
         guard index < trimmed.endIndex else {
-            log("Invalid command: missing quoted payload")
-            return ("", opts)
+            KLog.shared.log(id: "useraction", message: "Invalid command: missing quoted payload: \(command)")
+            return nil
         }
 
         let quoteChar = trimmed[index]
         guard quoteChar == "\"" || quoteChar == "'" else {
-            log("Invalid command: payload must be quoted with \"...\" or '...'")
-            return ("", opts)
+            KLog.shared.log(id: "useraction", message: "Invalid command: payload must be quoted: \(command)")
+            return nil
         }
 
         index = trimmed.index(after: index) // skip opening quote
 
         var rawPayload = ""
-        var escape = false
+        var payloadEscape = false
+        var closed = false
+
         while index < trimmed.endIndex {
             let c = trimmed[index]
-            if escape {
+
+            if payloadEscape {
                 rawPayload.append("\\")
                 rawPayload.append(c)
-                escape = false
+                payloadEscape = false
                 index = trimmed.index(after: index)
                 continue
             }
+
             if c == "\\" {
-                escape = true
+                payloadEscape = true
                 index = trimmed.index(after: index)
                 continue
             }
+
             if c == quoteChar {
                 index = trimmed.index(after: index) // skip closing quote
+                closed = true
                 break
             }
+
             rawPayload.append(c)
             index = trimmed.index(after: index)
         }
 
-        // 閉じクォートが無い
-        if index <= trimmed.endIndex, (index == trimmed.endIndex && (trimmed.last != quoteChar)) {
-            // 末尾まで到達しているのに閉じていないケースを拾う
-            // （上のループは quoteChar で break するため）
-            if trimmed.last != quoteChar {
-                log("Invalid command: quoted payload not closed")
-                return ("", opts)
-            }
+        guard closed else {
+            KLog.shared.log(id: "useraction", message: "Invalid command: quoted payload not closed: \(command)")
+            return nil
         }
 
         skipSpaces()
         if index < trimmed.endIndex {
-            // 余剰文字は不正（破壊的変更なので厳格）
-            log("Invalid command: trailing characters after payload")
-            return ("", opts)
+            KLog.shared.log(id: "useraction", message: "Invalid command: trailing characters after payload: \(command)")
+            return nil
         }
 
         let payload = unescapePayload(rawPayload)
@@ -328,8 +332,17 @@ enum KUserCommand {
 
     /// Application Support/Ganpi 以下から相対パスでファイルを読み込む。
     private func readFromApplicationSupport(_ relativePath: String) -> String? {
-        guard !relativePath.hasPrefix("/") else {
-            log("Absolute path not allowed in load command: \(relativePath)")
+        let trimmed = relativePath.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            KLog.shared.log(id: "load", message: "Invalid path: empty")
+            return nil
+        }
+        guard !trimmed.hasPrefix("/") else {
+            KLog.shared.log(id: "load", message: "Absolute path not allowed: \(trimmed)")
+            return nil
+        }
+        if trimmed.contains("..") {
+            KLog.shared.log(id: "load", message: "Path traversal not allowed: \(trimmed)")
             return nil
         }
 
@@ -347,14 +360,27 @@ enum KUserCommand {
             return nil
         }
 
-        let fileURL = appDir.appendingPathComponent(relativePath)
+        let baseURL = appDir.resolvingSymlinksInPath()
+        let fileURL = baseURL.appendingPathComponent(trimmed).resolvingSymlinksInPath()
+        let basePath = baseURL.path.hasSuffix("/") ? baseURL.path : baseURL.path + "/"
+        guard fileURL.path.hasPrefix(basePath) else {
+            KLog.shared.log(id: "load", message: "Path escapes snippets directory: \(trimmed)")
+            return nil
+        }
+
+        var isDir: ObjCBool = false
+        guard fm.fileExists(atPath: fileURL.path, isDirectory: &isDir), !isDir.boolValue else {
+            KLog.shared.log(id: "load", message: "File not found (or is a directory): \(trimmed)")
+            return nil
+        }
+
         do {
             let data = try Data(contentsOf: fileURL)
             guard let string = String(data: data, encoding: .utf8) else { log("#01"); return nil }
             let (convertedString, _) = string.normalizeNewlinesAndDetect()
             return convertedString
         } catch {
-            log("File not found or unreadable: \(relativePath)")
+            KLog.shared.log(id: "load", message: "File unreadable: \(trimmed)")
             return nil
         }
     }
