@@ -624,7 +624,7 @@ extension KTextView {
     /// 与えられたテキストを列幅で折り直す。
     /// CJK（ひらがな/カタカナ/漢字）を含む場合は CJK モード＝文字幅のみで改行（空白挿入なし）
     private func wrapToColumns(_ text: String, limit: Int, tabWidth: Int) -> [String] {
-        let containsCJK = text.contains { $0._jpScript != nil }
+        let containsCJK = text.contains { $0.jpScript != nil }
         if containsCJK {
             return wrapCJKToColumns(text, limit: limit)
         } else {

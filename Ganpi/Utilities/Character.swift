@@ -94,17 +94,17 @@ enum JpScript {
 }
 
 extension Character {
-    @inline(__always) var _isHiragana: Bool {
+    @inline(__always) var isHiragana: Bool {
         unicodeScalars.allSatisfy { (0x3040...0x309F).contains($0.value) }
     }
-    @inline(__always) var _isKatakana: Bool {
+    @inline(__always) var isKatakana: Bool {
         unicodeScalars.allSatisfy {
             (0x30A0...0x30FF).contains($0.value) ||    // カタカナ
             (0x31F0...0x31FF).contains($0.value) ||    // 小書きカタカナ拡張
             (0xFF66...0xFF9D).contains($0.value)       // 半角カタカナ
         }
     }
-    @inline(__always) var _isKanji: Bool {
+    @inline(__always) var isKanji: Bool {
         unicodeScalars.allSatisfy {
             (0x3400...0x4DBF).contains($0.value) ||     // 拡張A
             (0x4E00...0x9FFF).contains($0.value) ||     // 基本面
@@ -112,25 +112,25 @@ extension Character {
         }
     }
     
-    @inline(__always) var _isKanaProlong: Bool {
+    @inline(__always) var isKanaProlong: Bool {
         unicodeScalars.allSatisfy { $0.value == 0x30FC } // 「ー」
     }
     
     // 反復記号
-    @inline(__always) var _isHiraganaIteration: Bool {
+    @inline(__always) var isHiraganaIteration: Bool {
         unicodeScalars.allSatisfy { $0.value == 0x309D || $0.value == 0x309E } // ゝ ゞ
     }
-    @inline(__always) var _isKatakanaIteration: Bool {
+    @inline(__always) var isKatakanaIteration: Bool {
         unicodeScalars.allSatisfy { $0.value == 0x30FD || $0.value == 0x30FE } // ヽ ヾ
     }
-    @inline(__always) var _isKanjiIteration: Bool {
+    @inline(__always) var isKanjiIteration: Bool {
         unicodeScalars.allSatisfy { $0.value == 0x3005 || $0.value == 0x303B } // 々 〻
     }
     
-    @inline(__always) var _jpScript: JpScript? {
-        if _isKanji || _isKanjiIteration { return .kanji }
-        if _isHiragana || _isHiraganaIteration  { return .hiragana }
-        if _isKatakana || _isKatakanaIteration  { return .katakana }
+    @inline(__always) var jpScript: JpScript? {
+        if isKanji || isKanjiIteration { return .kanji }
+        if isHiragana || isHiraganaIteration  { return .hiragana }
+        if isKatakana || isKatakanaIteration  { return .katakana }
         return nil
     }
 }

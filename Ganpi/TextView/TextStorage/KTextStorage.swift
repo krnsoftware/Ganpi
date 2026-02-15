@@ -689,23 +689,24 @@ final class KTextStorage: KTextStorageProtocol {
     @inline(__always)
     private func spaceOrTabRunRange(at index: Int) -> Range<Int>? {
         let n = count
-        let chars = characterSlice
-        let base  = chars.startIndex
-        
+        if n == 0 { return nil }
+
+        // 末尾クリックは末尾-1を観察
         var i = max(0, min(index, n))
-        if i == n { i = max(0, n - 1) }
-        
-        @inline(__always) func isSpaceTab(_ ch: Character) -> Bool { ch == " " || ch == "\t" }
-        
-        let pivot = chars[base + i]
+        if i == n { i = n - 1 }
+
+        @inline(__always)
+        func isSpaceTab(_ b: UInt8) -> Bool { b == FC.space || b == FC.tab }
+
+        let pivot = skeletonString[i]
         guard isSpaceTab(pivot) else { return nil }
-        
+
         var lo = i
-        while lo > 0, isSpaceTab(chars[base + lo - 1]) { lo -= 1 }
-        
+        while lo > 0, isSpaceTab(skeletonString[lo - 1]) { lo -= 1 }
+
         var hi = i + 1
-        while hi < n, isSpaceTab(chars[base + hi]) { hi += 1 }
-        
+        while hi < n, isSpaceTab(skeletonString[hi]) { hi += 1 }
+
         return lo..<hi
     }
 
@@ -715,7 +716,7 @@ final class KTextStorage: KTextStorageProtocol {
     private func japaneseClusterRange(at index: Int) -> Range<Int>? {
         
         let n = count
-        if n == 0 { return 0..<0 }
+        if n == 0 { return nil }
         
         let chars = characterSlice
         let base  = chars.startIndex
@@ -727,16 +728,16 @@ final class KTextStorage: KTextStorageProtocol {
         let pivot = chars[base + i]
         
         // クリックが長音そのもの → その1文字だけ
-        if pivot._isKanaProlong { return i..<(i + 1) }
+        if pivot.isKanaProlong { return i..<(i + 1) }
         
         // ピボットスクリプト（漢字/ひらがな/カタカナ）
-        guard let script = pivot._jpScript else { return nil }
+        guard let script = pivot.jpScript else { return nil }
         
         // ひらがな/カタカナのときは長音を“同クラスタ扱い”にする
         @inline(__always)
         func matchesPivotScript(_ ch: Character) -> Bool {
-            if (script == .hiragana || script == .katakana), ch._isKanaProlong { return true }
-            if let s = ch._jpScript { return s == script }
+            if (script == .hiragana || script == .katakana), ch.isKanaProlong { return true }
+            if let s = ch.jpScript { return s == script }
             return false
         }
         
@@ -749,34 +750,37 @@ final class KTextStorage: KTextStorageProtocol {
         return lo..<hi
     }
 
-    // --- 3) ASCII 識別子（[A-Za-z0-9_]+）。該当しないなら “空選択” を返す ---
+    // ASCII 識別子（[A-Za-z0-9_]+）。該当しないなら nil を返す。
     @inline(__always)
     private func asciiIdentifierRange(at index: Int) -> Range<Int>? {
         let n = count
+        if n == 0 { return nil }
+
         let chars = characterSlice
         let base  = chars.startIndex
-        
+
         var i = max(0, min(index, n))
-        if i == n { i = max(0, n - 1) }
-        
+        if i == n { i = n - 1 }
+
         @inline(__always)
         func isAsciiIdent(_ ch: Character) -> Bool {
             guard ch.unicodeScalars.allSatisfy({ $0.value <= 0x7F }) else { return false }
             if let u = ch.unicodeScalars.first?.value {
                 return (0x30...0x39).contains(u) || (0x41...0x5A).contains(u) ||
-                (0x61...0x7A).contains(u) || u == 0x5F
+                       (0x61...0x7A).contains(u) || u == 0x5F
             }
             return false
         }
-        
+
         let p = chars[base + i]
-        guard isAsciiIdent(p) else { return i..<i }   // 記号などは“空選択”
-        
+        guard isAsciiIdent(p) else { return nil }
+
         var lo = i
         while lo > 0, isAsciiIdent(chars[base + lo - 1]) { lo -= 1 }
+
         var hi = i + 1
         while hi < n, isAsciiIdent(chars[base + hi]) { hi += 1 }
-        
+
         return lo..<hi
     }
     
