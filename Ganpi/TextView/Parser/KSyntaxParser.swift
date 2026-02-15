@@ -525,16 +525,8 @@ class KSyntaxParser {
 
     private static func userKeywordFileURL(fileName: String) -> URL? {
         let fm = FileManager.default
-        guard let base = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
-            log("Failed to resolve Application Support directory")
-            return nil
-        }
-
-        let dir = base.appendingPathComponent("Ganpi/keywords", isDirectory: true)
-        do {
-            try fm.createDirectory(at: dir, withIntermediateDirectories: true)
-        } catch {
-            log("Failed to create Ganpi/keywords directory: \(error)")
+        guard let dir = KAppPaths.keywordsDirectoryURL(createIfNeeded: true) else {
+            log("Failed to resolve keywords directory")
             return nil
         }
 

@@ -36,12 +36,11 @@ final class KPreference {
 
         _defaultINI = Bundle.main.url(forResource: "default", withExtension: "ini")!
 
-        let support = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library")
-            .appendingPathComponent("Application Support")
-            .appendingPathComponent("Ganpi")
+        guard let userIniURL = KAppPaths.preferenceFileURL(fileName: "user.ini", createDirectoryIfNeeded: true) else {
+            fatalError("Preferences directory is not available.")
+        }
 
-        _userINI = support.appendingPathComponent("user.ini")
+        _userINI = userIniURL
 
         load()
         

@@ -330,7 +330,7 @@ enum KUserCommand {
 
     // MARK: - ファイル読み込み補助
 
-    /// Application Support/Ganpi 以下から相対パスでファイルを読み込む。
+    /// Application Support/<bundle id>/snippets 以下から相対パスでファイルを読み込む。
     private func readFromApplicationSupport(_ relativePath: String) -> String? {
         let trimmed = relativePath.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
@@ -347,19 +347,8 @@ enum KUserCommand {
         }
 
         let fm = FileManager.default
-        guard let base = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
-            log("Failed to resolve Application Support directory")
-            return nil
-        }
-
-        let dirName = Bundle.main.bundleIdentifier ?? "ApplicationSupport"
-        let appDir = base.appendingPathComponent(dirName, isDirectory: true)
-            .appendingPathComponent("snippets", isDirectory: true)
-
-        do {
-            try fm.createDirectory(at: appDir, withIntermediateDirectories: true)
-        } catch {
-            KLog.shared.log(id: "load", message: "Failed to create snippets directory: \(appDir.path)")
+        guard let appDir = KAppPaths.snippetsDirectoryURL(createIfNeeded: true) else {
+            KLog.shared.log(id: "load", message: "Snippets directory not available.")
             return nil
         }
 
@@ -389,26 +378,57 @@ enum KUserCommand {
     }
 
     
-    /// Application Support/Ganpi/scripts 以下の外部コマンドを実行し、
+    /// Application Scripts/<bundle id>/scripts 以下の外部コマンドを実行し、
     /// UTF-8/LF 文字列を標準入出力でやり取りする。
-    /// - Parameter relativePath: scripts/ 以下の相対パス
-    /// - Returns: コマンドの標準出力 (UTF-8/LF) 。失敗時は nil。
-
     private func readFromStream(from relativePath: String, string: String, timeout: Float) -> String? {
         func makeLogSnippet(from data: Data, limit: Int) -> String {
             guard !data.isEmpty else { return "(no output)" }
             let text = String(data: data, encoding: .utf8) ?? String(decoding: data, as: UTF8.self)
             if text.count <= limit { return text }
-            let prefix = text.prefix(limit)
-            return "\(prefix)…"
+            return "\(text.prefix(limit))…"
+        }
+
+        let trimmed = relativePath.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            KLog.shared.log(id: "execute", message: "Invalid path: empty")
+            return nil
+        }
+        guard !trimmed.hasPrefix("/") else {
+            KLog.shared.log(id: "execute", message: "Absolute path not allowed: \(trimmed)")
+            return nil
+        }
+        if trimmed.contains("..") {
+            KLog.shared.log(id: "execute", message: "Path traversal not allowed: \(trimmed)")
+            return nil
         }
 
         let fm = FileManager.default
-        guard let base = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { log("#01"); return nil }
+        guard let scriptsDir = KAppPaths.scriptsDirectoryURL(createIfNeeded: true) else {
+            KLog.shared.log(id: "execute", message: "Scripts directory not available.")
+            return nil
+        }
 
-        let scriptsDir = base.appendingPathComponent("Ganpi/scripts", isDirectory: true)
-        let fileURL = scriptsDir.appendingPathComponent(relativePath)
-        guard fm.isExecutableFile(atPath: fileURL.path) else { log("#02"); return nil }
+        let baseURL = scriptsDir.resolvingSymlinksInPath()
+        let fileURL = baseURL.appendingPathComponent(trimmed).resolvingSymlinksInPath()
+        let basePath = baseURL.path.hasSuffix("/") ? baseURL.path : baseURL.path + "/"
+        guard fileURL.path.hasPrefix(basePath) else {
+            KLog.shared.log(id: "execute", message: "Path escapes scripts directory: \(trimmed)")
+            return nil
+        }
+
+        var isDir: ObjCBool = false
+        guard fm.fileExists(atPath: fileURL.path, isDirectory: &isDir) else {
+            KLog.shared.log(id: "execute", message: "Script not found: \(trimmed)")
+            return nil
+        }
+        guard !isDir.boolValue else {
+            KLog.shared.log(id: "execute", message: "Script is a directory: \(trimmed)")
+            return nil
+        }
+        guard fm.isExecutableFile(atPath: fileURL.path) else {
+            KLog.shared.log(id: "execute", message: "Script is not executable: \(trimmed)")
+            return nil
+        }
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/bash")
@@ -423,19 +443,17 @@ enum KUserCommand {
         do {
             try process.run()
         } catch {
-            KLog.shared.log(id: "execute", message: "Failed to launch process: \(relativePath) (\(error))")
+            KLog.shared.log(id: "execute", message: "Failed to launch process: \(trimmed) (\(error))")
             return nil
         }
 
         let pid = process.processIdentifier
 
-        // 入力（UTF-8）
         if let data = string.data(using: .utf8) {
             inputPipe.fileHandleForWriting.write(data)
         }
         inputPipe.fileHandleForWriting.closeFile()
 
-        // 非同期読み込み（stdout/stderr をまとめて回収）
         var resultData = Data()
         let group = DispatchGroup()
         group.enter()
@@ -453,7 +471,6 @@ enum KUserCommand {
             group.leave()
         }
 
-        // timeout 秒で待つ（最低 0.1 秒）
         let timeoutSeconds = max(0.1, Double(timeout))
         let deadline = DispatchTime.now() + .milliseconds(Int(timeoutSeconds * 1000.0))
 
@@ -461,33 +478,27 @@ enum KUserCommand {
         if waitResult == .timedOut {
             let snippetBefore = makeLogSnippet(from: resultData, limit: 500)
 
-            // 1) まずは穏当終了要求
             process.terminate()
 
-            // 2) 少しだけ猶予（TERMで止まるならここで止まる）
             let graceSeconds = 0.3
             let graceDeadline = DispatchTime.now() + .milliseconds(Int(graceSeconds * 1000.0))
             _ = group.wait(timeout: graceDeadline)
 
             var killed = false
-
-            // 3) まだ生きていたら SIGKILL
             if process.isRunning {
                 _ = kill(pid, SIGKILL)
                 killed = true
             }
 
-            // 4) 後始末（短時間だけ待つ）
             let finalWaitSeconds = 0.2
             let finalDeadline = DispatchTime.now() + .milliseconds(Int(finalWaitSeconds * 1000.0))
             _ = group.wait(timeout: finalDeadline)
 
-            // タイムアウト時は「どこまでやったか」＋「途中出力」を通知
             let action = killed ? "terminate+kill" : "terminate"
             KLog.shared.log(
                 id: "execute",
                 message: """
-                Process timed out (\(timeoutSeconds)s) [\(action)] pid=\(pid) script="\(relativePath)"
+                Process timed out (\(timeoutSeconds)s) [\(action)] pid=\(pid) script="\(trimmed)"
                 Output (partial):
                 \(snippetBefore)
                 """
