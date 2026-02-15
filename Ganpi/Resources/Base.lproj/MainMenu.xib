@@ -87,6 +87,25 @@
                                     </items>
                                 </menu>
                             </menuItem>
+                            <menuItem title="Open Folder" id="HgO-zT-2U2">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <menu key="submenu" id="yOV-tv-5B2">
+                                    <items>
+                                        <menuItem title="Open Scripts Folder" id="uWx-9n-Vfm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="openScriptsFolder:" target="-1" id="Ya3-9f-0CP"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Open Application Support Folder" id="6Mk-Yy-hhZ">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="openApplicationSupportFolder:" target="-1" id="90k-iJ-7vm"/>
+                                            </connections>
+                                        </menuItem>
+                                    </items>
+                                </menu>
+                            </menuItem>
                             <menuItem isSeparatorItem="YES" id="m54-Is-iLE"/>
                             <menuItem title="Close" keyEquivalent="w" id="DVo-aG-piG">
                                 <connections>

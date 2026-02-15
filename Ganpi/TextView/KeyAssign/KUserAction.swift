@@ -352,11 +352,14 @@ enum KUserCommand {
             return nil
         }
 
-        let appDir = base.appendingPathComponent("Ganpi/snippets", isDirectory: true)
+        let dirName = Bundle.main.bundleIdentifier ?? "ApplicationSupport"
+        let appDir = base.appendingPathComponent(dirName, isDirectory: true)
+            .appendingPathComponent("snippets", isDirectory: true)
+
         do {
             try fm.createDirectory(at: appDir, withIntermediateDirectories: true)
         } catch {
-            log("Failed to create Ganpi directory: \(error)")
+            KLog.shared.log(id: "load", message: "Failed to create snippets directory: \(appDir.path)")
             return nil
         }
 

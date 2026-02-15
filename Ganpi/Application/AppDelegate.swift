@@ -14,6 +14,50 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // ファイル指定で起動中かどうかを検知するためのフラグ
     private var launchingWithFiles = false
     
+    private enum FolderKind {
+        case scripts
+        case applicationSupportRoot
+    }
+
+    private func openFolder(_ kind: FolderKind) {
+        let fm = FileManager.default
+
+        let url: URL?
+        switch kind {
+        case .scripts:
+            // ~/Library/Application Scripts/<bundle id>/scripts/
+            guard let base = try? fm.url(for: .applicationScriptsDirectory,
+                                         in: .userDomainMask,
+                                         appropriateFor: nil,
+                                         create: false) else {
+                KLog.shared.log(id: "folders", message: "Application Scripts directory not available.")
+                return
+            }
+            url = base.appendingPathComponent("scripts", isDirectory: true)
+
+        case .applicationSupportRoot:
+            guard let base = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+                KLog.shared.log(id: "folders", message: "Application Support directory not available.")
+                return
+            }
+
+            let dirName = Bundle.main.bundleIdentifier ?? "ApplicationSupport"
+            url = base.appendingPathComponent(dirName, isDirectory: true)
+            
+        }
+
+        guard let url else { return }
+
+        do {
+            try fm.createDirectory(at: url, withIntermediateDirectories: true)
+        } catch {
+            KLog.shared.log(id: "folders", message: "Failed to create directory: \(url.path)")
+            return
+        }
+
+        NSWorkspace.shared.open(url)
+    }
+    
     // delete buffer
     var deleteBuffer: String = ""
     
@@ -45,6 +89,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
     
+    //MARK: - Actions
+    
     @IBAction func showSearchPanel(_ sender: Any?) {
         KSearchPanel.shared.show()
     }
@@ -75,6 +121,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 document.textStorage.replaceParser(for: document.syntaxType)
             }
         }
+    }
+    
+    @IBAction func openScriptsFolder(_ sender: Any?) {
+        openFolder(.scripts)
+    }
+
+    @IBAction func openApplicationSupportFolder(_ sender: Any?) {
+        openFolder(.applicationSupportRoot)
     }
     
     // MARK: - Dock menu
