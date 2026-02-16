@@ -40,9 +40,10 @@ struct KCommandOptions {
 
 // コマンドの種類。それぞれ内容はテキストとして渡される。内容は実行の時点で解釈される。
 enum KUserCommand {
-    case insert(String)         // insert[String] : insert String to the designated range.
+    case insert(String)          // insert[String] : insert String to the designated range.
     case load(String)            // load[PATH] or [PATH] : insert string from the designated filePATH.
     case execute(String)         // execute[PATH] : execute a file command represented with filePATH.
+    case tag(String)             // tag[pre="...", post="...", single="...", will_select=all|right|left]
     
     // 与えられたstorageと、現在の選択範囲rangeについて処理。allであればrangeは単に無視される。
     func execute(for storage:KTextStorageReadable, in range:Range<Int>) -> KCommandResult? {
@@ -78,6 +79,26 @@ enum KUserCommand {
                                                string: storage.string(in: targetRange),
                                                timeout: options.timeout) else { log("#02"); return nil }
             resultString = content
+            
+        case .tag(let body):
+            guard let spec = parseTagSpec(body) else {
+                KLog.shared.log(id: "useraction", message: "Invalid tag command: \(body)")
+                return nil
+            }
+
+            var opts = KCommandOptions()
+            opts.caret = spec.caret
+            opts.target = .selection
+
+            let selectedText = storage.string(in: range)
+            if range.isEmpty {
+                let s = spec.single ?? ((spec.pre ?? "") + (spec.post ?? ""))
+                return .init(string: s, options: opts)
+            } else {
+                let pre = spec.pre ?? ""
+                let post = spec.post ?? ""
+                return .init(string: pre + selectedText + post, options: opts)
+            }
         }
         
         return .init(string: resultString, options: options)
@@ -325,6 +346,158 @@ enum KUserCommand {
 
         let payload = unescapePayload(rawPayload)
         return (payload, opts)
+    }
+    
+    
+    // for tag[...]
+    private struct KTagSpec {
+        var pre: String?
+        var post: String?
+        var single: String?
+        var caret: KPostProcessingCaretPosition = .right
+    }
+
+    private func parseTagSpec(_ body: String) -> KTagSpec? {
+        // body は tag[ ... ] の ... 部分（KKeymapLoader 側で [] は剥がされている前提）
+        var spec = KTagSpec()
+
+        // 1) key=value を , 区切りで分解（クォート保護）
+        var parts: [String] = []
+        var current = ""
+        var quote: Character? = nil
+        var escape = false
+
+        for c in body {
+            if let q = quote {
+                current.append(c)
+
+                if escape {
+                    escape = false
+                    continue
+                }
+                if c == "\\" {
+                    escape = true
+                    continue
+                }
+                if c == q {
+                    quote = nil
+                }
+                continue
+            }
+
+            if c == "\"" || c == "'" {
+                quote = c
+                current.append(c)
+                continue
+            }
+
+            if c == "," {
+                let p = current.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !p.isEmpty { parts.append(p) }
+                current = ""
+                continue
+            }
+
+            current.append(c)
+        }
+
+        let tail = current.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !tail.isEmpty { parts.append(tail) }
+
+        // 2) 各 pair を解釈
+        for p in parts {
+            guard let eq = p.firstIndex(of: "=") else { continue }
+
+            let rawKey = String(p[..<eq]).trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            let rawVal = String(p[p.index(after: eq)...]).trimmingCharacters(in: .whitespacesAndNewlines)
+
+            if rawKey.isEmpty { continue }
+
+            switch rawKey {
+            case "pre":
+                spec.pre = parseTagStringValue(rawVal)
+            case "post":
+                spec.post = parseTagStringValue(rawVal)
+            case "single":
+                spec.single = parseTagStringValue(rawVal)
+            case "will_select":
+                spec.caret = parseWillSelect(rawVal)
+            default:
+                // 不明キーは無視（将来拡張用）
+                continue
+            }
+        }
+
+        // pre/post/single 全部 nil は意味が薄いので失敗扱い
+        if spec.pre == nil && spec.post == nil && spec.single == nil { return nil }
+
+        return spec
+    }
+
+    private func parseWillSelect(_ raw: String) -> KPostProcessingCaretPosition {
+        let v = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+            .lowercased()
+
+        switch v {
+        case "left":
+            return .left
+        case "right":
+            return .right
+        case "all":
+            return .select
+        default:
+            return .right
+        }
+    }
+
+    private func parseTagStringValue(_ raw: String) -> String? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        // クォートがあれば剥がす（"..." または '...'）
+        if (trimmed.hasPrefix("\"") && trimmed.hasSuffix("\"") && trimmed.count >= 2) ||
+           (trimmed.hasPrefix("'") && trimmed.hasSuffix("'") && trimmed.count >= 2) {
+
+            let inner = String(trimmed.dropFirst().dropLast())
+            return unescapeTagString(inner)
+        }
+
+        // クォート無しも許す（ただし空白を含む場合は推奨しない）
+        return unescapeTagString(trimmed)
+    }
+
+    private func unescapeTagString(_ raw: String) -> String {
+        // 必要最小：\n \t \r \\ \" \' \s(スペース)
+        var result = ""
+        var escape = false
+
+        for c in raw {
+            if escape {
+                switch c {
+                case "n": result.append("\n")
+                case "t": result.append("\t")
+                case "r": result.append("\r")
+                case "\\": result.append("\\")
+                case "\"": result.append("\"")
+                case "'": result.append("'")
+                case "s": result.append(" ")
+                default: result.append(c)
+                }
+                escape = false
+                continue
+            }
+
+            if c == "\\" {
+                escape = true
+                continue
+            }
+
+            result.append(c)
+        }
+
+        if escape { result.append("\\") }
+        return result
     }
 
 

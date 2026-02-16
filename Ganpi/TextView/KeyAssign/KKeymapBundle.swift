@@ -177,6 +177,8 @@ struct KKeymapLoader {
                     result.append(.command(.execute(body)))
                 case "load":
                     result.append(.command(.load(body)))
+                case "tag":
+                    result.append(.command(.tag(body)))
                 default:
                     // 破壊的変更： ""（head省略）も含めて不正扱い
                     log("Unknown command '\(head)' ignored")
