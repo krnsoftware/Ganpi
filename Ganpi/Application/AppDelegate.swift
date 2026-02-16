@@ -14,6 +14,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // ファイル指定で起動中かどうかを検知するためのフラグ
     private var launchingWithFiles = false
     
+    @IBOutlet weak var _userMenuItem: NSMenuItem!
+    
     private enum FolderKind {
         case scripts
         case applicationSupportRoot
