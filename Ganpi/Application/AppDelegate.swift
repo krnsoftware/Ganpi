@@ -11,10 +11,13 @@ import Cocoa
 @main
 class AppDelegate: NSObject, NSApplicationDelegate {
     
+    @IBOutlet weak var _userMenuItem: NSMenuItem!
+    
     // ファイル指定で起動中かどうかを検知するためのフラグ
     private var launchingWithFiles = false
     
-    @IBOutlet weak var _userMenuItem: NSMenuItem!
+    // delete buffer
+    var deleteBuffer: String = ""
     
     private enum FolderKind {
         case scripts
@@ -146,9 +149,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // UTF-8/LF に統一（末尾改行は付ける）
         return outLines.joined(separator: "\n") + "\n"
     }
-    
-    // delete buffer
-    var deleteBuffer: String = ""
     
     // 起動直後に復元されるウインドウをすべて無効化
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { false }
@@ -287,31 +287,36 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - User Menu
 
     private func constructMenus() {
-        _userMenuItem.submenu = buildUserMenu()
+        let result = buildUserMenu()
+        _userMenuItem.title = result.title
+        _userMenuItem.submenu = result.menu
     }
 
-    private func buildUserMenu() -> NSMenu {
-        let menu = NSMenu(title: "User Menu")
-
+    private func buildUserMenu() -> (title: String, menu: NSMenu) {
         guard let text = loadUserMenuText() else {
             KLog.shared.log(id: "usermenu", message: "usermenu.txt not found.")
-            return menu
+            let title = _userMenuItem.title
+            return (title, NSMenu(title: title))
         }
 
-        let lines = text.split(whereSeparator: \.isNewline).map { String($0) }
+        let rawLines = text.split(whereSeparator: \.isNewline).map { String($0) }
 
-        var stack: [NSMenu] = [menu]
+        // 先頭の menu "TITLE" をルートとして採用する
+        var rootTitle = _userMenuItem.title
+        var rootMenu = NSMenu(title: rootTitle)
+
+        var stack: [NSMenu] = [rootMenu]
 
         var currentItemTitle: String? = nil
         var currentItemKey: String? = nil
         var currentItemCommand: String? = nil
 
-        func flushItemIfNeeded() {
+        func flushItemIfNeeded(_ lineNo: Int) {
             guard let title = currentItemTitle else { return }
 
             let command = currentItemCommand?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             if command.isEmpty {
-                KLog.shared.log(id: "usermenu", message: "Item '\(title)' has no command; skipped.")
+                KLog.shared.log(id: "usermenu", message: "Line \(lineNo): Item '\(title)' has no command; skipped.")
                 currentItemTitle = nil
                 currentItemKey = nil
                 currentItemCommand = nil
@@ -320,7 +325,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
             let actions = KKeymapLoader.parseActions(from: command)
             if actions.isEmpty {
-                KLog.shared.log(id: "usermenu", message: "Item '\(title)' has no valid actions; skipped.")
+                KLog.shared.log(id: "usermenu", message: "Line \(lineNo): Item '\(title)' has no valid actions; skipped.")
                 currentItemTitle = nil
                 currentItemKey = nil
                 currentItemCommand = nil
@@ -330,7 +335,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let item = NSMenuItem(title: title,
                                   action: #selector(KTextView.performUserActions(_:)),
                                   keyEquivalent: "")
-            // Responder chain に流す
             item.target = nil
             item.representedObject = actions
 
@@ -345,14 +349,34 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             currentItemCommand = nil
         }
 
-        for (idx, rawLine) in lines.enumerated() {
-            let lineNo = idx + 1
-            let line = stripComment(from: rawLine).trimmingCharacters(in: .whitespacesAndNewlines)
+        // 1) 最初の有効行を先読みして root を決定
+        var startIndex = 0
+        while startIndex < rawLines.count {
+            let stripped = stripComment(from: rawLines[startIndex]).trimmingCharacters(in: .whitespacesAndNewlines)
+            if stripped.isEmpty { startIndex += 1; continue }
+
+            if stripped.hasPrefix("menu") {
+                if let title = parseLeadingQuotedString(afterKeyword: "menu", line: stripped) {
+                    rootTitle = title
+                    rootMenu = NSMenu(title: rootTitle)
+                    stack = [rootMenu]
+                } else {
+                    KLog.shared.log(id: "usermenu", message: "Line 1: invalid root menu syntax; using default title.")
+                }
+                startIndex += 1 // 先頭menuは消費（ルート扱い）
+            }
+            break
+        }
+
+        // 2) 本体解析
+        for i in startIndex..<rawLines.count {
+            let lineNo = i + 1
+            let line = stripComment(from: rawLines[i]).trimmingCharacters(in: .whitespacesAndNewlines)
             if line.isEmpty { continue }
 
             // menu "Title"
             if line.hasPrefix("menu") {
-                flushItemIfNeeded()
+                flushItemIfNeeded(lineNo)
 
                 guard let title = parseLeadingQuotedString(afterKeyword: "menu", line: line) else {
                     KLog.shared.log(id: "usermenu", message: "Line \(lineNo): invalid menu syntax.")
@@ -369,7 +393,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
             // end
             if line == "end" {
-                flushItemIfNeeded()
+                flushItemIfNeeded(lineNo)
 
                 if stack.count <= 1 {
                     KLog.shared.log(id: "usermenu", message: "Line \(lineNo): stray end ignored.")
@@ -381,7 +405,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
             // item "Title"
             if line.hasPrefix("item") {
-                flushItemIfNeeded()
+                flushItemIfNeeded(lineNo)
 
                 guard let title = parseLeadingQuotedString(afterKeyword: "item", line: line) else {
                     KLog.shared.log(id: "usermenu", message: "Line \(lineNo): invalid item syntax.")
@@ -417,17 +441,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 continue
             }
 
-            // unknown line
             KLog.shared.log(id: "usermenu", message: "Line \(lineNo): unknown directive ignored: \(line)")
         }
 
-        flushItemIfNeeded()
+        flushItemIfNeeded(rawLines.count)
 
         if stack.count != 1 {
             KLog.shared.log(id: "usermenu", message: "Unclosed menu blocks detected. (missing end?)")
         }
 
-        return menu
+        return (rootTitle, rootMenu)
     }
 
     private func loadUserMenuText() -> String? {
