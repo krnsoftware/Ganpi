@@ -301,11 +301,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         let rawLines = text.split(whereSeparator: \.isNewline).map { String($0) }
 
-        // 先頭の menu "TITLE" をルートとして採用する
         var rootTitle = _userMenuItem.title
-        var rootMenu = NSMenu(title: rootTitle)
+        let rootMenu = NSMenu(title: rootTitle)
 
+        // 実メニュー階層用スタック（rootMenu は常に残す）
         var stack: [NSMenu] = [rootMenu]
+
+        // 先頭 menu "..." を「ルートの menu ブロック」として扱うためのフラグ
+        // これが true の間は「ルート配下を構築中」
+        var rootMenuBlockOpen = false
 
         var currentItemTitle: String? = nil
         var currentItemKey: String? = nil
@@ -349,27 +353,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             currentItemCommand = nil
         }
 
-        // 1) 最初の有効行を先読みして root を決定
-        var startIndex = 0
-        while startIndex < rawLines.count {
-            let stripped = stripComment(from: rawLines[startIndex]).trimmingCharacters(in: .whitespacesAndNewlines)
-            if stripped.isEmpty { startIndex += 1; continue }
-
-            if stripped.hasPrefix("menu") {
-                if let title = parseLeadingQuotedString(afterKeyword: "menu", line: stripped) {
-                    rootTitle = title
-                    rootMenu = NSMenu(title: rootTitle)
-                    stack = [rootMenu]
-                } else {
-                    KLog.shared.log(id: "usermenu", message: "Line 1: invalid root menu syntax; using default title.")
-                }
-                startIndex += 1 // 先頭menuは消費（ルート扱い）
-            }
-            break
-        }
-
-        // 2) 本体解析
-        for i in startIndex..<rawLines.count {
+        for i in 0..<rawLines.count {
             let lineNo = i + 1
             let line = stripComment(from: rawLines[i]).trimmingCharacters(in: .whitespacesAndNewlines)
             if line.isEmpty { continue }
@@ -383,6 +367,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     continue
                 }
 
+                // ルート直下で最初に現れた menu は、サブメニューを作らず「ルート名の設定＋ブロック開始」として扱う
+                if stack.count == 1 && rootMenuBlockOpen == false {
+                    rootTitle = title
+                    rootMenu.title = title
+                    rootMenuBlockOpen = true
+                    continue
+                }
+
+                // 通常の submenu
                 let submenu = NSMenu(title: title)
                 let menuItem = NSMenuItem(title: title, action: nil, keyEquivalent: "")
                 menuItem.submenu = submenu
@@ -395,10 +388,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if line == "end" {
                 flushItemIfNeeded(lineNo)
 
-                if stack.count <= 1 {
-                    KLog.shared.log(id: "usermenu", message: "Line \(lineNo): stray end ignored.")
-                } else {
+                if stack.count > 1 {
                     _ = stack.popLast()
+                } else if rootMenuBlockOpen {
+                    // ルート menu ブロックを閉じる
+                    rootMenuBlockOpen = false
+                } else {
+                    KLog.shared.log(id: "usermenu", message: "Line \(lineNo): stray end ignored.")
                 }
                 continue
             }
@@ -430,7 +426,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 continue
             }
 
-            // command: <raw until end of line>
+            // command: ...
             if line.hasPrefix("command:") {
                 guard currentItemTitle != nil else {
                     KLog.shared.log(id: "usermenu", message: "Line \(lineNo): command without item ignored.")
@@ -446,7 +442,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         flushItemIfNeeded(rawLines.count)
 
-        if stack.count != 1 {
+        if stack.count != 1 || rootMenuBlockOpen {
             KLog.shared.log(id: "usermenu", message: "Unclosed menu blocks detected. (missing end?)")
         }
 
