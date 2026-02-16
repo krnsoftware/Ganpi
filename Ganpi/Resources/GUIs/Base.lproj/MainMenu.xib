@@ -709,20 +709,6 @@ CQ
                                 </menu>
                             </menuItem>
                             <menuItem isSeparatorItem="YES" id="sOB-A2-Bqx"/>
-                            <menuItem title="Color" id="aiM-IB-dEW">
-                                <modifierMask key="keyEquivalentModifierMask"/>
-                                <menu key="submenu" title="Color" id="5VZ-Iv-yDJ">
-                                    <items>
-                                        <menuItem title="Show Color Panel" id="PHU-Wb-yqT">
-                                            <modifierMask key="keyEquivalentModifierMask"/>
-                                            <connections>
-                                                <action selector="showColorPanel:" target="-1" id="JKq-l8-UEO"/>
-                                            </connections>
-                                        </menuItem>
-                                    </items>
-                                </menu>
-                            </menuItem>
-                            <menuItem isSeparatorItem="YES" id="S8H-EP-5hz"/>
                             <menuItem title="User Menu" id="gIY-DX-Bac">
                                 <modifierMask key="keyEquivalentModifierMask"/>
                             </menuItem>
@@ -809,12 +795,6 @@ CQ
                                                 <action selector="showFontSizePopoverFromMenu:" target="-1" id="zet-ls-M6r"/>
                                             </connections>
                                         </menuItem>
-                                        <menuItem title="Show Font Panel..." id="VuN-Ab-ImK">
-                                            <modifierMask key="keyEquivalentModifierMask"/>
-                                            <connections>
-                                                <action selector="showFontPanel:" target="-1" id="F5v-r8-ShO"/>
-                                            </connections>
-                                        </menuItem>
                                         <menuItem isSeparatorItem="YES" id="pYE-J5-mh9"/>
                                         <menuItem title="Use Monospace System Font" id="Pw0-yu-gA2">
                                             <modifierMask key="keyEquivalentModifierMask"/>
@@ -899,6 +879,19 @@ CQ
                                     <action selector="showLogPanel:" target="-1" id="PyF-tf-cO7"/>
                                 </connections>
                             </menuItem>
+                            <menuItem title="Show Color Panel" keyEquivalent="c" id="c4P-W5-goF">
+                                <modifierMask key="keyEquivalentModifierMask" option="YES" command="YES"/>
+                                <connections>
+                                    <action selector="showColorPanel:" target="-1" id="LzX-M6-Q42"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Show Font Panel..." id="WKD-kv-6aj">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <connections>
+                                    <action selector="showFontPanel:" target="-1" id="nMT-1z-yYz"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem isSeparatorItem="YES" id="Slb-UX-tqh"/>
                             <menuItem title="Reload Preferences" keyEquivalent="t" id="BYS-wn-5iK">
                                 <connections>
                                     <action selector="reloadPreferences:" target="-1" id="EUD-04-qmz"/>
