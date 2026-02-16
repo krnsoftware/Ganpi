@@ -166,12 +166,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.activate(ignoringOtherApps: true)
-        
+
         UserDefaults.standard.register(defaults: [
             KDefaultSearchKey.ignoreCase : true,
             KDefaultSearchKey.useRegex : false,
             KDefaultSearchKey.selectionOnly : false
         ])
+
+        constructMenus()
     }
     
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -203,13 +205,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @IBAction func reloadPreferences(_ sender: Any?) {
         KPreference.shared.load()
         KKeyAssign.shared.load()
-        
+
         for doc in NSDocumentController.shared.documents {
             if let document = doc as? Document {
                 // パーサを新しいものに入れ替える。
                 document.textStorage.replaceParser(for: document.syntaxType)
             }
         }
+
+        constructMenus()
     }
     
     @IBAction func openScriptsFolder(_ sender: Any?) {
@@ -278,6 +282,303 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func createNewDocumentFromDock(_ sender: NSMenuItem) {
         NSDocumentController.shared.newDocument(nil)
+    }
+    
+    // MARK: - User Menu
+
+    private func constructMenus() {
+        _userMenuItem.submenu = buildUserMenu()
+    }
+
+    private func buildUserMenu() -> NSMenu {
+        let menu = NSMenu(title: "User Menu")
+
+        guard let text = loadUserMenuText() else {
+            KLog.shared.log(id: "usermenu", message: "usermenu.txt not found.")
+            return menu
+        }
+
+        let lines = text.split(whereSeparator: \.isNewline).map { String($0) }
+
+        var stack: [NSMenu] = [menu]
+
+        var currentItemTitle: String? = nil
+        var currentItemKey: String? = nil
+        var currentItemCommand: String? = nil
+
+        func flushItemIfNeeded() {
+            guard let title = currentItemTitle else { return }
+
+            let command = currentItemCommand?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if command.isEmpty {
+                KLog.shared.log(id: "usermenu", message: "Item '\(title)' has no command; skipped.")
+                currentItemTitle = nil
+                currentItemKey = nil
+                currentItemCommand = nil
+                return
+            }
+
+            let actions = KKeymapLoader.parseActions(from: command)
+            if actions.isEmpty {
+                KLog.shared.log(id: "usermenu", message: "Item '\(title)' has no valid actions; skipped.")
+                currentItemTitle = nil
+                currentItemKey = nil
+                currentItemCommand = nil
+                return
+            }
+
+            let item = NSMenuItem(title: title,
+                                  action: #selector(KTextView.performUserActions(_:)),
+                                  keyEquivalent: "")
+            // Responder chain に流す
+            item.target = nil
+            item.representedObject = actions
+
+            if let keyText = currentItemKey {
+                applyMenuShortcut(from: keyText, to: item)
+            }
+
+            stack[stack.count - 1].addItem(item)
+
+            currentItemTitle = nil
+            currentItemKey = nil
+            currentItemCommand = nil
+        }
+
+        for (idx, rawLine) in lines.enumerated() {
+            let lineNo = idx + 1
+            let line = stripComment(from: rawLine).trimmingCharacters(in: .whitespacesAndNewlines)
+            if line.isEmpty { continue }
+
+            // menu "Title"
+            if line.hasPrefix("menu") {
+                flushItemIfNeeded()
+
+                guard let title = parseLeadingQuotedString(afterKeyword: "menu", line: line) else {
+                    KLog.shared.log(id: "usermenu", message: "Line \(lineNo): invalid menu syntax.")
+                    continue
+                }
+
+                let submenu = NSMenu(title: title)
+                let menuItem = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+                menuItem.submenu = submenu
+                stack[stack.count - 1].addItem(menuItem)
+                stack.append(submenu)
+                continue
+            }
+
+            // end
+            if line == "end" {
+                flushItemIfNeeded()
+
+                if stack.count <= 1 {
+                    KLog.shared.log(id: "usermenu", message: "Line \(lineNo): stray end ignored.")
+                } else {
+                    _ = stack.popLast()
+                }
+                continue
+            }
+
+            // item "Title"
+            if line.hasPrefix("item") {
+                flushItemIfNeeded()
+
+                guard let title = parseLeadingQuotedString(afterKeyword: "item", line: line) else {
+                    KLog.shared.log(id: "usermenu", message: "Line \(lineNo): invalid item syntax.")
+                    continue
+                }
+
+                currentItemTitle = title
+                continue
+            }
+
+            // key "cmd+opt+P"
+            if line.hasPrefix("key") {
+                guard currentItemTitle != nil else {
+                    KLog.shared.log(id: "usermenu", message: "Line \(lineNo): key without item ignored.")
+                    continue
+                }
+                guard let keyText = parseLeadingQuotedString(afterKeyword: "key", line: line) else {
+                    KLog.shared.log(id: "usermenu", message: "Line \(lineNo): invalid key syntax.")
+                    continue
+                }
+                currentItemKey = keyText
+                continue
+            }
+
+            // command: <raw until end of line>
+            if line.hasPrefix("command:") {
+                guard currentItemTitle != nil else {
+                    KLog.shared.log(id: "usermenu", message: "Line \(lineNo): command without item ignored.")
+                    continue
+                }
+                let body = String(line.dropFirst("command:".count)).trimmingCharacters(in: .whitespacesAndNewlines)
+                currentItemCommand = body
+                continue
+            }
+
+            // unknown line
+            KLog.shared.log(id: "usermenu", message: "Line \(lineNo): unknown directive ignored: \(line)")
+        }
+
+        flushItemIfNeeded()
+
+        if stack.count != 1 {
+            KLog.shared.log(id: "usermenu", message: "Unclosed menu blocks detected. (missing end?)")
+        }
+
+        return menu
+    }
+
+    private func loadUserMenuText() -> String? {
+        // 1) User: ~/Library/Application Support/<bundle id>/usermenu.txt
+        let fm = FileManager.default
+        if let base = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+            let dirName = Bundle.main.bundleIdentifier ?? "ApplicationSupport"
+            let url = base.appendingPathComponent(dirName, isDirectory: true)
+                .appendingPathComponent("menu", isDirectory: true)
+                .appendingPathComponent("usermenu.txt", isDirectory: false)
+            log("url:\(url)",from:self)
+            if let s = try? String(contentsOf: url, encoding: .utf8) {
+                return s
+            }
+        }
+
+        // 2) Bundle: usermenu.txt
+        if let url = Bundle.main.url(forResource: "usermenu", withExtension: "txt"),
+           let s = try? String(contentsOf: url, encoding: .utf8) {
+            return s
+        }
+
+        return nil
+    }
+
+    private func stripComment(from line: String) -> String {
+        var out = ""
+        var quote: Character? = nil
+        var escape = false
+
+        for c in line {
+            if let q = quote {
+                out.append(c)
+                if escape {
+                    escape = false
+                } else if c == "\\" {
+                    escape = true
+                } else if c == q {
+                    quote = nil
+                }
+                continue
+            }
+
+            if c == "\"" || c == "'" {
+                quote = c
+                out.append(c)
+                continue
+            }
+
+            if c == "#" || c == ";" {
+                break
+            }
+
+            out.append(c)
+        }
+
+        return out
+    }
+
+    private func parseLeadingQuotedString(afterKeyword keyword: String, line: String) -> String? {
+        var s = line
+        if s.hasPrefix(keyword) {
+            s = String(s.dropFirst(keyword.count))
+        }
+        s = s.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard s.first == "\"" else { return nil }
+
+        var result = ""
+        var escape = false
+        var index = s.index(after: s.startIndex)
+
+        while index < s.endIndex {
+            let c = s[index]
+
+            if escape {
+                switch c {
+                case "n": result.append("\n")
+                case "t": result.append("\t")
+                case "r": result.append("\r")
+                case "\\": result.append("\\")
+                case "\"": result.append("\"")
+                default: result.append(c)
+                }
+                escape = false
+                index = s.index(after: index)
+                continue
+            }
+
+            if c == "\\" {
+                escape = true
+                index = s.index(after: index)
+                continue
+            }
+
+            if c == "\"" {
+                return result
+            }
+
+            result.append(c)
+            index = s.index(after: index)
+        }
+
+        return nil
+    }
+
+    private func applyMenuShortcut(from keyText: String, to item: NSMenuItem) {
+        // 文字キーのみ対応（英数字1文字）。
+        // 形式例: "cmd+opt+P"
+        let parts = keyText
+            .split(separator: "+")
+            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+            .filter { !$0.isEmpty }
+
+        var mask: NSEvent.ModifierFlags = []
+        var key: String? = nil
+
+        for p in parts {
+            switch p {
+            case "cmd", "command":
+                mask.insert(.command)
+            case "opt", "option", "alt":
+                mask.insert(.option)
+            case "ctrl", "control":
+                mask.insert(.control)
+            case "shift":
+                mask.insert(.shift)
+            default:
+                // 最後に見つかった非修飾をキー扱い
+                key = p
+            }
+        }
+
+        guard var k = key, !k.isEmpty else { return }
+
+        // 1文字英数字のみ
+        if k.count != 1 {
+            KLog.shared.log(id: "usermenu", message: "Menu shortcut ignored (not 1-char): \(keyText)")
+            return
+        }
+
+        let ch = k.first!
+        guard ch.isLetter || ch.isNumber else {
+            KLog.shared.log(id: "usermenu", message: "Menu shortcut ignored (not alnum): \(keyText)")
+            return
+        }
+
+        // keyEquivalent は小文字が基本
+        k = String(ch).lowercased()
+
+        item.keyEquivalent = k
+        item.keyEquivalentModifierMask = mask
     }
     
 }

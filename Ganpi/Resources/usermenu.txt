@@ -1,0 +1,9 @@
+menu "edit"
+item "Paragraph"
+key "cmd+opt+p"
+command: tag[pre="<p>\n", post="\n</p>\n", will_select=right]
+
+item "Line Break"
+key "cmd+opt+b"
+command: tag[single="<br />\n", will_select=right]
+end
