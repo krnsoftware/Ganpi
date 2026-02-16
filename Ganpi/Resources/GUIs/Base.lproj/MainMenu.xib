@@ -885,7 +885,7 @@ CQ
                                     <action selector="showColorPanel:" target="-1" id="LzX-M6-Q42"/>
                                 </connections>
                             </menuItem>
-                            <menuItem title="Show Font Panel..." id="WKD-kv-6aj">
+                            <menuItem title="Show Font Panel" id="WKD-kv-6aj">
                                 <modifierMask key="keyEquivalentModifierMask"/>
                                 <connections>
                                     <action selector="showFontPanel:" target="-1" id="nMT-1z-yYz"/>
