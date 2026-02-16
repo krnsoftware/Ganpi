@@ -54,9 +54,9 @@ struct KAppPaths {
         return url
     }
 
-    static func snippetsDirectoryURL(createIfNeeded: Bool) -> URL? {
+    static func templatesDirectoryURL(createIfNeeded: Bool) -> URL? {
         guard let base = applicationSupportBaseURL(createIfNeeded: createIfNeeded) else { return nil }
-        let url = base.appendingPathComponent("snippets", isDirectory: true)
+        let url = base.appendingPathComponent("templates", isDirectory: true)
         if createIfNeeded {
             try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         }

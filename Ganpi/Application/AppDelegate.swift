@@ -22,7 +22,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private enum FolderKind {
         case scripts
         case applicationSupportRoot
-        case snippets
+        case templates
     }
 
     private func openFolder(_ kind: FolderKind) {
@@ -50,9 +50,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let dirName = Bundle.main.bundleIdentifier ?? "ApplicationSupport"
             url = base.appendingPathComponent(dirName, isDirectory: true)
             
-        case .snippets:
-            guard let url = KAppPaths.snippetsDirectoryURL(createIfNeeded: true) else {
-                KLog.shared.log(id: "folders", message: "Snippets directory not available.")
+        case .templates:
+            guard let url = KAppPaths.templatesDirectoryURL(createIfNeeded: true) else {
+                KLog.shared.log(id: "folders", message: "Templates directory not available.")
                 return
             }
             // この case だけは url をここで確定するので、下の共通処理へ渡す形にする
@@ -224,8 +224,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         openFolder(.applicationSupportRoot)
     }
     
-    @IBAction func openSnippetsFolder(_ sender: Any?) {
-        openFolder(.snippets)
+    @IBAction func openTemplatesFolder(_ sender: Any?) {
+        openFolder(.templates)
     }
     
     @IBAction func openPreferences(_ sender: Any?) {

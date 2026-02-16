@@ -2076,10 +2076,10 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         for action in actions {
             switch action {
             case .selector(let name):
-                log("SELECTOR: \(name)")
+                //log("SELECTOR: \(name)")
                 doCommand(by: Selector(name + ":"))
             case .command(let cmd):
-                guard let result = cmd.execute(for: textStorage, in: selectionRange) else { log("#01"); return }
+                guard let result = cmd.execute(for: textStorage, in: selectionRange) else { log("#02"); return }
                 let string = result.string
                 let stringCount = string.count
                 let targetRange = result.options.target == .selection ? selectionRange : 0..<textStorage.count
@@ -2090,17 +2090,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 case .select: selectionRange = targetRange.lowerBound..<targetRange.lowerBound + stringCount
                     
                 }
-                /*
-                switch cmd {
-                case .insert(_):
-                    let result = cmd.execute(for: textStorage, in: selectionRange)
-                    
-                case .load(let path):
-                    log("load[\(path)] (stub)")
-                case .execute(let path):
-                    log("execute[\(path)] (stub)")
-                }*/
-                
             }
         }
     }

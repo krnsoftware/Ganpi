@@ -65,7 +65,7 @@ enum KUserCommand {
                 return nil
             }
             options = result.options
-            guard let content = readFromApplicationSupport(result.command) else { log("#01"); return nil }
+            guard let content = readFromTemplatesDirectory(result.command) else { log("#01"); return nil }
             resultString = content
 
         case .execute(let command):
@@ -503,8 +503,8 @@ enum KUserCommand {
 
     // MARK: - ファイル読み込み補助
 
-    /// Application Support/<bundle id>/snippets 以下から相対パスでファイルを読み込む。
-    private func readFromApplicationSupport(_ relativePath: String) -> String? {
+    /// Application Support/<bundle id>/templates/ 以下から相対パスでファイルを読み込む。
+    private func readFromTemplatesDirectory(_ relativePath: String) -> String? {
         let trimmed = relativePath.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             KLog.shared.log(id: "load", message: "Invalid path: empty")
@@ -520,8 +520,8 @@ enum KUserCommand {
         }
 
         let fm = FileManager.default
-        guard let appDir = KAppPaths.snippetsDirectoryURL(createIfNeeded: true) else {
-            KLog.shared.log(id: "load", message: "Snippets directory not available.")
+        guard let appDir = KAppPaths.templatesDirectoryURL(createIfNeeded: true) else {
+            KLog.shared.log(id: "load", message: "Templates directory not available.")
             return nil
         }
 
@@ -529,7 +529,7 @@ enum KUserCommand {
         let fileURL = baseURL.appendingPathComponent(trimmed).resolvingSymlinksInPath()
         let basePath = baseURL.path.hasSuffix("/") ? baseURL.path : baseURL.path + "/"
         guard fileURL.path.hasPrefix(basePath) else {
-            KLog.shared.log(id: "load", message: "Path escapes snippets directory: \(trimmed)")
+            KLog.shared.log(id: "load", message: "Path escapes templates directory: \(trimmed)")
             return nil
         }
 
