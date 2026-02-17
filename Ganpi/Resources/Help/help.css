@@ -1,0 +1,180 @@
+/* Ganpi Help (Japanese) - UTF-8 / LF */
+
+:root {
+  color-scheme: light dark;
+  --content-max-width: 920px;
+  --content-padding: 32px;
+
+  --text: #111;
+  --muted: #555;
+  --bg: #fff;
+  --panel: #f6f7f9;
+  --border: #d7dbe0;
+  --link: #0b57d0;
+  --code-bg: #0f172a;
+  --code-fg: #e5e7eb;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text: #e6e6e6;
+    --muted: #b8b8b8;
+    --bg: #0b0f14;
+    --panel: #121923;
+    --border: #283447;
+    --link: #7db2ff;
+    --code-bg: #0a1220;
+    --code-fg: #e5e7eb;
+  }
+}
+
+html, body {
+  padding: 0;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN",
+               "Yu Gothic", "Meiryo", "Noto Sans JP", Arial, sans-serif;
+  line-height: 1.7;
+}
+
+/* Layout similar to the old KEdit help: centered “paper” */
+.contents {
+  max-width: var(--content-max-width);
+  margin: 56px auto 36px;
+  padding: 0 var(--content-padding);
+}
+
+.header {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 14px;
+  margin-bottom: 20px;
+}
+
+h1 {
+  font-size: 1.9rem;
+  font-weight: 700;
+  margin: 0 0 6px;
+  letter-spacing: 0.2px;
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.toc {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 18px 12px;
+  margin: 18px 0 26px;
+}
+
+.toc h2 {
+  font-size: 1.1rem;
+  margin: 0 0 10px;
+}
+
+.toc ul {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.toc li {
+  margin: 6px 0;
+}
+
+.main section {
+  margin: 28px 0 34px;
+}
+
+h2 {
+  font-size: 1.35rem;
+  margin: 0 0 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+h3 {
+  font-size: 1.05rem;
+  margin: 18px 0 8px;
+}
+
+p {
+  margin: 10px 0;
+}
+
+ul {
+  margin: 10px 0 10px;
+  padding-left: 1.25rem;
+}
+
+li {
+  margin: 6px 0;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+.note {
+  background: var(--panel);
+  border-left: 4px solid var(--border);
+  padding: 10px 12px;
+  border-radius: 10px;
+  color: var(--muted);
+}
+
+.example {
+  margin: 14px 0 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.example-title {
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+pre {
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  background: var(--code-bg);
+  color: var(--code-fg);
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 0.95rem;
+}
+
+.back-to-top {
+  margin-top: 28px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+
+.footer {
+  max-width: var(--content-max-width);
+  margin: 0 auto 48px;
+  padding: 14px var(--content-padding);
+  color: var(--muted);
+  font-size: 0.9rem;
+  border-top: 1px solid var(--border);
+}

@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>Ganpi - User's Manual</title>
+  <meta name="author" content="Karino, Masatsugu">
+  <meta name="description" content="Ganpi user manual (Japanese).">
+
+  <link rel="stylesheet" href="help.css">
+</head>
+
+<body>
+  <div class="contents">
+    <header class="header">
+      <h1 id="top">Ganpi - User's Manual</h1>
+      <p class="subtitle">簡易ヘルプ（テスト用）</p>
+    </header>
+
+    <nav class="toc" aria-label="目次">
+      <h2>目次</h2>
+      <ul>
+        <li><a href="#getting-started">はじめに</a></li>
+        <li><a href="#open-save">開く・保存</a></li>
+        <li><a href="#search-replace">検索・置換</a></li>
+        <li><a href="#encoding-lineendings">文字コード・改行コード</a></li>
+        <li><a href="#preferences">設定</a></li>
+        <li><a href="#faq">よくある質問</a></li>
+      </ul>
+    </nav>
+
+    <main class="main">
+      <section id="getting-started">
+        <h2>はじめに</h2>
+        <p>
+          Ganpiは、Mac上で動作するプレーンテキスト向けの軽量テキストエディタです。
+          本ヘルプは、友人向けテストの参照用に最低限の情報をまとめたものです。
+        </p>
+        <p class="note">
+          ※ このヘルプはアプリに同梱され、メニューから既定のWebブラウザで開きます。
+        </p>
+      </section>
+
+      <section id="open-save">
+        <h2>開く・保存</h2>
+
+        <h3 id="open">開く</h3>
+        <p>
+          File メニューから Open... を選択し、ファイルを開きます。
+          （ドラッグ＆ドロップ等を実装している場合はここに追記）
+        </p>
+
+        <h3 id="save">保存</h3>
+        <p>
+          File メニューから Save / Save As... を選択します。
+          文字コードや改行コードを変更した場合、保存時の挙動はここに明記してください。
+        </p>
+      </section>
+
+      <section id="search-replace">
+        <h2>検索・置換</h2>
+        <p>
+          Edit メニューから Find... / Replace... を選択します。
+          正規表現をサポートする場合、対応範囲（例：検索のみ／置換も可）をここに書きます。
+        </p>
+
+        <div class="example">
+          <p class="example-title">例</p>
+          <pre><code>検索:  foo([0-9]+)
+置換:  bar$1</code></pre>
+        </div>
+      </section>
+
+      <section id="encoding-lineendings">
+        <h2>文字コード・改行コード</h2>
+        <p>
+          ステータスバーに現在の文字コード・改行コードが表示されます。
+          変更する場合は、該当メニューから選択します。
+        </p>
+        <ul>
+          <li>文字コード：UTF-8 / UTF-16 / UTF-32（など）</li>
+          <li>改行コード：LF / CRLF（など）</li>
+        </ul>
+        <p class="note">
+          ※ 変更可能な範囲は実装状況に合わせて調整してください。
+        </p>
+      </section>
+
+      <section id="preferences">
+        <h2>設定</h2>
+        <p>
+          設定はアプリのポリシーに合わせて最小限にしています。
+          ここには、テストで確認してほしい設定項目だけを書いておくのが無難です。
+        </p>
+        <ul>
+          <li>フォント・フォントサイズ</li>
+          <li>ワードラップ</li>
+          <li>オートインデント</li>
+        </ul>
+      </section>
+
+      <section id="faq">
+        <h2>よくある質問</h2>
+
+        <h3 id="faq-open-help">ヘルプはどこにありますか？</h3>
+        <p>
+          Help メニューから開けます（既定のWebブラウザが起動します）。
+        </p>
+
+        <h3 id="faq-report">不具合はどこに報告すればいいですか？</h3>
+        <p>
+          （テスト依頼先の連絡方法、GitHub Issues、メール等をここに）
+        </p>
+      </section>
+
+      <div class="back-to-top">
+        <a href="#top">ページ先頭へ戻る</a>
+      </div>
+    </main>
+  </div>
+
+  <footer class="footer">
+    author : Karino, Masatsugu<br>
+    status : created 2026-02-17, last-modified 2026-02-17<br>
+  </footer>
+</body>
+</html>

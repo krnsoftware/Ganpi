@@ -231,6 +231,34 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @IBAction func openPreferences(_ sender: Any?) {
         openUserIniFile()
     }
+
+    @IBAction func openHelp(_ sender: Any?) {
+        guard let helpURL = Bundle.main.url(forResource: "help", withExtension: "html") else {
+            NSSound.beep()
+            NSLog("help.html not found in app bundle.")
+            return
+        }
+
+        // 「OS標準ブラウザ」を引くため、https の既定ハンドラを取得する
+        guard let probeURL = URL(string: "https://example.com"),
+              let browserAppURL = NSWorkspace.shared.urlForApplication(toOpen: probeURL) else {
+            NSSound.beep()
+            NSLog("default browser not found.")
+            return
+        }
+
+        let config = NSWorkspace.OpenConfiguration()
+        config.activates = true
+
+        NSWorkspace.shared.open([helpURL],
+                                withApplicationAt: browserAppURL,
+                                configuration: config) { _, error in
+            if let error = error {
+                NSSound.beep()
+                NSLog("failed to open help in browser: \(error)")
+            }
+        }
+    }
     
     
     
