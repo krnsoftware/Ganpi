@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Available Selectors</title>
+<link rel="stylesheet" href="help.css">
+</head>
+<body>
+<main class="contents">
+<h1 id="available_selectors">Available Selectors</h1>
+<p class="muted">セレクターはスコープによりグループ分けされています。左のカラムはセレクター名、右のカラムは簡単な説明となっています。<!--Selectors are grouped by scope. Left column is the selector name; right column is a short description (auto-generated as a starting point).--></p>
+<p>
+掲載しているセレクターはGanpiに独自実装されているものだけで、元々ApplicationやDocumentなどにデフォルト実装があるがGanpiには独自実装がないものは含まれていません。例えばApplicationならterminateやhide、DocumentならnewDocumentやopenDocument、WindowならperformCloseやminiaturizeなどですが、これらもユーザーコマンドとして利用できます。詳細は<a href="https://developer.apple.com/documentation/appkit">Apple Developer</a>などで確認してください。
+</p>
+
+<nav class="toc" aria-label="contents">
+<h2>Contents</h2>
+<ul>
+<li><a href="#application">Application</a></li>
+<li><a href="#document">Document</a></li>
+<li><a href="#viewcontroller">ViewController</a></li>
+<li><a href="#textview">TextView</a></li>
+</ul>
+</nav>
+
+<h2 id="application">Application</h2>
+<table class="selector-table">
+<thead><tr><th class="sel">Selector</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class="sel"><code>openApplicationSupportFolder</code></td><td>Application Supportフォルダを開く。</td></tr>
+<tr><td class="sel"><code>openHelp</code></td><td>Helpファイルを開く。</td></tr>
+<tr><td class="sel"><code>openPreferences</code></td><td>初期設定ファイルを開く。</td></tr>
+<tr><td class="sel"><code>openScriptsFolder</code></td><td>Scriptフォルダを開く。</td></tr>
+<tr><td class="sel"><code>openTemplatesFolder</code></td><td>templatesフォルダを開く。</td></tr>
+<tr><td class="sel"><code>reloadPreferences</code></td><td>初期設定をリロードする。</td></tr>
+<tr><td class="sel"><code>showLogPanel</code></td><td>Logパネルを開く。</td></tr>
+<tr><td class="sel"><code>showSearchPanel</code></td><td>検索パネルを開く。</td></tr>
+<tr><td class="sel"><code>terminateWithoutStore</code></td><td>編集されたドキュメントを保存せずに終了する。</td></tr>
+</tbody>
+</table>
+
+<h2 id="document">Document</h2>
+<table class="selector-table">
+<thead><tr><th class="sel">Selector</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class="sel"><code>performCloseWithoutStore</code></td><td>編集されたドキュメントを保存せずに閉じる。</td></tr>
+<!--<tr><td class="sel"><code>textStorageDidEdit</code></td><td>Handle text storage edit (internal).</td></tr>-->
+</tbody>
+</table>
+
+<h2 id="viewcontroller">ViewController</h2>
+<table class="selector-table">
+<thead><tr><th class="sel">Selector</th><th>Description</th></tr></thead>
+<tbody>
+<!--<tr><td class="sel"><code>changeFont</code></td><td>Change font.</td></tr>-->
+<tr><td class="sel"><code>decreaseFontSize</code></td><td>フォントサイズを小さくする。</td></tr>
+<tr><td class="sel"><code>decreaseLineSpacing</code></td><td>行間を狭める。</td></tr>
+<tr><td class="sel"><code>focusBackwardTextView</code></td><td>「前の」テキストビューをフォーカスする。</td></tr>
+<tr><td class="sel"><code>focusForwardTextView</code></td><td>「次の」テキストビューをフォーカスする。</td></tr>
+<tr><td class="sel"><code>increaseFontSize</code></td><td>フォントサイズを大きくする。</td></tr>
+<tr><td class="sel"><code>increaseLineSpacing</code></td><td>行間を広げる。</td></tr>
+<!--<tr><td class="sel"><code>lineWrapAlignment</code></td><td>Line wrap alignment.</td></tr>-->
+<tr><td class="sel"><code>openEncodingMenu</code></td><td>文字コードメニューを開く。</td></tr>
+<tr><td class="sel"><code>openEndOfLineMenu</code></td><td>改行コードメニューを開く。</td></tr>
+<tr><td class="sel"><code>openFunctionMenu</code></td><td>アウトラインメニューを開く。</td></tr>
+<tr><td class="sel"><code>openSortedFunctionMenu</code></td><td>ソートされたアウトラインメニューを開く。</td></tr>
+<tr><td class="sel"><code>openSyntaxMenu</code></td><td>シンタックスメニューを開く。</td></tr>
+<tr><td class="sel"><code>removeSplit</code></td><td>テキストビューのスプリットを削除する。</td></tr>
+<tr><td class="sel"><code>setBaseFontToMonoSpaceSystemFont</code></td><td>表示フォントを等幅システムフォントにする。</td></tr>
+<tr><td class="sel"><code>setDividerBackward</code></td><td>テキストビューのディバイダーを後方に移動する。</td></tr>
+<tr><td class="sel"><code>setDividerCenter</code></td><td>テキストビューのディバイダーを中央に移動する。</td></tr>
+<tr><td class="sel"><code>setDividerForward</code></td><td>テキストビューのディバイダーを前方に移動する。</td></tr>
+<tr><td class="sel"><code>setEditModeToEdit</code></td><td>エディットモードをEditにする。</td></tr>
+<tr><td class="sel"><code>setEditModeToNormal</code></td><td>エディットモードをNormalにする。</td></tr>
+<tr><td class="sel"><code>showCaretJumpPopoverFromMenu</code></td><td>行ジャンプ用のポップオーバーを表示する。</td></tr>
+<tr><td class="sel"><code>showFontPanel</code></td><td>フォントパネルを表示する。</td></tr>
+<tr><td class="sel"><code>showFontSizePopoverFromMenu</code></td><td>フォントサイズ変更のためのポップオーバーを表示する。</td></tr>
+<tr><td class="sel"><code>showLineSpacingPopoverFromMenu</code></td><td>行間変更のためのポップオーバーを表示する。</td></tr>
+<tr><td class="sel"><code>splitHorizontally</code></td><td>テキストビューを水平方向に分割する。</td></tr>
+<tr><td class="sel"><code>splitVertically</code></td><td>テキストビューを鉛直方向に分割する。</td></tr>
+<!--<tr><td class="sel"><code>statusBarNeedsUpdate</code></td><td>Status bar needs update.</td></tr>-->
+<tr><td class="sel"><code>toggleAutoIndent</code></td><td>オートインデントを行なうか否かをトグルする。</td></tr>
+<tr><td class="sel"><code>toggleShowInvisibleCharacters</code></td><td>不可視文字を表示するか否かをトグルする。</td></tr>
+<tr><td class="sel"><code>toggleShowLineNumbers</code></td><td>行番号表示を行なうか否かをトグルする。</td></tr>
+<tr><td class="sel"><code>toggleSyncOptions</code></td><td>シンクオプション(設定項目の同期)のオンオフをトグルする。</td></tr>
+<tr><td class="sel"><code>toggleWordWrap</code></td><td>行の折り返し表示をするか否かトグルする。</td></tr>
+</tbody>
+</table>
+
+<h2 id="textview">TextView</h2>
+<table class="selector-table">
+<thead><tr><th class="sel">Selector</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td class="sel"><code>alignAssignmentColons</code></td><td>コロン(:)で行を揃える。</td></tr>
+<tr><td class="sel"><code>alignAssignmentEquals</code></td><td>イコール(=)で行を揃える。</td></tr>
+<tr><td class="sel"><code>base64Decode</code></td><td>Base64からデコードする。</td></tr>
+<tr><td class="sel"><code>base64Encode</code></td><td>Base64にエンコードする。</td></tr>
+<tr><td class="sel"><code>capitalizeWord</code></td><td>単語をキャピタライズする。</td></tr>
+<tr><td class="sel"><code>centerSelectionInVisibleArea</code></td><td>選択範囲を表示領域の中央に移動する。</td></tr>
+<!--<tr><td class="sel"><code>changeColor</code></td><td>Change color.</td></tr>-->
+<tr><td class="sel"><code>collapseEmptyLines</code></td><td>連続した空行を1つにまとめる。</td></tr>
+<tr><td class="sel"><code>copy</code></td><td>コピーする。</td></tr>
+<tr><td class="sel"><code>cut</code></td><td>カットする。</td></tr>
+<tr><td class="sel"><code>deleteBackward</code></td><td>文頭方向に1文字削除する。</td></tr>
+<tr><td class="sel"><code>deleteForward</code></td><td>文末方向に1文字削除する。</td></tr>
+<tr><td class="sel"><code>deleteLines</code></td><td>選択範囲を含むParagraphを全て削除する。</td></tr>
+<tr><td class="sel"><code>deleteToBeginningOfLine</code></td><td>Lineの冒頭までを削除する。</td></tr>
+<tr><td class="sel"><code>deleteToBeginningOfParagraph</code></td><td>Paragraphの冒頭までを削除する。</td></tr>
+<tr><td class="sel"><code>deleteToBeginningOfParagraphWithoutLeadingSpaces</code></td><td>行頭の空白文字を除く先頭部分までを削除する。</td></tr>
+<tr><td class="sel"><code>deleteToEndOfLine</code></td><td>Lineの末尾まで削除する。</td></tr>
+<tr><td class="sel"><code>deleteToEndOfParagraph</code></td><td>Paragraphの末尾まで削除する。</td></tr>
+<tr><td class="sel"><code>deleteWordBackward</code></td><td>単語の冒頭までを削除する。</td></tr>
+<tr><td class="sel"><code>deleteWordForward</code></td><td>単語の末尾までを削除する。</td></tr>
+<tr><td class="sel"><code>doNFC</code></td><td>NFCに変換する。</td></tr>
+<tr><td class="sel"><code>doNFKC</code></td><td>NFKCに変換する。</td></tr>
+<tr><td class="sel"><code>duplicateLines</code></td><td>Paragraphを複製する。</td></tr>
+<tr><td class="sel"><code>exchangePaste</code></td><td>エクスチェンジペーストを実行する。</td></tr>
+<tr><td class="sel"><code>fullWidthToHalfWidth</code></td><td>全角カナを半角カナに変換する。</td></tr>
+<tr><td class="sel"><code>halfWidthToFullWidth</code></td><td>半角カナを全角カナに変換する。</td></tr>
+<tr><td class="sel"><code>hiraganaToKatakana</code></td><td>ひらがなをカタカナに変換する。</td></tr>
+<tr><td class="sel"><code>insertBacktab</code></td><td>バックタブの動作。</td></tr>
+<tr><td class="sel"><code>insertCurrentDateTime</code></td><td>現在の日時を挿入する。</td></tr>
+<tr><td class="sel"><code>insertDeleteBuffer</code></td><td>デリートバッファーを挿入する。</td></tr>
+<tr><td class="sel"><code>insertLiteralTabCharacter</code></td><td>タブ文字を挿入する。</td></tr>
+<tr><td class="sel"><code>insertNewline</code></td><td>改行文字を挿入する。</td></tr>
+<tr><td class="sel"><code>insertTab</code></td><td>タブを入力する。(タブキー押下の際の動作)</td></tr>
+<tr><td class="sel"><code>insertUUID</code></td><td>UUIDを挿入する。</td></tr>
+<tr><td class="sel"><code>joinLines</code></td><td>選択範囲を含むParagraphを1行に繋げる。</td></tr>
+<tr><td class="sel"><code>jumpToMarkedCaretIndexAndReset</code></td><td>現在のキャレット位置をマークし、前回のマークされたキャレット位置にジャンプする。</td></tr>
+<tr><td class="sel"><code>katakanaToHiragana</code></td><td>カタカナをひらがなに変換する。</td></tr>
+<tr><td class="sel"><code>lowercaseWord</code></td><td>単語を小文字に変換する。</td></tr>
+<tr><td class="sel"><code>md5Base64</code></td><td>MD5 Base64変換。</td></tr>
+<tr><td class="sel"><code>md5Hex</code></td><td>MD5 Hex変換。</td></tr>
+<tr><td class="sel"><code>moveDown</code></td><td>下に移動する。</td></tr>
+<tr><td class="sel"><code>moveDownAndModifySelection</code></td><td>下の行まで選択範囲を広げる。</td></tr>
+<tr><td class="sel"><code>moveLeft</code></td><td>左に移動する。</td></tr>
+<tr><td class="sel"><code>moveLeftAndModifySelection</code></td><td>1文字左まで選択範囲を広げる。</td></tr>
+<tr><td class="sel"><code>moveLineDown</code></td><td>Paragraph全体を下に移動する。</td></tr>
+<tr><td class="sel"><code>moveLineUp</code></td><td>Paragraph全体を上に移動する。</td></tr>
+<tr><td class="sel"><code>moveRight</code></td><td>右に移動する。</td></tr>
+<tr><td class="sel"><code>moveRightAndModifySelection</code></td><td>1文字右まで選択範囲を広げる。</td></tr>
+<tr><td class="sel"><code>moveToBeginningOfDocument</code></td><td>文頭に移動する。</td></tr>
+<tr><td class="sel"><code>moveToBeginningOfDocumentAndModifySelection</code></td><td>文頭まで選択範囲を広げる。</td></tr>
+<tr><td class="sel"><code>moveToBeginningOfLine</code></td><td>Lineの冒頭に移動する。</td></tr>
+<tr><td class="sel"><code>moveToBeginningOfLineAndModifySelection</code></td><td>Lineの冒頭まで選択範囲を広げる。</td></tr>
+<tr><td class="sel"><code>moveToBeginningOfParagraph</code></td><td>Paragraphの冒頭に移動する。</td></tr>
+<tr><td class="sel"><code>moveToBeginningOfParagraphAndModifySelection</code></td><td>Paragraphの冒頭まで選択範囲を広げる。</td></tr>
+<tr><td class="sel"><code>moveToBeginningOfSelection</code></td><td>選択範囲の冒頭にキャレットを移動する。</td></tr>
+<tr><td class="sel"><code>moveToEndOfDocument</code></td><td>文末に移動する。</td></tr>
+<tr><td class="sel"><code>moveToEndOfDocumentAndModifySelection</code></td><td>文末まで選択範囲を広げる。</td></tr>
+<tr><td class="sel"><code>moveToEndOfLine</code></td><td>Lineの末尾に移動する。</td></tr>
+<tr><td class="sel"><code>moveToEndOfLineAndModifySelection</code></td><td>Lineの末尾まで選択範囲を広げる。</td></tr>
+<tr><td class="sel"><code>moveToEndOfParagraph</code></td><td>Paragraphの末尾に移動する。</td></tr>
+<tr><td class="sel"><code>moveToEndOfParagraphAndModifySelection</code></td><td>Paragraphの末尾まで選択範囲を広げる。</td></tr>
+<tr><td class="sel"><code>moveToEndOfSelection</code></td><td>選択範囲の末尾に移動する。</td></tr>
+<tr><td class="sel"><code>moveToFirstPrintableCharacterInParagraph</code></td><td>そのParagraphの最初の印字可能な文字に移動する。</td></tr>
+<tr><td class="sel"><code>moveToFirstPrintableCharacterInParagraphAndModifySelection</code></td><td>そのParagraphの最初の印字可能な文字まで選択範囲を広げる。</td></tr>
+<tr><td class="sel"><code>moveUp</code></td><td>上に移動する。</td></tr>
+<tr><td class="sel"><code>moveUpAndModifySelection</code></td><td>上の行まで選択範囲を広げる。</td></tr>
+<tr><td class="sel"><code>moveWordLeft</code></td><td>単語の冒頭に移動。</td></tr>
+<tr><td class="sel"><code>moveWordLeftAndModifySelection</code></td><td>単語の冒頭まで選択範囲を広げる。</td></tr>
+<tr><td class="sel"><code>moveWordRight</code></td><td>単語の末尾に移動。</td></tr>
+<tr><td class="sel"><code>moveWordRightAndModifySelection</code></td><td>単語の末尾まで選択範囲を広げる。</td></tr>
+<tr><td class="sel"><code>pageDown</code></td><td>下方向に1ページ分スクロールする。キャレット追従あり。</td></tr>
+<!--<tr><td class="sel"><code>pageDownAndModifySelection</code></td><td>Page down and modify selection.</td></tr>-->
+<tr><td class="sel"><code>pageDownHalf</code></td><td>下方向に半ページ分スクロールする。キャレット追従あり。</td></tr>
+<tr><td class="sel"><code>pageUp</code></td><td>上方向に1ページ分スクロールする。キャレット追従あり。</td></tr>
+<tr><td class="sel"><code>pageUpAndModifySelection</code></td><td>上方向に半ページ分スクロールする。キャレット追従あり。</td></tr>
+<tr><td class="sel"><code>pageUpHalf</code></td><td>上方向に半ページ分スクロールする。キャレット追従あり。</td></tr>
+<tr><td class="sel"><code>paste</code></td><td>ペーストする。</td></tr>
+<tr><td class="sel"><code>performGridJump</code></td><td>グリッドジャンプ機能を起動する。</td></tr>
+<tr><td class="sel"><code>redo</code></td><td>Redoする。</td></tr>
+<tr><td class="sel"><code>reflowParagraph100</code></td><td>100文字相当で折り返す。</td></tr>
+<tr><td class="sel"><code>reflowParagraph72</code></td><td>72文字相当で折り返す。</td></tr>
+<tr><td class="sel"><code>reflowParagraph80</code></td><td>80文字相当で折り返す。</td></tr>
+<tr><td class="sel"><code>removeEmptyLines</code></td><td>空行を削除する。</td></tr>
+<tr><td class="sel"><code>replaceAction</code></td><td>選択された文字列を置換文字列に入れ替える。</td></tr>
+<tr><td class="sel"><code>replaceAllAction</code></td><td>全置換を実行する。</td></tr>
+<tr><td class="sel"><code>replaceAndFindeAgainAction</code></td><td>選択範囲を置換してから更に検索する。</td></tr>
+<tr><td class="sel"><code>restoreSelectionRange</code></td><td>現在の選択範囲をストアされていたものに入れ替える。</td></tr>
+<tr><td class="sel"><code>rot13</code></td><td>ROT13で変換する。</td></tr>
+<!--<tr><td class="sel"><code>scrollLineDown</code></td><td></td></tr>
+<tr><td class="sel"><code>scrollLineUp</code></td><td></td></tr>-->
+<tr><td class="sel"><code>scrollPageDown</code></td><td>下方向に1ページ分スクロールする。キャレット追従なし。</td></tr>
+<tr><td class="sel"><code>scrollPageUp</code></td><td>上方向に1ページ分スクロールする。キャレット追従なし。</td></tr>
+<tr><td class="sel"><code>searchAlternateAction</code></td><td>既定の検索方向に準じて検索する。</td></tr>
+<tr><td class="sel"><code>searchAlternateActionReverse</code></td><td>既定の検索方向の逆方向に検索する。</td></tr>
+<tr><td class="sel"><code>searchNextAction</code></td><td>次を検索する。</td></tr>
+<tr><td class="sel"><code>searchPrevAction</code></td><td>前を検索する。</td></tr>
+<tr><td class="sel"><code>selectAll</code></td><td>全て選択する。</td></tr>
+<tr><td class="sel"><code>selectInnerPair</code></td><td>次の括弧の内側を選択する。</td></tr>
+<tr><td class="sel"><code>selectInnerPairReverse</code></td><td>前の括弧の内側を選択する。</td></tr>
+<tr><td class="sel"><code>selectLine</code></td><td>Lineを選択する。</td></tr>
+<tr><td class="sel"><code>selectOuterPair</code></td><td>次の括弧の外側を選択する。</td></tr>
+<tr><td class="sel"><code>selectOuterPairReverse</code></td><td>前の括弧の外側を選択する。</td></tr>
+<tr><td class="sel"><code>selectParagraph</code></td><td>Paragraphを選択する。</td></tr>
+<!--<tr><td class="sel"><code>selectRange</code></td><td>Select range.</td></tr>-->
+<tr><td class="sel"><code>selectWord</code></td><td>単語を選択する。</td></tr>
+<tr><td class="sel"><code>setCompletionModeOff</code></td><td>語彙補完モードをオフにする。</td></tr>
+<tr><td class="sel"><code>setCompletionModeOn</code></td><td>語彙補完モードをオンにする。</td></tr>
+<tr><td class="sel"><code>setMarkedCaretIndex</code></td><td>現在の位置をマークする。</td></tr>
+<tr><td class="sel"><code>setSearchDirectionToBackward</code></td><td>既定の検索方向を文頭方向にする。</td></tr>
+<tr><td class="sel"><code>setSearchDirectionToForward</code></td><td>既定の検索方向を文末方向にする。</td></tr>
+<tr><td class="sel"><code>setSearchStringWithSelectedString</code></td><td>選択されている文字列を検索文字列にする。</td></tr>
+<tr><td class="sel"><code>sha256</code></td><td>SHA-256のハッシュを出力する。</td></tr>
+<tr><td class="sel"><code>shiftLeft</code></td><td>左にシフトする。</td></tr>
+<tr><td class="sel"><code>shiftRight</code></td><td>右にシフトする。</td></tr>
+<tr><td class="sel"><code>showColorPanel</code></td><td>カラーパネルを表示する。</td></tr>
+<tr><td class="sel"><code>showInfomation</code></td><td>情報ウインドウを表示する。</td></tr>
+<tr><td class="sel"><code>showMiniSearchPanel</code></td><td>ミニ検索ウインドウを表示する。</td></tr>
+<tr><td class="sel"><code>sortLines</code></td><td>Paragraphをソートする。</td></tr>
+<tr><td class="sel"><code>sortSelectedLines_AscN_CaseN_NumN</code></td><td>Sort selected lines asc n case n num n.</td></tr>
+<tr><td class="sel"><code>sortSelectedLines_AscN_CaseN_NumT</code></td><td>Sort selected lines asc n case n num t.</td></tr>
+<tr><td class="sel"><code>sortSelectedLines_AscN_CaseT_NumN</code></td><td>Sort selected lines asc n case t num n.</td></tr>
+<tr><td class="sel"><code>sortSelectedLines_AscN_CaseT_NumT</code></td><td>Sort selected lines asc n case t num t.</td></tr>
+<tr><td class="sel"><code>sortSelectedLines_AscT_CaseN_NumN</code></td><td>Sort selected lines asc t case n num n.</td></tr>
+<tr><td class="sel"><code>sortSelectedLines_AscT_CaseN_NumT</code></td><td>Sort selected lines asc t case n num t.</td></tr>
+<tr><td class="sel"><code>sortSelectedLines_AscT_CaseT_NumN</code></td><td>Sort selected lines asc t case t num n.</td></tr>
+<tr><td class="sel"><code>sortSelectedLines_AscT_CaseT_NumT</code></td><td>Sort selected lines asc t case t num t.</td></tr>
+<tr><td class="sel"><code>storeSelectionRange</code></td><td>現在の選択範囲をストアする。</td></tr>
+<tr><td class="sel"><code>surroundSelectionWithBlacket</code></td><td>[]で囲う。</td></tr>
+<tr><td class="sel"><code>surroundSelectionWithBrace</code></td><td>{}で囲う。</td></tr>
+<tr><td class="sel"><code>surroundSelectionWithDoubleQuote</code></td><td>&quot;&quot;で囲う。</td></tr>
+<tr><td class="sel"><code>surroundSelectionWithParen</code></td><td>()で囲う。</td></tr>
+<tr><td class="sel"><code>surroundSelectionWithSingleQuote</code></td><td>''で囲う。</td></tr>
+<!--<tr><td class="sel"><code>testFunction</code></td><td>Test function.</td></tr>-->
+<tr><td class="sel"><code>toggleCompletionMode</code></td><td>語彙補完モードのオンオフをトグルする。</td></tr>
+<tr><td class="sel"><code>toggleLineComment</code></td><td>単行のコメントを付け外しする。</td></tr>
+<tr><td class="sel"><code>transpose</code></td><td>キャレットの前後の文字を入れ替える。</td></tr>
+<tr><td class="sel"><code>trimTrailingSpaces</code></td><td>行末の空白文字を削除する。</td></tr>
+<tr><td class="sel"><code>undo</code></td><td>Undoする。</td></tr>
+<tr><td class="sel"><code>uniqueLinesKeepFirst</code></td><td>重複行を削除。先に出現したものを残す。</td></tr>
+<tr><td class="sel"><code>uniqueLinesKeepLast</code></td><td>重複行を削除。後に出現したものを残す。</td></tr>
+<tr><td class="sel"><code>uppercaseWord</code></td><td>単語を大文字に変換する。</td></tr>
+<tr><td class="sel"><code>urlDecode</code></td><td>URLデコードを行う。</td></tr>
+<tr><td class="sel"><code>urlEncode</code></td><td>URLエンコードを行う。</td></tr>
+<tr><td class="sel"><code>yank</code></td><td>Yank(=ペースト)する。</td></tr>
+<tr><td class="sel"><code>yankPop</code></td><td>YankをPopする。</td></tr>
+<tr><td class="sel"><code>yankPopReverse</code></td><td>Yankを逆方向にPopする。</td></tr>
+</tbody>
+</table>
+</main>
+</body>
+</html>

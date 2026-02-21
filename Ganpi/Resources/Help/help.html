@@ -1,128 +1,354 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <title>Ganpi - User's Manual</title>
-  <meta name="author" content="Karino, Masatsugu">
-  <meta name="description" content="Ganpi user manual (Japanese).">
+<title>Ganpi - User's Manual</title>
+<meta name="author" content="Karino, Masatsugu">
+<meta name="description" content="Ganpi user manual (Japanese).">
 
-  <link rel="stylesheet" href="help.css">
+<link rel="stylesheet" href="help.css">
 </head>
 
+<!--
+文書の構造は、header/nav/main/section/article/footer.
+
+note部分には、<p class="note">を使用。
+例示は、<div class="example">、内部に<p class="example-title">と<pre><code></code></pre>
+-->
+
 <body>
-  <div class="contents">
-    <header class="header">
-      <h1 id="top">Ganpi - User's Manual</h1>
-      <p class="subtitle">簡易ヘルプ（テスト用）</p>
-    </header>
+<div class="contents">
+<header class="header">
+<h1 id="top">Ganpi - User's Manual</h1>
+<p class="subtitle">テキストエディタ&quot;Ganpi&quot;のプレビュー用簡易ヘルプファイル</p>
+</header>
 
-    <nav class="toc" aria-label="目次">
-      <h2>目次</h2>
-      <ul>
-        <li><a href="#getting-started">はじめに</a></li>
-        <li><a href="#open-save">開く・保存</a></li>
-        <li><a href="#search-replace">検索・置換</a></li>
-        <li><a href="#encoding-lineendings">文字コード・改行コード</a></li>
-        <li><a href="#preferences">設定</a></li>
-        <li><a href="#faq">よくある質問</a></li>
-      </ul>
-    </nav>
+<nav class="toc" aria-label="目次">
+<h2>目次</h2>
+<ul>
+<li><a href="#getting-started">はじめに</a></li>
+<li><a href="#installation">インストール</a></li>
+<li><a href="#basic_functions">基本的な機能</a></li>
+</ul>
+<h2>附録</h2>
+<ul>
+<li><a href="available_selectors.html">利用可能なセレクター</a></li>
+</ul>
+</nav>
 
-    <main class="main">
-      <section id="getting-started">
-        <h2>はじめに</h2>
-        <p>
-          Ganpiは、Mac上で動作するプレーンテキスト向けの軽量テキストエディタです。
-          本ヘルプは、友人向けテストの参照用に最低限の情報をまとめたものです。
-        </p>
-        <p class="note">
-          ※ このヘルプはアプリに同梱され、メニューから既定のWebブラウザで開きます。
-        </p>
-      </section>
+<main class="main">
+<section id="getting-started">
+<h2>はじめに</h2>
+<p>
+Ganpiは、macOS上で動作するプレーンテキスト専用テキストエディタです。かつてのKEdit for BeOS/MacOSXと言えば御存知の方もおられるかも知れません。従来のシンプルで味気ないUIはそのままに、「Ganpi」として生まれ変わりました。
+</p>
+<p>
+特徴は、単一フォント・単一文字サイズのテキストエディタで、それなりに巨大なテキストファイル(具体的には10万行・800万文字程度)を快適に編集できること、複数の開発言語についてシンタックスカラーリングやコンテクスト表示、アウトラインメニュー、語彙補完などで閲覧と入力をサポートできること、キーアサインやユーザーメニューを柔軟に定義できることです。
+</p>
+<p>
+その他、動作が極めてキーボードフレンドリーであること、その反面でマウスの右クリックが基本的に実装されていないこと、初期設定をテキストファイルの編集で行なうこと(アナクロ!)、vi/emacsのキーアサインをそれなりに再現していること、非常にアプリケーションサイズがコンパクトなことなど、あまり既存のmacOS用テキストエディタにはない特徴があります。ちょっと不思議な実装も含め、楽しんで頂ければ幸いです。
+</p>
 
-      <section id="open-save">
-        <h2>開く・保存</h2>
+<p class="note">
+※ 初期設定を含め設定の全てをテキストファイルで実装しているのは、ユーザーが慣れた環境をファイルを交換の手間だけで再現できるようにするためです。Ganpiが動作中であってもファイルを入れ替えてReload Preferencesを実行すれば即座に新しい設定で動作するようになります。シンタックスカラーリングの色設定なども書換えながら試すことができるため、それほど扱いにくくはないと思いますよ。
+</p>
+</section>
 
-        <h3 id="open">開く</h3>
-        <p>
-          File メニューから Open... を選択し、ファイルを開きます。
-          （ドラッグ＆ドロップ等を実装している場合はここに追記）
-        </p>
+<section id="installation">
+<h2>インストール</h2>
+<p>
+入手したアプリケーションファイル(アプリケーションパッケージ)を、Applicationフォルダにコピーします。
+</p>
+<p>
+初期設定用のフォルダは必要になった際に自動的に作成されます。
+</p>
+<ul>
+<li>初期設定フォルダ: ~/Library/Application Support/com.drycarbon.Ganpi/</li>
+<li>スクリプトフォルダ: ~/Library/Application Scripts/com.drycarbon.Ganpi/</li>
+</ul>
+<p>
+アンインストールする際は、上記のフォルダを削除して下さい。
+</p>
 
-        <h3 id="save">保存</h3>
-        <p>
-          File メニューから Save / Save As... を選択します。
-          文字コードや改行コードを変更した場合、保存時の挙動はここに明記してください。
-        </p>
-      </section>
+</section>
 
-      <section id="search-replace">
-        <h2>検索・置換</h2>
-        <p>
-          Edit メニューから Find... / Replace... を選択します。
-          正規表現をサポートする場合、対応範囲（例：検索のみ／置換も可）をここに書きます。
-        </p>
+<section id="basic_functions">
+<h2>基本的な機能</h2>
+<p>
+多くの機能は一般的なテキストエディタの操作に準じますので、ここではGanpi独特の操作方法について説明します。
+</p>
+<nav class="toc" aria-label="目次">
+<ul>
+<li><a href="#drag_and_drop">ドラッグ &amp; ドロップ</a></li>
+<li><a href="#mode_select">文字コード・改行コード・ドキュメントタイプ</a></li>
+<li><a href="#syntax">シンタックス</a></li>
+<li><a href="#caret_move">キャレット移動</a></li>
+<li><a href="#preferences">初期設定</a></li>
+<li><a href="#keyassign">キーアサイン</a></li>
+<li><a href="#user_menu">ユーザーメニュー</a></li>
+<li><a href="#user_macro">ユーザーマクロ</a></li>
+</ul>
+</nav>
+</section>
 
-        <div class="example">
-          <p class="example-title">例</p>
-          <pre><code>検索:  foo([0-9]+)
-置換:  bar$1</code></pre>
-        </div>
-      </section>
+<section id="drag_and_drop">
+<h3>ドラッグ &amp; ドロップ</h3>
+<p>
+一般的なテキストエディタ同様、Ganpiもドラッグ&amp;ドロップ(DnD)に対応しています。
+</p>
+<ul>
+<li>テキストをDnDした場合、<br />
+<ul>
+<li>単にドラッグすればテキストが移動される。</li>
+<li>optionキーを押下しながらドラッグするとテキストが複製される。</li>
+</ul>
+</li>
+<li>ファイルをDnDした場合、
+<ul>
+<li>そのままドラッグすると、そのドキュメントからの相対パスが挿入されます。<br />
+ドキュメントが保存されていない場合など相対パスが生成できない場合は絶対パスが挿入されます。</li>
+<li>optionを押下しながらドラッグすると、ファイルの絶対パスが挿入されます。</li>
+<li>command+optionを押下しながらだと、ファイルの内容が挿入されます。<br />
+Ganpiが開けるファイルであれば、文字コードと改行コードを判定して自動的に変換されます。</li>
+<li>shiftを押下しながらだと、HTMLモードの時に限り選択範囲を囲う形でaタグが挿入されます。<br />
+挿入されるパスは相対パスになります。</li>
+</ul>
+</li>
+<li>URLをDnDした場合、
+<ul>
+<li>そのままドラッグすると、URLがそのまま挿入されます。</li>
+<li>shiftを押下しながらだと、HTMLモードの時に限り選択範囲を囲う形でaタグが挿入されます。</li>
+</ul>
+</li>
+</ul>
 
-      <section id="encoding-lineendings">
-        <h2>文字コード・改行コード</h2>
-        <p>
-          ステータスバーに現在の文字コード・改行コードが表示されます。
-          変更する場合は、該当メニューから選択します。
-        </p>
-        <ul>
-          <li>文字コード：UTF-8 / UTF-16 / UTF-32（など）</li>
-          <li>改行コード：LF / CRLF（など）</li>
-        </ul>
-        <p class="note">
-          ※ 変更可能な範囲は実装状況に合わせて調整してください。
-        </p>
-      </section>
+</section>
 
-      <section id="preferences">
-        <h2>設定</h2>
-        <p>
-          設定はアプリのポリシーに合わせて最小限にしています。
-          ここには、テストで確認してほしい設定項目だけを書いておくのが無難です。
-        </p>
-        <ul>
-          <li>フォント・フォントサイズ</li>
-          <li>ワードラップ</li>
-          <li>オートインデント</li>
-        </ul>
-      </section>
+<section id="mode_select">
+<h3>文字コード・改行コード・ドキュメントタイプ</h3>
+<p>
+Ganpiで扱かうことのできる文字コード・改行コード・ドキュメントタイプは現在のところ下記の通りです。現在の状態はウインドウ下のステータスバーの左端に表示され、そこをクリックすることで表示されるメニューにより変更することができます。
+</p>
+<ul>
+<li>文字コード : S-JIS, JIS(ISO-2022JP), ECU-JP, UTF-8(Unicode), UTF-16(Unicode), UTF-32(Unicode)</li>
+<li>改行コード ： LF, CR, CR-LF</li>
+<li>ドキュメントタイプ : Plain, HTML/XHTML, Ruby, INI, CSS, Python, Shell, TypeScript</li>
+</ul>
+<p>
+文字コード・改行コードについては、変更するとドキュメントが変更済みの状態になりますが、実際に変更されたテキストデータが保存されるのは次回の保存時になります。
+</p>
+<p>
+ドキュメントタイプについては、変更すると即座にカラーリングなどの機能がその言語用に切り替わりますが、見た目と機能が変わるだけで実際のデータには一切手を加えません。ファイルの拡張子を変更することもありません。
+</p>
+<p>
+ドキュメントタイプについては、それぞれの形式について個別に下記の機能が実装されています。
+</p>
+</section>
 
-      <section id="faq">
-        <h2>よくある質問</h2>
+<section id="syntax">
+<h3>シンタックス</h3>
+使用する開発言語それぞれについて、下記の機能が個別に実装されています。ただし全ての機能が実装されているとは限りません。
+<ul>
+<li>シンタックスカラーリング<br />
+コメント・クオートされた文字列・ヒアドキュメント・予約語などを色分けして表示します。</li>
+<li>キャレットの存在するコンテキストの表示<br />
+キャレットの含まれる関数・クラスなどをウインドウ下部のステータスバーに表示します。</li>
+<li>アウトラインメニュー<br />
+構文の樹状構造をメニューとして表現し、特定の場所へのジャンプ機能を提供する。コンテキストの場所をクリックするとメニューが表示されます。左クリックで標準のメニュー、右クリックまたはoption+左クリックでソートされたメニューとなります。(言語による)</li>
+<li>単語選択の際の選択範囲<br />
+ダブルクリックやコマンドによる単語選択の際の選択範囲を言語毎に変更します。</li>
+<li>語彙補完<br />
+ドキュメント内部と予約語から補完文字列を作成し、ユーザの指示により表示する。列挙メニューは持たず、上下キーアサインにより候補を入れ替えます。</li>
+</ul>
+</section>
 
-        <h3 id="faq-open-help">ヘルプはどこにありますか？</h3>
-        <p>
-          Help メニューから開けます（既定のWebブラウザが起動します）。
-        </p>
+<section id="caret_move">
+<h3>キャレット移動</h3>
+<p>
+Ganpiはなるべくマウスを使わずに編集する方針のため、キャレット移動に関する機能が少し充実しています。
+</p>
+<ul>
+<li>ページ遷移<br />
+ページ遷移の際、scrollUp/Downの場合にはキャレットは移動しませんが、pageUp/Down, pageUpHalf/DownHalfの場合には遷移したページの上下にキャレットが追従します。</li>
+<li>行ジャンプ<br />
+ステータスバーの行番号付近のクリックやEdit/Jump to Line...(cmd+U)で行番号入力用のPopOverが表示されます。単純に自然数を入れればその行の行頭から行末(改行含む)が選択されます。&quot;L:C&quot;の書式で自然数を2つ並べた場合にはL行目のC文字目が選択されます。C文字目はL行目の行頭からの文字数のため、必ずしもL行目内である必要はありません。また一方を省略すると、省略された数値は1と見做されます。例えば&quot;:5&quot;は1行目の5文字目、&quot;10:&quot;は10行目の1文字目を表します。行の書式を2つ並べると、1つ目の最初から2つ目の最後までを選択します。例えば&quot;10:5 20:3&quot;であれば、10行目の5文字目から20行目の3文字目までが選択されます。</li>
+<li>グリッドジャンプ<br />
+現在画面に表示されている範囲において、2回のキーストロークで任意の位置にキャレットを移動する手段を提供します。具体的にはキーアサインでperformGridJump(Ganpi標準ではctrl+;)を呼び出すと、テキストビュー全体がグリッド状に分割され、それぞれの区画に1文字のアルファベットまたは数字が表示されます。移動したい場所の文字をタイプすると、さらにその区画が9のグリッドに分割され、そこに表示された1文字のアルファベットをタイプすることで、その場所にキャレットを移動することができます。</li>
+<li>ブラッケトペア選択<br />
+1行の範囲内で、対になる括弧を選択します。括弧の外側(括弧を含む)と内側(括弧を含まない)の2通りの選択方法があります。selectOuterPair(Ganpi標準ではctrl+L)を呼び出すと、選択範囲より右の対になる括弧の外側を選択します。selectInnerPair(Ganpi標準ではctrl+K)を呼び出すと、同様に内側を選択します。逆方向の動作も可能(selectOuterPairReverse, selectInnerPairReverse)です。対応する括弧は '...', &quot;...&quot;, (...), {...}, [...] です。&lt;...&gt;には対応していません。</li>
+<li>ミニ検索ウインドウ<br />
+検索をキャレットの移動に利用することができます。標準検索ウインドウを使用することもできますが、Ganpiではより簡易な「ミニ検索ウインドウ」も用意しています。showMiniSearchPanel(Ganpi標準ではctrl+/)を呼び出すと、キャレットの近くにテキスト入力部分だけの小さなウインドウが開きます。これに文字列を入力してリターンすると、即座にキャレット後方の最も近い一致文字列にジャンプします。標準では順方向ですが、呼び出しの際にctrl+shift+/を利用することで逆方向の検索も可能です。また標準検索ウインドウ・ミニ検索ウインドウで検索文字列が設定されていれば、Edit/Find/Find Next(cmd+G), Edit/Find/Find Previous(cmd+shift+G)で文末側・文頭側に続けて検索できます。ctrl+.とctrl+,でも前後の検索が可能ですが、こちらはミニ検索ウインドウの呼び出しの際の方向性に合わせて検索方向が変化します。検索条件は標準検索ウインドウで設定されているものに準じます。</li>
+</ul>
+</section>
 
-        <h3 id="faq-report">不具合はどこに報告すればいいですか？</h3>
-        <p>
-          （テスト依頼先の連絡方法、GitHub Issues、メール等をここに）
-        </p>
-      </section>
+<section id="preferences">
+<h3>初期設定</h3>
+<p>
+Ganpiの初期設定は、一般的な初期設定ウインドウによらず、テキストファイルの編集によって行います。テキストファイルのフォーマットはINIです。Ganpi/Settings...を選択すると、初期設定ファイルがあればそれを、なければファイルを新規に作成してからそれを開きます。新規の設定ファイルは、アプリケーションが初期設定として利用するINIファイルをコピーして生成するのですが、生成の際に設定項目は全てコメントアウトします。設定は全て「上書き」で、記載するのが1項目だけでも問題なく動作します。
+</p>
+<p>
+設定はアプリケーション起動時に読み込まれますが、起動中もOption/Reload Preferencesメニュー(cmd+T)を実行すれば任意のタイミングで再度読み込むことができます。
+</p>
 
-      <div class="back-to-top">
-        <a href="#top">ページ先頭へ戻る</a>
-      </div>
-    </main>
-  </div>
+</section>
 
-  <footer class="footer">
-    author : Karino, Masatsugu<br>
-    status : created 2026-02-17, last-modified 2026-02-17<br>
-  </footer>
+<section id="keyassign">
+<h3>キーアサイン</h3>
+<p>
+Ganpiのキーアサインは、任意の連続した1つ以上のキーストロークについて、1つ以上のユーザーコマンドを連続して実行する機構です。具体的には、任意の組み合わせの修飾キー(control/shift/option)と1つの文字キー(a/b/c...)を組み合わせたキーストロークのシーケンスについて、それが押下された際に<a href="#user_macro">ユーザーマクロ</a>と呼ばれる命令文を実行するというものです。
+</p>
+<div class="example">
+<p class="example-title">
+keymap.ini
+</p>
+<pre><code>
+ctrl+Q, ctrl+1 : selectWord, deleteBackward
+</code></pre>
+</div>
+<p>
+この例では、controlキー+Q、controlキー+1を連続して押下すると、ユーザーアクションのselectWordとdeleteBackwardが連続して実行されます。
+</p>
+<p>
+キーアサインとして認識されるシーケンは最短一致で、最短一致があるシーケンスに更にキーストロークが付加されたキーアサインは実行されません。例えばA→BというシーケンスとA→B→Cというシーケンスが登録されていた場合、常にA→Bが実行され、A→B→Cを実行する方法はありません。
+</p>
+<p>
+キーアサインは2つのモードがあります。
+</p>
+<ul>
+<li>Normal Mode<br />
+通常のテキスト入力用のモードです。キーアサインを指定されたストローク以外のストロークは文字入力として解釈され、テキスト入力が実行されます。</li>
+<li>Edit Mode<br />
+文字列編集専用のモードです。キーアサインで指定されたストローク以外は無視されます。</li>
+</ul>
+</section>
+<p>
+モード切り替えキー(標準ではEscキー)を押下するとモードがトグルします。現在のモードの状態はウインドウ下部のステータスバーに「N」または「E」の文字で表されます。動作としてはvi系のInsert/Normalモードに近い概念だと考えると分かりやすいでしょうか。Ganpiの標準キーアサインでは、EditモードにviのNormalモードに似せたキーアサインが実装されています。
+</p>
+<p>
+キーアサインは必ずしも修飾キーを必要としません。例えば「a」というキーストロークについてコマンドを指定することもできます。Normalモードでは修飾キーのないキーアサインを指定するとその文字は文字入力に使えなくなるため推奨されませんが、あえて使用することについて特に制限はありません。Editモードでは勿論問題ありません。
+</p>
+<p>
+キーアサインは初期設定で3つのプリセットまたはユーザー定義のうちから指定することができます。
+</p>
+<ul>
+<li>ganpi<br />
+Ganpiのオリジナルキーアサインです。作者が昔愛用していたYooEditに近いものになっています。Editモードはvi風の実装になっています。</li>
+<li>vi<br />
+vi/vim風のキーアサインです。できる範囲でなるべく似せるようにしてあります。</li>
+<li>emacs<br />
+emacs風のキーアサインです。できる範囲でなるべく似せるようにしてあります。</li>
+<li>user<br />
+ユーザー定義のキーアサインです。~/Library/Application Support/com.drycarbon.Ganpi/preferences/keymap.ini を作成して使用します。ユーザ定義ファイルは完全に置き換えのため、全てのキーアサインを指定する必要があります。</li>
+</ul>
+<p>
+Ganpiのキーアサインには固定のものはなく、全てキーアサインファイルにて定義されています。
+</p>
+
+<section id="user_menu">
+<h3>ユーザーメニュー</h3>
+<p>
+Textメニューの最下段にユーザー定義のメニューを付加することができます。
+</p>
+<p>
+menu Stringでメニューを開始し、endで閉じます。トップメニューの項目名はユーザーメニューの項目名となります。メニューは階層化が可能です。メニュー項目は、itemで始まり、key key_stringとcommand: command_stringを内包します。
+</p>
+
+
+<div class="example">
+<p class="example-title">
+usermenu.txt
+</p>
+<pre><code>
+menu &quot;USER&quot;
+  menu &quot;Text&quot;
+    item &quot;Comment Out&quot;
+      command: tag[pre=&quot;&lt;!--\n&quot;, post=&quot;\n--&gt;\n&quot;, will_select=right]
+
+    item &quot;目次&lt;li&gt;&quot;
+      key &quot;cmd+opt+L&quot;
+      command: tag[pre=&quot;&lt;li&gt;&lt;a href=\&quot;#\&quot;&gt;&quot;, post=&quot;&lt;/a&gt;&lt;/li&gt;&quot;]
+      
+    item &quot;Section template&quot;
+      key &quot;cmd+opt+S&quot;
+      command: insert[&quot;&lt;section id=\&quot;\&quot;&gt;\n&lt;h3&gt;sectionName&lt;/h3&gt;\n&lt;p&gt;\n\n&lt;/p&gt;\n&lt;/section&gt;&quot;]
+  end
+end
+</code></pre>
+</div>
+<p>
+keyには特殊キーを設定することができません。command:には<a href="#user_macro">ユーザーマクロを記述します。</a>
+</p>
+
+</section>
+
+<section id="user_macro">
+<h3>ユーザーマクロ</h3>
+<p>
+ユーザーマクロは、キーアサインやユーザーメニューなどで利用されるユーザー定義の命令のシーケンスです。複数のユーザーアクションをカンマ区切りで列挙した文章で表現されます。
+</p>
+
+<div class="example">
+<p class="example-title">
+User Macro: Sample
+</p>
+<pre><code>
+moveToBeginningOfDocument, execute[{timeout:3} "sample.sh"], selectAll
+</code></pre>
+</div>
+
+<p>
+ユーザーアクションにはセレクター型とコマンド型があり、コマンド型にはさらに4つの型があります。
+</p>
+
+<ul>
+<li>Selector Type<br />
+セレクター(起動するメソッドを指定するための識別子)を文字列で表現したもの。
+上記のサンプルで言えば、moveToBeginningOfDocumentなどがそれにあたります。<br />
+記述にあたっては<a href="available_selectors.html">利用可能なセレクター</a>を参考にして下さい。</li>
+<li>Command Type<br />
+独自定義の命令文法を使用した命令文。<br />
+上記のサンプルで言えば、execute[{timeout:3} "sample.sh"] がそれにあたります。<br />
+key[{opt0:value, opt1:value...} C-String] 形式で記述されます。<br />
+もしkeyが省略された場合はloadとして実行されます。
+共通オプションは、caret(left/right*/select), target(all/selection*), timeout(float(5.0*))です。(*は初期値) ただし、tagについては指定方法が少し異なります。
+<ul>
+<li>insert<br />
+指定した文字列を挿入する。<br />
+ex: insert[{caret:left, target:selection} "hello."] - "hello."を選択範囲に限定して置換し、キャレットを選択範囲の左端(文頭側)に置く。</li>
+<li>load<br />
+指定したファイルの内容を挿入する。<br />
+ファイルは~/Library/Application Support/com.drycarbon.Ganpi/templates/をベースとした相対指定(絶対パス・../による遡行禁止)で行う。<br />
+ex: load[{caret:select, target:all} "sample.txt"] - sample.txtに保存されているテキストを読み込んで正規化し、文書全体を置き換えた後に全体を選択する。
+</li>
+<li>execute<br />
+指定したスクリプトファイルを実行してその結果を利用する。<br />
+ファイルは~Library/Application Scripts/com.drycarbon.Ganpi/scripts/をベースとした相対指定(絶対パス・../による遡行禁止)で行う。<br />
+ex: execute[{timeout:3} "sample.sh"] - 3秒のタイムアウトを設定して、選択範囲の文字列を標準入力に渡してsample.shを実行し、標準出力を選択範囲に置き換えてキャレットを置換範囲の右端(文末側)に置く。</li>
+<li>tags<br />
+タグ形式のデータ挿入を実行する。<br />
+この形式は他の形式と異なり、4つの独自の項目を設定する。<br />
+tag[pre=String, post=String, single=String, will_select=all|right*|left]<br />
+選択範囲がある場合、選択範囲の左端にpreを、右端にpostを挿入し、キャレットをwill_selectに置く。選択範囲がない場合、キャレットにsingleがあればsingleを、なければpreとpostを繋げたものを挿入し、キャレットをwill_selectに置く。<br />
+ex: tag[pre=&quot;&lt;p&gt;\n&quot;, post=&quot;\n&lt;/p&gt;\n&quot;, single=&quot;&lt;br /&gt;\n&quot;, will_select=right] - 選択範囲があればpタグで囲み、なければbrタグを挿入してキャレットを右端に置く。</li>
+</ul>
+</li>
+</ul>
+
+ユーザーアクションは先頭から同期的に実行されます。記述に誤りがあっても実行時まで通知はされず、実行時にはLogウインドウに結果を出してそれ以降のアクションの実行を中止します。
+
+</section>
+
+<div class="back-to-top">
+<a href="#top">ページ先頭へ戻る</a>
+</div>
+</main>
+</div>
+
+<footer class="footer">
+author : Karino, Masatsugu<br>
+status : created 2026-02-17, last-modified 2026-02-17<br>
+</footer>
 </body>
 </html>

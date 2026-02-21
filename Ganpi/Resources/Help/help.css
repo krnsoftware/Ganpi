@@ -178,3 +178,80 @@ code {
   font-size: 0.9rem;
   border-top: 1px solid var(--border);
 }
+
+/* === Available Selectors (compact) === */
+
+.selector-toc {
+  margin-top: 10px;
+}
+
+.selector-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0 18px;
+}
+
+.selector-table tr + tr td {
+  border-top: 1px solid var(--border);
+}
+
+.selector-table td {
+  padding: 6px 8px;
+  vertical-align: top;
+}
+
+.selector-table td.sel {
+  width: 22rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 0.95rem;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.selector-table td.desc {
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+/* narrow screens: stack selector above description */
+@media (max-width: 720px) {
+  .selector-table, .selector-table tbody, .selector-table tr, .selector-table td {
+    display: block;
+    width: 100%;
+  }
+  .selector-table tr + tr td {
+    border-top: none;
+  }
+  .selector-table tr {
+    border-top: 1px solid var(--border);
+    padding-top: 8px;
+    margin-top: 8px;
+  }
+  .selector-table td {
+    padding: 2px 0;
+  }
+  .selector-table td.sel {
+    width: auto;
+  }
+}
+
+
+/* ---- Overrides: align Selector/Description to the left (compact) ---- */
+table.selector-table th,
+table.selector-table td {
+  text-align: left;
+}
+
+table.selector-table th {
+  padding-left: 0;
+}
+
+table.selector-table td {
+  padding-left: 0;
+}
+
+/* If you want a tiny breathing room without "right-shift" feel */
+table.selector-table td.selector {
+  padding-right: 12px;
+}
