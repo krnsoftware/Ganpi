@@ -30,7 +30,23 @@ final class KInvisibleCharacters {
     init(attributes: [NSAttributedString.Key: Any] = _defaultAttributes,
              dictionary: [Character: String] = _defaultDictionary) {
             _attributes = attributes
-            _dictionary = dictionary
+            //_dictionary = dictionary
+        
+        log("invisible characters: init")
+        
+        let prefs = KPreference.shared
+        let spaceGlyph = prefs.string(.parserInvisiblesGlyphSpace)
+        let tabGlyph = prefs.string(.parserInvisiblesGlyphTab)
+        let newlineGlyph = prefs.string(.parserInvisiblesGlyphNewline)
+        let fw_spaceGlyph = prefs.string(.parserInvisiblesGlyphFullwidthSpace)
+        
+        _dictionary = [
+            "\u{0020}": spaceGlyph,
+            "\u{0009}": tabGlyph,
+            "\u{000A}": newlineGlyph,
+            "\u{3000}": fw_spaceGlyph,
+        ]
+               
     }
 
     func ctLine(for char: Character) -> CTLine? {

@@ -210,6 +210,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if let document = doc as? Document {
                 // パーサを新しいものに入れ替える。
                 document.textStorage.replaceParser(for: document.syntaxType)
+                document.textStorage.resetInvisibleCharacters()
             }
         }
 

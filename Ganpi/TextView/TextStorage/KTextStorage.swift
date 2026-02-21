@@ -606,6 +606,10 @@ final class KTextStorage: KTextStorageProtocol {
         parser = type.makeParser(storage: self)
     }
     
+    func resetInvisibleCharacters() {
+        _invisibleCharacters = nil
+    }
+    
     // MARK: - Range Comparison
 
     /// 指定された2つの範囲の内容が完全に等しいかを判定する。
