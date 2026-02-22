@@ -522,10 +522,13 @@ final class KTextStorage: KTextStorageProtocol {
         }
 
         // 3) Base attributes (font + default color + optional paragraph style)
+        // カーニング等が有効だと、約物（例：「。」）の直後境界が後続文字で揺れることがあるため、
+        // caret/offset の安定性を優先して明示的に無効化する。
         var baseAttrs: [NSAttributedString.Key: Any] = [
             .font: baseFont,
-            //.foregroundColor: NSColor.black
-            .foregroundColor: _parser.baseTextColor
+            .foregroundColor: _parser.baseTextColor,
+            .kern: 0.0,
+            .ligature: 0
         ]
         if let tabWidth = tabWidth {
             let ps = NSMutableParagraphStyle()

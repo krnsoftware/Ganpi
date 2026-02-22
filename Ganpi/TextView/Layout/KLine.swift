@@ -210,68 +210,21 @@ class KLine: CustomStringConvertible {
         
         // CTLineから文字のoffsetを算出してcacheを入れ替える。
         if !_widthAndOffsetsFixed {
-            // 1) UTF-16 境界ごとの x を用意（runs 一括で O(n) ）
-            let ns = (attrString.string as NSString)
-            let utf16Count = ns.length
 
-            // NaN で初期化して「未設定」を表す
-            var u16ToX = Array<CGFloat>(repeating: .nan, count: utf16Count + 1)
-
-            let runs = CTLineGetGlyphRuns(ctLine) as NSArray
-            for anyRun in runs {
-                let run = anyRun as! CTRun
-                let gCount = CTRunGetGlyphCount(run)
-                if gCount == 0 { continue }
-
-                // glyph -> UTF-16 string index（先頭位置）
-                var stringIndices = Array<CFIndex>(repeating: 0, count: gCount)
-                CTRunGetStringIndices(run, CFRange(location: 0, length: 0), &stringIndices)
-
-                // glyph の描画位置（x）
-                var positions = Array<CGPoint>(repeating: .zero, count: gCount)
-                CTRunGetPositions(run, CFRange(location: 0, length: 0), &positions)
-
-                // 各 glyph 先頭の UTF-16 インデックスに x を割り当てる
-                // （合字や結合文字は「先頭コードユニットの x」を採用）
-                for g in 0..<gCount {
-                    let u16 = max(0, min(Int(stringIndices[g]), utf16Count))
-                    u16ToX[u16] = positions[g].x
-                }
-
-                // Run 終端の UTF-16 位置も、直前 glyph の x で穴埋めできるようにする
-                let rs = CTRunGetStringRange(run)
-                let runEnd = Int(rs.location + rs.length)
-                if runEnd <= utf16Count, u16ToX[runEnd].isNaN, gCount > 0 {
-                    u16ToX[runEnd] = positions[gCount - 1].x
-                }
-            }
-
-            // 行幅を取得して「末尾の境界」を確定
-            let lineWidth = CGFloat(CTLineGetTypographicBounds(ctLine, nil, nil, nil))
-            u16ToX[utf16Count] = lineWidth
-
-            // 未設定穴（NaN）を左から前方値で埋める（結合文字など）
-            var lastX: CGFloat = 0
-            for i in 0...utf16Count {
-                if u16ToX[i].isNaN { u16ToX[i] = lastX } else { lastX = u16ToX[i] }
-            }
-
-            // 2) UTF-16 → Character 境界へ写像して _cachedOffsets を構築（O(n)）
             let s = attrString.string
+
             var offsets: [CGFloat] = []
             offsets.reserveCapacity(s.count + 1)
 
+            // 先頭境界
             var u16Pos = 0
-            offsets.append(u16ToX[0])     // 先頭境界
+            offsets.append(CTLineGetOffsetForStringIndex(ctLine, 0, nil))
 
-            // 各 Character の UTF-16 長を足し込みながら境界 x を拾う
+            // 各 Character の UTF-16 長を足し込みながら境界 x を取得
             for ch in s {
-                // Character の UTF-16 長（結合文字等も正しくカバー）
-                let len = ch.utf16.count
-                u16Pos &+= len
-                // 範囲防御
-                let clamped = (u16Pos <= utf16Count) ? u16Pos : utf16Count
-                offsets.append(u16ToX[clamped])
+                u16Pos &+= ch.utf16.count
+                let x = CTLineGetOffsetForStringIndex(ctLine, u16Pos, nil)
+                offsets.append(x)
             }
 
             _cachedOffsets = offsets.isEmpty ? [0.0] : offsets
