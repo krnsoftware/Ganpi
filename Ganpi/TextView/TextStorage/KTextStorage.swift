@@ -287,7 +287,7 @@ final class KTextStorage: KTextStorageProtocol {
             .font: font,
             .foregroundColor: NSColor.secondaryLabelColor
         ]
-        _invisibleCharacters = KInvisibleCharacters(attributes: attr)
+        _invisibleCharacters = KInvisibleCharacters(syntaxType: parser.type, attributes: attr)
         return _invisibleCharacters
     }
     
@@ -330,9 +330,6 @@ final class KTextStorage: KTextStorageProtocol {
     
     
     init() {
-        
-        _invisibleCharacters = KInvisibleCharacters()
-        
                 
     }
 

@@ -206,13 +206,13 @@ enum KPrefKey {
             return "parser.base.wrapline_offset"
 
         case .parserShowInvisiblesTab:
-            return "parser.base.show_invisibles.tab"
+            return "parser.base.show.invisibles.tab"
         case .parserShowInvisiblesNewline:
-            return "parser.base.show_invisibles.newline"
+            return "parser.base.show.invisibles.newline"
         case .parserShowInvisiblesSpace:
-            return "parser.base.show_invisibles.space"
+            return "parser.base.show.invisibles.space"
         case .parserShowInvisiblesFullwidthSpace:
-            return "parser.base.show_invisibles.fullwidth_space"
+            return "parser.base.show.invisibles.fullwidth_space"
 
         case .parserInvisiblesGlyphNewline:
             return "parser.base.invisibles.glyph.newline"
