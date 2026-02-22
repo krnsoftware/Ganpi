@@ -452,55 +452,113 @@ final class KLines: CustomStringConvertible {
     
     // 外部から特定の行について別のAttributedStringを挿入することができる。
     // hardLineIndex行のinsertionオフセットの部分にattrStringを挿入する形になる。
-    func addFakeLine(replacementRange: Range<Int>, attrString: NSAttributedString, kind: KFakeLineKind = .im) {
-                
+    // IM（marked text）用：選択中セグメント（selectedRange）があるなら下線色を濃くする
+    func addIMFakeLine(replacementRange: Range<Int>,
+                       attrString: NSAttributedString,
+                       selectedRangeInMarkedText: NSRange?) {
+
+        let muAttrString = NSMutableAttributedString(attributedString: attrString)
+
+        // 1) 挿入直前の文字色を引き継ぐ（従来の挙動）
+        if let inheritedColor = inheritedForegroundColorBeforeInsertion(replacementRange: replacementRange) {
+            muAttrString.addAttribute(.foregroundColor, value: inheritedColor,
+                                      range: NSRange(location: 0, length: muAttrString.length))
+        }
+
+        // 2) 変換全体：薄いアクセント色下線
+        muAttrString.addAttributes([
+            .underlineStyle: NSUnderlineStyle.single.rawValue,
+            .underlineColor: NSColor.controlAccentColor.withAlphaComponent(0.8)
+        ], range: NSRange(location: 0, length: muAttrString.length))
+
+        // 3) 選択中セグメント：濃い下線（selectedRange が渡る場合のみ）
+        if let sel = selectedRangeInMarkedText,
+           sel.location >= 0,
+           sel.length > 0,
+           sel.location + sel.length <= muAttrString.length {
+
+            muAttrString.addAttributes([
+                .underlineColor: NSColor.controlAccentColor.withAlphaComponent(1.0),
+                //.underlineStyle: NSUnderlineStyle.thick.rawValue
+            ], range: sel)
+        }
+
+        addFakeLineCore(replacementRange: replacementRange, insertedAttrString: muAttrString)
+    }
+
+    // completion 用：選択範囲等は不要
+    func addCompletionFakeLine(replacementRange: Range<Int>, attrString: NSAttributedString) {
+        let muAttrString = NSMutableAttributedString(attributedString: attrString)
+
+        muAttrString.addAttributes([
+            .foregroundColor: NSColor.secondaryLabelColor
+        ], range: NSRange(location: 0, length: muAttrString.length))
+
+        addFakeLineCore(replacementRange: replacementRange, insertedAttrString: muAttrString)
+    }
+
+    // 共通部分：fakeLine の構築・配列への反映
+    private func addFakeLineCore(replacementRange: Range<Int>, insertedAttrString: NSAttributedString) {
+
         _fakeLines = []
+
         guard let textStorageRef = _textStorageRef else { print("\(#function) - textStorageRef is nil"); return }
         guard let layoutManager = _layoutManager else { print("\(#function) - layoutManagerRef is nil"); return }
-        
-        guard let  hardLineIndex = lineAt(characterIndex: replacementRange.lowerBound)?.hardLineIndex else { print("\(#function) - replacementRange.lowerBound is out of range"); return }
+
+        guard let hardLineIndex = lineAt(characterIndex: replacementRange.lowerBound)?.hardLineIndex else {
+            print("\(#function) - replacementRange.lowerBound is out of range")
+            return
+        }
         _replaceLineNumber = hardLineIndex
-        
-        guard let range = hardLineRange(hardLineIndex: hardLineIndex) else { print("\(#function) - hardLineIndex:\(hardLineIndex) is out of range"); return }
-        
+
+        guard let hardRange = hardLineRange(hardLineIndex: hardLineIndex) else {
+            print("\(#function) - hardLineIndex:\(hardLineIndex) is out of range")
+            return
+        }
+
         guard let layoutRects = _layoutManager?.makeLayoutRects() else {
             print("\(#function): layoutRects is nil")
             return
         }
-        
-        if let lineA = textStorageRef.attributedString(for: range.lowerBound..<replacementRange.lowerBound, tabWidth: nil, withoutColors: false),
-           let lineB = textStorageRef.attributedString(for: replacementRange.upperBound..<range.upperBound, tabWidth: nil, withoutColors: false){
-            let muAttrString =  NSMutableAttributedString(attributedString: attrString)
-            
-            var attributes: [NSAttributedString.Key: Any] = [
-                .font: textStorageRef.baseFont
-            ]
-            switch kind {
-            case .im:
-                // 挿入された文字列の直前(lineAの最後の文字)の.foregroundColorを挿入された文字全体に適用する。
-                if lineA.length > 0, let lastCharColor = lineA.attribute(.foregroundColor, at: lineA.length - 1, effectiveRange: nil) as? NSColor {
-                    attributes[.foregroundColor] = lastCharColor
-                }
-            case .completion:
-                // 挿入された文字列をグレーにする。
-                attributes[.foregroundColor] = NSColor.secondaryLabelColor
-            default:
-                log("currently no implementation.",from:self)
-            }
-            muAttrString.addAttributes(attributes, range: NSRange(location: 0, length: muAttrString.length))
-            
+
+        if let lineA = textStorageRef.attributedString(for: hardRange.lowerBound..<replacementRange.lowerBound,
+                                                       tabWidth: nil,
+                                                       withoutColors: false),
+           let lineB = textStorageRef.attributedString(for: replacementRange.upperBound..<hardRange.upperBound,
+                                                       tabWidth: nil,
+                                                       withoutColors: false) {
+
             let fullLine = NSMutableAttributedString()
             fullLine.append(lineA)
-            fullLine.append(muAttrString)
+            fullLine.append(insertedAttrString)
             fullLine.append(lineB)
-            
-            let width: CGFloat? = layoutManager.wordWrap ? layoutRects.textRegionWidth - layoutRects.textEdgeInsets.right : nil
-            
-            _fakeLines.append(contentsOf: layoutManager.makeFakeLines(from: fullLine, hardLineIndex: hardLineIndex, width: width))
+
+            let width: CGFloat? = layoutManager.wordWrap
+            ? layoutRects.textRegionWidth - layoutRects.textEdgeInsets.right
+            : nil
+
+            _fakeLines.append(contentsOf: layoutManager.makeFakeLines(from: fullLine,
+                                                                      hardLineIndex: hardLineIndex,
+                                                                      width: width))
         }
-        
+
         _replaceLineCount = countSoftLinesOf(hardLineIndex: _replaceLineNumber)
         _replaceLineIndex = lineArrayIndex(for: _replaceLineNumber)
+    }
+
+    // 挿入された文字列の直前（lineA末尾）の .foregroundColor を取得する
+    private func inheritedForegroundColorBeforeInsertion(replacementRange: Range<Int>) -> NSColor? {
+        guard let textStorageRef = _textStorageRef else { return nil }
+
+        guard let hardLineIndex = lineAt(characterIndex: replacementRange.lowerBound)?.hardLineIndex else { return nil }
+        guard let hardRange = hardLineRange(hardLineIndex: hardLineIndex) else { return nil }
+
+        guard let lineA = textStorageRef.attributedString(for: hardRange.lowerBound..<replacementRange.lowerBound,
+                                                          tabWidth: nil,
+                                                          withoutColors: false) else { return nil }
+
+        guard lineA.length > 0 else { return nil }
+        return lineA.attribute(.foregroundColor, at: lineA.length - 1, effectiveRange: nil) as? NSColor
     }
     
     func removeFakeLines() {

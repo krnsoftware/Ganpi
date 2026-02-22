@@ -571,9 +571,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
         
-        //log("dirtyRect: \(dirtyRect)",from:self)
-        
-        
         guard let layoutRects = _layoutManager.makeLayoutRects() else {
             print("\(#function): layoutRects is nil")
             return
@@ -648,11 +645,11 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         // テキストを描画
         // IMの変換中文字列あれば、それをKLinesにFakeLineとして追加する。
         if hasMarkedText(), let repRange = _replacementRange{
-            lines.addFakeLine(replacementRange: repRange, attrString: _markedText, kind: .im)
+            lines.addIMFakeLine(replacementRange: repRange, attrString: _markedText, selectedRangeInMarkedText: markedRange())
         
         // 単語補完中であれば、それをKLinesにFakeLineとして追加する。
         } else if completion.isInCompletionMode, let attrString = completion.currentWordTail {
-            lines.addFakeLine(replacementRange: caretIndex..<caretIndex, attrString: attrString, kind: .completion)
+            lines.addCompletionFakeLine(replacementRange: caretIndex..<caretIndex, attrString: attrString)
         }
 
         for i in 0..<lines.count {
@@ -664,9 +661,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             guard let line = lines[i] else { continue }
             
             if verticalRange.contains(textPoint.y) {
-                
                 line.draw(at: textPoint, in: bounds)
-                
             }
         }
         
@@ -740,13 +735,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
                 
             }
         }
-        /*
-         let path = NSBezierPath(rect: layoutRects.lineNumberRegion!.rect)
-         NSColor.red.setStroke()
-         path.lineWidth = 2
-         path.stroke()*/
-        
-        
         
     }
     
@@ -1706,44 +1694,58 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     }
     
     func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
-        
+
         let attrString: NSAttributedString
+        
+        // 送られてきたstringはNSStringとNSAttributedStringの両方の可能性がある。
+        // いずれにしてもNSAttributedStringとして整形しておく。
         if let str = string as? String {
             attrString = NSAttributedString(string: str)
-            //print("setMarkedText: as? String")
         } else if let aStr = string as? NSAttributedString {
             attrString = aStr
-            //print("setMarkedText: as? NSAttributedString")
         } else {
             return
         }
-        
+
         // selectedRangeは「挿入される文字列のどこが選択されているか」、replacementRangeは「どこに挿入するか」を示す。
-        
+
         // 選択範囲がある場合は、その部分を削除しておく。
         if selectionRange.count > 0 {
             textStorage.replaceCharacters(in: selectionRange, with: [])
             selectionRange = selectionRange.lowerBound..<selectionRange.lowerBound
         }
-        
+
         // もし文字列が空の場合は変換が終了したとみなしてunmarkText()を呼び出す。
         // OS標準のIMとAquaSKKを試したがいずれも変換終了時にunmarkedText()を呼び出さないことを確認。2025-07-10
         if attrString.string.count == 0 {
             unmarkText()
             return
         }
-        
+
+        // Ganpi側の表示フォントに正規化（IME由来の underline 等は保持）
+        let baseFont = textStorage.baseFont
+
+        let fixedAttrString: NSAttributedString
+        if attrString.length > 0,
+           let f = attrString.attribute(.font, at: 0, effectiveRange: nil) as? NSFont,
+           f == baseFont {
+            fixedAttrString = attrString
+        } else {
+            let mu = NSMutableAttributedString(attributedString: attrString)
+            mu.addAttribute(.font, value: baseFont, range: NSRange(location: 0, length: mu.length))
+            fixedAttrString = mu
+        }
+
         let range = Range(replacementRange) ?? selectionRange
-        let plain = attrString.string
+        let plain = fixedAttrString.string
+
         _markedTextRange = range.lowerBound..<(range.lowerBound + plain.count)
-        _markedText = attrString
+        _markedText = fixedAttrString
         _replacementRange = range
-        
+
         _caretView.isHidden = true
-        
+
         needsDisplay = true
-        
-        
     }
     
     func unmarkText() {
