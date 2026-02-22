@@ -451,36 +451,56 @@ final class KLines: CustomStringConvertible {
     }
     
     // 外部から特定の行について別のAttributedStringを挿入することができる。
-    // hardLineIndex行のinsertionオフセットの部分にattrStringを挿入する形になる。
-    // IM（marked text）用：選択中セグメント（selectedRange）があるなら下線色を濃くする
+    // log(muAttrString.debugAttributeSummary(firstN: 6),from:self)
     func addIMFakeLine(replacementRange: Range<Int>,
                        attrString: NSAttributedString,
                        selectedRangeInMarkedText: NSRange?) {
 
         let muAttrString = NSMutableAttributedString(attributedString: attrString)
 
-        // 1) 挿入直前の文字色を引き継ぐ（従来の挙動）
+        // 挿入直前の文字色を引き継ぐ（従来の挙動）
         if let inheritedColor = inheritedForegroundColorBeforeInsertion(replacementRange: replacementRange) {
             muAttrString.addAttribute(.foregroundColor, value: inheritedColor,
                                       range: NSRange(location: 0, length: muAttrString.length))
         }
 
-        // 2) 変換全体：薄いアクセント色下線
-        muAttrString.addAttributes([
-            .underlineStyle: NSUnderlineStyle.single.rawValue,
-            .underlineColor: NSColor.controlAccentColor.withAlphaComponent(0.8)
-        ], range: NSRange(location: 0, length: muAttrString.length))
+        let strongColor = NSColor.controlAccentColor
+        let normalColor = NSColor.controlAccentColor.withAlphaComponent(0.65)
 
-        // 3) 選択中セグメント：濃い下線（selectedRange が渡る場合のみ）
-        if let sel = selectedRangeInMarkedText,
-           sel.location >= 0,
-           sel.length > 0,
-           sel.location + sel.length <= muAttrString.length {
+        let fullRange = NSRange(location: 0, length: muAttrString.length)
 
-            muAttrString.addAttributes([
-                .underlineColor: NSColor.controlAccentColor.withAlphaComponent(1.0),
-                //.underlineStyle: NSUnderlineStyle.thick.rawValue
-            ], range: sel)
+        // thick は single|thick（thick単体だと太くならないケースがある）
+        let thickValue = NSUnderlineStyle.single.union(.thick).rawValue
+        let thinValue  = NSUnderlineStyle.single.rawValue
+
+        // 1st pass: underlineStyle=2 が存在するか
+        var hasStyle2 = false
+        muAttrString.enumerateAttributes(in: fullRange, options: []) { attrs, _, stop in
+            if let n = (attrs[.underlineStyle] as? NSNumber)?.intValue, n == 2 {
+                hasStyle2 = true
+                stop.pointee = true
+            }
+        }
+
+        // 2nd pass: ルール適用
+        // - no.無し → thick
+        // - 2がある時だけ: 1=thin, 2=thick
+        // - 2が無い時: 1もthick
+        muAttrString.enumerateAttributes(in: fullRange, options: []) { attrs, range, _ in
+            let n = (attrs[.underlineStyle] as? NSNumber)?.intValue ?? 0
+
+            let isThin: Bool
+            if hasStyle2 {
+                isThin = (n == 1)
+            } else {
+                isThin = false
+            }
+
+            let styleValue = isThin ? thinValue : thickValue
+            let colorValue = isThin ? normalColor : strongColor
+
+            muAttrString.addAttribute(.underlineStyle, value: styleValue, range: range)
+            muAttrString.addAttribute(.underlineColor, value: colorValue, range: range)
         }
 
         addFakeLineCore(replacementRange: replacementRange, insertedAttrString: muAttrString)
