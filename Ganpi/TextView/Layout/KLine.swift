@@ -252,6 +252,74 @@ final class KFakeLine : KLine {
         return _cachedOffsets.last ?? 0
     }
     
+    // KFakeLine は TextStorage 上の range を持たないため、
+    // 自前の文字列と offsets で不可視文字を描画する。
+    override func draw(at point: CGPoint, in bounds: CGRect) {
+        guard let context = NSGraphicsContext.current?.cgContext else { return }
+        guard let ctLine = self.ctLine else { return }
+        guard let textStorageRef = _textStorageRef else { log("_textStorageRef is nil.", from: self); return }
+        guard let layoutManager = _layoutManager else { log("_layoutManager is nil.", from: self); return }
+
+        func _alignToDevicePixel(_ yFromTop: CGFloat) -> CGFloat {
+            let scale = NSApp.mainWindow?.backingScaleFactor
+            ?? NSScreen.main?.backingScaleFactor
+            ?? 1.0
+            return (yFromTop * scale).rounded(.toNearestOrAwayFromZero) / scale
+        }
+
+        context.saveGState()
+        context.translateBy(x: 0, y: bounds.height)
+        context.scaleBy(x: 1, y: -1)
+
+        var asc: CGFloat = 0, des: CGFloat = 0, lead: CGFloat = 0
+        _ = CTLineGetTypographicBounds(ctLine, &asc, &des, &lead)
+
+        if asc == 0 && des == 0 {
+            let font = textStorageRef.baseFont
+            asc = CTFontGetAscent(font)
+            des = CTFontGetDescent(font)
+        }
+
+        let baselineFromTop = point.y + asc
+        let baselineAligned = _alignToDevicePixel(baselineFromTop)
+
+        let lineOriginY = bounds.height - baselineAligned
+        context.textPosition = CGPoint(x: point.x + wordWrapOffset, y: lineOriginY)
+
+        CTLineDraw(ctLine, context)
+
+        // 不可視文字を表示（FakeLine は自前文字列で描く）
+        if layoutManager.showInvisibleCharacters {
+            let s = _attributedString.string
+
+            // _cachedOffsets は「文字数 + 1」を前提（initでその形で作っている）
+            let maxIndex = min(s.count, max(0, _cachedOffsets.count - 1))
+
+            var i = 0
+            for ch in s {
+                if i >= maxIndex { break }
+
+                if let placeholderLine = textStorageRef.invisibleCharacters?.ctLine(for: ch) {
+                    let x0 = _cachedOffsets[i]
+                    let x1 = _cachedOffsets[i + 1]
+                    let advance = max(x1 - x0, 0)
+
+                    var ascent: CGFloat = 0, descent: CGFloat = 0, leading: CGFloat = 0
+                    let placeholderWidth = CGFloat(CTLineGetTypographicBounds(placeholderLine, &ascent, &descent, &leading))
+
+                    let dx = max((advance - placeholderWidth) * 0.5, 0)
+
+                    context.textPosition = CGPoint(x: point.x + x0 + dx + wordWrapOffset, y: lineOriginY)
+                    CTLineDraw(placeholderLine, context)
+                }
+
+                i += 1
+            }
+        }
+
+        context.restoreGState()
+    }
+    
     
     init(attributedString: NSAttributedString, hardLineIndex: Int, softLineIndex: Int, wordWrapOffset: CGFloat, layoutManager: KLayoutManager, textStorageRef: KTextStorageReadable) {
         _ctLine = CTLineCreateWithAttributedString(attributedString)
