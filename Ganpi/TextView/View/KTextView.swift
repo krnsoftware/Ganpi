@@ -120,6 +120,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     
     // not required.
     private var _replacementRange: Range<Int>? = nil
+    private var _selectedRangeInMarkedText = NSRange(location: 0, length: 0)
     var replacementRange: Range<Int>? { get { _replacementRange } }
     
     
@@ -645,7 +646,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         // テキストを描画
         // IMの変換中文字列あれば、それをKLinesにFakeLineとして追加する。
         if hasMarkedText(), let repRange = _replacementRange{
-            lines.addIMFakeLine(replacementRange: repRange, attrString: _markedText, selectedRangeInMarkedText: markedRange())
+            lines.addIMFakeLine(replacementRange: repRange, attrString: _markedText, selectedRangeInMarkedText: _selectedRangeInMarkedText)
         
         // 単語補完中であれば、それをKLinesにFakeLineとして追加する。
         } else if completion.isInCompletionMode, let attrString = completion.currentWordTail {
@@ -1668,12 +1669,19 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     }
 
     func selectedRange() -> NSRange {
-        NSRange(selectionRange)
+        if hasMarkedText(), let marked = _markedTextRange {
+            // markedText内（相対）の選択を文書座標へ変換
+            let markedLen = marked.upperBound - marked.lowerBound
+            let locInMarked = max(0, min(_selectedRangeInMarkedText.location, markedLen))
+            let lenInMarked = max(0, min(_selectedRangeInMarkedText.length, markedLen - locInMarked))
+            return NSRange(location: marked.lowerBound + locInMarked, length: lenInMarked)
+        }
+        return NSRange(selectionRange)
     }
     
     func insertText(_ string: Any, replacementRange: NSRange) {
         endYankCycle()
-                
+
         let rawString: String
         if let str = string as? String {
             rawString = str
@@ -1682,21 +1690,34 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         } else {
             return
         }
-        
-        let range = Range(replacementRange) ?? selectionRange
-        
+
+        // IMEのreplacementRangeがNSNotFoundのことが多いので、
+        // composing中はGanpi側で維持している_replacementRangeを優先して確定置換する
+        let incoming = Range(replacementRange)
+        let range: Range<Int>
+        if let r = incoming {
+            range = r
+        } else if hasMarkedText(), let rep = _replacementRange {
+            range = rep
+        } else {
+            range = selectionRange
+        }
+
         let string = rawString.normalizedString
         textStorage.replaceCharacters(in: range, with: Array(string))
-       
+
         _markedTextRange = nil
         _markedText = NSAttributedString()
-        
+        _replacementRange = nil
+        _selectedRangeInMarkedText = NSRange(location: 0, length: 0)
     }
+    
+    //log("_replacementRange:\(_replacementRange), _markedTextRange:\(_markedTextRange), selectionRange:\(selectionRange), _selectedRangeInMarkedText:\(_selectedRangeInMarkedText)",from:self)
     
     func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
 
         let attrString: NSAttributedString
-        
+
         // 送られてきたstringはNSStringとNSAttributedStringの両方の可能性がある。
         // いずれにしてもNSAttributedStringとして整形しておく。
         if let str = string as? String {
@@ -1736,7 +1757,27 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             fixedAttrString = mu
         }
 
-        let range = Range(replacementRange) ?? selectionRange
+        // IMEはreplacementRangeをNSNotFoundで送ってくることが多い。
+        // その場合に毎回selectionRangeへ退避すると、左へ拡張したreplacementRangeが次のsetMarkedTextで戻ってしまい、
+        // FakeLine合成（prefix + marked + suffix）で重複が発生しやすい。
+        //
+        // 方針:
+        // 1) replacementRangeが来たらそれを採用
+        // 2) NSNotFoundなら、前回の_replacementRangeがあればそれを維持
+        // 3) 前回が無ければ（= composing開始）selectionRangeを採用
+        let incoming = Range(replacementRange)
+        let range: Range<Int>
+        if let r = incoming {
+            range = r
+        } else if let prev = _replacementRange {
+            range = prev
+        } else {
+            range = selectionRange
+        }
+
+        // markedText内の選択（相対）を保持（既にプロパティ追加済み前提）
+        _selectedRangeInMarkedText = selectedRange
+
         let plain = fixedAttrString.string
 
         _markedTextRange = range.lowerBound..<(range.lowerBound + plain.count)
@@ -1747,10 +1788,12 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
 
         needsDisplay = true
     }
+
     
     func unmarkText() {
         _markedTextRange = nil
         _markedText = NSAttributedString()
+        _selectedRangeInMarkedText = NSRange(location: 0, length: 0)
         
         _caretView.isHidden = false
         
@@ -1758,7 +1801,10 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     }
 
     func validAttributesForMarkedText() -> [NSAttributedString.Key] {
-        []
+        [
+            .underlineStyle,
+            .underlineColor
+        ]
     }
 
     func attributedSubstring(forProposedRange range: NSRange, actualRange: NSRangePointer?) -> NSAttributedString? {
@@ -1773,7 +1819,26 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     }
 
     func characterIndex(for point: NSPoint) -> Int {
-        caretIndex // 仮実装（後でマウス位置計算を追加）
+        // NSTextInputClient: point は screen 座標
+        guard let window else { return NSNotFound }
+
+        // screen -> window -> view
+        let windowPoint = window.convertPoint(fromScreen: point)
+        let viewPoint = convert(windowPoint, from: nil)
+
+        guard let layoutRects = layoutManager.makeLayoutRects() else { return NSNotFound }
+
+        switch layoutRects.regionType(for: viewPoint) {
+        case let .text(index, _):
+            // 念のためクランプ
+            if index < 0 { return 0 }
+            let n = textStorage.count
+            if index > n { return n }
+            return index
+
+        case .lineNumber, .outside:
+            return NSNotFound
+        }
     }
 
     func firstRect(forCharacterRange range: NSRange, actualRange: NSRangePointer?) -> NSRect {

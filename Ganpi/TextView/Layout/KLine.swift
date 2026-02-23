@@ -469,7 +469,7 @@ final class KLines: CustomStringConvertible {
 
         let fullRange = NSRange(location: 0, length: muAttrString.length)
 
-        // thick は single|thick（thick単体だと太くならないケースがある）
+        // thick は single|thick（thick単体だと太くならないnケースがある）
         let thickValue = NSUnderlineStyle.single.union(.thick).rawValue
         let thinValue  = NSUnderlineStyle.single.rawValue
 
@@ -541,10 +541,15 @@ final class KLines: CustomStringConvertible {
             return
         }
 
-        if let lineA = textStorageRef.attributedString(for: hardRange.lowerBound..<replacementRange.lowerBound,
+        // replacementRange は編集中に行境界とズレることがあるため、hardRange にクランプしてから分割する
+        let repLo = max(hardRange.lowerBound, min(replacementRange.lowerBound, hardRange.upperBound))
+        let repHi = max(repLo, min(replacementRange.upperBound, hardRange.upperBound))
+        let rep = repLo..<repHi
+
+        if let lineA = textStorageRef.attributedString(for: hardRange.lowerBound..<rep.lowerBound,
                                                        tabWidth: nil,
                                                        withoutColors: false),
-           let lineB = textStorageRef.attributedString(for: replacementRange.upperBound..<hardRange.upperBound,
+           let lineB = textStorageRef.attributedString(for: rep.upperBound..<hardRange.upperBound,
                                                        tabWidth: nil,
                                                        withoutColors: false) {
 
