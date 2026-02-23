@@ -101,10 +101,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         inLiveResize && (_textStorageRef.count >= _liveResizeFreezeThreshold)
     }
     
-    // textStorageを編集しているのが自分であるか否かのフラグ
-    private var _isSelfEditing = false
-
-    
     // Text Input Clientの実装。
     // IME変換中のテキスト（確定前）
     private var _markedText: NSAttributedString = NSAttributedString()
@@ -551,6 +547,9 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     }
     
     func scrollSelectionToVisible() {
+        guard window?.isKeyWindow == true else { return }
+        guard window?.firstResponder === self else { return }
+        
         guard let scrollView = self.enclosingScrollView else { return }
         guard let layoutRects = layoutManager.makeLayoutRects() else { return }
         
@@ -1707,8 +1706,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
 
         let string = rawString.normalizedString
-        _isSelfEditing = true
-        defer { _isSelfEditing = false }
         textStorage.replaceCharacters(in: range, with: Array(string))
 
         _markedTextRange = nil
@@ -1880,7 +1877,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         case let .textChanged(info):
             let delta = info.insertedCount - info.range.count
             
-            if _isSelfEditing, info.range.lowerBound == selectionRange.lowerBound /*(削除+)追記*/ ||
+            if info.range.lowerBound == selectionRange.lowerBound /*(削除+)追記*/ ||
                 info.range.upperBound == selectionRange.lowerBound /*1文字削除*/ {
                 // このtextviewによる編集。
                 caretIndex = info.range.lowerBound + info.insertedCount
