@@ -510,6 +510,13 @@ final class KLines: CustomStringConvertible {
     func addCompletionFakeLine(replacementRange: Range<Int>, attrString: NSAttributedString) {
         let muAttrString = NSMutableAttributedString(attributedString: attrString)
 
+        // completion も本文と同じフォントで描画する（他の属性は保持）
+        if let textStorageRef = _textStorageRef {
+            muAttrString.addAttribute(.font,
+                                      value: textStorageRef.baseFont,
+                                      range: NSRange(location: 0, length: muAttrString.length))
+        }
+
         muAttrString.addAttributes([
             .foregroundColor: NSColor.secondaryLabelColor
         ], range: NSRange(location: 0, length: muAttrString.length))
