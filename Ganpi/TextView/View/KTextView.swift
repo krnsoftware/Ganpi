@@ -648,7 +648,16 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         // テキストを描画
         // IMの変換中文字列あれば、それをKLinesにFakeLineとして追加する。
         if hasMarkedText(), let repRange = _replacementRange{
-            lines.addIMFakeLine(replacementRange: repRange, attrString: _markedText, selectedRangeInMarkedText: _selectedRangeInMarkedText)
+            //lines.addIMFakeLine(replacementRange: repRange, attrString: _markedText, selectedRangeInMarkedText: _selectedRangeInMarkedText)
+            
+            if validateCompositionState() {
+                // validate内で破綻検出時は状態をclearしてfalseを返す
+                if let repRange2 = _replacementRange {
+                    lines.addIMFakeLine(replacementRange: repRange2,
+                                        attrString: _markedText,
+                                        selectedRangeInMarkedText: _selectedRangeInMarkedText)
+                }
+            }
         
         // 単語補完中であれば、それをKLinesにFakeLineとして追加する。
         } else if completion.isInCompletionMode, let attrString = completion.currentWordTail {
@@ -1693,9 +1702,13 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             return
         }
 
+        // IME確定時に内部状態が壊れている場合は、ここで一旦破棄して復帰する
+        _ = validateCompositionState()
+
         // IMEのreplacementRangeがNSNotFoundのことが多いので、
         // composing中はGanpi側で維持している_replacementRangeを優先して確定置換する
         let incoming = Range(replacementRange)
+
         let range: Range<Int>
         if let r = incoming {
             range = r
@@ -1705,8 +1718,9 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
             range = selectionRange
         }
 
-        let string = rawString.normalizedString
-        textStorage.replaceCharacters(in: range, with: Array(string))
+        let s = rawString.normalizedString
+        //log("string:\(Array(s))", from: self)
+        textStorage.replaceCharacters(in: range, with: Array(s))
 
         _markedTextRange = nil
         _markedText = NSAttributedString()
@@ -1867,6 +1881,85 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
 
     func windowLevel() -> Int {
         0
+    }
+    
+
+    private func validateCompositionState() -> Bool {
+        let hasAny = (_replacementRange != nil) || (_markedTextRange != nil) || (_markedText.length > 0)
+        if !hasAny { return true }
+
+        let n = textStorage.count
+
+        // 空のmarkedTextなのに状態だけ残っているのは破綻
+        if _markedText.length == 0 {
+            clearCompositionState()
+            return false
+        }
+
+        // replacementRange は textStorage 内に収まっていなければならない（FakeLineの切り出しに使う）
+        if let rep = _replacementRange {
+            if rep.lowerBound < 0 || rep.upperBound < rep.lowerBound || rep.upperBound > n {
+                clearCompositionState()
+                return false
+            }
+        }
+
+        // markedTextRange は「挿入基準点（lower）」の整合だけを保証する。
+        // upper は仮想挿入のため textStorage.count を超えてよい。
+        if let marked = _markedTextRange {
+            if marked.lowerBound < 0 || marked.lowerBound > n || marked.upperBound < marked.lowerBound {
+                clearCompositionState()
+                return false
+            }
+
+            let expectedEnd = marked.lowerBound + _markedText.length
+            if marked.upperBound != expectedEnd {
+                clearCompositionState()
+                return false
+            }
+
+            // replacement と marked の開始点は一致しているべき（Ganpiの設計）
+            if let rep = _replacementRange, rep.lowerBound != marked.lowerBound {
+                clearCompositionState()
+                return false
+            }
+
+            // marked内選択（相対）の整合
+            let loc = _selectedRangeInMarkedText.location
+            let len = _selectedRangeInMarkedText.length
+            if loc < 0 || len < 0 || (loc + len) > _markedText.length {
+                clearCompositionState()
+                return false
+            }
+        }
+
+        // 挿入点（置換なし）型のcomposingでは、基準点はキャレットに追従すべき。
+        // ここがズレるとFakeLineの差し替え行が別行になり、縦横ともズレて見える。
+        if let rep = _replacementRange, rep.isEmpty {
+            let caret = selectionRange.lowerBound
+            if caret < 0 || caret > n {
+                clearCompositionState()
+                return false
+            }
+
+            if rep.lowerBound != caret {
+                _replacementRange = caret..<caret
+                _markedTextRange = caret..<(caret + _markedText.length)
+                // _selectedRangeInMarkedText は「marked内相対」なのでそのまま
+            }
+        }
+
+        return true
+    }
+
+    private func clearCompositionState() {
+        _replacementRange = nil
+        _markedTextRange = nil
+        _markedText = NSAttributedString()
+        _selectedRangeInMarkedText = NSRange(location: 0, length: 0)
+
+        _caretView.isHidden = false
+        needsDisplay = true
     }
 
 
