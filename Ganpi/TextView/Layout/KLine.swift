@@ -459,10 +459,8 @@ final class KLines: CustomStringConvertible {
         let muAttrString = NSMutableAttributedString(attributedString: attrString)
 
         // 挿入直前の文字色を引き継ぐ（従来の挙動）
-        if let inheritedColor = inheritedForegroundColorBeforeInsertion(replacementRange: replacementRange) {
-            muAttrString.addAttribute(.foregroundColor, value: inheritedColor,
-                                      range: NSRange(location: 0, length: muAttrString.length))
-        }
+        let inheritedColor = inheritedForegroundColorBeforeInsertion(replacementRange: replacementRange)
+        muAttrString.addAttribute(.foregroundColor, value: inheritedColor, range: NSRange(location: 0, length: muAttrString.length))
 
         let strongColor = NSColor.controlAccentColor
         let normalColor = NSColor.controlAccentColor.withAlphaComponent(0.65)
@@ -578,19 +576,18 @@ final class KLines: CustomStringConvertible {
         _replaceLineIndex = lineArrayIndex(for: _replaceLineNumber)
     }
 
-    // 挿入された文字列の直前（lineA末尾）の .foregroundColor を取得する
-    private func inheritedForegroundColorBeforeInsertion(replacementRange: Range<Int>) -> NSColor? {
-        guard let textStorageRef = _textStorageRef else { return nil }
-
-        guard let hardLineIndex = lineAt(characterIndex: replacementRange.lowerBound)?.hardLineIndex else { return nil }
-        guard let hardRange = hardLineRange(hardLineIndex: hardLineIndex) else { return nil }
-
-        guard let lineA = textStorageRef.attributedString(for: hardRange.lowerBound..<replacementRange.lowerBound,
-                                                          tabWidth: nil,
-                                                          withoutColors: false) else { return nil }
-
-        guard lineA.length > 0 else { return nil }
-        return lineA.attribute(.foregroundColor, at: lineA.length - 1, effectiveRange: nil) as? NSColor
+    // 挿入された文字列の直前の文字の .foregroundColor を取得する
+    private func inheritedForegroundColorBeforeInsertion(replacementRange: Range<Int>) -> NSColor {
+        guard let textStorageRef = _textStorageRef else { log("01",from:self); return NSColor.black }
+        
+        let baseTextColor = textStorageRef.parser.baseTextColor
+        if replacementRange.lowerBound == 0 { return baseTextColor }
+        let lastCharRange = replacementRange.lowerBound - 1..<replacementRange.lowerBound
+        guard let charA = textStorageRef.attributedString(for: lastCharRange, tabWidth: nil, withoutColors: false) else {
+            log("textStorage.attributedString(): nil.",from:self)
+            return baseTextColor
+        }
+        return charA.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor ?? baseTextColor
     }
     
     func removeFakeLines() {
