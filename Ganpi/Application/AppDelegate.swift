@@ -12,6 +12,8 @@ import Cocoa
 class AppDelegate: NSObject, NSApplicationDelegate {
     
     @IBOutlet weak var _userMenuItem: NSMenuItem!
+    @IBOutlet weak var _scriptMenuItem: NSMenuItem!
+    @IBOutlet weak var _templateMenuItem: NSMenuItem!
     
     // ファイル指定で起動中かどうかを検知するためのフラグ
     private var launchingWithFiles = false

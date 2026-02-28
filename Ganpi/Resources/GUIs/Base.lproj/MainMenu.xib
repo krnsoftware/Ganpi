@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<document type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="3.0" toolsVersion="23727" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none" useAutolayout="YES" customObjectInstantitationMethod="direct">
+<document type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="3.0" toolsVersion="24506" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none" useAutolayout="YES" customObjectInstantitationMethod="direct">
     <dependencies>
         <deployment identifier="macosx"/>
-        <plugIn identifier="com.apple.InterfaceBuilder.CocoaPlugin" version="23727"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.CocoaPlugin" version="24506"/>
     </dependencies>
     <objects>
         <customObject id="-2" userLabel="File's Owner" customClass="NSApplication">
@@ -14,6 +14,8 @@
         <customObject id="-3" userLabel="Application" customClass="NSObject"/>
         <customObject id="Voe-Tx-rLC" customClass="AppDelegate" customModule="Ganpi" customModuleProvider="target">
             <connections>
+                <outlet property="_scriptMenuItem" destination="II9-f6-Z2n" id="2c9-dL-6Fc"/>
+                <outlet property="_templateMenuItem" destination="gUH-Ox-fSv" id="eao-nj-RUO"/>
                 <outlet property="_userMenuItem" destination="gIY-DX-Bac" id="wgZ-ee-2Z6"/>
             </connections>
         </customObject>
@@ -709,6 +711,13 @@ CQ
                                 </menu>
                             </menuItem>
                             <menuItem isSeparatorItem="YES" id="sOB-A2-Bqx"/>
+                            <menuItem title="Execute Scripts" id="II9-f6-Z2n">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                            </menuItem>
+                            <menuItem title="Insert Templates" id="gUH-Ox-fSv">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                            </menuItem>
+                            <menuItem isSeparatorItem="YES" id="8Be-3M-gz0"/>
                             <menuItem title="User Menu" id="gIY-DX-Bac">
                                 <modifierMask key="keyEquivalentModifierMask"/>
                             </menuItem>
