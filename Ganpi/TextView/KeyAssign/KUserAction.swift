@@ -49,6 +49,7 @@ enum KUserCommand {
     func execute(for storage:KTextStorageReadable, in range:Range<Int>) -> KCommandResult? {
         var options: KCommandOptions
         let resultString: String
+        
         switch self {
         case .insert(let command):
             guard let result = estimateCommand(command) else {
@@ -56,7 +57,7 @@ enum KUserCommand {
                 return nil
             }
             options = result.options
-            log(".insert: command:\(result.command), options:\(result.options)")
+            options.target = .selection // .insert always replace the selection.
             resultString = result.command
 
         case .load(let command):
@@ -65,6 +66,7 @@ enum KUserCommand {
                 return nil
             }
             options = result.options
+            options.target = .selection // .load always replace the selection.
             guard let content = readFromTemplatesDirectory(result.command) else { log("#01"); return nil }
             resultString = content
 
@@ -112,7 +114,6 @@ enum KUserCommand {
                 return .init(string: pre + selectedText + post, options: opts)
             }
         }
-        
         return .init(string: resultString, options: options)
     }
     

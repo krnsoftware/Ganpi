@@ -317,10 +317,137 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     // MARK: - User Menu
 
+    // MARK: - User Menu
+
     private func constructMenus() {
-        let result = buildUserMenu()
-        _userMenuItem.title = result.title
-        _userMenuItem.submenu = result.menu
+        let userMenuResult = buildUserMenu()
+        _userMenuItem.title = userMenuResult.title
+        _userMenuItem.submenu = userMenuResult.menu
+
+        _scriptMenuItem.submenu = buildExecuteScriptsMenu()
+        _templateMenuItem.submenu = buildInsertTemplatesMenu()
+    }
+
+    private func buildExecuteScriptsMenu() -> NSMenu {
+        let menu = NSMenu(title: _scriptMenuItem.title)
+
+        guard let baseURL = KAppPaths.scriptsDirectoryURL(createIfNeeded: true) else {
+            KLog.shared.log(id: "menus", message: "Scripts directory not available.")
+            menu.addItem(NSMenuItem(title: "(Folder not available)", action: nil, keyEquivalent: ""))
+            return menu
+        }
+
+        buildFileTreeMenu(into: menu,
+                          baseURL: baseURL,
+                          currentURL: baseURL,
+                          makeCommand: { relativePath in
+                              "execute[\"\(relativePath)\"]"
+                          })
+
+        if menu.items.isEmpty {
+            menu.addItem(NSMenuItem(title: "(Empty)", action: nil, keyEquivalent: ""))
+        }
+
+        return menu
+    }
+
+    private func buildInsertTemplatesMenu() -> NSMenu {
+        let menu = NSMenu(title: _templateMenuItem.title)
+
+        guard let baseURL = KAppPaths.templatesDirectoryURL(createIfNeeded: true) else {
+            KLog.shared.log(id: "menus", message: "Templates directory not available.")
+            menu.addItem(NSMenuItem(title: "(Folder not available)", action: nil, keyEquivalent: ""))
+            return menu
+        }
+
+        buildFileTreeMenu(into: menu,
+                          baseURL: baseURL,
+                          currentURL: baseURL,
+                          makeCommand: { relativePath in
+                              // templates は現状 load[...] が「templatesフォルダから読む」仕様
+                              "load[\"\(relativePath)\"]"
+                          })
+
+        if menu.items.isEmpty {
+            menu.addItem(NSMenuItem(title: "(Empty)", action: nil, keyEquivalent: ""))
+        }
+
+        return menu
+    }
+
+    private func buildFileTreeMenu(into targetMenu: NSMenu,
+                                   baseURL: URL,
+                                   currentURL: URL,
+                                   makeCommand: (String) -> String) {
+        let fm = FileManager.default
+
+        let urls: [URL]
+        do {
+            urls = try fm.contentsOfDirectory(at: currentURL,
+                                              includingPropertiesForKeys: [.isDirectoryKey],
+                                              options: [.skipsHiddenFiles])
+        } catch {
+            KLog.shared.log(id: "menus", message: "Failed to list directory: \(currentURL.path)")
+            return
+        }
+
+        // ディレクトリ優先、名前順
+        let sorted = urls.sorted { a, b in
+            let aIsDir = (try? a.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+            let bIsDir = (try? b.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+            if aIsDir != bIsDir { return aIsDir && !bIsDir }
+            return a.lastPathComponent.localizedStandardCompare(b.lastPathComponent) == .orderedAscending
+        }
+
+        for url in sorted {
+            let name = url.lastPathComponent
+            guard !name.isEmpty else { continue }
+            if name.hasPrefix(".") { continue }
+
+            let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+            if isDir {
+                let submenu = NSMenu(title: name)
+                let item = NSMenuItem(title: name, action: nil, keyEquivalent: "")
+                item.submenu = submenu
+                targetMenu.addItem(item)
+
+                buildFileTreeMenu(into: submenu,
+                                  baseURL: baseURL,
+                                  currentURL: url,
+                                  makeCommand: makeCommand)
+                continue
+            }
+
+            guard let relativePath = makeRelativePath(fileURL: url, baseURL: baseURL) else {
+                continue
+            }
+
+            let command = makeCommand(relativePath)
+            let actions = KKeymapLoader.parseActions(from: command)
+            if actions.isEmpty {
+                KLog.shared.log(id: "menus", message: "Invalid actions for command: \(command)")
+                continue
+            }
+
+            let item = NSMenuItem(title: name,
+                                  action: #selector(KTextView.performUserActions(_:)),
+                                  keyEquivalent: "")
+            item.target = nil
+            item.representedObject = actions
+            targetMenu.addItem(item)
+        }
+    }
+
+    private func makeRelativePath(fileURL: URL, baseURL: URL) -> String? {
+        let base = baseURL.resolvingSymlinksInPath()
+        let file = fileURL.resolvingSymlinksInPath()
+
+        let basePath = base.path.hasSuffix("/") ? base.path : base.path + "/"
+        guard file.path.hasPrefix(basePath) else { return nil }
+
+        var rel = String(file.path.dropFirst(basePath.count))
+        if rel.hasPrefix("/") { rel.removeFirst() }
+        return rel
     }
 
     private func buildUserMenu() -> (title: String, menu: NSMenu) {
