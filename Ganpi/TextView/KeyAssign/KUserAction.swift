@@ -22,7 +22,7 @@ enum KUserAction {
 // テキスト入力処理後のキャレットの位置
 enum KPostProcessingCaretPosition { case left; case right; case select }
 // コマンドが対象にした文字列の範囲
-enum KTextEditingTarget { case all; case selection }
+enum KTextEditingTarget { case all; case selection; case auto }
 
 // コマンドの結果
 struct KCommandResult {
@@ -32,7 +32,7 @@ struct KCommandResult {
 
 struct KCommandOptions {    
     var caret: KPostProcessingCaretPosition = .right
-    var target: KTextEditingTarget = .selection
+    var target: KTextEditingTarget = .auto
     var timeout: Float = 5.0
     var extras: [String: String] = [:]
 }
@@ -47,7 +47,7 @@ enum KUserCommand {
     
     // 与えられたstorageと、現在の選択範囲rangeについて処理。allであればrangeは単に無視される。
     func execute(for storage:KTextStorageReadable, in range:Range<Int>) -> KCommandResult? {
-        let options: KCommandOptions
+        var options: KCommandOptions
         let resultString: String
         switch self {
         case .insert(let command):
@@ -74,7 +74,19 @@ enum KUserCommand {
                 return nil
             }
             options = result.options
-            let targetRange = options.target == .selection ? range : 0..<storage.count
+            let allRange = 0..<storage.count
+
+            let targetRange: Range<Int>
+            switch options.target {
+            case .selection:
+                targetRange = range
+            case .all:
+                targetRange = allRange
+            case .auto:
+                targetRange = range.isEmpty ? allRange : range
+                options.target = range.isEmpty ? .all : .selection
+            }
+
             guard let content = readFromStream(from: result.command,
                                                string: storage.string(in: targetRange),
                                                timeout: options.timeout) else { log("#02"); return nil }
@@ -151,6 +163,7 @@ enum KUserCommand {
                 switch v.lowercased() {
                 case "all": opts.target = .all
                 case "selection": opts.target = .selection
+                case "auto": opts.target = .auto
                 default:
                     opts.extras[k] = v
                 }
