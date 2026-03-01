@@ -90,8 +90,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
+        // 既に存在するなら「このアプリ(Ganpi)で開く」
         if fm.fileExists(atPath: userIniURL.path) {
-            NSWorkspace.shared.open(userIniURL)
+            NSDocumentController.shared.openDocument(withContentsOf: userIniURL, display: true) { _, _, error in
+                if let error {
+                    KLog.shared.log(id: "preferences", message: "Failed to open user.ini: \(error)")
+                }
+            }
             return
         }
 
@@ -114,7 +119,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        NSWorkspace.shared.open(userIniURL)
+        // 作成後も「このアプリ(Ganpi)で開く」
+        NSDocumentController.shared.openDocument(withContentsOf: userIniURL, display: true) { _, _, error in
+            if let error {
+                KLog.shared.log(id: "preferences", message: "Failed to open user.ini: \(error)")
+            }
+        }
     }
     
     private func makeCommentedUserIni(from template: String) -> String {
