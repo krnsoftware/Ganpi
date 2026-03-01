@@ -184,6 +184,9 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     var editMode: KEditMode {
         get { _editMode }
         set {
+            if !KPreference.shared.bool(.editorUseEditMode), _editMode == .normal {
+                return
+            }
             _editMode = newValue
             sendStatusBarUpdateAction()
         }
