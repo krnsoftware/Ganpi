@@ -315,7 +315,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSDocumentController.shared.newDocument(nil)
     }
     
-    // MARK: - User Menu
 
     // MARK: - User Menu
 
@@ -331,6 +330,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func buildExecuteScriptsMenu() -> NSMenu {
         let menu = NSMenu(title: _scriptMenuItem.title)
 
+        // 先頭: Open folder + separator
+        let openItem = NSMenuItem(title: "Open Scripts Folder",
+                                  action: #selector(openScriptsFolder(_:)),
+                                  keyEquivalent: "")
+        openItem.target = self
+        menu.addItem(openItem)
+        menu.addItem(.separator())
+
         guard let baseURL = KAppPaths.scriptsDirectoryURL(createIfNeeded: true) else {
             KLog.shared.log(id: "menus", message: "Scripts directory not available.")
             menu.addItem(NSMenuItem(title: "(Folder not available)", action: nil, keyEquivalent: ""))
@@ -344,7 +351,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                               "execute[\"\(relativePath)\"]"
                           })
 
-        if menu.items.isEmpty {
+        if menu.items.count == 2 { // openItem + separator のみ
             menu.addItem(NSMenuItem(title: "(Empty)", action: nil, keyEquivalent: ""))
         }
 
@@ -353,6 +360,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func buildInsertTemplatesMenu() -> NSMenu {
         let menu = NSMenu(title: _templateMenuItem.title)
+
+        // 先頭: Open folder + separator
+        let openItem = NSMenuItem(title: "Open Templates Folder",
+                                  action: #selector(openTemplatesFolder(_:)),
+                                  keyEquivalent: "")
+        openItem.target = self
+        menu.addItem(openItem)
+        menu.addItem(.separator())
 
         guard let baseURL = KAppPaths.templatesDirectoryURL(createIfNeeded: true) else {
             KLog.shared.log(id: "menus", message: "Templates directory not available.")
@@ -364,11 +379,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                           baseURL: baseURL,
                           currentURL: baseURL,
                           makeCommand: { relativePath in
-                              // templates は現状 load[...] が「templatesフォルダから読む」仕様
                               "load[\"\(relativePath)\"]"
                           })
 
-        if menu.items.isEmpty {
+        if menu.items.count == 2 { // openItem + separator のみ
             menu.addItem(NSMenuItem(title: "(Empty)", action: nil, keyEquivalent: ""))
         }
 

@@ -38,6 +38,12 @@
                                     <action selector="openPreferences:" target="-1" id="UCM-bv-FDg"/>
                                 </connections>
                             </menuItem>
+                            <menuItem title="Open Application Support Folder" id="42Z-Bg-1Aa">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <connections>
+                                    <action selector="openApplicationSupportFolder:" target="-1" id="hrQ-Dv-g8d"/>
+                                </connections>
+                            </menuItem>
                             <menuItem isSeparatorItem="YES" id="wFC-TO-SCJ"/>
                             <menuItem title="Services" id="NMo-om-nkz">
                                 <modifierMask key="keyEquivalentModifierMask"/>
@@ -92,25 +98,6 @@
                                             <modifierMask key="keyEquivalentModifierMask"/>
                                             <connections>
                                                 <action selector="clearRecentDocuments:" target="-1" id="Daa-9d-B3U"/>
-                                            </connections>
-                                        </menuItem>
-                                    </items>
-                                </menu>
-                            </menuItem>
-                            <menuItem title="Open Folder" id="HgO-zT-2U2">
-                                <modifierMask key="keyEquivalentModifierMask"/>
-                                <menu key="submenu" id="yOV-tv-5B2">
-                                    <items>
-                                        <menuItem title="Open Scripts Folder" id="uWx-9n-Vfm">
-                                            <modifierMask key="keyEquivalentModifierMask"/>
-                                            <connections>
-                                                <action selector="openScriptsFolder:" target="-1" id="Ya3-9f-0CP"/>
-                                            </connections>
-                                        </menuItem>
-                                        <menuItem title="Open Application Support Folder" id="6Mk-Yy-hhZ">
-                                            <modifierMask key="keyEquivalentModifierMask"/>
-                                            <connections>
-                                                <action selector="openApplicationSupportFolder:" target="-1" id="90k-iJ-7vm"/>
                                             </connections>
                                         </menuItem>
                                     </items>
