@@ -284,10 +284,11 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
             menuItem.state = menuTag == textView.layoutManager.wrapLineOffsetType ? .on : .off
             return true
 
-        case #selector(splitVertically), #selector(splitHorizontally):
+        case #selector(splitVertically(_:)), #selector(splitHorizontally(_:)):
             return _panes.count == 1 && _splitView != nil
-        case #selector(removeSplit):
+        case #selector(removeSplit(_:)):
             return _panes.count == 2
+            
         default:
             return true
         }

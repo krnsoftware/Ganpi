@@ -7,7 +7,7 @@
 
 import Cocoa
 
-final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
+final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterfaceValidations {
     
     // MARK: - Struct and Enum
     /*
@@ -759,6 +759,19 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         }
         
         super.setFrameSize(NSSize(width: rects.textRegion.rect.width, height: rects.textRegion.rect.height))
+    }
+    
+    // MARK: - UI validation (NSUserInterfaceValidations)
+
+    func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
+        switch item.action {
+        case #selector(yankPop(_:)), #selector(yankPopReverse(_:)):
+            if !KPreference.shared.bool(.editorUseYankPop) { return false }
+            let buffer = KClipBoardBuffer.shared
+            return buffer.isInCycle && _yankSelection != nil
+        default:
+            return true
+        }
     }
     
     // MARK: - Keyboard Input (NSResponder methods)
@@ -3152,6 +3165,12 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     }
     
     @IBAction func yankPop(_ sender: Any?) {
+        if !KPreference.shared.bool(.editorUseYankPop){
+            endYankCycle()
+            NSSound.beep()
+            return
+        }
+        
         let buffer = KClipBoardBuffer.shared
         guard buffer.isInCycle, let selection = _yankSelection else { NSSound.beep(); return }
         _isApplyingYank = true
@@ -3162,6 +3181,12 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
     }
     
     @IBAction func yankPopReverse(_ sender: Any?) {
+        if !KPreference.shared.bool(.editorUseYankPop){
+            endYankCycle()
+            NSSound.beep()
+            return
+        }
+        
         let buffer = KClipBoardBuffer.shared
         guard buffer.isInCycle, let selection = _yankSelection else { NSSound.beep(); return }
         _isApplyingYank = true
