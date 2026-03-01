@@ -343,6 +343,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource {
         
         _wordWrap = prefs.bool(.parserWordWrap, lang: lang)
         _showInvisibleCharacters = prefs.bool(.parserShowInvisibles, lang: lang)
+        _editMode = prefs.editMode()
         
     }
     
