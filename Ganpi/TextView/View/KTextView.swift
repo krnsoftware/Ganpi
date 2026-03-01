@@ -337,6 +337,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         
         _layoutManager.textView = self
         
+        _showLineNumbers = KPreference.shared.bool(.documentShowLineNumber)
+        
         registerForDraggedTypes([.string, .fileURL])
     }
     
