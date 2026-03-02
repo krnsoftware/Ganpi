@@ -18,7 +18,9 @@ extension KTextView {
     }
     
     @IBAction func searchNextAction(_ sender: Any?) {
-        KSearchPanel.shared.close()
+        if KPreference.shared.bool(.searchWindowCloseWhenDone){
+            KSearchPanel.shared.close()
+        }
         search(for: .forward)
     }
     
