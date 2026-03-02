@@ -238,13 +238,14 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         guard let storage = document?.textStorage else { log("document is nil.", from:self); return }
         let panelFont = manager.convert(storage.baseFont)
         let isOption = NSApp.currentEvent?.modifierFlags.contains(.option) == true
-        if isOption {
+        if !isOption {
             guard let textView = activeTextView() else { log("activeTextView() is nil.", from:self); return }
             let selection = textView.selectionRange
             let string = "\(panelFont.fontName) \(panelFont.pointSize)"
             storage.replaceString(in: selection, with: string)
             textView.selectionRange = selection.lowerBound..<selection.lowerBound + string.count
-        } else {
+            
+        } else if !KPreference.shared.bool(.documentRejectFontChange){
             storage.baseFont = panelFont
             updateStatusBar()
         }
