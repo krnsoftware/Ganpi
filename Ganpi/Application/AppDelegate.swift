@@ -226,7 +226,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         
-        KSearchPanel.shared.loadPreferences()
+        // search panelのwindowがまだロードされていない場合には無視する。
+        if KSearchPanel.shared.isWindowLoaded {
+            KSearchPanel.shared.loadPreferences()
+        }
 
         constructMenus()
     }

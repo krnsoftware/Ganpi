@@ -880,10 +880,12 @@ extension KTextView {
         let panel = NSColorPanel.shared
         let selection = selectionRange
         let string = textStorage.string(in: selection)
+        let withAlpha = KPreference.shared.bool(.colorPanelWithAlpha)
         let isOption = NSApp.currentEvent?.modifierFlags.contains(.option) == true
-        panel.showsAlpha = isOption ? true : false
+        //panel.showsAlpha = isOption ? true : false
+        panel.showsAlpha = withAlpha == isOption ? false : true
         
-        if  let color = NSColor(hexString: string) {
+        if let color = NSColor(hexString: string) {
             panel.color = color
         }
         
