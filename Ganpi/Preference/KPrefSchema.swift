@@ -74,8 +74,6 @@ struct KPrefSchema {
         "search_window.replace_field.font.family": .init(type: .string),
         
         "search_window.close_when_done"         : .init(type: .bool),
-        "search_window.ignore_case"             : .init(type: .bool),
-        "search_window.use_regex"               : .init(type: .bool),
         
         
         // -----------------------------

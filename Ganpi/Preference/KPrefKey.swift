@@ -60,8 +60,6 @@ enum KPrefKey {
     case replaceFieldFontFamily
 
     case searchWindowCloseWhenDone
-    case searchWindowIgnoreCase
-    case searchWindowUseRegex
 
 
     // ============================
@@ -182,10 +180,6 @@ enum KPrefKey {
 
         case .searchWindowCloseWhenDone:
             return "search_window.close_when_done"
-        case .searchWindowIgnoreCase:
-            return "search_window.ignore_case"
-        case .searchWindowUseRegex:
-            return "search_window.use_regex"
 
         // ---- color panel ----
         case .colorPanelWithAlpha:
