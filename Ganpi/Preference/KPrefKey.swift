@@ -55,9 +55,11 @@ enum KPrefKey {
 
     case searchFieldFontSize
     case searchFieldFontFamily
+    case searchFieldFont // 抽象キー（rawKey: nil）
 
     case replaceFieldFontSize
     case replaceFieldFontFamily
+    case replaceFieldFont // 抽象キー（rawKey: nil）
 
     case searchWindowCloseWhenDone
 
@@ -172,11 +174,15 @@ enum KPrefKey {
             return "search_window.search_field.font.size"
         case .searchFieldFontFamily:
             return "search_window.search_field.font.family"
+        case .searchFieldFont:
+            return nil
 
         case .replaceFieldFontSize:
             return "search_window.replace_field.font.size"
         case .replaceFieldFontFamily:
             return "search_window.replace_field.font.family"
+        case .replaceFieldFont:
+            return nil
 
         case .searchWindowCloseWhenDone:
             return "search_window.close_when_done"

@@ -65,6 +65,8 @@ final class KSearchPanel: NSWindowController {
         // 任意：編集終了でバックストアへ戻す
         findField.target = self;     findField.action = #selector(_fieldsEdited)
         replaceField.target = self;  replaceField.action = #selector(_fieldsEdited)
+        
+        loadPreferences()
     }
 
     /// 表示（メニュー等から呼ぶ）
@@ -72,6 +74,12 @@ final class KSearchPanel: NSWindowController {
         if window?.screen == nil { window?.center() }
         window?.makeKeyAndOrderFront(nil)
         window?.makeFirstResponder(findField)  // 初期フォーカス
+    }
+    
+    func loadPreferences() {
+        let prefs = KPreference.shared
+        findField.font = prefs.font(.searchFieldFont)
+        replaceField.font = prefs.font(.replaceFieldFont)
     }
 
     // MARK: - Actions

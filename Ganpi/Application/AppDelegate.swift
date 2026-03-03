@@ -225,6 +225,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 document.textStorage.resetInvisibleCharacters()
             }
         }
+        
+        KSearchPanel.shared.loadPreferences()
 
         constructMenus()
     }
