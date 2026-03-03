@@ -3020,6 +3020,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     // 複数行を選択している場合はshiftRight:を実行する。
     // 単行の場合は選択範囲を削除した上で、行頭の空白(space|tab混合)内ならtab stop相当までspaceを入力、
     // そうでなければ1文字のspaceを入力する。
+    // tabをspaceで置換しないオプション指定の場合は単にtabを入力する。
     @IBAction override func insertTab(_ sender: Any?) {
         let parags = textStorage.paragraphs
         
@@ -3037,8 +3038,12 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
             selection = selectionRange
         }
         
-        let tabWidth = layoutManager.tabWidth
+        if !KPreference.shared.bool(.parserIndentUsingSpaces) {
+            textStorage.replaceString(in: selection, with: "\t")
+            return
+        }
         
+        let tabWidth = layoutManager.tabWidth
         guard let pIndex = parags.paragraphIndex(containing: selection.lowerBound) else { log("0"); return }
         let width = parags[pIndex].tabStopDeltaInIndent(at: selection.lowerBound, tabWidth: tabWidth, direction: .forward)
         textStorage.replaceString(in: selection, with: String(repeating: " ", count: max(1, width)))

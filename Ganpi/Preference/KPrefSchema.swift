@@ -94,6 +94,8 @@ struct KPrefSchema {
         // wrapline_offset → enumerated
         "parser.base.wrapline_offset"           : .init(type: .enumerated),
         
+        "parser.base.indent_using_spaces"       : .init(type: .bool),
+        
         "parser.base.show.invisibles.tab"       : .init(type: .bool),
         "parser.base.show.invisibles.newline"   : .init(type: .bool),
         "parser.base.show.invisibles.space"     : .init(type: .bool),

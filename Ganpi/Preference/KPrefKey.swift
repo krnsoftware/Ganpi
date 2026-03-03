@@ -87,6 +87,7 @@ enum KPrefKey {
     case parserAutoIndent
     case parserShowInvisibles
     case parserWraplineOffset     // enumerated
+    case parserIndentUsingSpaces
 
     case parserShowInvisiblesTab
     case parserShowInvisiblesNewline
@@ -204,7 +205,9 @@ enum KPrefKey {
             return "parser.base.show.invisibles"
         case .parserWraplineOffset:
             return "parser.base.wrapline_offset"
-
+        case .parserIndentUsingSpaces:
+            return "parser.base.indent_using_spaces"
+            
         case .parserShowInvisiblesTab:
             return "parser.base.show.invisibles.tab"
         case .parserShowInvisiblesNewline:
