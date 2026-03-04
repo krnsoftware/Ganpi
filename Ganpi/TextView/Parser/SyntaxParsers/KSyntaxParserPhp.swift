@@ -136,6 +136,247 @@ final class KSyntaxParserPhp: KSyntaxParser {
 
         return left..<right
     }
+    
+    override func outline(in range: Range<Int>?) -> [KOutlineItem] {
+        let skeleton = storage.skeletonString
+        let bytes = skeleton.bytes
+        let count = bytes.count
+        if count == 0 { return [] }
+
+        let scanRange: Range<Int> = {
+            if let r = range {
+                let lower = max(0, min(r.lowerBound, count))
+                let upper = max(0, min(r.upperBound, count))
+                return (lower < upper) ? (lower..<upper) : (0..<0)
+            }
+            return 0..<count
+        }()
+        if scanRange.isEmpty { return [] }
+
+        ensureUpToDate(for: scanRange)
+
+        // ローカル関数は最小限
+        func lowerAscii(_ b: UInt8) -> UInt8 {
+            if b >= 0x41 && b <= 0x5A { return b + 0x20 }
+            return b
+        }
+
+        func matchWordCI(_ word: [UInt8], at index: Int, end: Int) -> Bool {
+            if index + word.count > end { return false }
+            if index > scanRange.lowerBound, bytes[index - 1].isIdentPartAZ09_ { return false }
+            for i in 0..<word.count {
+                if lowerAscii(bytes[index + i]) != word[i] { return false }
+            }
+            let right = index + word.count
+            if right < end, bytes[right].isIdentPartAZ09_ { return false }
+            return true
+        }
+
+        let wNamespace = Array("namespace".utf8)
+        let wClass = Array("class".utf8)
+        let wInterface = Array("interface".utf8)
+        let wTrait = Array("trait".utf8)
+        let wEnum = Array("enum".utf8)
+        let wFunction = Array("function".utf8)
+
+        enum Mode { case html, php, lineComment, blockComment, sQuote, dQuote, backtick }
+        var mode: Mode = .html
+        var braceDepth = 0
+
+        var items: [KOutlineItem] = []
+        items.reserveCapacity(128)
+
+        var i = scanRange.lowerBound
+        let end = scanRange.upperBound
+
+        while i < end {
+            let b = bytes[i]
+
+            switch mode {
+            case .html:
+                // <?xml は除外（短縮タグ誤認回避）
+                if b == FC.lt, i + 1 < end, bytes[i + 1] == FC.question {
+                    if i + 4 < end {
+                        let b2 = lowerAscii(bytes[i + 2])
+                        let b3 = lowerAscii(bytes[i + 3])
+                        let b4 = lowerAscii(bytes[i + 4])
+                        if b2 == 0x78 && b3 == 0x6D && b4 == 0x6C { // xml
+                            i += 2
+                            continue
+                        }
+                    }
+                    mode = .php
+                    i += 2
+                    continue
+                }
+                i += 1
+
+            case .lineComment:
+                if b == FC.lf { mode = .php }
+                i += 1
+
+            case .blockComment:
+                if b == FC.asterisk, i + 1 < end, bytes[i + 1] == FC.slash {
+                    mode = .php
+                    i += 2
+                    continue
+                }
+                i += 1
+
+            case .sQuote:
+                if b == FC.backSlash { i = min(i + 2, end); continue }
+                if b == FC.singleQuote { mode = .php }
+                i += 1
+
+            case .dQuote:
+                if b == FC.backSlash { i = min(i + 2, end); continue }
+                if b == FC.doubleQuote { mode = .php }
+                i += 1
+
+            case .backtick:
+                if b == FC.backSlash { i = min(i + 2, end); continue }
+                if b == FC.backtick { mode = .php }
+                i += 1
+
+            case .php:
+                // ?> で HTMLへ
+                if b == FC.question, i + 1 < end, bytes[i + 1] == FC.gt {
+                    mode = .html
+                    i += 2
+                    continue
+                }
+
+                // コメント/文字列（軽量版）
+                if b == FC.numeric { mode = .lineComment; i += 1; continue } // '#'
+                if b == FC.slash, i + 1 < end {
+                    let b1 = bytes[i + 1]
+                    if b1 == FC.slash { mode = .lineComment; i += 2; continue }
+                    if b1 == FC.asterisk { mode = .blockComment; i += 2; continue }
+                }
+                if b == FC.singleQuote { mode = .sQuote; i += 1; continue }
+                if b == FC.doubleQuote { mode = .dQuote; i += 1; continue }
+                if b == FC.backtick { mode = .backtick; i += 1; continue }
+
+                // ネスト概算（neutral 中のみ）
+                if b == FC.leftBrace { braceDepth += 1; i += 1; continue }
+                if b == FC.rightBrace { braceDepth = max(0, braceDepth - 1); i += 1; continue }
+
+                // キーワード検出
+                if b.isIdentStartAZ_ {
+                    // namespace Foo\Bar;
+                    if matchWordCI(wNamespace, at: i, end: end) {
+                        var p = i + wNamespace.count
+                        p = skeleton.skipSpaces(from: p, to: end)
+                        if p < end, bytes[p] == FC.backSlash { p += 1 }
+                        if p < end, bytes[p].isIdentStartAZ_ {
+                            var q = p + 1
+                            while q < end {
+                                let c = bytes[q]
+                                if c.isIdentPartAZ09_ { q += 1; continue }
+                                if c == FC.backSlash, q + 1 < end, bytes[q + 1].isIdentStartAZ_ { q += 2; continue }
+                                break
+                            }
+                            items.append(KOutlineItem(kind: .module, nameRange: p..<q, level: braceDepth, isSingleton: false))
+                        }
+                        i += wNamespace.count
+                        continue
+                    }
+
+                    // class/interface/trait/enum Name
+                    let kindWordLen: (KOutlineItem.Kind, Int)? = {
+                        if matchWordCI(wClass, at: i, end: end) { return (.class, wClass.count) }
+                        if matchWordCI(wInterface, at: i, end: end) { return (.class, wInterface.count) }
+                        if matchWordCI(wTrait, at: i, end: end) { return (.class, wTrait.count) }
+                        if matchWordCI(wEnum, at: i, end: end) { return (.class, wEnum.count) }
+                        return nil
+                    }()
+
+                    if let (kind, len) = kindWordLen {
+                        var p = i + len
+                        p = skeleton.skipSpaces(from: p, to: end)
+                        if p < end, bytes[p].isIdentStartAZ_ {
+                            var q = p + 1
+                            while q < end, bytes[q].isIdentPartAZ09_ { q += 1 }
+                            items.append(KOutlineItem(kind: kind, nameRange: p..<q, level: braceDepth, isSingleton: false))
+                        }
+                        i += len
+                        continue
+                    }
+
+                    // function name(...) （無名 function(...) は除外）
+                    if matchWordCI(wFunction, at: i, end: end) {
+                        var p = i + wFunction.count
+                        p = skeleton.skipSpaces(from: p, to: end)
+                        if p < end, bytes[p] == FC.ampersand {
+                            p += 1
+                            p = skeleton.skipSpaces(from: p, to: end)
+                        }
+                        if p < end, bytes[p] == FC.leftParen {
+                            i += wFunction.count
+                            continue
+                        }
+                        if p < end, bytes[p].isIdentStartAZ_ {
+                            var q = p + 1
+                            while q < end, bytes[q].isIdentPartAZ09_ { q += 1 }
+                            items.append(KOutlineItem(kind: .method, nameRange: p..<q, level: braceDepth, isSingleton: false))
+                        }
+                        i += wFunction.count
+                        continue
+                    }
+
+                    // 識別子を飛ばす
+                    var q = i + 1
+                    while q < end, bytes[q].isIdentPartAZ09_ { q += 1 }
+                    i = q
+                    continue
+                }
+
+                i += 1
+            }
+        }
+
+        return items
+    }
+
+    override func currentContext(at index: Int) -> (outer: String?, inner: String?) {
+        let skeleton = storage.skeletonString
+        let bytes = skeleton.bytes
+        let count = bytes.count
+        if count == 0 { return (nil, nil) }
+
+        let pos = max(0, min(index, count))
+        if count >= 1 {
+            let ensureLower = max(0, min(pos, count - 1))
+            ensureUpToDate(for: ensureLower..<(ensureLower + 1))
+        }
+
+        let items = outline(in: nil)
+        if items.isEmpty { return (nil, nil) }
+
+        func toString(_ r: Range<Int>) -> String {
+            if r.isEmpty { return "" }
+            return String(decoding: bytes[r], as: UTF8.self)
+        }
+
+        var outer: String? = nil
+        var inner: String? = nil
+
+        for item in items {
+            if item.nameRange.lowerBound > pos { break }
+            switch item.kind {
+            case .module, .class:
+                outer = toString(item.nameRange)
+            case .method:
+                inner = toString(item.nameRange)
+            case .heading:
+                break
+            }
+        }
+        if let o = outer, let i = inner {
+            return ("\(o) :: ", i)
+        }
+        return (outer, inner)
+    }
 
     // MARK: - Private (scan)
 
