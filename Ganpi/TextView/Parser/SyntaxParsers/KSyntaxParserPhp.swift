@@ -311,20 +311,20 @@ final class KSyntaxParserPhp: KSyntaxParser {
             switch state {
             case .html:
                 guard let open = findPhpOpen(from: i) else {
-                    emit(i..<end, .comment)
+                    emit(i..<end, .tag)
                     return .html
                 }
 
                 if isXmlProcessingInstruction(at: open) {
                     // "<?" だけ消費して次を探す（XHTML前提でも安全側に寄せる）
                     let next = min(open + 2, end)
-                    if next > i { emit(i..<next, .comment) }
+                    if next > i { emit(i..<next, .tag) }
                     i = next
                     continue
                 }
 
                 if open > i {
-                    emit(i..<open, .comment)
+                    emit(i..<open, .tag)
                 }
 
                 // open tag length
