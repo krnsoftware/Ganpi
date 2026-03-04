@@ -152,6 +152,25 @@
           <key>NSDocumentClass</key>
           <string>$(PRODUCT_MODULE_NAME).Document</string>
         </dict>
+        
+        <!-- 7) YAML -->
+        <dict>
+          <key>CFBundleTypeName</key>
+          <string>YAML</string>
+          <key>CFBundleTypeRole</key>
+          <string>Editor</string>
+          <key>LSItemContentTypes</key>
+          <array>
+            <string>public.yaml</string>
+          </array>
+          <key>CFBundleTypeExtensions</key>
+          <array>
+            <string>yaml</string>
+            <string>yml</string>
+          </array>
+          <key>NSDocumentClass</key>
+          <string>$(PRODUCT_MODULE_NAME).Document</string>
+        </dict>
     
     </array>
 	<key>NSMainNibFile</key>
