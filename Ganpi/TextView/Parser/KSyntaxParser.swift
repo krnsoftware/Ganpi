@@ -35,6 +35,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
     case plain = "public.plain-text"
     case ruby  = "public.ruby-script"
     case html  = "public.html"
+    case php   = "public.php-script"
     case ini   = "public.ini-text"
     case sh    = "public.shell-script"
     case python = "public.python-script"
@@ -49,6 +50,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         case .plain: return ["txt", "text", "md"]
         case .ruby:  return ["rb", "rake", "ru", "erb"]
         case .html:  return ["html", "htm", "xhtml", "xml", "plist"]
+        case .php:   return ["php", "phtml", "php3", "php4", "php5", "php7", "php8", "phps", "inc"]
         case .ini:   return ["ini", "cfg", "conf"]
         case .sh:    return ["sh", "bash", "zsh", "ksh"]
         case .python: return ["py", "pyw"]
@@ -74,6 +76,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         case .plain: return "Plain"
         case .ruby:  return "Ruby"
         case .html:  return "HTML/XML"
+        case .php:   return "PHP"
         case .ini:   return "INI"
         case .sh:    return "Shell"
         case .python: return "Python"
@@ -108,6 +111,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
             .plain : "plain",
             .ruby  : "ruby",
             .html  : "html",
+            .php   : "php",
             .ini   : "ini",
             .sh    : "sh",
             .python : "python",
@@ -129,6 +133,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         case .plain: return KSyntaxParserPlain(storage: storage)
         case .ruby:  return KSyntaxParserRuby(storage: storage)
         case .html:  return KSyntaxParserHtml(storage: storage)
+        case .php:   return KSyntaxParserPhp(storage: storage)
         case .ini:   return KSyntaxParserIni(storage: storage)
         case .sh:    return KSyntaxParserSh(storage: storage)
         case .python: return KSyntaxParserPython(storage: storage)
@@ -225,6 +230,8 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
             return .ruby
         case "python", "python3", "python2":
             return .python
+        case "php", "php8", "php7", "php5":
+             return .php
         case "node", "nodejs", "deno", "bun":
             return .typescript
         default:

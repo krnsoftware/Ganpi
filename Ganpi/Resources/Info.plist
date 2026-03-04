@@ -171,6 +171,30 @@
           <key>NSDocumentClass</key>
           <string>$(PRODUCT_MODULE_NAME).Document</string>
         </dict>
+        
+        <!-- PHP -->
+        <dict>
+          <key>CFBundleTypeName</key>
+          <string>PHP</string>
+          <key>CFBundleTypeRole</key>
+          <string>Editor</string>
+          <key>LSHandlerRank</key>
+          <string>Alternate</string>
+          <key>CFBundleTypeExtensions</key>
+          <array>
+            <string>php</string>
+            <string>phtml</string>
+            <string>php3</string>
+            <string>php4</string>
+            <string>php5</string>
+            <string>php7</string>
+            <string>php8</string>
+            <string>phps</string>
+            <string>inc</string>
+          </array>
+          <key>NSDocumentClass</key>
+          <string>$(PRODUCT_MODULE_NAME).Document</string>
+        </dict>
     
     </array>
 	<key>NSMainNibFile</key>
