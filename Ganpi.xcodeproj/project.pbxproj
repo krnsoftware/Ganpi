@@ -10,9 +10,22 @@
 		8680A5092E65DF8F00243FE8 /* Ganpi.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Ganpi.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		86515F792F58795A006B699B /* Exceptions for "Ganpi" folder in "Ganpi" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Resources/Info.plist,
+			);
+			target = 8680A5082E65DF8F00243FE8 /* Ganpi */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		8680A50B2E65DF8F00243FE8 /* Ganpi */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				86515F792F58795A006B699B /* Exceptions for "Ganpi" folder in "Ganpi" target */,
+			);
 			path = Ganpi;
 			sourceTree = "<group>";
 		};
