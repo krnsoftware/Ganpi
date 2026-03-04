@@ -107,6 +107,215 @@ final class KSyntaxParserYaml: KSyntaxParser {
 
         return spans
     }
+    
+    override func outline(in range: Range<Int>?) -> [KOutlineItem] {
+        // 軽量仕様：
+        // - Doc boundary: '---'
+        // - Top-level key: indent == 0 の 'key:' のみ
+        // - ブロックスカラー本文中は拾わない（| / > のみ endState 相当で追跡）
+        let skeleton = storage.skeletonString
+        let bytes = skeleton.bytes
+
+        @inline(__always)
+        func isSpaceOrTab(_ b: UInt8) -> Bool { b == FC.space || b == FC.tab }
+
+        @inline(__always)
+        func computeIndent(lineStart: Int, lineEnd: Int) -> (indent: Int, firstNonWS: Int) {
+            var col = 0
+            var i = lineStart
+            while i < lineEnd {
+                let b = bytes[i]
+                if b == FC.space {
+                    col += 1
+                    i += 1
+                    continue
+                }
+                if b == FC.tab {
+                    col += 4
+                    i += 1
+                    continue
+                }
+                break
+            }
+            return (indent: col, firstNonWS: i)
+        }
+
+        var items: [KOutlineItem] = []
+        items.reserveCapacity(64)
+
+        // block scalar 状態（最小）
+        var inBlockScalar = false
+        var blockScalarBaseIndent = 0
+        var blockScalarContentIndent = -1 // -1 means unknown
+
+        let lineCount = skeletonLineCount()
+        if lineCount <= 0 { return [] }
+
+        for line in 0..<lineCount {
+            let lineRange = skeleton.lineRange(at: line)
+            let start = lineRange.lowerBound
+            let end = lineRange.upperBound
+            if start >= end { continue }
+
+            let (indent, firstNonWS) = computeIndent(lineStart: start, lineEnd: end)
+
+            // ---- block scalar 本文中の扱い
+            if inBlockScalar {
+                if firstNonWS >= end {
+                    // 空行は本文扱いで継続
+                    continue
+                }
+
+                let required = (blockScalarContentIndent >= 0) ? blockScalarContentIndent : (blockScalarBaseIndent + 1)
+
+                if indent < required {
+                    // ここで block scalar 終了。通常解析へ。
+                    inBlockScalar = false
+                    blockScalarBaseIndent = 0
+                    blockScalarContentIndent = -1
+                } else {
+                    // contentIndent 未確定なら最初の非空行で確定
+                    if blockScalarContentIndent < 0 { blockScalarContentIndent = indent }
+                    continue
+                }
+            }
+
+            if firstNonWS >= end { continue }
+
+            // ---- Doc boundary（--- のみ）
+            if end - firstNonWS >= 3 {
+                let b0 = bytes[firstNonWS]
+                let b1 = bytes[firstNonWS + 1]
+                let b2 = bytes[firstNonWS + 2]
+                if b0 == FC.minus && b1 == FC.minus && b2 == FC.minus {
+                    let after = firstNonWS + 3
+                    if after == end || isSpaceOrTab(bytes[after]) {
+                        items.append(KOutlineItem(kind: .heading,
+                                                  nameRange: firstNonWS..<after,
+                                                  level: 0,
+                                                  isSingleton: false))
+                        continue
+                    }
+                }
+            }
+
+            // ---- Top-level key（indent==0 の 'key:' だけ）
+            if indent != 0 { continue }
+
+            // "- key:" は拾わない（軽量仕様）
+            if bytes[firstNonWS] == FC.minus {
+                continue
+            }
+
+            // 行内スキャン（クォート/コメントを避けて ':' を探す）
+            let keyStart = firstNonWS
+            let headByte = bytes[keyStart]
+            if headByte == FC.doubleQuote || headByte == FC.singleQuote || headByte == FC.question {
+                continue
+            }
+
+            var i = firstNonWS
+            var inDouble = false
+            var inSingle = false
+            var quoteStart = 0
+            var commentStart: Int? = nil
+            var keySep: Int? = nil
+
+            @inline(__always)
+            func isEscapedQuote(at index: Int, limit: Int) -> Bool {
+                if index <= limit { return false }
+                var backslashCount = 0
+                var j = index - 1
+                while j >= limit && bytes[j] == FC.backSlash {
+                    backslashCount += 1
+                    if j == 0 { break }
+                    j -= 1
+                }
+                return (backslashCount & 1) == 1
+            }
+
+            while i < end {
+                let b = bytes[i]
+
+                if inDouble {
+                    if b == FC.doubleQuote && !isEscapedQuote(at: i, limit: quoteStart) {
+                        inDouble = false
+                    }
+                    i += 1
+                    continue
+                }
+                if inSingle {
+                    if b == FC.singleQuote {
+                        if i + 1 < end && bytes[i + 1] == FC.singleQuote {
+                            i += 2
+                            continue
+                        }
+                        inSingle = false
+                    }
+                    i += 1
+                    continue
+                }
+
+                // comment start（直前が空白/行頭のみ）
+                if b == FC.numeric {
+                    if i == start || isSpaceOrTab(bytes[i - 1]) {
+                        commentStart = i
+                        break
+                    }
+                }
+
+                if b == FC.doubleQuote {
+                    quoteStart = i
+                    inDouble = true
+                    i += 1
+                    continue
+                }
+                if b == FC.singleQuote {
+                    quoteStart = i
+                    inSingle = true
+                    i += 1
+                    continue
+                }
+
+                if b == FC.colon {
+                    let after = i + 1
+                    if after == end || isSpaceOrTab(bytes[after]) {
+                        keySep = i
+                        break
+                    }
+                }
+
+                i += 1
+            }
+
+            guard let sep = keySep else { continue }
+
+            // key の末尾空白を落とす
+            var keyEnd = sep
+            while keyEnd > keyStart && isSpaceOrTab(bytes[keyEnd - 1]) { keyEnd -= 1 }
+            if keyStart >= keyEnd { continue }
+
+            items.append(KOutlineItem(kind: .heading,
+                                      nameRange: keyStart..<keyEnd,
+                                      level: 0,
+                                      isSingleton: false))
+
+            // block scalar 開始（| / >）だけ追跡
+            let scanEnd = commentStart ?? end
+            var j = sep + 1
+            while j < scanEnd && isSpaceOrTab(bytes[j]) { j += 1 }
+            if j < scanEnd {
+                let c = bytes[j]
+                if c == FC.pipe || c == FC.gt {
+                    inBlockScalar = true
+                    blockScalarBaseIndent = indent
+                    blockScalarContentIndent = -1
+                }
+            }
+        }
+
+        return items
+    }
 
     // MARK: - Private
 
