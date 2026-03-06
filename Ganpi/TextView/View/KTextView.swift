@@ -653,8 +653,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         
         // テキストを描画
         // IMの変換中文字列あれば、それをKLinesにFakeLineとして追加する。
-        if hasMarkedText(), let repRange = _replacementRange{
-            //lines.addIMFakeLine(replacementRange: repRange, attrString: _markedText, selectedRangeInMarkedText: _selectedRangeInMarkedText)
+        //if hasMarkedText(), let repRange = _replacementRange{
+        if hasMarkedText(), _replacementRange != nil {
             
             if validateCompositionState() {
                 // validate内で破綻検出時は状態をclearしてfalseを返す

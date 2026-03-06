@@ -791,7 +791,7 @@ final class KSyntaxParserTypeScript: KSyntaxParser {
         // Template の中で、次の `${` または `` ` `` を探す
         func processTemplateText(from startIndex: Int, segmentStart: Int) -> (newState: KEndState, nextIndex: Int) {
             var i = startIndex
-            var segmentStart = segmentStart
+            //var segmentStart = segmentStart
 
             while i < end {
                 let b = bytes[i]

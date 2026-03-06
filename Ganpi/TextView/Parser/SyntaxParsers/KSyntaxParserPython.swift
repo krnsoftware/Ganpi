@@ -688,7 +688,7 @@ final class KSyntaxParserPython: KSyntaxParser {
         @inline(__always)
         func scanExponent(from i0: Int) -> Int {
             // e/E[+/-]?digits
-            var i = i0
+            let i = i0
             if i >= end { return i0 }
 
             let b = bytes[i]
