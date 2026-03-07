@@ -36,6 +36,134 @@ final class KSyntaxParserYamaha: KSyntaxParser {
     // MARK: - Overrides
 
     override var lineCommentPrefix: String? { "#" }
+    
+    override class func detectScore(content: String) -> Int? {
+        if content.isEmpty { return nil }
+
+        let maxLines = 250
+
+        func hasPrefix(_ tokens: [String], _ expected: [String]) -> Bool {
+            if tokens.count < expected.count { return false }
+
+            for index in expected.indices {
+                if tokens[index] != expected[index] {
+                    return false
+                }
+            }
+            return true
+        }
+
+        var score = 0
+        var matchedStrongLines = 0
+        var matchedMediumLines = 0
+        var checkedLines = 0
+
+        for rawLine in content.split(separator: "\n", omittingEmptySubsequences: false) {
+            if checkedLines >= maxLines { break }
+            checkedLines += 1
+
+            let line = rawLine.trimmingCharacters(in: .whitespaces)
+            if line.isEmpty { continue }
+            if line.hasPrefix("#") || line.hasPrefix(";") || line.hasPrefix("!") {
+                continue
+            }
+
+            let tokens = line.split { $0 == " " || $0 == "\t" }.map { $0.lowercased() }
+            if tokens.isEmpty { continue }
+
+            if hasPrefix(tokens, ["pp", "select"]) {
+                score += 40
+                matchedStrongLines += 1
+                continue
+            }
+
+            if hasPrefix(tokens, ["tunnel", "select"]) {
+                score += 40
+                matchedStrongLines += 1
+                continue
+            }
+
+            if hasPrefix(tokens, ["nat", "descriptor", "type"]) {
+                score += 45
+                matchedStrongLines += 1
+                continue
+            }
+
+            if hasPrefix(tokens, ["pp", "auth"]) {
+                score += 35
+                matchedStrongLines += 1
+                continue
+            }
+
+            if hasPrefix(tokens, ["pppoe", "use"]) {
+                score += 35
+                matchedStrongLines += 1
+                continue
+            }
+
+            if hasPrefix(tokens, ["ip", "lan1", "address"]) || hasPrefix(tokens, ["ip", "lan2", "address"]) {
+                score += 35
+                matchedStrongLines += 1
+                continue
+            }
+
+            if hasPrefix(tokens, ["ip", "route"]) {
+                score += 18
+                matchedMediumLines += 1
+                continue
+            }
+
+            if hasPrefix(tokens, ["ip", "filter"]) {
+                score += 18
+                matchedMediumLines += 1
+                continue
+            }
+
+            if hasPrefix(tokens, ["dhcp", "scope"]) {
+                score += 18
+                matchedMediumLines += 1
+                continue
+            }
+
+            if hasPrefix(tokens, ["dns", "server"]) {
+                score += 16
+                matchedMediumLines += 1
+                continue
+            }
+
+            if hasPrefix(tokens, ["administrator", "password"]) {
+                score += 16
+                matchedMediumLines += 1
+                continue
+            }
+
+            if hasPrefix(tokens, ["schedule", "at"]) {
+                score += 14
+                matchedMediumLines += 1
+                continue
+            }
+
+            if hasPrefix(tokens, ["syslog", "notice"]) {
+                score += 14
+                matchedMediumLines += 1
+                continue
+            }
+        }
+
+        if matchedStrongLines >= 2 {
+            return score
+        }
+
+        if matchedStrongLines >= 1, matchedMediumLines >= 1 {
+            return score
+        }
+
+        if matchedMediumLines >= 4 {
+            return score
+        }
+
+        return nil
+    }
 
     override func attributes(in range: Range<Int>, tabWidth: Int) -> [KAttributedSpan] {
         if range.isEmpty { return [] }
@@ -271,6 +399,8 @@ final class KSyntaxParserYamaha: KSyntaxParser {
 
         return (nil, nil)
     }
+    
+    
 
     // MARK: - Private
 

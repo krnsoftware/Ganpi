@@ -155,36 +155,49 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
 
     static func detect(fromTypeName typeName: String?, orExtension ext: String?, content: String) -> Self {
         // 1) typeName が UTI として一致するか
-        if let type = typeName, let knownType = KSyntaxType(rawValue: type) {
+        // .plain はここでは確定しない
+        if let type = typeName, let knownType = KSyntaxType(rawValue: type), knownType != .plain {
             return knownType
         }
 
-        // 2) 拡張子から推定（拡張子優先。ただし plain系拡張子は確定にしない）
-        var isAmbiguousPlain = false
+        // 2) 拡張子から推定
+        // .plain はここでは確定しない
         if let fileExtension = ext?.lowercased(), !fileExtension.isEmpty {
-            if let type = Self.fromExtension(fileExtension) {
-                if type != .plain {
-                    return type
-                }
-
-                // plain拡張子でも「曖昧」なものは確定しない
-                let ambiguousPlainExtensions: Set<String> = ["txt", "text", "md"]
-                isAmbiguousPlain = ambiguousPlainExtensions.contains(fileExtension)
-                if !isAmbiguousPlain {
-                    return .plain
-                }
-                // fallthrough: 内容判定へ
+            if let type = Self.fromExtension(fileExtension), type != .plain {
+                return type
             }
-            // 未登録の拡張子 → 内容判定へ
         }
 
-        // 3) 内容判定
-        // 3-1) shebang（主に sh / ruby / python / php / node 等）
+        // 3) shebang
         if let detected = detectFromShebang(content) {
             return detected
         }
 
+        // 4) 内容判定
+        var bestType: Self? = nil
+        var bestScore: Int? = nil
 
+        func consider(_ type: Self, _ parserType: KSyntaxParser.Type) {
+            guard let score = parserType.detectScore(content: content) else { return }
+
+            if let currentBestScore = bestScore {
+                if score > currentBestScore {
+                    bestScore = score
+                    bestType = type
+                }
+            } else {
+                bestScore = score
+                bestType = type
+            }
+        }
+
+        consider(.yamaha, KSyntaxParserYamaha.self)
+
+        if let detected = bestType {
+            return detected
+        }
+
+        // 5) 最後のフォールバック
         return .plain
     }
     
