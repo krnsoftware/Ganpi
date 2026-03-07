@@ -42,6 +42,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
     case typescript = "com.microsoft.typescript"
     case css   = "public.css"
     case yaml  = "public.yaml"
+    case json  = "public.json"
 
 
     // extensions for every type.
@@ -57,6 +58,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         case .typescript: return ["js", "jsx", "mjs", "cjs", "ts", "tsx", "mts", "cts"]
         case .css:   return ["css"]
         case .yaml:  return ["yaml", "yml"]
+        case .json:  return ["json", "jsonc"]
         }
     }
 
@@ -83,6 +85,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         case .typescript: return "TypeScript"
         case .css:   return "CSS"
         case .yaml:  return "YAML"
+        case .json:  return "JSON"
         }
     }
 
@@ -118,6 +121,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
             .typescript : "typescript",
             .css   : "css",
             .yaml  : "yaml",
+            .json  : "json",
         ]
         // 設定名 → enum
         static let reverse: [String : KSyntaxType] = {
@@ -140,6 +144,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         case .typescript: return KSyntaxParserTypeScript(storage: storage)
         case .css:   return KSyntaxParserCss(storage: storage)
         case .yaml:  return KSyntaxParserYaml(storage: storage)
+        case .json:  return KSyntaxParserJson(storage: storage)
         }
     }
 

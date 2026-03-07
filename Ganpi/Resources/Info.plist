@@ -172,8 +172,29 @@
     <key>NSDocumentClass</key>
     <string>$(PRODUCT_MODULE_NAME).Document</string>
   </dict>
+  
+  <!-- 8) JSON -->
+  <dict>
+    <key>CFBundleTypeName</key>
+    <string>JSON</string>
+    <key>CFBundleTypeRole</key>
+    <string>Editor</string>
+    <key>LSHandlerRank</key>
+    <string>Default</string>
+    <key>LSItemContentTypes</key>
+    <array>
+      <string>public.json</string>
+    </array>
+    <key>CFBundleTypeExtensions</key>
+    <array>
+      <string>json</string>
+      <string>jsonc</string>
+    </array>
+    <key>NSDocumentClass</key>
+    <string>$(PRODUCT_MODULE_NAME).Document</string>
+  </dict>
         
-  <!-- 8) PHP -->
+  <!-- 9) PHP -->
   <dict>
     <key>CFBundleTypeName</key>
     <string>PHP</string>
@@ -201,7 +222,7 @@
     <string>$(PRODUCT_MODULE_NAME).Document</string>
   </dict>
         
-  <!-- 9) INI -->
+  <!-- 10) INI -->
   <dict>
     <key>CFBundleTypeName</key>
     <string>INI Configuration File</string>
