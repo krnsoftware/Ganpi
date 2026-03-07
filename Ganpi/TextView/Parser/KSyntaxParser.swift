@@ -43,6 +43,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
     case css   = "public.css"
     case yaml  = "public.yaml"
     case json  = "public.json"
+    case yamaha = "com.ganpi.yamaha-router-config"
 
 
     // extensions for every type.
@@ -59,6 +60,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         case .css:   return ["css"]
         case .yaml:  return ["yaml", "yml"]
         case .json:  return ["json", "jsonc"]
+        case .yamaha: return []
         }
     }
 
@@ -86,6 +88,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         case .css:   return "CSS"
         case .yaml:  return "YAML"
         case .json:  return "JSON"
+        case .yamaha: return "Yamaha"
         }
     }
 
@@ -122,6 +125,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
             .css   : "css",
             .yaml  : "yaml",
             .json  : "json",
+            .yamaha : "yamaha",
         ]
         // 設定名 → enum
         static let reverse: [String : KSyntaxType] = {
@@ -145,6 +149,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         case .css:   return KSyntaxParserCss(storage: storage)
         case .yaml:  return KSyntaxParserYaml(storage: storage)
         case .json:  return KSyntaxParserJson(storage: storage)
+        case .yamaha: return KSyntaxParserYamaha(storage: storage)
         }
     }
 
@@ -155,32 +160,35 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         }
 
         // 2) 拡張子から推定（拡張子優先。ただし plain系拡張子は確定にしない）
+        var isAmbiguousPlain = false
         if let fileExtension = ext?.lowercased(), !fileExtension.isEmpty {
             if let type = Self.fromExtension(fileExtension) {
-                // .txt などは plain 確定にせず、内容判定に回す
                 if type != .plain {
                     return type
                 }
 
                 // plain拡張子でも「曖昧」なものは確定しない
-                // （必要ならここに追加する）
                 let ambiguousPlainExtensions: Set<String> = ["txt", "text", "md"]
-                if !ambiguousPlainExtensions.contains(fileExtension) {
+                isAmbiguousPlain = ambiguousPlainExtensions.contains(fileExtension)
+                if !isAmbiguousPlain {
                     return .plain
                 }
                 // fallthrough: 内容判定へ
-            } else {
-                // 未登録の拡張子 → 内容判定へ
             }
+            // 未登録の拡張子 → 内容判定へ
         }
 
-        // 3) 拡張子が無い場合だけ内容判定（当面は shebang）
+        // 3) 内容判定
+        // 3-1) shebang（主に sh / ruby / python / php / node 等）
         if let detected = detectFromShebang(content) {
             return detected
         }
 
+
         return .plain
     }
+    
+   
 
     private static func detectFromShebang(_ content: String) -> Self? {
         if content.isEmpty { return nil }
@@ -360,6 +368,10 @@ class KSyntaxParser {
     func currentContext(at index: Int) -> (outer: String?, inner: String?) { return (nil, nil) }
     // get outline of structures. for 'jump' menu.
     func outline(in range: Range<Int>?) -> [KOutlineItem] { return [] }
+    
+    // Content detection hook (optional)
+    // Return nil if this parser cannot confidently detect the content.
+    class func detectScore(content: String) -> Int? { return nil }
     
     // get completion words (alphabetical / prefix match)
     // completion system needs implementaion of wordRange(at:).
