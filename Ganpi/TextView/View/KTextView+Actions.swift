@@ -69,6 +69,47 @@ extension KTextView {
         KMiniSearchPanel.shared.isAlternateSearchDirectionForward = false
     }
     
+    // MARK: - Command line (:s) action
+
+    /// Mini Search Panel の :s/<regex>/<rep>/[g] を実行する（UIは出さない）
+    @IBAction func executeSubstituteCommandLineAction(_ sender: Any?) {
+        guard let cmd = KMiniSearchPanel.shared.takePendingSubstitute() else {
+            NSSound.beep()
+            return
+        }
+
+        // もとの設定を退避（ユーザーの検索設定を勝手に変えない）
+        let defaults = UserDefaults.standard
+        let prevUseRegex = defaults.bool(forKey: KDefaultSearchKey.useRegex)
+        let prevSelectionOnly = defaults.bool(forKey: KDefaultSearchKey.selectionOnly)
+
+        // :s は regex 前提
+        defaults.set(true, forKey: KDefaultSearchKey.useRegex)
+
+        // selection があるなら selection のみ、なければ全文
+        let selectionOnly = !selectionRange.isEmpty
+        defaults.set(selectionOnly, forKey: KDefaultSearchKey.selectionOnly)
+
+        // パネルのバッキングストアへ設定（Search Window を開かなくても効く）
+        KSearchPanel.shared.searchString = cmd.pattern
+        KSearchPanel.shared.replaceString = cmd.replacement
+
+        if cmd.isGlobal {
+            _ = replaceAll()
+        } else {
+            // まず1件探して、それを置換（見つからなければ beep は search/replace 側が出す）
+            if search(for: .forward) {
+                _ = replace()
+            } else {
+                NSSound.beep()
+            }
+        }
+
+        // 設定を復帰
+        defaults.set(prevUseRegex, forKey: KDefaultSearchKey.useRegex)
+        defaults.set(prevSelectionOnly, forKey: KDefaultSearchKey.selectionOnly)
+    }
+    
     
     
     // MARK: - Undo actions

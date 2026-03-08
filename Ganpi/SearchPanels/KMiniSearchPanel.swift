@@ -81,16 +81,37 @@ final class KMiniSearchPanel: NSWindowController {
     
     @objc private func fieldEdited(_ sender: Any?) {
         if _suspendAction { return }
-        
-        let search = _findField.stringValue
-        
-        if !search.isEmpty {
-            KSearchPanel.shared.searchString = search
-            NSApp.sendAction(#selector(KTextView.searchAlternateAction), to: nil, from: self)
-            _findField.stringValue = ""
-            window?.orderOut(nil)
+
+        let input = _findField.stringValue
+        if input.isEmpty { return }
+
+        // :s コマンド（UIなし即実行）
+        if input.hasPrefix(":s") {
+            guard let pending = parseSubstituteCommandLine(input) else {
+                NSSound.beep()
+                return
+            }
+
+            _pendingSubstitute = pending
+
+            let ok = NSApp.sendAction(#selector(KTextView.executeSubstituteCommandLineAction),
+                                      to: nil,
+                                      from: self)
+            if ok {
+                _findField.stringValue = ""
+                window?.orderOut(nil)
+            } else {
+                // 実行先が無い（TextViewがいない等）
+                NSSound.beep()
+            }
+            return
         }
-        
+
+        // 従来どおり：検索
+        KSearchPanel.shared.searchString = input
+        NSApp.sendAction(#selector(KTextView.searchAlternateAction), to: nil, from: self)
+        _findField.stringValue = ""
+        window?.orderOut(nil)
     }
     
     @IBAction private func actCancel(_ sender: Any?) {
@@ -132,6 +153,117 @@ final class KMiniSearchPanel: NSWindowController {
         let fieldY = floor((container.bounds.height - fieldHeight) / 2)
 
         _findField.frame = NSRect(x: insetX, y: max(insetY, fieldY), width: fieldWidth, height: fieldHeight)
+    }
+    
+    
+    // MARK: - :s command support
+
+    private struct KPendingSubstitute {
+        let pattern: String
+        let replacement: String
+        let isGlobal: Bool
+    }
+
+    private var _pendingSubstitute: KPendingSubstitute? = nil
+
+    func takePendingSubstitute() -> (pattern: String, replacement: String, isGlobal: Bool)? {
+        guard let p = _pendingSubstitute else { return nil }
+        _pendingSubstitute = nil
+        return (p.pattern, p.replacement, p.isGlobal)
+    }
+
+    /// :s/<regex>/<rep>/[g]
+    /// - delimiterは'/'固定
+    /// - '\/' は '/' として扱う（両セクション共通）
+    /// - '\\' は '\' として扱う（最低限）
+    private func parseSubstituteCommandLine(_ input: String) -> KPendingSubstitute? {
+        // ":s" 以降を読む
+        let chars = Array(input)
+        if chars.count < 3 { return nil } // ":s" だけ等
+
+        // 先頭 ":s" を確認
+        guard chars[0] == ":", chars[1] == "s" else { return nil }
+
+        var index = 2
+
+        // ":s/" を要求
+        guard index < chars.count, chars[index] == "/" else { return nil }
+        index += 1
+
+        func readSection() -> String? {
+            var out: [Character] = []
+            var escaped = false
+
+            while index < chars.count {
+                let c = chars[index]
+                index += 1
+
+                if escaped {
+                    // 最低限：\/ と \\ を復元（他はそのまま）
+                    out.append(c)
+                    escaped = false
+                    continue
+                }
+
+                if c == "\\" {
+                    escaped = true
+                    continue
+                }
+
+                if c == "/" {
+                    return String(out)
+                }
+
+                out.append(c)
+            }
+            return nil // 終端に達した（区切りがない）
+        }
+
+        guard let rawPattern = readSection() else { return nil }
+        guard !rawPattern.isEmpty else { return nil } // 空regexは不可
+
+        guard let rawReplacement = readSection() else { return nil }
+
+        // 末尾フラグ（gのみ）
+        // 末尾に空白があってもよい
+        while index < chars.count, chars[index].isWhitespace { index += 1 }
+
+        var isGlobal = false
+        if index < chars.count {
+            if chars[index] == "g" {
+                isGlobal = true
+                index += 1
+            }
+            while index < chars.count, chars[index].isWhitespace { index += 1 }
+        }
+
+        // 余計な文字があるなら不正
+        if index < chars.count { return nil }
+
+        // エスケープ復元：\/ -> /, \\ -> \
+        func unescape(_ s: String) -> String {
+            var result: [Character] = []
+            let a = Array(s)
+            var i = 0
+            while i < a.count {
+                let c = a[i]
+                if c == "\\", i + 1 < a.count {
+                    let n = a[i + 1]
+                    if n == "/" || n == "\\" {
+                        result.append(n)
+                        i += 2
+                        continue
+                    }
+                }
+                result.append(c)
+                i += 1
+            }
+            return String(result)
+        }
+
+        return KPendingSubstitute(pattern: unescape(rawPattern),
+                                  replacement: unescape(rawReplacement),
+                                  isGlobal: isGlobal)
     }
     
 }
