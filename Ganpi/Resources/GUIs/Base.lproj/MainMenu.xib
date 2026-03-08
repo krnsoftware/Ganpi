@@ -237,6 +237,12 @@
                                                 <action selector="centerSelectionInVisibleArea:" target="-1" id="IOG-6D-g5B"/>
                                             </connections>
                                         </menuItem>
+                                        <menuItem isSeparatorItem="YES" id="t3S-t2-LE7"/>
+                                        <menuItem title="Mini Search..." keyEquivalent="/" id="NyV-de-m4n">
+                                            <connections>
+                                                <action selector="showMiniSearchPanel:" target="-1" id="oaS-nb-Y6w"/>
+                                            </connections>
+                                        </menuItem>
                                     </items>
                                 </menu>
                             </menuItem>
