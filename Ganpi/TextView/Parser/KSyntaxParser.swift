@@ -44,6 +44,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
     case yaml  = "public.yaml"
     case json  = "public.json"
     case yamaha = "com.ganpi.yamaha-router-config"
+    case cisco  = "com.ganpi.cisco-ios-config"
 
 
     // extensions for every type.
@@ -61,6 +62,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         case .yaml:  return ["yaml", "yml"]
         case .json:  return ["json", "jsonc"]
         case .yamaha: return []
+        case .cisco: return []
         }
     }
 
@@ -89,6 +91,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         case .yaml:  return "YAML"
         case .json:  return "JSON"
         case .yamaha: return "Yamaha"
+        case .cisco: return "Cisco"
         }
     }
 
@@ -126,6 +129,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
             .yaml  : "yaml",
             .json  : "json",
             .yamaha : "yamaha",
+            .cisco  : "cisco",
         ]
         // 設定名 → enum
         static let reverse: [String : KSyntaxType] = {
@@ -150,6 +154,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         case .yaml:  return KSyntaxParserYaml(storage: storage)
         case .json:  return KSyntaxParserJson(storage: storage)
         case .yamaha: return KSyntaxParserYamaha(storage: storage)
+        case .cisco: return KSyntaxParserCisco(storage: storage)
         }
     }
 
@@ -192,6 +197,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         }
 
         consider(.yamaha, KSyntaxParserYamaha.self)
+        consider(.cisco, KSyntaxParserCisco.self)
 
         if let detected = bestType {
             return detected
