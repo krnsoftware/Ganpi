@@ -298,21 +298,28 @@ extension Document {
             // 重要：未編集状態へ（閉じるとき保存確認を出さない）
             doc.updateChangeCount(.changeCleared)
 
+            // 先にWindowを作る（まだ表示しない）
             doc.makeWindowControllers()
-            doc.showWindows()
 
             // タイトル
             doc.displayName = title
             let newWindow = doc.windowControllers.first?.window
             newWindow?.title = title
 
-            // タブ結合（可能なら同一ウインドウへ）
+            // 親ウインドウがあるなら「表示する前に」タブとして結合
             if let parentWindow,
                let newWindow,
                newWindow !== parentWindow {
                 parentWindow.addTabbedWindow(newWindow, ordered: .above)
+
+                // 新しく追加されたタブ（= newWindow）を選択して前面化
                 newWindow.makeKeyAndOrderFront(nil)
+                return doc
             }
+
+            // 親がない/結合できない場合だけ通常表示
+            doc.showWindows()
+            newWindow?.makeKeyAndOrderFront(nil)
 
             return doc
         } catch {
