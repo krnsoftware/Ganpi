@@ -3329,8 +3329,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
             point = convert(point, to: nil)
             point = window.convertPoint(toScreen: point)
         }
-        KMiniSearchPanel.shared.show(at: point)
-        
+
+        KMiniSearchPanel.shared.show(at: point, font: textStorage.baseFont)
     }
     
 }
