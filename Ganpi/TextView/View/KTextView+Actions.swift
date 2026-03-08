@@ -90,12 +90,10 @@ extension KTextView {
             targetRange = lineRange
         }
 
-        // 既存設定を退避（ユーザー設定を汚さない）
         let defaults = UserDefaults.standard
         let prevUseRegex = defaults.bool(forKey: KDefaultSearchKey.useRegex)
         defaults.set(true, forKey: KDefaultSearchKey.useRegex)
 
-        // パネルのストアへ設定（Search Window を開かずに動作させる）
         KSearchPanel.shared.searchString = cmd.pattern
         KSearchPanel.shared.replaceString = cmd.replacement
 
@@ -105,54 +103,32 @@ extension KTextView {
 
             if count == 0 { return }
 
-            // 置換結果の範囲を選択（caretは selectionRange に追従する前提）
             selectionRange = targetRange.lowerBound ..< (targetRange.lowerBound + length)
             return
         }
 
-        // gなし：targetRange 内の「最初の1件だけ」置換
-        let searchString = KSearchPanel.shared.searchString
-        let replaceString = KSearchPanel.shared.replaceString
-        let isCaseInsensitive = defaults.bool(forKey: KDefaultSearchKey.ignoreCase)
-
-        guard !searchString.isEmpty else {
+        // gなし：targetRange内の「最初の1件だけ」
+        // anchorRange は「upperBound から検索開始」なので、targetRangeの先頭で空rangeを渡す
+        let anchor = targetRange.lowerBound ..< targetRange.lowerBound
+        guard let hit = search(for: .forward, anchorRange: anchor) else {
             defaults.set(prevUseRegex, forKey: KDefaultSearchKey.useRegex)
             NSSound.beep()
             return
         }
 
-        let wholeString = textStorage.string
-        let targetString = wholeString[targetRange]
-
-        var options: NSRegularExpression.Options = [.anchorsMatchLines]
-        if isCaseInsensitive { options.insert(.caseInsensitive) }
-
-        guard let regex = try? NSRegularExpression(pattern: searchString, options: options) else {
+        // :s（現在行）のとき、行の外で見つかったものは無効
+        guard hit.lowerBound >= targetRange.lowerBound, hit.upperBound <= targetRange.upperBound else {
             defaults.set(prevUseRegex, forKey: KDefaultSearchKey.useRegex)
             NSSound.beep()
             return
         }
 
-        let sub = String(targetString)
-        let mutable = NSMutableString(string: sub)
-        let nsWhole = NSRange(location: 0, length: mutable.length)
-
-        guard let match = regex.firstMatch(in: sub, options: [], range: nsWhole) else {
-            defaults.set(prevUseRegex, forKey: KDefaultSearchKey.useRegex)
-            NSSound.beep()
-            return
-        }
-
-        let replacedSub = regex.stringByReplacingMatches(in: sub,
-                                                         options: [],
-                                                         range: match.range,
-                                                         withTemplate: replaceString)
-        textStorage.replaceString(in: targetRange, with: replacedSub)
-
+        let (_, replacedLength) = replaceAll(for: hit)
         defaults.set(prevUseRegex, forKey: KDefaultSearchKey.useRegex)
 
-        // 置換後範囲を選択（caretは selectionRange に追従する前提）
-        selectionRange = targetRange.lowerBound ..< (targetRange.lowerBound + replacedSub.count)
+        if replacedLength == 0 { return }
+
+        selectionRange = hit.lowerBound ..< (hit.lowerBound + replacedLength)
     }
     
     // MARK: - Command line (:g / :v) action
@@ -192,6 +168,7 @@ extension KTextView {
             let r = NSRange(location: 0, length: ns.length)
             let matched = (regex.firstMatch(in: lineString, options: [], range: r) != nil)
 
+            //isInvertがfalseならmatchした行を、trueならmatchしなかった行を追加する。
             if matched != cmd.isInvert {
                 let lineNo = i + 1
                 let prefix = String(format: "%0*d: ", width, lineNo)

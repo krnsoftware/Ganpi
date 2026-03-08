@@ -1488,6 +1488,16 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     
     @discardableResult
     func search(for direction:KDirection = .forward) -> Bool {
+        guard let result = search(for: direction, anchorRange: selectionRange) else {
+            log("no result.", from:self)
+            return false
+        }
+        
+        selectionRange = result
+        centerSelectionInVisibleArea(nil)
+        return true
+        
+        /*
         let searchString = KSearchPanel.shared.searchString
         let isCaseInsensitive = UserDefaults.standard.bool(forKey: KDefaultSearchKey.ignoreCase)
         let usesRegularExpression = UserDefaults.standard.bool(forKey: KDefaultSearchKey.useRegex)
@@ -1533,6 +1543,57 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         centerSelectionInVisibleArea(nil)
         
         return true
+         */
+    }
+    
+    @discardableResult
+    func search(for direction:KDirection, anchorRange:Range<Int>) -> Range<Int>? {
+        let searchString = KSearchPanel.shared.searchString
+        let isCaseInsensitive = UserDefaults.standard.bool(forKey: KDefaultSearchKey.ignoreCase)
+        let usesRegularExpression = UserDefaults.standard.bool(forKey: KDefaultSearchKey.useRegex)
+        
+        guard  anchorRange.lowerBound >= 0, anchorRange.upperBound <= textStorage.count else {
+            log("range is out of range.",from:self)
+            return nil
+        }
+        
+        var regexPattern:Regex<Substring>
+        var selection:Range<Int>?
+        
+        do {
+            if usesRegularExpression {
+                regexPattern = try Regex(searchString).anchorsMatchLineEndings(true)
+            } else {
+                regexPattern = try Regex(NSRegularExpression.escapedPattern(for: searchString))
+            }
+        } catch {
+            log("searchString is invalid.",from:self)
+            return nil
+        }
+        
+        if isCaseInsensitive {
+            regexPattern = regexPattern.ignoresCase()
+        }
+        
+        if direction == .forward {
+            let searchIndex = anchorRange.upperBound
+            let targetString = textStorage.string(in: searchIndex..<textStorage.count)
+            
+            if let match = targetString.firstMatch(of: regexPattern),
+               let range = targetString.integerRange(from:match.range) {
+                
+                selection = searchIndex + range.lowerBound..<searchIndex + range.upperBound
+            }
+        } else {
+            let targetString = textStorage.string(in: 0..<anchorRange.lowerBound)
+            let matches = targetString.matches(of: regexPattern)
+            if let range = matches.last?.range,
+               let intrange = targetString.integerRange(from: range){
+                selection = intrange
+            }
+        }
+        
+        return selection
     }
     
     @discardableResult

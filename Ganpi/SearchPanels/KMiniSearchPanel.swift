@@ -88,15 +88,15 @@ final class KMiniSearchPanel: NSWindowController {
         // :s / :%s を優先
         if input.hasPrefix(":s") || input.hasPrefix(":%s") {
             guard let pending = parseSubstituteCommandLine(input) else {
-                NSSound.beep()
+                reportCommandLineParseError("Command parse error", input: input)
                 return
             }
             _pendingSubstitute = pending
 
-            let ok = NSApp.sendAction(#selector(KTextView.executeSubstituteCommandLineAction),
+            let status = NSApp.sendAction(#selector(KTextView.executeSubstituteCommandLineAction),
                                       to: nil,
                                       from: self)
-            if ok {
+            if status {
                 _findField.stringValue = ""
                 window?.orderOut(nil)
             } else {
@@ -108,16 +108,16 @@ final class KMiniSearchPanel: NSWindowController {
         // :g / :v を優先
         if input.hasPrefix(":g") || input.hasPrefix(":v") {
             guard let pending = parseGlobalCommandLine(input) else {
-                NSSound.beep()
+                reportCommandLineParseError("Command parse error", input: input)
                 return
             }
             _pendingGlobal = pending
 
-            let ok = NSApp.sendAction(#selector(KTextView.executeGlobalCommandLineAction),
+            let status = NSApp.sendAction(#selector(KTextView.executeGlobalCommandLineAction),
                                       to: nil,
                                       from: self)
             
-            if ok {
+            if status {
                 _findField.stringValue = ""
                 window?.orderOut(nil)
             } else {
@@ -372,6 +372,11 @@ final class KMiniSearchPanel: NSWindowController {
             i += 1
         }
         return String(result)
+    }
+    
+    private func reportCommandLineParseError(_ message: String, input: String) {
+        KLog.shared.log(id: "commandline", message: "\(message) (\(input))")
+        KLogPanel.shared.present()
     }
     
 }
