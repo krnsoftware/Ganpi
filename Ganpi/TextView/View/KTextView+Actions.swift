@@ -69,18 +69,25 @@ extension KTextView {
         KMiniSearchPanel.shared.isAlternateSearchDirectionForward = false
     }
     
-    // MARK: - Command line (:s) action
+    // MARK: - Command line (:s / :%s) action
 
-    /// Mini Search Panel の :s/<regex>/<rep>/[g] を実行する（UIは出さない）
-    /// 対象は「現在行」固定（selectionの有無で挙動を変えない）
+    /// Mini Search Panel の :s/<regex>/<rep>/[g] / :%s/<regex>/<rep>/[g] を実行する（UIは出さない）
+    /// :s  は「現在行」固定、:%s は「全文」固定（selectionの有無で挙動を変えない）
     @IBAction func executeSubstituteCommandLineAction(_ sender: Any?) {
         guard let cmd = KMiniSearchPanel.shared.takePendingSubstitute() else {
             NSSound.beep()
             return
         }
-        guard let lineRange = textStorage.lineRange(at: caretIndex) else {
-            NSSound.beep()
-            return
+
+        let targetRange: Range<Int>
+        if cmd.isWholeDocument {
+            targetRange = 0 ..< textStorage.count
+        } else {
+            guard let lineRange = textStorage.lineRange(at: caretIndex) else {
+                NSSound.beep()
+                return
+            }
+            targetRange = lineRange
         }
 
         // 既存設定を退避（ユーザー設定を汚さない）
@@ -88,24 +95,22 @@ extension KTextView {
         let prevUseRegex = defaults.bool(forKey: KDefaultSearchKey.useRegex)
         defaults.set(true, forKey: KDefaultSearchKey.useRegex)
 
-        // パネルのストアへ設定（Search Windowを開かずに動作させる）
+        // パネルのストアへ設定（Search Window を開かずに動作させる）
         KSearchPanel.shared.searchString = cmd.pattern
         KSearchPanel.shared.replaceString = cmd.replacement
 
         if cmd.isGlobal {
-            let (count, length) = replaceAll(for: lineRange)
-            if count == 0 { defaults.set(prevUseRegex, forKey: KDefaultSearchKey.useRegex); return }
-
-            // 置換後の行全体を選択（replaceAll()の流儀に合わせる）
-            selectionRange = lineRange.lowerBound ..< (lineRange.lowerBound + length)
-
-            scrollCaretToVisible()
-
+            let (count, length) = replaceAll(for: targetRange)
             defaults.set(prevUseRegex, forKey: KDefaultSearchKey.useRegex)
+
+            if count == 0 { return }
+
+            // 置換結果の範囲を選択（caretは selectionRange に追従する前提）
+            selectionRange = targetRange.lowerBound ..< (targetRange.lowerBound + length)
             return
         }
 
-        // gなし：現在行の最初の1件だけ置換
+        // gなし：targetRange 内の「最初の1件だけ」置換
         let searchString = KSearchPanel.shared.searchString
         let replaceString = KSearchPanel.shared.replaceString
         let isCaseInsensitive = defaults.bool(forKey: KDefaultSearchKey.ignoreCase)
@@ -117,7 +122,7 @@ extension KTextView {
         }
 
         let wholeString = textStorage.string
-        let targetString = wholeString[lineRange]
+        let targetString = wholeString[targetRange]
 
         var options: NSRegularExpression.Options = [.anchorsMatchLines]
         if isCaseInsensitive { options.insert(.caseInsensitive) }
@@ -138,20 +143,17 @@ extension KTextView {
             return
         }
 
-        // マッチ1件だけ置換して、行全体を差し替える（UTF-16 index変換を避ける）
-        let replacedLine = regex.stringByReplacingMatches(in: sub,
-                                                          options: [],
-                                                          range: match.range,
-                                                          withTemplate: replaceString)
-        textStorage.replaceString(in: lineRange, with: replacedLine)
-
-        // 置換後の行を選択
-        selectionRange = lineRange.lowerBound ..< (lineRange.lowerBound + replacedLine.count)
-        scrollCaretToVisible()
+        let replacedSub = regex.stringByReplacingMatches(in: sub,
+                                                         options: [],
+                                                         range: match.range,
+                                                         withTemplate: replaceString)
+        textStorage.replaceString(in: targetRange, with: replacedSub)
 
         defaults.set(prevUseRegex, forKey: KDefaultSearchKey.useRegex)
+
+        // 置換後範囲を選択（caretは selectionRange に追従する前提）
+        selectionRange = targetRange.lowerBound ..< (targetRange.lowerBound + replacedSub.count)
     }
-    
     
     
     // MARK: - Undo actions

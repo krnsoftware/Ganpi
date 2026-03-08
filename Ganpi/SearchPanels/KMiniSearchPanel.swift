@@ -85,8 +85,8 @@ final class KMiniSearchPanel: NSWindowController {
         let input = _findField.stringValue
         if input.isEmpty { return }
 
-        // :s/<regex>/<rep>/[g] を優先
-        if input.hasPrefix(":s") {
+        // :s / :%s を優先
+        if input.hasPrefix(":s") || input.hasPrefix(":%s") {
             guard let pending = parseSubstituteCommandLine(input) else {
                 NSSound.beep()
                 return
@@ -154,9 +154,15 @@ final class KMiniSearchPanel: NSWindowController {
     }
     
     
-    // MARK: - :s command support
+    // MARK: - :s / :%s command support
+
+    private enum KSubstituteTarget {
+        case currentLine
+        case wholeDocument
+    }
 
     private struct KPendingSubstitute {
+        let target: KSubstituteTarget
         let pattern: String
         let replacement: String
         let isGlobal: Bool
@@ -164,22 +170,33 @@ final class KMiniSearchPanel: NSWindowController {
 
     private var _pendingSubstitute: KPendingSubstitute? = nil
 
-    func takePendingSubstitute() -> (pattern: String, replacement: String, isGlobal: Bool)? {
+    func takePendingSubstitute() -> (isWholeDocument: Bool, pattern: String, replacement: String, isGlobal: Bool)? {
         guard let p = _pendingSubstitute else { return nil }
         _pendingSubstitute = nil
-        return (p.pattern, p.replacement, p.isGlobal)
+        return (p.target == .wholeDocument, p.pattern, p.replacement, p.isGlobal)
     }
 
     /// :s/<regex>/<rep>/[g]
+    /// :%s/<regex>/<rep>/[g]
     /// - delimiterは'/'固定
     /// - '\/' と '\\' を最低限解釈
     private func parseSubstituteCommandLine(_ input: String) -> KPendingSubstitute? {
         let chars = Array(input)
-        if chars.count < 4 { return nil } // ":s/" 未満は不可
+        if chars.count < 4 { return nil }
 
-        guard chars[0] == ":", chars[1] == "s" else { return nil }
+        guard chars[0] == ":" else { return nil }
 
-        var index = 2
+        var index = 1
+        var target: KSubstituteTarget = .currentLine
+
+        if index < chars.count, chars[index] == "%" {
+            target = .wholeDocument
+            index += 1
+        }
+
+        guard index < chars.count, chars[index] == "s" else { return nil }
+        index += 1
+
         guard index < chars.count, chars[index] == "/" else { return nil }
         index += 1
 
@@ -221,6 +238,7 @@ final class KMiniSearchPanel: NSWindowController {
             }
             while index < chars.count, chars[index].isWhitespace { index += 1 }
         }
+
         if index < chars.count { return nil }
 
         func unescape(_ s: String) -> String {
@@ -243,7 +261,8 @@ final class KMiniSearchPanel: NSWindowController {
             return String(result)
         }
 
-        return KPendingSubstitute(pattern: unescape(rawPattern),
+        return KPendingSubstitute(target: target,
+                                  pattern: unescape(rawPattern),
                                   replacement: unescape(rawReplacement),
                                   isGlobal: isGlobal)
     }
