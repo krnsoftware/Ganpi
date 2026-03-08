@@ -72,42 +72,84 @@ extension KTextView {
     // MARK: - Command line (:s) action
 
     /// Mini Search Panel の :s/<regex>/<rep>/[g] を実行する（UIは出さない）
+    /// 対象は「現在行」固定（selectionの有無で挙動を変えない）
     @IBAction func executeSubstituteCommandLineAction(_ sender: Any?) {
         guard let cmd = KMiniSearchPanel.shared.takePendingSubstitute() else {
             NSSound.beep()
             return
         }
+        guard let lineRange = textStorage.lineRange(at: caretIndex) else {
+            NSSound.beep()
+            return
+        }
 
-        // もとの設定を退避（ユーザーの検索設定を勝手に変えない）
+        // 既存設定を退避（ユーザー設定を汚さない）
         let defaults = UserDefaults.standard
         let prevUseRegex = defaults.bool(forKey: KDefaultSearchKey.useRegex)
-        let prevSelectionOnly = defaults.bool(forKey: KDefaultSearchKey.selectionOnly)
-
-        // :s は regex 前提
         defaults.set(true, forKey: KDefaultSearchKey.useRegex)
 
-        // selection があるなら selection のみ、なければ全文
-        let selectionOnly = !selectionRange.isEmpty
-        defaults.set(selectionOnly, forKey: KDefaultSearchKey.selectionOnly)
-
-        // パネルのバッキングストアへ設定（Search Window を開かなくても効く）
+        // パネルのストアへ設定（Search Windowを開かずに動作させる）
         KSearchPanel.shared.searchString = cmd.pattern
         KSearchPanel.shared.replaceString = cmd.replacement
 
         if cmd.isGlobal {
-            _ = replaceAll()
-        } else {
-            // まず1件探して、それを置換（見つからなければ beep は search/replace 側が出す）
-            if search(for: .forward) {
-                _ = replace()
-            } else {
-                NSSound.beep()
-            }
+            let (count, length) = replaceAll(for: lineRange)
+            if count == 0 { defaults.set(prevUseRegex, forKey: KDefaultSearchKey.useRegex); return }
+
+            // 置換後の行全体を選択（replaceAll()の流儀に合わせる）
+            selectionRange = lineRange.lowerBound ..< (lineRange.lowerBound + length)
+
+            scrollCaretToVisible()
+
+            defaults.set(prevUseRegex, forKey: KDefaultSearchKey.useRegex)
+            return
         }
 
-        // 設定を復帰
+        // gなし：現在行の最初の1件だけ置換
+        let searchString = KSearchPanel.shared.searchString
+        let replaceString = KSearchPanel.shared.replaceString
+        let isCaseInsensitive = defaults.bool(forKey: KDefaultSearchKey.ignoreCase)
+
+        guard !searchString.isEmpty else {
+            defaults.set(prevUseRegex, forKey: KDefaultSearchKey.useRegex)
+            NSSound.beep()
+            return
+        }
+
+        let wholeString = textStorage.string
+        let targetString = wholeString[lineRange]
+
+        var options: NSRegularExpression.Options = [.anchorsMatchLines]
+        if isCaseInsensitive { options.insert(.caseInsensitive) }
+
+        guard let regex = try? NSRegularExpression(pattern: searchString, options: options) else {
+            defaults.set(prevUseRegex, forKey: KDefaultSearchKey.useRegex)
+            NSSound.beep()
+            return
+        }
+
+        let sub = String(targetString)
+        let mutable = NSMutableString(string: sub)
+        let nsWhole = NSRange(location: 0, length: mutable.length)
+
+        guard let match = regex.firstMatch(in: sub, options: [], range: nsWhole) else {
+            defaults.set(prevUseRegex, forKey: KDefaultSearchKey.useRegex)
+            NSSound.beep()
+            return
+        }
+
+        // マッチ1件だけ置換して、行全体を差し替える（UTF-16 index変換を避ける）
+        let replacedLine = regex.stringByReplacingMatches(in: sub,
+                                                          options: [],
+                                                          range: match.range,
+                                                          withTemplate: replaceString)
+        textStorage.replaceString(in: lineRange, with: replacedLine)
+
+        // 置換後の行を選択
+        selectionRange = lineRange.lowerBound ..< (lineRange.lowerBound + replacedLine.count)
+        scrollCaretToVisible()
+
         defaults.set(prevUseRegex, forKey: KDefaultSearchKey.useRegex)
-        defaults.set(prevSelectionOnly, forKey: KDefaultSearchKey.selectionOnly)
     }
     
     

@@ -1579,8 +1579,9 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         return true
     }
     
+    // 全文置換の本体。
     @discardableResult
-    private func replaceAll(for range: Range<Int>) -> (count: Int, length: Int) {
+    func replaceAll(for range: Range<Int>) -> (count: Int, length: Int) {
         if range.isEmpty { NSSound.beep(); return (0, range.count) }
         guard range.lowerBound >= 0, range.upperBound <= textStorage.count else {
             log("range is out of bounds.",from:self)
@@ -1620,7 +1621,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         let mutableRange = NSRange(location: 0, length: mutableString.length)
         let count = regex.replaceMatches(in: mutableString, options: [], range: mutableRange, withTemplate: template)
 
-        guard count > 0 else { NSSound.beep(); return (0, range.count) }
+        guard count > 0 else { return (0, range.count) }
 
         // 置換結果で選択範囲全体を差し替え（nsRange内のみ変更されている）
         let replacedSub = String(mutableString)

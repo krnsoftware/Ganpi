@@ -85,13 +85,12 @@ final class KMiniSearchPanel: NSWindowController {
         let input = _findField.stringValue
         if input.isEmpty { return }
 
-        // :s コマンド（UIなし即実行）
+        // :s/<regex>/<rep>/[g] を優先
         if input.hasPrefix(":s") {
             guard let pending = parseSubstituteCommandLine(input) else {
                 NSSound.beep()
                 return
             }
-
             _pendingSubstitute = pending
 
             let ok = NSApp.sendAction(#selector(KTextView.executeSubstituteCommandLineAction),
@@ -101,7 +100,6 @@ final class KMiniSearchPanel: NSWindowController {
                 _findField.stringValue = ""
                 window?.orderOut(nil)
             } else {
-                // 実行先が無い（TextViewがいない等）
                 NSSound.beep()
             }
             return
@@ -174,19 +172,14 @@ final class KMiniSearchPanel: NSWindowController {
 
     /// :s/<regex>/<rep>/[g]
     /// - delimiterは'/'固定
-    /// - '\/' は '/' として扱う（両セクション共通）
-    /// - '\\' は '\' として扱う（最低限）
+    /// - '\/' と '\\' を最低限解釈
     private func parseSubstituteCommandLine(_ input: String) -> KPendingSubstitute? {
-        // ":s" 以降を読む
         let chars = Array(input)
-        if chars.count < 3 { return nil } // ":s" だけ等
+        if chars.count < 4 { return nil } // ":s/" 未満は不可
 
-        // 先頭 ":s" を確認
         guard chars[0] == ":", chars[1] == "s" else { return nil }
 
         var index = 2
-
-        // ":s/" を要求
         guard index < chars.count, chars[index] == "/" else { return nil }
         index += 1
 
@@ -199,33 +192,25 @@ final class KMiniSearchPanel: NSWindowController {
                 index += 1
 
                 if escaped {
-                    // 最低限：\/ と \\ を復元（他はそのまま）
                     out.append(c)
                     escaped = false
                     continue
                 }
-
                 if c == "\\" {
                     escaped = true
                     continue
                 }
-
                 if c == "/" {
                     return String(out)
                 }
-
                 out.append(c)
             }
-            return nil // 終端に達した（区切りがない）
+            return nil
         }
 
-        guard let rawPattern = readSection() else { return nil }
-        guard !rawPattern.isEmpty else { return nil } // 空regexは不可
-
+        guard let rawPattern = readSection(), !rawPattern.isEmpty else { return nil }
         guard let rawReplacement = readSection() else { return nil }
 
-        // 末尾フラグ（gのみ）
-        // 末尾に空白があってもよい
         while index < chars.count, chars[index].isWhitespace { index += 1 }
 
         var isGlobal = false
@@ -236,11 +221,8 @@ final class KMiniSearchPanel: NSWindowController {
             }
             while index < chars.count, chars[index].isWhitespace { index += 1 }
         }
-
-        // 余計な文字があるなら不正
         if index < chars.count { return nil }
 
-        // エスケープ復元：\/ -> /, \\ -> \
         func unescape(_ s: String) -> String {
             var result: [Character] = []
             let a = Array(s)
