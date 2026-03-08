@@ -104,6 +104,27 @@ final class KMiniSearchPanel: NSWindowController {
             }
             return
         }
+        
+        // :g / :v を優先
+        if input.hasPrefix(":g") || input.hasPrefix(":v") {
+            guard let pending = parseGlobalCommandLine(input) else {
+                NSSound.beep()
+                return
+            }
+            _pendingGlobal = pending
+
+            let ok = NSApp.sendAction(#selector(KTextView.executeGlobalCommandLineAction),
+                                      to: nil,
+                                      from: self)
+            
+            if ok {
+                _findField.stringValue = ""
+                window?.orderOut(nil)
+            } else {
+                NSSound.beep()
+            }
+            return
+        }
 
         // 従来どおり：検索
         KSearchPanel.shared.searchString = input
@@ -265,6 +286,92 @@ final class KMiniSearchPanel: NSWindowController {
                                   pattern: unescape(rawPattern),
                                   replacement: unescape(rawReplacement),
                                   isGlobal: isGlobal)
+    }
+    
+    // MARK: - :g / :v command support
+
+    private struct KPendingGlobal {
+        let isInvert: Bool   // true = :v
+        let pattern: String
+    }
+
+    private var _pendingGlobal: KPendingGlobal? = nil
+
+    func takePendingGlobal() -> (isInvert: Bool, pattern: String)? {
+        guard let p = _pendingGlobal else { return nil }
+        _pendingGlobal = nil
+        return (p.isInvert, p.pattern)
+    }
+
+    /// :g/<regex>/
+    /// :v/<regex>/
+    /// - delimiterは'/'固定
+    /// - '\/' と '\\' を最低限解釈
+    private func parseGlobalCommandLine(_ input: String) -> KPendingGlobal? {
+        let chars = Array(input)
+        if chars.count < 4 { return nil }
+
+        guard chars[0] == ":" else { return nil }
+        let isInvert: Bool
+        if chars[1] == "g" {
+            isInvert = false
+        } else if chars[1] == "v" {
+            isInvert = true
+        } else {
+            return nil
+        }
+
+        var index = 2
+        guard index < chars.count, chars[index] == "/" else { return nil }
+        index += 1
+
+        var out: [Character] = []
+        var escaped = false
+
+        while index < chars.count {
+            let c = chars[index]
+            index += 1
+
+            if escaped {
+                out.append(c)
+                escaped = false
+                continue
+            }
+            if c == "\\" {
+                escaped = true
+                continue
+            }
+            if c == "/" {
+                // 末尾は空白のみ許容
+                while index < chars.count, chars[index].isWhitespace { index += 1 }
+                if index < chars.count { return nil }
+                let raw = String(out)
+                if raw.isEmpty { return nil }
+                return KPendingGlobal(isInvert: isInvert, pattern: unescapeSlashAndBackslash(raw))
+            }
+            out.append(c)
+        }
+        return nil
+    }
+
+    private func unescapeSlashAndBackslash(_ s: String) -> String {
+        var result: [Character] = []
+        let a = Array(s)
+        var i = 0
+        while i < a.count {
+            let c = a[i]
+            if c == "\\", i + 1 < a.count {
+                let n = a[i + 1]
+                if n == "/" || n == "\\" {
+                    result.append(n)
+                    i += 2
+                    continue
+                }
+            }
+            result.append(c)
+            i += 1
+        }
+        return String(result)
     }
     
 }

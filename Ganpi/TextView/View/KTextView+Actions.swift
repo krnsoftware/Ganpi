@@ -155,6 +155,69 @@ extension KTextView {
         selectionRange = targetRange.lowerBound ..< (targetRange.lowerBound + replacedSub.count)
     }
     
+    // MARK: - Command line (:g / :v) action
+
+    /// Mini Search Panel の :g/<regex>/ / :v/<regex>/ を実行する（抽出結果は新規タブ）
+    @IBAction func executeGlobalCommandLineAction(_ sender: Any?) {
+        guard let cmd = KMiniSearchPanel.shared.takePendingGlobal() else {
+            NSSound.beep()
+            return
+        }
+        guard let parentWindow = window else {
+            NSSound.beep()
+            return
+        }
+
+        let defaults = UserDefaults.standard
+        let isCaseInsensitive = defaults.bool(forKey: KDefaultSearchKey.ignoreCase)
+
+        var options: NSRegularExpression.Options = [.anchorsMatchLines]
+        if isCaseInsensitive { options.insert(.caseInsensitive) }
+
+        guard let regex = try? NSRegularExpression(pattern: cmd.pattern, options: options) else {
+            NSSound.beep()
+            return
+        }
+
+        let parags = textStorage.paragraphs
+        var result = ""
+        var matchedLines = 0
+        let lineCount = parags.count
+        let width = String(lineCount).count
+
+        for i in 0..<parags.count {
+            let lineString = parags[i].string
+
+            let ns = lineString as NSString
+            let r = NSRange(location: 0, length: ns.length)
+            let matched = (regex.firstMatch(in: lineString, options: [], range: r) != nil)
+
+            if matched != cmd.isInvert {
+                let lineNo = i + 1
+                let prefix = String(format: "%0*d: ", width, lineNo)
+                result.append(prefix)
+                result.append(lineString)
+                if i < parags.count - 1 { result.append("\n") }
+                matchedLines += 1
+            }
+        }
+
+        if matchedLines == 0 {
+            NSSound.beep()
+            return
+        }
+
+        let st = KSyntaxType.log
+
+        let prefix = cmd.isInvert ? ":v" : ":g"
+        let title = "Extract \(prefix)/\(cmd.pattern)/"
+
+        Document.openTemporaryTabDocument(parentWindow: parentWindow,
+                                         title: title,
+                                         content: result,
+                                         syntaxType: st)
+    }
+    
     
     // MARK: - Undo actions
     
