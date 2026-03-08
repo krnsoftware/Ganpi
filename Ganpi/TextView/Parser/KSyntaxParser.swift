@@ -27,8 +27,8 @@ enum KFunctionalColor: CaseIterable {
     case number
     case variable
     case tag
-    case attribute
-    case selector
+    //case attribute
+    //case selector
 }
 
 enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
@@ -45,6 +45,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
     case json  = "public.json"
     case yamaha = "com.ganpi.yamaha-router-config"
     case cisco  = "com.ganpi.cisco-ios-config"
+    case log    = "com.ganpi.log"
 
 
     // extensions for every type.
@@ -63,6 +64,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         case .json:  return ["json", "jsonc"]
         case .yamaha: return []
         case .cisco: return []
+        case .log: return []
         }
     }
 
@@ -92,6 +94,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         case .json:  return "JSON"
         case .yamaha: return "Yamaha"
         case .cisco: return "Cisco"
+        case .log: return "Log"
         }
     }
 
@@ -130,6 +133,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
             .json  : "json",
             .yamaha : "yamaha",
             .cisco  : "cisco",
+            .log    : "log",
         ]
         // 設定名 → enum
         static let reverse: [String : KSyntaxType] = {
@@ -155,6 +159,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
         case .json:  return KSyntaxParserJson(storage: storage)
         case .yamaha: return KSyntaxParserYamaha(storage: storage)
         case .cisco: return KSyntaxParserCisco(storage: storage)
+        case .log:  return KSyntaxParserLog(storage: storage)
         }
     }
 
@@ -198,6 +203,7 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
 
         consider(.yamaha, KSyntaxParserYamaha.self)
         consider(.cisco, KSyntaxParserCisco.self)
+        consider(.log, KSyntaxParserLog.self)
 
         if let detected = bestType {
             return detected
@@ -539,8 +545,8 @@ class KSyntaxParser {
         case .number:     return .parserColorNumeric
         case .variable:   return .parserColorVariable
         case .tag:        return .parserColorTag
-        case .attribute, .selector:
-            return nil
+        //case .attribute, .selector:
+        //    return nil
         }
     }
     
