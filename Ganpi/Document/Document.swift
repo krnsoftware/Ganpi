@@ -260,6 +260,71 @@ extension Document {
     }
 }
 
+// MARK: - Temporary tab document
+
+extension Document {
+
+    /// 文字列から「一時ドキュメント」を生成し、可能なら parentWindow にタブとして組み込む。
+    /// - 生成したドキュメントは「未編集状態」に戻す（閉じる時に保存確認を出さないため）。
+    @discardableResult
+    static func openTemporaryTabDocument(parentWindow: NSWindow?,
+                                        title: String,
+                                        content: String,
+                                        syntaxType: KSyntaxType? = nil) -> Document? {
+        do {
+            guard let typeName = NSDocumentController.shared.defaultType else {
+                log("NSDocumentController.defaultType is nil.", from: self)
+                NSSound.beep()
+                return nil
+            }
+
+            guard let doc = try NSDocumentController.shared.makeUntitledDocument(ofType: typeName) as? Document else {
+                log("Failed to make untitled Document.", from: self)
+                NSSound.beep()
+                return nil
+            }
+
+            NSDocumentController.shared.addDocument(doc)
+
+            // 内容投入（全文置換）
+            doc.textStorage.replaceString(in: 0 ..< doc.textStorage.count, with: content)
+            doc.textStorage.resetUndoHistory()
+
+            if let st = syntaxType {
+                doc.syntaxType = st
+                doc.textStorage.replaceParser(for: st)
+            }
+
+            // 重要：未編集状態へ（閉じるとき保存確認を出さない）
+            doc.updateChangeCount(.changeCleared)
+
+            doc.makeWindowControllers()
+            doc.showWindows()
+
+            // タイトル
+            doc.displayName = title
+            let newWindow = doc.windowControllers.first?.window
+            newWindow?.title = title
+
+            // タブ結合（可能なら同一ウインドウへ）
+            if let parentWindow,
+               let newWindow,
+               newWindow !== parentWindow {
+                parentWindow.addTabbedWindow(newWindow, ordered: .above)
+                newWindow.makeKeyAndOrderFront(nil)
+            }
+
+            return doc
+        } catch {
+            log("Failed to create temporary document: \(error)", from: self)
+            NSSound.beep()
+            return nil
+        }
+    }
+}
+
+//MARK: - TextStorage Action
+
 
 @objc protocol KTextStorageAction {
     @objc func textStorageDidEdit(_ sender: Any?)
