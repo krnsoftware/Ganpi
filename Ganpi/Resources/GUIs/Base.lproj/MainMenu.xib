@@ -243,6 +243,31 @@
                                                 <action selector="showMiniSearchPanel:" target="-1" id="oaS-nb-Y6w"/>
                                             </connections>
                                         </menuItem>
+                                        <menuItem isSeparatorItem="YES" id="tdj-Fw-RWw"/>
+                                        <menuItem title="Show Substitute Command Line..." id="0st-50-Ais">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="showSubstituteCommandLineAction:" target="-1" id="ZcT-Eh-eJR"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Show Whole Document Substitute Command Line..." id="R6c-BH-vN0">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="showWholeDocumentSubstituteCommandLineAction:" target="-1" id="cgm-46-Adg"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Show Global Filter Command Line..." id="dnD-Ud-WGB">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="showGlobalFilterCommandLineAction:" target="-1" id="1jt-29-sQl"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Show Inverse Global Filter Command Line..." id="HhQ-Z2-iGF">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="showInverseGlobalFilterCommandLineAction:" target="-1" id="xi5-bi-7Kt"/>
+                                            </connections>
+                                        </menuItem>
                                     </items>
                                 </menu>
                             </menuItem>

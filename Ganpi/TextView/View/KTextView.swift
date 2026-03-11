@@ -3323,16 +3323,41 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         }
     }
     
+    //MARK: - Mini Search Panel function.
     
-    @IBAction func showMiniSearchPanel(_ sender: Any?) {
+    private func miniSearchPanelOrigin() -> CGPoint {
         var point = characterPosition(at: caretIndex)
         point.y = point.y + layoutManager.lineHeight
         if let window = self.window {
             point = convert(point, to: nil)
             point = window.convertPoint(toScreen: point)
         }
+        return point
+    }
 
-        KMiniSearchPanel.shared.show(at: point, font: textStorage.baseFont)
+    @IBAction func showMiniSearchPanel(_ sender: Any?) {
+        let point = miniSearchPanelOrigin()
+        KMiniSearchPanel.shared.show(at: point, font: textStorage.baseFont, mode: .search)
+    }
+
+    @IBAction func showSubstituteCommandLineAction(_ sender: Any?) {
+        let point = miniSearchPanelOrigin()
+        KMiniSearchPanel.shared.show(at: point, font: textStorage.baseFont, mode: .substitute)
+    }
+
+    @IBAction func showWholeDocumentSubstituteCommandLineAction(_ sender: Any?) {
+        let point = miniSearchPanelOrigin()
+        KMiniSearchPanel.shared.show(at: point, font: textStorage.baseFont, mode: .wholeDocumentSubstitute)
+    }
+
+    @IBAction func showGlobalFilterCommandLineAction(_ sender: Any?) {
+        let point = miniSearchPanelOrigin()
+        KMiniSearchPanel.shared.show(at: point, font: textStorage.baseFont, mode: .globalFilter)
+    }
+
+    @IBAction func showInverseGlobalFilterCommandLineAction(_ sender: Any?) {
+        let point = miniSearchPanelOrigin()
+        KMiniSearchPanel.shared.show(at: point, font: textStorage.baseFont, mode: .inverseGlobalFilter)
     }
     
 }

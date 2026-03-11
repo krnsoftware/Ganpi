@@ -8,25 +8,31 @@
 //  All rights reserved.
 //
 
-
 import AppKit
 
 final class KMiniSearchPanel: NSWindowController {
     static let shared = KMiniSearchPanel(windowNibName: "MiniSearchPanel")
     
+    enum Mode {
+        case search
+        case substitute
+        case wholeDocumentSubstitute
+        case globalFilter
+        case inverseGlobalFilter
+    }
+    
     @IBOutlet private weak var _findField: NSTextField!
     
-    var isAlternateSearchDirectionForward:Bool = true
+    var isAlternateSearchDirectionForward: Bool = true
     
     private var _suspendAction = false
-        
+    private var _mode: Mode = .search
+    
     override func windowDidLoad() {
         super.windowDidLoad()
         
         _findField.target = self
         _findField.action = #selector(fieldEdited)
-        
-        //_findField.backgroundColor = NSColor(hexString: "#B8B8B8FF")
         
         guard let w = window else { return }
         
@@ -39,13 +45,13 @@ final class KMiniSearchPanel: NSWindowController {
         w.standardWindowButton(.miniaturizeButton)?.isHidden = true
         w.standardWindowButton(.zoomButton)?.isHidden = true
         
-        // 透明ウィンドウとして扱う（必要なら）
+        // 透明ウィンドウとして扱う
         w.isOpaque = false
         w.backgroundColor = .clear
-        
     }
     
-    func show(at point: CGPoint, font: NSFont) {
+    func show(at point: CGPoint, font: NSFont, mode: Mode) {
+        _mode = mode
         applyFontAndResize(font: font)
 
         var origin = point
@@ -67,7 +73,27 @@ final class KMiniSearchPanel: NSWindowController {
         if win.screen == nil { window?.center() }
         win.makeKeyAndOrderFront(nil)
         win.makeFirstResponder(_findField)
-        _findField.stringValue = KSearchPanel.shared.searchString
+
+        switch mode {
+        case .search:
+            _findField.stringValue = KSearchPanel.shared.searchString
+            
+        case .substitute:
+            _findField.stringValue = ""
+            _findField.placeholderString = "/pattern/rep/[g]"
+            
+        case .wholeDocumentSubstitute:
+            _findField.stringValue = ""
+            _findField.placeholderString = "/pattern/rep/[g]"
+            
+        case .globalFilter:
+            _findField.stringValue = ""
+            _findField.placeholderString = "pattern"
+            
+        case .inverseGlobalFilter:
+            _findField.stringValue = ""
+            _findField.placeholderString = "pattern"
+        }
 
         DispatchQueue.main.async {
             self._suspendAction = false
@@ -78,59 +104,87 @@ final class KMiniSearchPanel: NSWindowController {
         actCancel(sender)
     }
 
-    
     @objc private func fieldEdited(_ sender: Any?) {
         if _suspendAction { return }
 
         let input = _findField.stringValue
         if input.isEmpty { return }
 
-        // :s / :%s を優先
-        if input.hasPrefix(":s") || input.hasPrefix(":%s") {
-            guard let pending = parseSubstituteCommandLine(input) else {
+        switch _mode {
+        case .search:
+            KSearchPanel.shared.searchString = input
+            NSApp.sendAction(#selector(KTextView.searchAlternateAction), to: nil, from: self)
+            _findField.stringValue = ""
+            window?.orderOut(nil)
+
+        case .substitute:
+            guard let pending = parseSubstituteBody(input, isWholeDocument: false) else {
                 reportCommandLineParseError("Command parse error", input: input)
                 return
             }
             _pendingSubstitute = pending
 
             let status = NSApp.sendAction(#selector(KTextView.executeSubstituteCommandLineAction),
-                                      to: nil,
-                                      from: self)
+                                          to: nil,
+                                          from: self)
             if status {
                 _findField.stringValue = ""
                 window?.orderOut(nil)
             } else {
                 NSSound.beep()
             }
-            return
-        }
-        
-        // :g / :v を優先
-        if input.hasPrefix(":g") || input.hasPrefix(":v") {
-            guard let pending = parseGlobalCommandLine(input) else {
+
+        case .wholeDocumentSubstitute:
+            guard let pending = parseSubstituteBody(input, isWholeDocument: true) else {
+                reportCommandLineParseError("Command parse error", input: input)
+                return
+            }
+            _pendingSubstitute = pending
+
+            let status = NSApp.sendAction(#selector(KTextView.executeSubstituteCommandLineAction),
+                                          to: nil,
+                                          from: self)
+            if status {
+                _findField.stringValue = ""
+                window?.orderOut(nil)
+            } else {
+                NSSound.beep()
+            }
+
+        case .globalFilter:
+            guard let pending = parseGlobalPattern(input, isInvert: false) else {
                 reportCommandLineParseError("Command parse error", input: input)
                 return
             }
             _pendingGlobal = pending
 
             let status = NSApp.sendAction(#selector(KTextView.executeGlobalCommandLineAction),
-                                      to: nil,
-                                      from: self)
-            
+                                          to: nil,
+                                          from: self)
             if status {
                 _findField.stringValue = ""
                 window?.orderOut(nil)
             } else {
                 NSSound.beep()
             }
-            return
-        }
 
-        // 従来どおり：検索
-        KSearchPanel.shared.searchString = input
-        NSApp.sendAction(#selector(KTextView.searchAlternateAction), to: nil, from: self)
-        _findField.stringValue = ""
-        window?.orderOut(nil)
+        case .inverseGlobalFilter:
+            guard let pending = parseGlobalPattern(input, isInvert: true) else {
+                reportCommandLineParseError("Command parse error", input: input)
+                return
+            }
+            _pendingGlobal = pending
+
+            let status = NSApp.sendAction(#selector(KTextView.executeGlobalCommandLineAction),
+                                          to: nil,
+                                          from: self)
+            if status {
+                _findField.stringValue = ""
+                window?.orderOut(nil)
+            } else {
+                NSSound.beep()
+            }
+        }
     }
     
     @IBAction private func actCancel(_ sender: Any?) {
@@ -142,26 +196,20 @@ final class KMiniSearchPanel: NSWindowController {
 
         _findField.font = font
 
-        // 基準（XIBの元サイズが 272x33 / フォント12pt 前提）
         let baseFontSize: CGFloat = 12.0
         let baseWindowSize = CGSize(width: 272, height: 33)
 
         let scale = max(0.75, min(2.5, font.pointSize / baseFontSize))
 
-        // 高さは素直に追従（上限下限だけ付ける）
         let newHeight = max(28, min(70, round(baseWindowSize.height * scale)))
 
-        // 幅は追従しすぎると不格好なので「緩く」追従させる
         let widthScale = max(1.0, min(1.6, 1.0 + (scale - 1.0) * 0.4))
         let newWidth = max(baseWindowSize.width, round(baseWindowSize.width * widthScale))
 
-        // まずウインドウのコンテンツサイズを変更
         win.setContentSize(NSSize(width: newWidth, height: newHeight))
 
-        // テキストフィールドのフレームを更新（XIBがframeベース前提）
         guard let container = _findField.superview else { return }
 
-        // フォントの実サイズから入力欄の高さを決める
         let fontHeight = ceil(font.ascender - font.descender)
         let fieldHeight = max(18, min(newHeight - 8, fontHeight + 6))
 
@@ -175,7 +223,7 @@ final class KMiniSearchPanel: NSWindowController {
     }
     
     
-    // MARK: - :s / :%s command support
+    // MARK: - Substitute command support
 
     private enum KSubstituteTarget {
         case currentLine
@@ -197,28 +245,15 @@ final class KMiniSearchPanel: NSWindowController {
         return (p.target == .wholeDocument, p.pattern, p.replacement, p.isGlobal)
     }
 
-    /// :s/<regex>/<rep>/[g]
-    /// :%s/<regex>/<rep>/[g]
+    /// /<regex>/<rep>/[g]
     /// - delimiterは'/'固定
     /// - '\/' と '\\' を最低限解釈
-    private func parseSubstituteCommandLine(_ input: String) -> KPendingSubstitute? {
+    private func parseSubstituteBody(_ input: String, isWholeDocument: Bool) -> KPendingSubstitute? {
         let chars = Array(input)
-        if chars.count < 4 { return nil }
+        if chars.count < 3 { return nil }
 
-        guard chars[0] == ":" else { return nil }
-
-        var index = 1
-        var target: KSubstituteTarget = .currentLine
-
-        if index < chars.count, chars[index] == "%" {
-            target = .wholeDocument
-            index += 1
-        }
-
-        guard index < chars.count, chars[index] == "s" else { return nil }
-        index += 1
-
-        guard index < chars.count, chars[index] == "/" else { return nil }
+        var index = 0
+        guard chars[index] == "/" else { return nil }
         index += 1
 
         func readSection() -> String? {
@@ -262,36 +297,20 @@ final class KMiniSearchPanel: NSWindowController {
 
         if index < chars.count { return nil }
 
-        func unescape(_ s: String) -> String {
-            var result: [Character] = []
-            let a = Array(s)
-            var i = 0
-            while i < a.count {
-                let c = a[i]
-                if c == "\\", i + 1 < a.count {
-                    let n = a[i + 1]
-                    if n == "/" || n == "\\" {
-                        result.append(n)
-                        i += 2
-                        continue
-                    }
-                }
-                result.append(c)
-                i += 1
-            }
-            return String(result)
-        }
+        let target: KSubstituteTarget = isWholeDocument ? .wholeDocument : .currentLine
 
-        return KPendingSubstitute(target: target,
-                                  pattern: unescape(rawPattern),
-                                  replacement: unescape(rawReplacement),
-                                  isGlobal: isGlobal)
+        return KPendingSubstitute(
+            target: target,
+            pattern: unescapeSlashAndBackslash(rawPattern),
+            replacement: unescapeSlashAndBackslash(rawReplacement),
+            isGlobal: isGlobal
+        )
     }
     
-    // MARK: - :g / :v command support
+    // MARK: - Global filter command support
 
     private struct KPendingGlobal {
-        let isInvert: Bool   // true = :v
+        let isInvert: Bool
         let pattern: String
     }
 
@@ -303,55 +322,10 @@ final class KMiniSearchPanel: NSWindowController {
         return (p.isInvert, p.pattern)
     }
 
-    /// :g/<regex>/
-    /// :v/<regex>/
-    /// - delimiterは'/'固定
-    /// - '\/' と '\\' を最低限解釈
-    private func parseGlobalCommandLine(_ input: String) -> KPendingGlobal? {
-        let chars = Array(input)
-        if chars.count < 4 { return nil }
-
-        guard chars[0] == ":" else { return nil }
-        let isInvert: Bool
-        if chars[1] == "g" {
-            isInvert = false
-        } else if chars[1] == "v" {
-            isInvert = true
-        } else {
-            return nil
-        }
-
-        var index = 2
-        guard index < chars.count, chars[index] == "/" else { return nil }
-        index += 1
-
-        var out: [Character] = []
-        var escaped = false
-
-        while index < chars.count {
-            let c = chars[index]
-            index += 1
-
-            if escaped {
-                out.append(c)
-                escaped = false
-                continue
-            }
-            if c == "\\" {
-                escaped = true
-                continue
-            }
-            if c == "/" {
-                // 末尾は空白のみ許容
-                while index < chars.count, chars[index].isWhitespace { index += 1 }
-                if index < chars.count { return nil }
-                let raw = String(out)
-                if raw.isEmpty { return nil }
-                return KPendingGlobal(isInvert: isInvert, pattern: unescapeSlashAndBackslash(raw))
-            }
-            out.append(c)
-        }
-        return nil
+    private func parseGlobalPattern(_ input: String, isInvert: Bool) -> KPendingGlobal? {
+        let pattern = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !pattern.isEmpty else { return nil }
+        return KPendingGlobal(isInvert: isInvert, pattern: pattern)
     }
 
     private func unescapeSlashAndBackslash(_ s: String) -> String {
@@ -378,5 +352,4 @@ final class KMiniSearchPanel: NSWindowController {
         KLog.shared.log(id: "commandline", message: "\(message) (\(input))")
         KLogPanel.shared.present()
     }
-    
 }
