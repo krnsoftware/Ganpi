@@ -1487,145 +1487,72 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     // MARK: - Search Functions
     
     @discardableResult
-    func search(for direction:KDirection = .forward) -> Bool {
-        guard let result = search(for: direction, anchorRange: selectionRange) else {
-            log("no result.", from:self)
+    func search(for direction: KDirection = .forward) -> Bool {
+        guard let engine = makePanelSearchEngine() else {
+            NSSound.beep()
+            return false
+        }
+        guard let result = engine.search(in: textStorage.string, anchorRange: selectionRange, direction: direction) else {
+            log("no result.", from: self)
             return false
         }
         
         selectionRange = result
         centerSelectionInVisibleArea(nil)
         return true
-        
-        /*
-        let searchString = KSearchPanel.shared.searchString
-        let isCaseInsensitive = UserDefaults.standard.bool(forKey: KDefaultSearchKey.ignoreCase)
-        let usesRegularExpression = UserDefaults.standard.bool(forKey: KDefaultSearchKey.useRegex)
-        let wholeString = textStorage.string
-        
-        var regexPattern:Regex<Substring>
-        
-        do {
-            if usesRegularExpression {
-                regexPattern = try Regex(searchString).anchorsMatchLineEndings(true)
-            } else {
-                regexPattern = try Regex(NSRegularExpression.escapedPattern(for: searchString))
-            }
-        } catch {
-            log("searchString is invalid.",from:self)
-            NSSound.beep()
-            return false
-        }
-        
-        if isCaseInsensitive {
-            regexPattern = regexPattern.ignoresCase()
-        }
-        
-        if direction == .forward {
-            let searchIndex = selectionRange.upperBound
-            let targetString = wholeString[searchIndex..<wholeString.count]
-            
-            if let match = targetString.firstMatch(of: regexPattern),
-               let range = targetString.integerRange(from:match.range) {
-                
-                selectionRange = searchIndex + range.lowerBound..<searchIndex + range.upperBound
-            }
-        } else {
-            let targetString = wholeString[0..<selectionRange.lowerBound]
-            let matches = targetString.matches(of: regexPattern)
-            if let range = matches.last?.range,
-               let intrange = targetString.integerRange(from: range){
-                selectionRange = intrange
-            }
-        }
-        
-        updateCaretPosition()
-        centerSelectionInVisibleArea(nil)
-        
-        return true
-         */
     }
     
     @discardableResult
-    func search(for direction:KDirection, anchorRange:Range<Int>) -> Range<Int>? {
-        let searchString = KSearchPanel.shared.searchString
-        let isCaseInsensitive = UserDefaults.standard.bool(forKey: KDefaultSearchKey.ignoreCase)
-        let usesRegularExpression = UserDefaults.standard.bool(forKey: KDefaultSearchKey.useRegex)
-        
-        guard  anchorRange.lowerBound >= 0, anchorRange.upperBound <= textStorage.count else {
-            log("range is out of range.",from:self)
+    func search(for direction: KDirection, anchorRange: Range<Int>) -> Range<Int>? {
+        guard let engine = makePanelSearchEngine() else {
             return nil
         }
-        
-        var regexPattern:Regex<Substring>
-        var selection:Range<Int>?
-        
-        do {
-            if usesRegularExpression {
-                regexPattern = try Regex(searchString).anchorsMatchLineEndings(true)
-            } else {
-                regexPattern = try Regex(NSRegularExpression.escapedPattern(for: searchString))
-            }
-        } catch {
-            log("searchString is invalid.",from:self)
-            return nil
-        }
-        
-        if isCaseInsensitive {
-            regexPattern = regexPattern.ignoresCase()
-        }
-        
-        if direction == .forward {
-            let searchIndex = anchorRange.upperBound
-            let targetString = textStorage.string(in: searchIndex..<textStorage.count)
-            
-            if let match = targetString.firstMatch(of: regexPattern),
-               let range = targetString.integerRange(from:match.range) {
-                
-                selection = searchIndex + range.lowerBound..<searchIndex + range.upperBound
-            }
-        } else {
-            let targetString = textStorage.string(in: 0..<anchorRange.lowerBound)
-            let matches = targetString.matches(of: regexPattern)
-            if let range = matches.last?.range,
-               let intrange = targetString.integerRange(from: range){
-                selection = intrange
-            }
-        }
-        
-        return selection
+        return engine.search(in: textStorage.string, anchorRange: anchorRange, direction: direction)
     }
     
     @discardableResult
     func replace() -> Bool {
-        if selectionRange.isEmpty { NSSound.beep(); return false }
+        if selectionRange.isEmpty {
+            NSSound.beep()
+            return false
+        }
+        guard let entry = makePanelSearchEntry() else {
+            NSSound.beep()
+            return false
+        }
         
-        let (count, _) = replaceAll(for: selectionRange)
+        let (count, _) = replaceAll(for: selectionRange, entry: entry)
         if count == 0 { return false }
         
         updateCaretPosition()
         scrollCaretToVisible()
-        
         return true
     }
     
     @discardableResult
     func replaceAll() -> Bool {
-        if textStorage.count == 0 { NSSound.beep(); return false }
+        if textStorage.count == 0 {
+            NSSound.beep()
+            return false
+        }
+        guard let entry = makePanelSearchEntry() else {
+            NSSound.beep()
+            return false
+        }
         
-        let targetRanage:Range<Int>
-        let postSelectionLowerBound:Int
+        let targetRange: Range<Int>
+        let postSelectionLowerBound: Int
         
         let selectionOnly = UserDefaults.standard.bool(forKey: KDefaultSearchKey.selectionOnly)
-        
         if selectionOnly {
-            targetRanage = selectionRange
+            targetRange = selectionRange
             postSelectionLowerBound = selectionRange.lowerBound
         } else {
-            targetRanage = 0..<textStorage.count
+            targetRange = 0..<textStorage.count
             postSelectionLowerBound = 0
         }
-        let (count, length) = replaceAll(for: targetRanage)
+        
+        let (count, length) = replaceAll(for: targetRange, entry: entry)
         var postSelection = postSelectionLowerBound..<postSelectionLowerBound + length
         if postSelection == 0..<textStorage.count {
             postSelection = 0..<0
@@ -1636,59 +1563,72 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         scrollCaretToVisible()
         
         KLog.shared.log(id: "TextView:replaceAll", message: "Replace All: \(count) replacement done.")
-        
         return true
     }
     
-    // 全文置換の本体。
     @discardableResult
     func replaceAll(for range: Range<Int>) -> (count: Int, length: Int) {
-        if range.isEmpty { NSSound.beep(); return (0, range.count) }
-        guard range.lowerBound >= 0, range.upperBound <= textStorage.count else {
-            log("range is out of bounds.",from:self)
+        guard let entry = makePanelSearchEntry() else {
             return (0, range.count)
         }
-
-        let searchString = KSearchPanel.shared.searchString
-        let replaceString = KSearchPanel.shared.replaceString
-        let isCaseInsensitive = UserDefaults.standard.bool(forKey: KDefaultSearchKey.ignoreCase)
-        let usesRegularExpression = UserDefaults.standard.bool(forKey: KDefaultSearchKey.useRegex)
+        return replaceAll(for: range, entry: entry)
+    }
+    
+    @discardableResult
+    func replaceAll(for range: Range<Int>, entry: KSearchEntry) -> (count: Int, length: Int) {
+        if range.isEmpty {
+            NSSound.beep()
+            return (0, range.count)
+        }
+        guard range.lowerBound >= 0, range.upperBound <= textStorage.count else {
+            log("range is out of bounds.", from: self)
+            return (0, range.count)
+        }
         
-        guard !searchString.isEmpty else { log("searchString is empty.",from:self); return (0, range.count) }
-
-        let wholeString  = textStorage.string
-        let targetString = wholeString[range]
-
-
-        // Regex 準備（OFF のときは検索パターンをリテラル化、テンプレはエスケープ）
-        let pattern  = usesRegularExpression
-            ? searchString
-            : NSRegularExpression.escapedPattern(for: searchString)
-        let template = usesRegularExpression
-            ? replaceString
-            : NSRegularExpression.escapedTemplate(for: replaceString)
-
-        var options: NSRegularExpression.Options =  [.anchorsMatchLines]
-        if isCaseInsensitive {
-            options.insert(.caseInsensitive)
+        let wholeString = textStorage.string
+        
+        let engine: KSearchEngine
+        do {
+            engine = try KSearchEngine(entry: entry)
+        } catch {
+            log("searchString is invalid.", from: self)
+            NSSound.beep()
+            return (0, range.count)
         }
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: options) else {
-            log("regex is nil.",from:self)
-            NSSound.beep(); return (0, range.count)
+        
+        guard let result = engine.replaceAll(in: wholeString, range: range) else {
+            log("replaceAll failed.", from: self)
+            return (0, range.count)
         }
-
-        // 部分文字列を可変化して置換＋件数取得
-        let mutableString = NSMutableString(string: String(targetString))
-        let mutableRange = NSRange(location: 0, length: mutableString.length)
-        let count = regex.replaceMatches(in: mutableString, options: [], range: mutableRange, withTemplate: template)
-
-        guard count > 0 else { return (0, range.count) }
-
-        // 置換結果で選択範囲全体を差し替え（nsRange内のみ変更されている）
-        let replacedSub = String(mutableString)
-        textStorage.replaceString(in: range, with: replacedSub)
-
-        return (count, replacedSub.count)
+        
+        guard result.count > 0 else {
+            return (0, range.count)
+        }
+        
+        textStorage.replaceString(in: range, with: result.string)
+        return (result.count, result.string.count)
+    }
+    
+    private func makePanelSearchEntry() -> KSearchEntry? {
+        let entry = KSearchPanel.shared.searchEntry
+        guard !entry.searchString.isEmpty else {
+            log("searchString is empty.", from: self)
+            return nil
+        }
+        return entry
+    }
+    
+    private func makePanelSearchEngine() -> KSearchEngine? {
+        guard let entry = makePanelSearchEntry() else {
+            return nil
+        }
+        
+        do {
+            return try KSearchEngine(entry: entry)
+        } catch {
+            log("searchString is invalid.", from: self)
+            return nil
+        }
     }
     
     

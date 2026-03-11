@@ -31,6 +31,16 @@ final class KSearchPanel: NSWindowController {
     private var _searchString:  String = ""
     private var _replaceString: String = ""
     
+    var searchEntry: KSearchEntry {
+        let defaults = UserDefaults.standard
+        return KSearchEntry(
+            searchString: searchString,
+            replaceString: replaceString,
+            useRegex: defaults.bool(forKey: KDefaultSearchKey.useRegex),
+            ignoreCase: defaults.bool(forKey: KDefaultSearchKey.ignoreCase)
+        )
+    }
+    
     
 
     // MARK: - 外部公開（KTextView 等から参照・設定）

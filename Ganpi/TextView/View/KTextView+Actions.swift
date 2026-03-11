@@ -81,7 +81,7 @@ extension KTextView {
 
         let targetRange: Range<Int>
         if cmd.isWholeDocument {
-            targetRange = 0 ..< textStorage.count
+            targetRange = 0..<textStorage.count
         } else {
             guard let lineRange = textStorage.lineRange(at: caretIndex) else {
                 NSSound.beep()
@@ -91,44 +91,43 @@ extension KTextView {
         }
 
         let defaults = UserDefaults.standard
-        let prevUseRegex = defaults.bool(forKey: KDefaultSearchKey.useRegex)
-        defaults.set(true, forKey: KDefaultSearchKey.useRegex)
-
-        KSearchPanel.shared.searchString = cmd.pattern
-        KSearchPanel.shared.replaceString = cmd.replacement
+        let entry = KSearchEntry(
+            searchString: cmd.pattern,
+            replaceString: cmd.replacement,
+            useRegex: true,
+            ignoreCase: defaults.bool(forKey: KDefaultSearchKey.ignoreCase)
+        )
 
         if cmd.isGlobal {
-            let (count, length) = replaceAll(for: targetRange)
-            defaults.set(prevUseRegex, forKey: KDefaultSearchKey.useRegex)
-
+            let (count, length) = replaceAll(for: targetRange, entry: entry)
             if count == 0 { return }
 
-            selectionRange = targetRange.lowerBound ..< (targetRange.lowerBound + length)
+            selectionRange = targetRange.lowerBound..<(targetRange.lowerBound + length)
             return
         }
 
-        // gなし：targetRange内の「最初の1件だけ」
-        // anchorRange は「upperBound から検索開始」なので、targetRangeの先頭で空rangeを渡す
-        let anchor = targetRange.lowerBound ..< targetRange.lowerBound
-        guard let hit = search(for: .forward, anchorRange: anchor) else {
-            defaults.set(prevUseRegex, forKey: KDefaultSearchKey.useRegex)
+        let engine: KSearchEngine
+        do {
+            engine = try KSearchEngine(entry: entry)
+        } catch {
             NSSound.beep()
             return
         }
 
-        // :s（現在行）のとき、行の外で見つかったものは無効
+        let anchorRange = targetRange.lowerBound..<targetRange.lowerBound
+        guard let hit = engine.search(in: textStorage.string, anchorRange: anchorRange, direction: .forward) else {
+            NSSound.beep()
+            return
+        }
         guard hit.lowerBound >= targetRange.lowerBound, hit.upperBound <= targetRange.upperBound else {
-            defaults.set(prevUseRegex, forKey: KDefaultSearchKey.useRegex)
             NSSound.beep()
             return
         }
 
-        let (_, replacedLength) = replaceAll(for: hit)
-        defaults.set(prevUseRegex, forKey: KDefaultSearchKey.useRegex)
-
+        let (_, replacedLength) = replaceAll(for: hit, entry: entry)
         if replacedLength == 0 { return }
 
-        selectionRange = hit.lowerBound ..< (hit.lowerBound + replacedLength)
+        selectionRange = hit.lowerBound..<(hit.lowerBound + replacedLength)
     }
     
     // MARK: - Command line (:g / :v) action
@@ -145,12 +144,17 @@ extension KTextView {
         }
 
         let defaults = UserDefaults.standard
-        let isCaseInsensitive = defaults.bool(forKey: KDefaultSearchKey.ignoreCase)
+        let entry = KSearchEntry(
+            searchString: cmd.pattern,
+            replaceString: nil,
+            useRegex: true,
+            ignoreCase: defaults.bool(forKey: KDefaultSearchKey.ignoreCase)
+        )
 
-        var options: NSRegularExpression.Options = [.anchorsMatchLines]
-        if isCaseInsensitive { options.insert(.caseInsensitive) }
-
-        guard let regex = try? NSRegularExpression(pattern: cmd.pattern, options: options) else {
+        let engine: KSearchEngine
+        do {
+            engine = try KSearchEngine(entry: entry)
+        } catch {
             NSSound.beep()
             return
         }
@@ -163,18 +167,16 @@ extension KTextView {
 
         for i in 0..<parags.count {
             let lineString = parags[i].string
+            let matched = engine.containsMatch(in: lineString, range: 0..<lineString.count)
 
-            let ns = lineString as NSString
-            let r = NSRange(location: 0, length: ns.length)
-            let matched = (regex.firstMatch(in: lineString, options: [], range: r) != nil)
-
-            //isInvertがfalseならmatchした行を、trueならmatchしなかった行を追加する。
             if matched != cmd.isInvert {
                 let lineNo = i + 1
                 let prefix = String(format: "%0*d: ", width, lineNo)
                 result.append(prefix)
                 result.append(lineString)
-                if i < parags.count - 1 { result.append("\n") }
+                if i < parags.count - 1 {
+                    result.append("\n")
+                }
                 matchedLines += 1
             }
         }
@@ -184,15 +186,16 @@ extension KTextView {
             return
         }
 
-        let st = KSyntaxType.log
-
+        let syntaxType = KSyntaxType.log
         let prefix = cmd.isInvert ? ":v" : ":g"
         let title = "Extract \(prefix)/\(cmd.pattern)/"
 
-        Document.openTemporaryTabDocument(parentWindow: parentWindow,
-                                         title: title,
-                                         content: result,
-                                         syntaxType: st)
+        Document.openTemporaryTabDocument(
+            parentWindow: parentWindow,
+            title: title,
+            content: result,
+            syntaxType: syntaxType
+        )
     }
     
     
