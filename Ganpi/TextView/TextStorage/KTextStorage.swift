@@ -148,7 +148,7 @@ final class KTextStorage: KTextStorageProtocol {
         let attributes: [NSAttributedString.Key: Any]
     }
     
-    private struct _ObserverEntry {
+    private struct KObserverEntry {
         weak var owner: AnyObject?
         let handler: (KStorageModified) -> Void
     }
@@ -158,7 +158,7 @@ final class KTextStorage: KTextStorageProtocol {
 
     // data.
     private(set) var _characters: [Character] = []
-    private var _observers: [_ObserverEntry] = []
+    private var _observers: [KObserverEntry] = []
     private lazy var _parser: KSyntaxParser = KSyntaxParserPlain(storage: self)
     private var _skeletonString: KSkeletonString = .init()
     
@@ -176,6 +176,7 @@ final class KTextStorage: KTextStorageProtocol {
     private var _invisibleCharacters: KInvisibleCharacters?
     private var _lineNumberCharacterMaxWidth: CGFloat?
     private var _paragraphs: KTextParagraphs?
+    private var _string: String?
     
     // for undo.
     private lazy var _undoManager: KUndoManager = .init(with: self)
@@ -185,8 +186,15 @@ final class KTextStorage: KTextStorageProtocol {
     var count: Int { _characters.count }
     
     var string: String {
-        get { String(_characters) }
-        set { characters = Array(newValue) }
+        get {
+            if let cached = _string { return cached }
+            let newString = String(_characters)
+            _string = newString
+            return newString
+        }
+        set {
+            replaceCharacters(in: 0..<_characters.count, with: Array(newValue))
+        }
     }
     
     var characters: [Character] {
@@ -352,6 +360,7 @@ final class KTextStorage: KTextStorageProtocol {
             _hardLineCount = nil
         }
         _paragraphs = nil
+        _string = nil
         
         // replacement.
         _characters.replaceSubrange(range, with: newCharacters)
@@ -576,7 +585,7 @@ final class KTextStorage: KTextStorageProtocol {
     func addObserver(_ owner: AnyObject, _ handler: @escaping (KStorageModified) -> Void) {
         // 既存の owner を一掃してから登録（重複防止）
         _observers.removeAll { $0.owner === owner || $0.owner == nil }
-        _observers.append(_ObserverEntry(owner: owner, handler: handler))
+        _observers.append(KObserverEntry(owner: owner, handler: handler))
     }
 
     // 解除：owner 一致だけ除去
@@ -667,7 +676,7 @@ final class KTextStorage: KTextStorageProtocol {
 
     // 通知：同期。死んだ参照はついでに掃除。
     private func notifyObservers(_ note: KStorageModified) {
-        var alive: [_ObserverEntry] = []
+        var alive: [KObserverEntry] = []
         alive.reserveCapacity(_observers.count)
         for e in _observers {
             if let _ = e.owner {
