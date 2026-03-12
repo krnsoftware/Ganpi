@@ -3344,6 +3344,11 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         let point = miniSearchPanelOrigin()
         KMiniSearchPanel.shared.show(at: point, font: textStorage.baseFont, mode: .substitute)
     }
+    
+    @IBAction func showSelectionSubstituteCommandLineAction(_ sender: Any?) {
+        let point = miniSearchPanelOrigin()
+        KMiniSearchPanel.shared.show(at: point, font: textStorage.baseFont, mode: .selectionSubstitute)
+    }
 
     @IBAction func showWholeDocumentSubstituteCommandLineAction(_ sender: Any?) {
         let point = miniSearchPanelOrigin()

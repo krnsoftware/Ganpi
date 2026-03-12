@@ -220,7 +220,7 @@ Ganpiはなるべくマウスを使わずに編集する方針のため、キャ
 <li>グリッドジャンプ<br />
 現在画面に表示されている範囲において、2回のキーストロークで任意の位置にキャレットを移動する手段を提供します。具体的にはキーアサインでperformGridJump(Ganpi標準ではctrl+;)を呼び出すと、テキストビュー全体がグリッド状に分割され、それぞれの区画に1文字のアルファベットまたは数字が表示されます。移動したい場所の文字をタイプすると、さらにその区画が9のグリッドに分割され、そこに表示された1文字のアルファベットをタイプすることで、その場所にキャレットを移動することができます。</li>
 <li>ブラッケトペア選択<br />
-1行の範囲内で、対になる括弧を選択します。括弧の外側(括弧を含む)と内側(括弧を含まない)の2通りの選択方法があります。selectOuterPair(Ganpi標準ではctrl+L)を呼び出すと、選択範囲より右の対になる括弧の外側を選択します。selectInnerPair(Ganpi標準ではctrl+K)を呼び出すと、同様に内側を選択します。逆方向の動作も可能(selectOuterPairReverse, selectInnerPairReverse)です。対応する括弧は '...', &quot;...&quot;, (...), {...}, [...] です。&lt;...&gt;には対応していません。</li>
+1行の範囲内で、対になる括弧を選択します。括弧の外側(括弧を含む)と内側(括弧を含まない)の2通りの選択方法があります。selectOuterPair(Ganpi標準ではctrl+L)を呼び出すと、選択範囲が含まれるか、含まれるものがなければより右の対になる括弧の外側を選択します。selectInnerPair(Ganpi標準ではctrl+K)を呼び出すと、同様に内側を選択します。逆方向の動作も可能(selectOuterPairReverse - ctrl+shift+L, selectInnerPairReverse - ctrl+shift+K)です。対応する括弧は '...', &quot;...&quot;, (...), {...}, [...] です。&lt;...&gt;には対応していません。</li>
 </ul>
 <p>
 この他、検索パネル・ミニ検索パネルもキャレットの移動に利用できます。
@@ -236,18 +236,43 @@ Ganpiは、現在編集中の文章について任意の字句を検索するこ
 標準の検索パネルの他に、「ミニ検索パネル(Mini Search Panel)」を利用することもできます。既定のショートカット(Ganpi標準ではctrl+/)を押下すると、キャレットの近くにテキスト入力部分だけの小さなウインドウが開きます。これに文字列を入力してリターンすると、即座にキャレット後方の最も近い一致文字列にジャンプします。標準では順方向ですが、呼び出しの際にショートカット(標準でctrl+shift+/)を利用することで逆方向の検索も可能です。また標準検索ウインドウ・ミニ検索ウインドウで検索文字列が設定されていれば、Edit/Find/Find Next(cmd+G), Edit/Find/Find Previous(cmd+shift+G)で文末側・文頭側に続けて検索できます。ctrl+.とctrl+,でも前後の検索が可能ですが、こちらはミニ検索ウインドウの呼び出しの際の方向性に合わせて検索方向が変化します。検索条件は標準検索ウインドウで設定されているものに準じます。
 </p>
 <p>
-ミニ検索パネルでは、ExCommandを利用することができます。これは検索窓の検索文字列を:から始まる文字列で指定した場合、検索用のコマンドが起動するものです。これにはいくつかの種類があります。
+この他、ExCommandを利用することができます。既定のキーアサインを入力することで専用のミニパネルが表示されます。メニューバーからも呼び出すことができます。(Edit/Find/の下の方)
 </p>
+<ul>
+<li>Substitute in Current Line (:s)<br />
+/&lt;regex&gt;/&lt;reg&gt;/[g]<br />
+対象: 現在行, gなし: 最初の1件のみ, gあり: 全件, 置換後: 行選択<br />
+キー: ctrl+O, s (normal mode), shift+;, s (Edit mode)</li>
+<li>Substitute in Selection (:%s)<br />
+/&lt;regex&gt;/&lt;reg&gt;/[g]<br />
+対象: 選択範囲, gなし: 最初の1件のみ, gあり: 全件, 置換後: 行選択<br />
+キー: ctrl+O, 5, s (normal mode), shift+;, shift+8, s (Edit mode)</li>
+<li>Substitute in Document (:%s)<br />
+/&lt;regex&gt;/&lt;reg&gt;/[g]<br />
+対象: 現在行, gなし: 最初の1件のみ, gあり: 全件, 置換後: 行選択<br />
+キー: ctrl+O, 5, s (normal mode), shift+;, shift+5, s (Edit mode)</li>
+<li>Extract Matching Line (:g)<br />
+&lt;regex&gt;<br />
+対象: 文書全体, regexに一致する行だけ抽出して別tabに表示する。<br />
+キー: ctrl+O, g (normal mode), shift+;, g (edit mode)
+</li>
+<li>Extract Non-matching Line (:v)<br />
+&lt;regex&gt;<br />
+対象: 文書全体, regexに一致しない行だけ抽出して別tabに表示する。<br />
+キー: ctrl+O, v (normal mode), shift+;, v (edit mode)
+</li>
+</ul>
+<!--
 <ul>
 <li>:s/&lt;regex&gt;/&lt;reg&gt;/[g] - 対象: 現在行, gなし: 最初の1件のみ, gあり: 全件, 置換後: 行選択</li>
 <li>:%s/&lt;regex&gt;/&lt;reg&gt;/[g] - 対象: 文書全体, あとは無印同様。
 <li>:g/&lt;regex&gt;/ - 対象: 文書全体, regexに一致する行だけ抽出して別tabに表示する。</li>
 <li>:v/&lt;regex&gt;/ - 対象: 文書全体, regexに一致しない行だけ抽出して別tabに表示する。</li>
 </ul>
+-->
 <p>
 :g, :vは同じウインドウ内に別のタブを開いてそちらに検索結果を表示します。行頭にオリジナルの行番号が付加されているので、必要があればそれを利用して検索して下さい。現在のところ検索結果から直接ジャンプする機能は実装していません。検索結果のタブの内部でも再度検索できます。検索結果のタブは別名で保存すれば保存することができます。
 </p>
-
 </section>
 
 <section id="preferences">

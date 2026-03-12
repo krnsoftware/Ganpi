@@ -80,14 +80,27 @@ extension KTextView {
         }
 
         let targetRange: Range<Int>
-        if cmd.isWholeDocument {
-            targetRange = 0 ..< textStorage.count
-        } else {
+        switch cmd.target {
+        case "currentLine":
             guard let lineRange = textStorage.lineRange(at: caretIndex) else {
                 NSSound.beep()
                 return
             }
             targetRange = lineRange
+
+        case "selection":
+            guard !selectionRange.isEmpty else {
+                NSSound.beep()
+                return
+            }
+            targetRange = selectionRange
+
+        case "wholeDocument":
+            targetRange = 0 ..< textStorage.count
+
+        default:
+            NSSound.beep()
+            return
         }
 
         let defaults = UserDefaults.standard

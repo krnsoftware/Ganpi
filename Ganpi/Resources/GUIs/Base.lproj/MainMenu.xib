@@ -250,6 +250,12 @@
                                                 <action selector="showSubstituteCommandLineAction:" target="-1" id="ZcT-Eh-eJR"/>
                                             </connections>
                                         </menuItem>
+                                        <menuItem title="Substitute in Selection..." id="Z6H-uZ-39h">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="showSelectionSubstituteCommandLineAction:" target="-1" id="ufG-kD-WQo"/>
+                                            </connections>
+                                        </menuItem>
                                         <menuItem title="Substitute in Document..." id="R6c-BH-vN0">
                                             <modifierMask key="keyEquivalentModifierMask"/>
                                             <connections>

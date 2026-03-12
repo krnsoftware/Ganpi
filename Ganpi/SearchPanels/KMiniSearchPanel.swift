@@ -16,6 +16,7 @@ final class KMiniSearchPanel: NSWindowController {
     enum Mode {
         case search
         case substitute
+        case selectionSubstitute
         case wholeDocumentSubstitute
         case globalFilter
         case inverseGlobalFilter
@@ -77,20 +78,13 @@ final class KMiniSearchPanel: NSWindowController {
         switch mode {
         case .search:
             _findField.stringValue = KSearchPanel.shared.searchString
-            
-        case .substitute:
+            _findField.placeholderString = nil
+
+        case .substitute, .selectionSubstitute, .wholeDocumentSubstitute:
             _findField.stringValue = ""
             _findField.placeholderString = "/pattern/rep/[g]"
-            
-        case .wholeDocumentSubstitute:
-            _findField.stringValue = ""
-            _findField.placeholderString = "/pattern/rep/[g]"
-            
-        case .globalFilter:
-            _findField.stringValue = ""
-            _findField.placeholderString = "pattern"
-            
-        case .inverseGlobalFilter:
+
+        case .globalFilter, .inverseGlobalFilter:
             _findField.stringValue = ""
             _findField.placeholderString = "pattern"
         }
@@ -118,7 +112,24 @@ final class KMiniSearchPanel: NSWindowController {
             window?.orderOut(nil)
 
         case .substitute:
-            guard let pending = parseSubstituteBody(input, isWholeDocument: false) else {
+            guard let pending = parseSubstituteBody(input, target: .currentLine) else {
+                reportCommandLineParseError("Command parse error", input: input)
+                return
+            }
+            _pendingSubstitute = pending
+
+            let status = NSApp.sendAction(#selector(KTextView.executeSubstituteCommandLineAction),
+                                          to: nil,
+                                          from: self)
+            if status {
+                _findField.stringValue = ""
+                window?.orderOut(nil)
+            } else {
+                NSSound.beep()
+            }
+
+        case .selectionSubstitute:
+            guard let pending = parseSubstituteBody(input, target: .selection) else {
                 reportCommandLineParseError("Command parse error", input: input)
                 return
             }
@@ -135,7 +146,7 @@ final class KMiniSearchPanel: NSWindowController {
             }
 
         case .wholeDocumentSubstitute:
-            guard let pending = parseSubstituteBody(input, isWholeDocument: true) else {
+            guard let pending = parseSubstituteBody(input, target: .wholeDocument) else {
                 reportCommandLineParseError("Command parse error", input: input)
                 return
             }
@@ -227,6 +238,7 @@ final class KMiniSearchPanel: NSWindowController {
 
     private enum KSubstituteTarget {
         case currentLine
+        case selection
         case wholeDocument
     }
 
@@ -239,70 +251,102 @@ final class KMiniSearchPanel: NSWindowController {
 
     private var _pendingSubstitute: KPendingSubstitute? = nil
 
-    func takePendingSubstitute() -> (isWholeDocument: Bool, pattern: String, replacement: String, isGlobal: Bool)? {
-        guard let p = _pendingSubstitute else { return nil }
+    func takePendingSubstitute() -> (target: String, pattern: String, replacement: String, isGlobal: Bool)? {
+        guard let pending = _pendingSubstitute else { return nil }
         _pendingSubstitute = nil
-        return (p.target == .wholeDocument, p.pattern, p.replacement, p.isGlobal)
+
+        let target: String
+        switch pending.target {
+        case .currentLine:
+            target = "currentLine"
+        case .selection:
+            target = "selection"
+        case .wholeDocument:
+            target = "wholeDocument"
+        }
+
+        return (target, pending.pattern, pending.replacement, pending.isGlobal)
     }
 
     /// /<regex>/<rep>/[g]
     /// - delimiterは'/'固定
     /// - '\/' と '\\' を最低限解釈
-    private func parseSubstituteBody(_ input: String, isWholeDocument: Bool) -> KPendingSubstitute? {
-        let chars = Array(input)
-        if chars.count < 3 { return nil }
+    /// /<regex>/<rep>/[g]
+    /// - delimiterは'/'固定
+    /// - '\/' のみ区切り文字のエスケープとして扱う
+    /// - '\\' や '\+' など、その他のバックスラッシュ列は壊さずそのまま残す
+    private func parseSubstituteBody(_ input: String, target: KSubstituteTarget) -> KPendingSubstitute? {
+        let characters = Array(input)
+        if characters.count < 3 { return nil }
 
-        var index = 0
-        guard chars[index] == "/" else { return nil }
-        index += 1
+        var currentIndex = 0
+        guard characters[currentIndex] == "/" else { return nil }
+        currentIndex += 1
 
         func readSection() -> String? {
-            var out: [Character] = []
-            var escaped = false
+            var output: [Character] = []
 
-            while index < chars.count {
-                let c = chars[index]
-                index += 1
+            while currentIndex < characters.count {
+                let character = characters[currentIndex]
 
-                if escaped {
-                    out.append(c)
-                    escaped = false
+                if character == "/" {
+                    currentIndex += 1
+                    return String(output)
+                }
+
+                if character == "\\" {
+                    guard currentIndex + 1 < characters.count else {
+                        output.append(character)
+                        currentIndex += 1
+                        continue
+                    }
+
+                    let nextCharacter = characters[currentIndex + 1]
+
+                    if nextCharacter == "/" {
+                        output.append("/")
+                        currentIndex += 2
+                        continue
+                    }
+
+                    output.append("\\")
+                    output.append(nextCharacter)
+                    currentIndex += 2
                     continue
                 }
-                if c == "\\" {
-                    escaped = true
-                    continue
-                }
-                if c == "/" {
-                    return String(out)
-                }
-                out.append(c)
+
+                output.append(character)
+                currentIndex += 1
             }
+
             return nil
         }
 
-        guard let rawPattern = readSection(), !rawPattern.isEmpty else { return nil }
-        guard let rawReplacement = readSection() else { return nil }
+        guard let pattern = readSection(), !pattern.isEmpty else { return nil }
+        guard let replacement = readSection() else { return nil }
 
-        while index < chars.count, chars[index].isWhitespace { index += 1 }
-
-        var isGlobal = false
-        if index < chars.count {
-            if chars[index] == "g" {
-                isGlobal = true
-                index += 1
-            }
-            while index < chars.count, chars[index].isWhitespace { index += 1 }
+        while currentIndex < characters.count, characters[currentIndex].isWhitespace {
+            currentIndex += 1
         }
 
-        if index < chars.count { return nil }
+        var isGlobal = false
+        if currentIndex < characters.count {
+            if characters[currentIndex] == "g" {
+                isGlobal = true
+                currentIndex += 1
+            }
 
-        let target: KSubstituteTarget = isWholeDocument ? .wholeDocument : .currentLine
+            while currentIndex < characters.count, characters[currentIndex].isWhitespace {
+                currentIndex += 1
+            }
+        }
+
+        if currentIndex < characters.count { return nil }
 
         return KPendingSubstitute(
             target: target,
-            pattern: unescapeSlashAndBackslash(rawPattern),
-            replacement: unescapeSlashAndBackslash(rawReplacement),
+            pattern: pattern,
+            replacement: replacement,
             isGlobal: isGlobal
         )
     }
@@ -326,26 +370,6 @@ final class KMiniSearchPanel: NSWindowController {
         let pattern = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !pattern.isEmpty else { return nil }
         return KPendingGlobal(isInvert: isInvert, pattern: pattern)
-    }
-
-    private func unescapeSlashAndBackslash(_ s: String) -> String {
-        var result: [Character] = []
-        let a = Array(s)
-        var i = 0
-        while i < a.count {
-            let c = a[i]
-            if c == "\\", i + 1 < a.count {
-                let n = a[i + 1]
-                if n == "/" || n == "\\" {
-                    result.append(n)
-                    i += 2
-                    continue
-                }
-            }
-            result.append(c)
-            i += 1
-        }
-        return String(result)
     }
     
     private func reportCommandLineParseError(_ message: String, input: String) {
