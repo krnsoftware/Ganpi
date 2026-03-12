@@ -132,7 +132,7 @@ final class KPairSpan: CustomStringConvertible {
     func nextSpan(contains selection: Range<Int>, includeBrackets: Bool, direction: KDirection) -> KPairSpan? {
         var allSpans = flatSpans
         if direction == .backward { allSpans = allSpans.reversed() }
-        
+
         if let selected = span(contains: selection) {
             let isInner = selection == selected.innerRange
             let isOuter = selection == selected.outerRange
@@ -141,7 +141,7 @@ final class KPairSpan: CustomStringConvertible {
             // span内部だが一致しないか、またはinnerに一致しつつouter要求またはその逆の場合はそのspanを返す。
             if !isFit || (isOuter && !includeBrackets) || (isInner && includeBrackets) {
                 return selected
-                
+
             } else {
                 // outer→outer または inner→inner の場合は次へ
                 if let i = allSpans.firstIndex(where: { $0 === selected }), i < allSpans.count - 1 {
@@ -152,16 +152,17 @@ final class KPairSpan: CustomStringConvertible {
             // spanの外の場合
             for span in allSpans {
                 if direction == .forward {
-                    if span.range.lowerBound > selection.lowerBound {
+                    if span.range.upperBound > selection.upperBound {
                         return span
                     }
                 } else {
-                    if span.range.upperBound < selection.upperBound {
+                    if span.range.lowerBound < selection.lowerBound {
                         return span
                     }
                 }
             }
         }
+
         return nil
     }
 
