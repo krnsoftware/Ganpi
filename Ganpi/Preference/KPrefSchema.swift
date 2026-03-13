@@ -55,7 +55,6 @@ struct KPrefSchema {
         // editor
         // -----------------------------
         "editor.key_assign"                     : .init(type: .enumerated),
-        "editor.use_only_user_keymap"           : .init(type: .bool),
         "editor.use_edit_mode"                  : .init(type: .bool),
         
         // normal|edit

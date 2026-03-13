@@ -2241,6 +2241,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     // mouseDown()などのセレクター履歴を残すためのダミー。
     @objc func clearCaretContext(_ sender: Any?) { }
     
+    // キーアサインを無効にするためのダミー。
+    @objc func disableKeyBinding(_ sender: Any?) { }
     
     // キーボードショートカットやメニューから機能を実行するためのメソッド。
     @objc func performUserActions(_ sender: Any?) {

@@ -28,7 +28,6 @@ enum KKeyAssignKind {
     case emacs
     case vi
     case system
-    case user
     
     var fileName: String? {
         switch self {
@@ -36,7 +35,6 @@ enum KKeyAssignKind {
         case .emacs: return "keymap_emacs"
         case .vi:    return "keymap_vi"
         case .system: return nil
-        case .user:   return nil
         }
     }
     
@@ -46,7 +44,6 @@ enum KKeyAssignKind {
         case "emacs": return .emacs
         case "vi":    return .vi
         case "system": return .system
-        case "user":   return .user
         default:       return nil
         }
     }
@@ -109,45 +106,25 @@ class KKeyAssign {
     func load() {
         let assign = KPreference.shared.keyAssign()
 
-        let url: URL?
-        switch assign {
-        case .ganpi:
-            url = Bundle.main.url(forResource: "keymap_ganpi", withExtension: "ini")
-        case .emacs:
-            url = Bundle.main.url(forResource: "keymap_emacs", withExtension: "ini")
-        case .vi:
-            url = Bundle.main.url(forResource: "keymap_vi", withExtension: "ini")
-
-        case .user:
-            guard let keymapURL = KAppPaths.preferenceFileURL(fileName: "keymap.ini", createDirectoryIfNeeded: true) else {
-                KLog.shared.log(id: "keymap", message: "Preferences directory not available.")
-                url = nil
-                break
-            }
-
-            if FileManager.default.fileExists(atPath: keymapURL.path) {
-                url = keymapURL
-            } else {
-                // keymap.ini は「全置換」なので、自動生成はしない。無ければデフォルト運用。
-                url = nil
-            }
-
-        case .system:
-            url = nil
-        }
-
         _normalmodeShortcuts.removeAll()
         _editmodeShortcuts.removeAll()
 
-        if let url = url {
-            loadUserKeymap(at: url)
+        let baseURL = keymapURL(for: assign)
+        let userURL = userKeymapURL()
+
+        if let userURL {
+            appendKeymap(at: userURL)
+        }
+
+        if let baseURL {
+            appendKeymap(at: baseURL)
         }
 
         reset()
     }
     
     func setShortcuts(with shortcuts:[KShortCut], for mode:KEditMode = .normal) {
-        log("setShortcuts")
+        //log("setShortcuts")
         switch mode {
         case .normal: _normalmodeShortcuts = shortcuts
         case .edit:   _editmodeShortcuts   = shortcuts
@@ -167,7 +144,7 @@ class KKeyAssign {
         if let owner = _pendingOwner, let oid = _pendingOwnerID,
            !(owner === requester && oid == ObjectIdentifier(requester)) {
             resetPending()
-            log("Sequence buffer reset due to owner change")
+            //log("Sequence buffer reset due to owner change")
         }
         _pendingOwner   = requester
         _pendingOwnerID = ObjectIdentifier(requester)
@@ -225,14 +202,41 @@ class KKeyAssign {
 // MARK: - User Keymap Loader hook
 
 extension KKeyAssign {
-    func loadUserKeymap(at url: URL) {
+
+    private func keymapURL(for assign: KKeyAssignKind) -> URL? {
+        switch assign {
+        case .ganpi:
+            return Bundle.main.url(forResource: "keymap_ganpi", withExtension: "ini")
+        case .emacs:
+            return Bundle.main.url(forResource: "keymap_emacs", withExtension: "ini")
+        case .vi:
+            return Bundle.main.url(forResource: "keymap_vi", withExtension: "ini")
+        case .system:
+            return nil
+        }
+    }
+
+    private func userKeymapURL() -> URL? {
+        guard let keymapURL = KAppPaths.preferenceFileURL(fileName: "keymap.ini", createDirectoryIfNeeded: true) else {
+            KLog.shared.log(id: "keymap", message: "Preferences directory not available.")
+            return nil
+        }
+
+        guard FileManager.default.fileExists(atPath: keymapURL.path) else {
+            return nil
+        }
+
+        return keymapURL
+    }
+
+    private func appendKeymap(at url: URL) {
         do {
             let bundle = try KKeymapLoader.load(from: url)
-            setShortcuts(with: bundle.normal, for: .normal)
-            setShortcuts(with: bundle.edit, for: .edit)
-            log("User keymap loaded successfully: \(url.lastPathComponent)")
+            _normalmodeShortcuts += bundle.normal
+            _editmodeShortcuts += bundle.edit
+            //log("Keymap loaded successfully: \(url.lastPathComponent)")
         } catch {
-            log("Failed to load user keymap: \(error.localizedDescription)")
+            log("Failed to load keymap \(url.lastPathComponent): \(error.localizedDescription)")
         }
     }
 }
