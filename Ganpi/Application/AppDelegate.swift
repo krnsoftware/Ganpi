@@ -644,7 +644,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let url = base.appendingPathComponent(dirName, isDirectory: true)
                 .appendingPathComponent("menu", isDirectory: true)
                 .appendingPathComponent("usermenu.txt", isDirectory: false)
-            log("url:\(url)",from:self)
+            //log("url:\(url)",from:self)
             if let s = try? String(contentsOf: url, encoding: .utf8) {
                 return s
             }
