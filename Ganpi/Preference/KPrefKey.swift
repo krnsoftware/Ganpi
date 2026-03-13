@@ -43,6 +43,7 @@ enum KPrefKey {
     // ============================
 
     case editorKeyAssign          // enumerated
+    case editorUseOnlyUserKeymap
     case editorUseEditMode
     case editorEditMode           // enumerated
     case editorUseYankPop
@@ -161,6 +162,8 @@ enum KPrefKey {
         // ---- editor ----
         case .editorKeyAssign:
             return "editor.key_assign"
+        case .editorUseOnlyUserKeymap:
+            return "editor.use_only_user_keymap"
         case .editorUseEditMode:
             return "editor.use_edit_mode"
         case .editorEditMode:
