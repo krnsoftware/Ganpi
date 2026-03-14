@@ -106,6 +106,11 @@ protocol KTextStorageReadable: KTextStorageCommon {
     // comparing characters using ranges.
     func equals(_ rangeA: Range<Int>, _ rangeB: Range<Int>) -> Bool
     func hash(of range: Range<Int>) -> Int
+    
+    // helpers for wordRange().
+    func spaceOrTabRunRange(at index: Int) -> Range<Int>?
+    func japaneseClusterRange(at index: Int) -> Range<Int>?
+    func asciiIdentifierRange(at index: Int) -> Range<Int>?
 }
 
 // 書き込み可能プロトコル（読み取り継承なし）
@@ -700,7 +705,7 @@ final class KTextStorage: KTextStorageProtocol {
     
     // 空白文字とタブの連続を検出する。
     @inline(__always)
-    private func spaceOrTabRunRange(at index: Int) -> Range<Int>? {
+    func spaceOrTabRunRange(at index: Int) -> Range<Int>? {
         let n = count
         if n == 0 { return nil }
 
@@ -726,7 +731,7 @@ final class KTextStorage: KTextStorageProtocol {
 
     // ひらがな/カタカナ/漢字クラスタ（ーは仮名に結合）
     @inline(__always)
-    private func japaneseClusterRange(at index: Int) -> Range<Int>? {
+    func japaneseClusterRange(at index: Int) -> Range<Int>? {
         
         let n = count
         if n == 0 { return nil }
@@ -765,15 +770,13 @@ final class KTextStorage: KTextStorageProtocol {
 
     // ASCII 識別子（[A-Za-z0-9_]+）。該当しないなら nil を返す。
     @inline(__always)
-    private func asciiIdentifierRange(at index: Int) -> Range<Int>? {
+    func asciiIdentifierRange(at index: Int) -> Range<Int>? {
         let n = count
         if n == 0 { return nil }
+        if index < 0 || index > n { return nil }
 
         let chars = characterSlice
-        let base  = chars.startIndex
-
-        var i = max(0, min(index, n))
-        if i == n { i = n - 1 }
+        let base = chars.startIndex
 
         @inline(__always)
         func isAsciiIdent(_ ch: Character) -> Bool {
@@ -785,13 +788,19 @@ final class KTextStorage: KTextStorageProtocol {
             return false
         }
 
-        let p = chars[base + i]
-        guard isAsciiIdent(p) else { return nil }
+        var p: Int? = nil
 
-        var lo = i
+        if index < n, isAsciiIdent(chars[base + index]) {
+            p = index
+        } else if index > 0, isAsciiIdent(chars[base + index - 1]) {
+            p = index - 1
+        }
+        guard let pos = p else { return nil }
+
+        var lo = pos
         while lo > 0, isAsciiIdent(chars[base + lo - 1]) { lo -= 1 }
 
-        var hi = i + 1
+        var hi = pos + 1
         while hi < n, isAsciiIdent(chars[base + hi]) { hi += 1 }
 
         return lo..<hi

@@ -394,10 +394,15 @@ class KSyntaxParser {
     }
     
     // Additional functions.
-    // language-specific range of word. needed by completion system.
-    func wordRange(at index: Int) -> Range<Int>? { return nil }
+    // Language-specific word range. Used by the completion system.
+    // Default: returns an ASCII identifier range.
+    // Override if a parser needs custom word range recognition.
+    // func wordRange(at index: Int) -> Range<Int>? { return nil }
+    func wordRange(at index: Int) -> Range<Int>? { return storage.asciiIdentifierRange(at: index) }
+    
     // where the caret is. Outer: class/struct, Inner: var/func.
     func currentContext(at index: Int) -> (outer: String?, inner: String?) { return (nil, nil) }
+    
     // get outline of structures. for 'jump' menu.
     func outline(in range: Range<Int>?) -> [KOutlineItem] { return [] }
     
