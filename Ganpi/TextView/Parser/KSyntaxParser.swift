@@ -110,9 +110,15 @@ enum KSyntaxType: String, CaseIterable, CustomStringConvertible {
     }
 
     // キーワードファイルのベース名（拡張子なし）
-    // - 既存仕様: keyword_<settingName>.txt
+    // - 仕様: keyword_<settingName>.txt
     var keywordFileBaseName: String {
         return "keyword_\(settingName)"
+    }
+    
+    // 補完専用辞書ファイルのベース名（拡張子なし）
+    // - 仕様: completion_<settingName>.txt
+    var completionFileBaseName: String {
+        return "completion_\(settingName)"
     }
 
 
@@ -302,6 +308,7 @@ class KSyntaxParser {
     let storage: KTextStorageReadable
     let type: KSyntaxType
     let keywords: [[UInt8]]
+    let completionWords: [[UInt8]]
     private let _theme: [KFunctionalColor: NSColor]
     private var _dirtyLineRange: Range<Int>? = nil
     private var _lastSkeletonLineCount: Int = 0
@@ -439,6 +446,9 @@ class KSyntaxParser {
         
         // load keywords
         keywords = Self.loadKeywords(type: type)
+
+        // load completion words
+        completionWords = Self.loadCompletionWords(type: type)
         
         // load theme.
         let prefs = KPreference.shared
@@ -551,10 +561,10 @@ class KSyntaxParser {
     }
     
     
-    // for keywords.
+    // for keywords / completion words.
     
     private static func loadKeywords(type: KSyntaxType) -> [[UInt8]] {
-        // plain はキーワード無し（ファイルがあっても使わない方針ならここで返す）
+        // plain はキーワード無し
         if type == .plain { return [] }
 
         let resourceBaseName = type.keywordFileBaseName
@@ -562,15 +572,28 @@ class KSyntaxParser {
 
         // 1) User (Application Support) を優先
         if let userURL = userKeywordFileURL(fileName: fileName) {
-            if let words = readKeywordFile(from: userURL) {
-                return normalizeAndSortKeywords(words)
+            if let words = readWordListFile(from: userURL) {
+                return normalizeAndSortWords(words)
             }
         }
 
         // 2) Bundle fallback
         if let url = Bundle.main.url(forResource: resourceBaseName, withExtension: "txt") {
-            if let words = readKeywordFile(from: url) {
-                return normalizeAndSortKeywords(words)
+            if let words = readWordListFile(from: url) {
+                return normalizeAndSortWords(words)
+            }
+        }
+
+        return []
+    }
+
+    private static func loadCompletionWords(type: KSyntaxType) -> [[UInt8]] {
+        let fileName = type.completionFileBaseName + ".txt"
+
+        // completion 専用辞書は user 側のみ。無ければ空。
+        if let userURL = userCompletionFileURL(fileName: fileName) {
+            if let words = readWordListFile(from: userURL) {
+                return normalizeAndSortWords(words)
             }
         }
 
@@ -591,11 +614,25 @@ class KSyntaxParser {
         return nil
     }
 
-    private static func readKeywordFile(from url: URL) -> [String]? {
+    private static func userCompletionFileURL(fileName: String) -> URL? {
+        let fm = FileManager.default
+        guard let dir = KAppPaths.completionDirectoryURL(createIfNeeded: true) else {
+            log("Failed to resolve completion directory")
+            return nil
+        }
+
+        let url = dir.appendingPathComponent(fileName)
+        if fm.fileExists(atPath: url.path) {
+            return url
+        }
+        return nil
+    }
+
+    private static func readWordListFile(from url: URL) -> [String]? {
         do {
             let data = try Data(contentsOf: url)
             guard let string = String(data: data, encoding: .utf8) else {
-                log("Keyword file is not UTF-8: \(url.lastPathComponent)")
+                log("Word list file is not UTF-8: \(url.lastPathComponent)")
                 return nil
             }
             let (normalized, _) = string.normalizeNewlinesAndDetect()
@@ -611,12 +648,12 @@ class KSyntaxParser {
             }
             return lines
         } catch {
-            log("Failed to read keyword file: \(url.lastPathComponent), \(error)")
+            log("Failed to read word list file: \(url.lastPathComponent), \(error)")
             return nil
         }
     }
 
-    private static func normalizeAndSortKeywords(_ words: [String]) -> [[UInt8]] {
+    private static func normalizeAndSortWords(_ words: [String]) -> [[UInt8]] {
         var bytes: [[UInt8]] = []
         bytes.reserveCapacity(words.count)
 
@@ -624,10 +661,8 @@ class KSyntaxParser {
             bytes.append(Array(w.utf8))
         }
 
-        // sort（[[UInt8]] は sorted 前提）
         bytes.sort { $0.lexicographicallyPrecedes($1) }
 
-        // unique（重複排除）
         var unique: [[UInt8]] = []
         unique.reserveCapacity(bytes.count)
 
@@ -661,13 +696,16 @@ class KSyntaxParser {
 
         let minLen = completionMinPrefixLength
         let maxLen = completionMaxWordLength
-        let keywordCatalog = keywords   // [[UInt8]]（loadKeywordsで正規化済み）
+        let keywordCatalog = keywords
+        let completionWordCatalog = completionWords
 
         _completionQueue.async { [weak self] in
             guard let self else { return }
 
             let docCatalog = buildCompletionCatalog(bytes: bytes, minWordLength: minLen, maxWordLength: maxLen)
-            let mergedCatalog = mergeSortedUniqueCatalogs(doc: docCatalog, keywords: keywordCatalog)
+            let mergedCatalog = mergeSortedUniqueCatalogs(doc: docCatalog,
+                                                          keywords: keywordCatalog,
+                                                          completionWords: completionWordCatalog)
 
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
@@ -677,19 +715,24 @@ class KSyntaxParser {
         }
     }
     
-    private func mergeSortedUniqueCatalogs(doc: [[UInt8]], keywords: [[UInt8]]) -> [[UInt8]] {
-        if doc.isEmpty { return keywords }
-        if keywords.isEmpty { return doc }
+    private func mergeSortedUniqueCatalogs(doc: [[UInt8]], keywords: [[UInt8]], completionWords: [[UInt8]]) -> [[UInt8]] {
+        let mergedDocAndKeywords = mergeTwoSortedUniqueCatalogs(lhs: doc, rhs: keywords)
+        return mergeTwoSortedUniqueCatalogs(lhs: mergedDocAndKeywords, rhs: completionWords)
+    }
+
+    private func mergeTwoSortedUniqueCatalogs(lhs: [[UInt8]], rhs: [[UInt8]]) -> [[UInt8]] {
+        if lhs.isEmpty { return rhs }
+        if rhs.isEmpty { return lhs }
 
         var res: [[UInt8]] = []
-        res.reserveCapacity(doc.count + keywords.count)
+        res.reserveCapacity(lhs.count + rhs.count)
 
         var i = 0
         var j = 0
 
-        while i < doc.count && j < keywords.count {
-            let a = doc[i]
-            let b = keywords[j]
+        while i < lhs.count && j < rhs.count {
+            let a = lhs[i]
+            let b = rhs[j]
             let c = compareBytes(a, b)
 
             if c == 0 {
@@ -705,12 +748,12 @@ class KSyntaxParser {
             }
         }
 
-        while i < doc.count {
-            res.append(doc[i])
+        while i < lhs.count {
+            res.append(lhs[i])
             i += 1
         }
-        while j < keywords.count {
-            res.append(keywords[j])
+        while j < rhs.count {
+            res.append(rhs[j])
             j += 1
         }
 

@@ -53,6 +53,15 @@ struct KAppPaths {
         }
         return url
     }
+    
+    static func completionDirectoryURL(createIfNeeded: Bool) -> URL? {
+        guard let base = applicationSupportBaseURL(createIfNeeded: createIfNeeded) else { return nil }
+        let url = base.appendingPathComponent("completion", isDirectory: true)
+        if createIfNeeded {
+            try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        }
+        return url
+    }
 
     static func templatesDirectoryURL(createIfNeeded: Bool) -> URL? {
         guard let base = applicationSupportBaseURL(createIfNeeded: createIfNeeded) else { return nil }
