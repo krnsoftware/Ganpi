@@ -593,11 +593,19 @@ class KSyntaxParser {
     }
 
     private static func loadCompletionWords(type: KSyntaxType) -> [[UInt8]] {
-        let fileName = type.completionFileBaseName + ".txt"
+        let resourceBaseName = type.completionFileBaseName
+        let fileName = resourceBaseName + ".txt"
 
-        // completion 専用辞書は user 側のみ。無ければ空。
+        // 1) User (Application Support) を優先
         if let userURL = userCompletionFileURL(fileName: fileName) {
             if let words = readWordListFile(from: userURL) {
+                return normalizeAndSortWords(words)
+            }
+        }
+
+        // 2) Bundle fallback
+        if let url = Bundle.main.url(forResource: resourceBaseName, withExtension: "txt") {
+            if let words = readWordListFile(from: url) {
                 return normalizeAndSortWords(words)
             }
         }
