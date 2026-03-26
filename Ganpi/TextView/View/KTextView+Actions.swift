@@ -1110,6 +1110,187 @@ extension KTextView {
         NSSound.beep()
     }
     
+    // MARK: - XML Entity References
+    
+    @IBAction func escapeXmlEntityReferences(_ sender: Any?) {
+        let selection = selectionRange
+        guard !selection.isEmpty else {
+            NSSound.beep()
+            return
+        }
+        
+        let skeleton = textStorage.skeletonString
+        let bytes = Array(skeleton.bytes(in: selection))
+        
+        var hasTarget = false
+        for byte in bytes {
+            switch byte {
+            case FC.ampersand, FC.lt, FC.gt, FC.doubleQuote, FC.singleQuote:
+                hasTarget = true
+                break
+            default:
+                break
+            }
+            if hasTarget { break }
+        }
+        
+        guard hasTarget else {
+            NSSound.beep()
+            return
+        }
+        
+        var result = ""
+        result.reserveCapacity(selection.count)
+        
+        var segmentStart = selection.lowerBound
+        var index = selection.lowerBound
+        
+        while index < selection.upperBound {
+            let byte = skeleton[index]
+            
+            let replacement: String?
+            switch byte {
+            case FC.ampersand:
+                replacement = "&amp;"
+            case FC.lt:
+                replacement = "&lt;"
+            case FC.gt:
+                replacement = "&gt;"
+            case FC.doubleQuote:
+                replacement = "&quot;"
+            case FC.singleQuote:
+                replacement = "&apos;"
+            default:
+                replacement = nil
+            }
+            
+            guard let replacement else {
+                index += 1
+                continue
+            }
+            
+            if segmentStart < index {
+                result += textStorage.string(in: segmentStart..<index)
+            }
+            result += replacement
+            
+            index += 1
+            segmentStart = index
+        }
+        
+        if segmentStart < selection.upperBound {
+            result += textStorage.string(in: segmentStart..<selection.upperBound)
+        }
+        
+        textStorage.replaceString(in: selection, with: result)
+        selectionRange = selection.lowerBound..<selection.lowerBound + result.count
+    }
+    
+    @IBAction func unescapeXmlEntityReferences(_ sender: Any?) {
+        let selection = selectionRange
+        guard !selection.isEmpty else {
+            NSSound.beep()
+            return
+        }
+        
+        let skeleton = textStorage.skeletonString
+        guard skeleton.containsSubsequence([FC.ampersand], in: selection) else {
+            NSSound.beep()
+            return
+        }
+        
+        var result = ""
+        result.reserveCapacity(selection.count)
+        
+        var segmentStart = selection.lowerBound
+        var scanIndex = selection.lowerBound
+        var didChange = false
+        
+        while scanIndex < selection.upperBound {
+            guard let ampIndex = skeleton.firstIndex(of: FC.ampersand, in: scanIndex..<selection.upperBound) else {
+                break
+            }
+            
+            let semicolonSearchRange = (ampIndex + 1)..<selection.upperBound
+            guard let semicolonIndex = skeleton.firstIndex(of: FC.semicolon, in: semicolonSearchRange) else {
+                scanIndex = ampIndex + 1
+                continue
+            }
+            
+            let entityRange = ampIndex...semicolonIndex
+            let entityString = textStorage.string(in: ampIndex..<(semicolonIndex + 1))
+            
+            guard let decoded = decodeXmlEntityReference(entityString) else {
+                scanIndex = ampIndex + 1
+                continue
+            }
+            
+            if segmentStart < ampIndex {
+                result += textStorage.string(in: segmentStart..<ampIndex)
+            }
+            result += decoded
+            
+            didChange = true
+            let nextIndex = entityRange.upperBound + 1
+            segmentStart = nextIndex
+            scanIndex = nextIndex
+        }
+        
+        guard didChange else {
+            NSSound.beep()
+            return
+        }
+        
+        if segmentStart < selection.upperBound {
+            result += textStorage.string(in: segmentStart..<selection.upperBound)
+        }
+        
+        textStorage.replaceString(in: selection, with: result)
+        selectionRange = selection.lowerBound..<selection.lowerBound + result.count
+    }
+    
+    private func decodeXmlEntityReference(_ entityString: String) -> String? {
+        switch entityString {
+        case "&amp;":
+            return "&"
+        case "&lt;":
+            return "<"
+        case "&gt;":
+            return ">"
+        case "&quot;":
+            return "\""
+        case "&apos;":
+            return "'"
+        default:
+            break
+        }
+        
+        guard entityString.hasPrefix("&#"), entityString.hasSuffix(";") else { return nil }
+        
+        let bodyStart = entityString.index(entityString.startIndex, offsetBy: 2)
+        let bodyEnd = entityString.index(before: entityString.endIndex)
+        let body = entityString[bodyStart..<bodyEnd]
+        guard !body.isEmpty else { return nil }
+        
+        let scalarValue: UInt32?
+        
+        if body.count >= 2, body.first == "0", body.dropFirst().first.map({ $0 == "x" || $0 == "X" }) == true {
+            scalarValue = nil
+        } else if body.first == "x" || body.first == "X" {
+            let hexPart = body.dropFirst()
+            guard !hexPart.isEmpty else { return nil }
+            scalarValue = UInt32(hexPart, radix: 16)
+        } else {
+            scalarValue = UInt32(body, radix: 10)
+        }
+        
+        guard let scalarValue,
+              let scalar = UnicodeScalar(scalarValue) else { return nil }
+        
+        return String(Character(scalar))
+    }
+    
+    
     // MARK: - Hiragana <-> Katakana
     
     @IBAction func hiraganaToKatakana(_ sender: Any?) {

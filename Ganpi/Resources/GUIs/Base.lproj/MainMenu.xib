@@ -394,6 +394,25 @@
                                                 </items>
                                             </menu>
                                         </menuItem>
+                                        <menuItem title="HTML / XML" id="DOn-G0-nB2">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <menu key="submenu" id="PpU-ML-neh">
+                                                <items>
+                                                    <menuItem title="Escape Entity References" id="yZC-uc-SMI">
+                                                        <modifierMask key="keyEquivalentModifierMask"/>
+                                                        <connections>
+                                                            <action selector="escapeXmlEntityReferences:" target="-1" id="E03-8C-aGM"/>
+                                                        </connections>
+                                                    </menuItem>
+                                                    <menuItem title="Unescape Entity References" id="iLX-yJ-hGk">
+                                                        <modifierMask key="keyEquivalentModifierMask"/>
+                                                        <connections>
+                                                            <action selector="unescapeXmlEntityReferences:" target="-1" id="Dmk-EG-L8U"/>
+                                                        </connections>
+                                                    </menuItem>
+                                                </items>
+                                            </menu>
+                                        </menuItem>
                                     </items>
                                 </menu>
                             </menuItem>
