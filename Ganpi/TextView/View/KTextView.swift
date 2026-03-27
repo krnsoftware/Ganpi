@@ -130,19 +130,20 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         get { _selectionRange }
         set {
             _selectionRange = newValue
-            
+
             endYankCycle()
-            
+
             if completion.isInCompletionMode {
                 completion.update()
             }
-            
+
             _ = currentLineIndex
 
             updateCaretPosition()
             sendStatusBarUpdateAction()
             updateCaretActiveStatus()
-            
+            syncCompletionMenu()
+
             needsDisplay = true
         }
     }
@@ -788,21 +789,23 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
             interpretKeyEvents([event])
             return
         }
-        
+
         // Application専用キーアサインを使用する場合
         // IM変換中はそちらを優先
         if hasMarkedText() {
             completion.isInCompletionMode = false
+            syncCompletionMenu()
             _ = inputContext?.handleEvent(event)
             return
         }
-        
+
         // 補完機能に渡してキーが消費されるか確認。
         if completion.estimate(event: event) {
+            syncCompletionMenu()
             needsDisplay = true
             return
         }
-        
+
         // キーアサインに適合するかチェック。適合しなければinputContextに投げて、そちらでも使われなければkeyDown()へ。
         guard let keyStroke = KKeyStroke(event: event) else { log("#01"); return }
         let status = KKeyAssign.shared.estimateKeyStroke(keyStroke, requester: self, mode: _editMode)
@@ -810,8 +813,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
             if inputContext?.handleEvent(event) == true { return }
             nextResponder?.keyDown(with: event)
         }
-        
-        
     }
     
     
@@ -1660,6 +1661,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
                 }
 
                 _prevContentViewBounds = contentBounds
+                syncCompletionMenu()
                 needsDisplay = true
             } else {
                 _prevContentViewBounds = contentBounds
@@ -1676,9 +1678,10 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
                 // 選択が空のときだけ表示可。行番号領域に隠れたら消す。
                 _caretView.isHidden = !selectionRange.isEmpty || (currentX < 0)
             }
-
         }
+
         _prevContentViewBounds = contentBounds
+        syncCompletionMenu()
         needsDisplay = true
     }
 
@@ -2107,7 +2110,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     }
     
     // characterIndex文字目の文字の位置。textRegion左上原点。
-    private func characterPosition(at characterIndex:Int) -> CGPoint {
+    // 元々privateだがinternalに変更。
+    func characterPosition(at characterIndex:Int) -> CGPoint {
         guard let layoutRects = layoutManager.makeLayoutRects() else { log("#0"); return .zero }
         guard let lineIndex = layoutManager.lines.lineIndex(at: characterIndex) else { log("#1"); return .zero }
         return layoutRects.characterPosition(lineIndex: lineIndex, characterIndex: characterIndex)
@@ -2702,6 +2706,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     @IBAction override func moveUp(_ sender: Any?) {
         if completion.isInCompletionMode, completion.nowCompleting {
             completion.selectPrevious()
+            syncCompletionMenu()
             needsDisplay = true
             return
         }
@@ -2711,6 +2716,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     @IBAction override func moveDown(_ sender: Any?) {
         if completion.isInCompletionMode, completion.nowCompleting {
             completion.selectNext()
+            syncCompletionMenu()
             needsDisplay = true
             return
         }
@@ -3224,15 +3230,38 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     @IBAction func setCompletionModeOn(_ sender: Any?) {
         if !KPreference.shared.bool(.editorUseWordCompletion) { return }
         completion.isInCompletionMode = true
+        completion.update()
+        syncCompletionMenu()
+        needsDisplay = true
     }
     
     @IBAction func setCompletionModeOff(_ sender: Any?) {
         completion.isInCompletionMode = false
+        syncCompletionMenu()
+        needsDisplay = true
     }
     
     @IBAction func toggleCompletionMode(_ sender: Any?) {
         if !KPreference.shared.bool(.editorUseWordCompletion), !completion.isInCompletionMode { return }
+
         completion.isInCompletionMode = !completion.isInCompletionMode
+
+        if completion.isInCompletionMode {
+            completion.update()
+        }
+
+        syncCompletionMenu()
+        needsDisplay = true
+    }
+    
+    private func syncCompletionMenu() {
+        guard let containerView else { return }
+
+        if completion.isInCompletionMode, completion.nowCompleting {
+            containerView.updateCompletionMenu()
+        } else {
+            containerView.hideCompletionMenu()
+        }
     }
     
     // MARK: - COPY and Paste (NSResponder method)

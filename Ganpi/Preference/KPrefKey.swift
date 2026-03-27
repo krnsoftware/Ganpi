@@ -47,6 +47,7 @@ enum KPrefKey {
     case editorEditMode           // enumerated
     case editorUseYankPop
     case editorUseWordCompletion
+    case editorShowCompletionMenu
 
 
     // ============================
@@ -169,6 +170,8 @@ enum KPrefKey {
             return "editor.use_yank_pop"
         case .editorUseWordCompletion:
             return "editor.use_word_completion"
+        case .editorShowCompletionMenu:
+            return "editor.show_completion_menu"
 
         // ---- search window ----
         case .searchFieldFontSize:

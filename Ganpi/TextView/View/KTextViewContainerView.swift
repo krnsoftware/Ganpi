@@ -16,6 +16,8 @@ final class KTextViewContainerView: NSView {
     private let _textView: KTextView
 
     private var _overlay: KFocusOverlayView?
+    
+    private var _completionMenuView: KCompletionMenuView?
 
     // MARK: - Accessor
 
@@ -68,7 +70,7 @@ final class KTextViewContainerView: NSView {
         setup()
     }
     
-    private func _installOverlayIfNeeded() {
+    private func installOverlayIfNeeded() {
         guard _overlay == nil else { return }
         let clip = _scrollView.contentView
 
@@ -93,13 +95,13 @@ final class KTextViewContainerView: NSView {
     // どこか確実に通るフックで一度だけインストール（同期）
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        _installOverlayIfNeeded()
+        installOverlayIfNeeded()
         syncFocusOverlayNow()
     }
     
     override func layout() {
         super.layout()
-        _installOverlayIfNeeded()
+        installOverlayIfNeeded()
         syncFocusOverlayNow()
     }
 
@@ -110,11 +112,88 @@ final class KTextViewContainerView: NSView {
     }
     
     func syncFocusOverlayNow() {
-        _installOverlayIfNeeded()  // 念のため（多重追加しない実装のはず）
+        installOverlayIfNeeded()  // 念のため（多重追加しない実装のはず）
         let multiple = ((superview as? NSSplitView)?.subviews.count ?? 1) > 1
         let isActive = (window?.firstResponder === _textView)
         _overlay?.showsFocus = multiple && isActive
         _overlay?.needsDisplay = true
+    }
+    
+    private func installCompletionMenuIfNeeded() {
+        if _completionMenuView != nil { return }
+
+        let completionMenuView = KCompletionMenuView(frame: .zero)
+        completionMenuView.isHidden = true
+
+        let clipView = _scrollView.contentView
+        clipView.addSubview(completionMenuView, positioned: .above, relativeTo: _textView)
+
+        _completionMenuView = completionMenuView
+    }
+
+    func hideCompletionMenu() {
+        _completionMenuView?.isHidden = true
+    }
+
+    func updateCompletionMenu() {
+        guard KPreference.shared.bool(.editorShowCompletionMenu) else {
+            hideCompletionMenu()
+            return
+        }
+
+        let completion = _textView.completion
+        guard completion.isInCompletionMode, completion.nowCompleting else {
+            hideCompletionMenu()
+            return
+        }
+
+        let currentEntryIndex = completion.currentEntryIndex
+        let menuEntries = completion.menuEntries(after: currentEntryIndex, maxCount: 5)
+
+        guard !menuEntries.isEmpty else {
+            hideCompletionMenu()
+            return
+        }
+
+        installCompletionMenuIfNeeded()
+
+        guard let completionMenuView = _completionMenuView else { return }
+
+        let showsLowerFade = completion.entriesCount > currentEntryIndex + 6
+        let font = _textView.textStorage.baseFont
+        let lineHeight = _textView.layoutManager.lineHeight
+
+        completionMenuView.update(
+            entries: menuEntries,
+            showsLowerFade: showsLowerFade,
+            font: font,
+            lineHeight: lineHeight
+        )
+
+        let preferredSize = completionMenuView.preferredSize()
+        let caretOrigin = _textView.characterPosition(at: _textView.caretIndex)
+
+        var origin = NSPoint(
+            x: caretOrigin.x - 1.0,
+            y: caretOrigin.y + lineHeight
+        )
+
+        let clipBounds = _scrollView.contentView.bounds
+
+        if origin.x < clipBounds.minX {
+            origin.x = clipBounds.minX
+        }
+
+        if origin.x + preferredSize.width > clipBounds.maxX {
+            origin.x = max(clipBounds.minX, clipBounds.maxX - preferredSize.width)
+        }
+
+        if origin.y + preferredSize.height > clipBounds.maxY {
+            origin.y = max(clipBounds.minY, origin.y - preferredSize.height - lineHeight - 2.0)
+        }
+
+        completionMenuView.frame = NSRect(origin: origin, size: preferredSize)
+        completionMenuView.isHidden = false
     }
     
     

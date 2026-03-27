@@ -62,6 +62,7 @@ struct KPrefSchema {
         
         "editor.use_yank_pop"                   : .init(type: .bool),
         "editor.use_word_completion"            : .init(type: .bool),
+        "editor.show_completion_menu"           : .init(type: .bool),
         
         
         // -----------------------------

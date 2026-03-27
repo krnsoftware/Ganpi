@@ -18,6 +18,9 @@ final class KCompletionController {
     private weak var _textView: KTextView?
 
     var currentWordTail: NSAttributedString?
+    var nowCompleting: Bool { currentWordTail != nil }
+    var currentEntryIndex: Int { _entryIndex }
+    var entriesCount: Int { _entries.count }
 
     var isInCompletionMode: Bool = false {
         didSet {
@@ -27,8 +30,6 @@ final class KCompletionController {
             sendStatusBarUpdateAction()
         }
     }
-
-    var nowCompleting: Bool { currentWordTail != nil }
 
     private func sendStatusBarUpdateAction() {
         NSApp.sendAction(#selector(KStatusBarUpdateAction.statusBarNeedsUpdate(_:)),
@@ -64,6 +65,28 @@ final class KCompletionController {
 
     init(textView: KTextView) {
         _textView = textView
+    }
+
+    func menuEntries(after index: Int, maxCount: Int) -> [String] {
+        guard index + 1 < _entries.count, maxCount > 0 else { return [] }
+
+        let upperBound = min(index + 1 + maxCount, _entries.count)
+        var result: [String] = []
+        result.reserveCapacity(maxCount)
+
+        for entryIndex in (index + 1)..<upperBound {
+            let wordBytes = _entries[entryIndex]
+            guard _currentPrefixLength < wordBytes.count else { continue }
+
+            let tailBytes = Array(wordBytes[_currentPrefixLength..<wordBytes.count])
+            let tailString = String(decoding: tailBytes, as: UTF8.self)
+
+            if !tailString.isEmpty {
+                result.append(tailString)
+            }
+        }
+
+        return result
     }
 
     // 選択範囲が変更された際に呼び出す（KTextView.selectionRange setter）。
