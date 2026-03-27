@@ -695,7 +695,7 @@ class KSyntaxParser {
         _completionIsDirty = true
     }
 
-    private func startCompletionCatalogBuildIfNeeded() {
+    func startCompletionCatalogBuildIfNeeded() {
         if !_completionIsDirty { return }
         if _completionIsBuilding { return }
 

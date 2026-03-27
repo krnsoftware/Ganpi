@@ -3227,8 +3227,11 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     
     
     // MARK: - Completion
+    
     @IBAction func setCompletionModeOn(_ sender: Any?) {
         if !KPreference.shared.bool(.editorUseWordCompletion) { return }
+
+        textStorage.parser.startCompletionCatalogBuildIfNeeded()
         completion.isInCompletionMode = true
         completion.update()
         syncCompletionMenu()
@@ -3244,7 +3247,13 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     @IBAction func toggleCompletionMode(_ sender: Any?) {
         if !KPreference.shared.bool(.editorUseWordCompletion), !completion.isInCompletionMode { return }
 
-        completion.isInCompletionMode = !completion.isInCompletionMode
+        let nextMode = !completion.isInCompletionMode
+
+        if nextMode {
+            textStorage.parser.startCompletionCatalogBuildIfNeeded()
+        }
+
+        completion.isInCompletionMode = nextMode
 
         if completion.isInCompletionMode {
             completion.update()
