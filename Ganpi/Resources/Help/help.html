@@ -204,7 +204,8 @@ Ganpiで扱うことのできる文字コード・改行コード・ドキュメ
 <li>単語選択の際の選択範囲<br />
 ダブルクリックやコマンドによる単語選択の際の選択範囲を言語毎に変更します。</li>
 <li>語彙補完<br />
-ドキュメント内部の文字列・キーワード・コンプリーション用辞書(ユーザー定義があればそれを、なければ組込みを、それもなければ使用しない)から補完文字列を作成し、ユーザの指示により表示します。列挙メニューは持たず、上下矢印キーにより候補を入れ替えます。<br />
+ドキュメント内部の文字列・キーワード・コンプリーション用辞書(ユーザー定義があればそれを、なければ組込みを、それもなければ使用しない)から補完文字列を作成し、ユーザの指示により表示します。上下矢印キーにより候補を入れ替えます。<br />
+語彙候補のリストを表示したくない場合は、初期設定ファイルでeditor.show_completion_menuをfalseにセットして下さい。<br />
 ユーザー定義のコンプリーション用辞書ファイルは ~/Library/Application Support/com.drycarbon.Ganpi/completion/ 以下に completion_&lt;lang&gt;.txt というファイルを置きます。1語1行のテキストファイルで、ソートの必要はありません。形式はUTF-8/LFです。</li>
 </ul>
 </section>
@@ -283,7 +284,59 @@ Ganpiは、現在編集中の文章について任意の字句を検索するこ
 Ganpiの初期設定は、一般的な初期設定ウインドウによらず、テキストファイルの編集によって行います。テキストファイルのフォーマットはINIです。Ganpi/Settings...を選択すると、初期設定ファイルがあればそれを、なければファイルを新規に作成してからそれを開きます。新規の設定ファイルは、アプリケーションが初期設定として利用するINIファイルをコピーして生成するのですが、生成の際に設定項目は全てコメントアウトします。設定は全て「上書き」で、記載するのが1項目だけでも問題なく動作します。
 </p>
 <p>
-設定はアプリケーション起動時に読み込まれますが、起動中もOption/Reload Preferencesメニュー(cmd+T)を実行すれば任意のタイミングで再度読み込むことができます。
+初期設定の各項目は、.(dot)で区切られた設定項目識別子に、:(コロン)を挟んで設定値を記述することで設定します。例えば、
+</p>
+<div class="example">
+<p class="example-title">
+user.ini
+</p>
+<pre><code>
+document.show_line_number : true
+</code></pre>
+</div>
+<p>
+といった形になります。セクション([...])を指定すると、そのセクションの内部の識別子は冒頭部分からセクション部分を省略したものになります。ただし、セクションは最後に.を含んではならず、また省略された識別子は必ず.から始まる必要があります。セクション内部であっても.で開始されない識別子はそのままフルタームの識別子として認識されます。
+</p>
+<div class="example">
+<p class="example-title">
+user.ini
+</p>
+<pre><code>
+[document]
+.show_line_number : true
+
+document.show_line_number : true
+</code></pre>
+</div>
+<p>
+上記の2つの識別子は同じものを指します。セクション名は命名規則を守れば自由に設定できます。
+</p>
+<div class="example">
+<p class="example-title">
+user.ini
+</p>
+<pre><code>
+parser.base.show.invisibles.tab : true
+
+[parser]
+.base.show.invisibles.tab : true
+
+[parser.base]
+.show.invisibles.tab : true
+
+[parser.base.show]
+.invisibles.tab : true
+
+[parser.base.show.invisibles]
+.tab : true
+</code></pre>
+</div>
+<p>
+これらは全て同じ意味です。必要に応じてセクションを切るといいでしょう。
+</p>
+
+<p>
+設定はアプリケーション起動時に読み込まれますが、起動中もOption/Reload Preferencesメニュー(cmd+T)を実行すれば任意のタイミングで再度読み込むことができます。設定に問題がある場合、その内容がLog Windowに表示されます。
 </p>
 
 </section>

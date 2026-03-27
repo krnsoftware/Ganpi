@@ -1,4 +1,4 @@
-menu "edit"
+menu "User Menu"
 item "Paragraph"
 key "cmd+opt+p"
 command: tag[pre="<p>\n", post="\n</p>\n", will_select=right]
