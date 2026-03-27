@@ -23,16 +23,25 @@ final class KCompletionMenuView: NSView {
     private var _showsLowerFade = false
     private var _font: NSFont = .monospacedSystemFont(ofSize: 12.0, weight: .regular)
     private var _lineHeight: CGFloat = 14.0
+    private var _textColor: NSColor = .labelColor
+    private var _backgroundColor: NSColor = .textBackgroundColor
 
     override var isFlipped: Bool { true }
 
     var textOriginX: CGFloat { _horizontalPadding }
 
-    func update(entries: [String], showsLowerFade: Bool, font: NSFont, lineHeight: CGFloat) {
+    func update(entries: [String],
+                showsLowerFade: Bool,
+                font: NSFont,
+                lineHeight: CGFloat,
+                textColor: NSColor,
+                backgroundColor: NSColor) {
         _entries = entries
         _showsLowerFade = showsLowerFade
         _font = font
         _lineHeight = lineHeight
+        _textColor = textColor.withAlphaComponent(0.8)
+        _backgroundColor = backgroundColor.withAlphaComponent(0.95)
         needsDisplay = true
     }
 
@@ -50,16 +59,16 @@ final class KCompletionMenuView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         let boundsPath = NSBezierPath(roundedRect: bounds, xRadius: _cornerRadius, yRadius: _cornerRadius)
-        NSColor.windowBackgroundColor.withAlphaComponent(0.95).setFill()
+        _backgroundColor.setFill()
         boundsPath.fill()
 
-        NSColor.separatorColor.withAlphaComponent(0.45).setStroke()
+        _textColor.withAlphaComponent(0.18).setStroke()
         boundsPath.lineWidth = 1.0
         boundsPath.stroke()
 
         let attributes: [NSAttributedString.Key: Any] = [
             .font: _font,
-            .foregroundColor: NSColor.labelColor
+            .foregroundColor: _textColor
         ]
 
         for rowIndex in 0..<_visibleRowCount {
@@ -88,8 +97,8 @@ final class KCompletionMenuView: NSView {
         context.clip(to: fadeRect)
 
         let colors = [
-            NSColor.clear.cgColor,
-            NSColor.windowBackgroundColor.withAlphaComponent(0.95).cgColor
+            _backgroundColor.withAlphaComponent(0.0).cgColor,
+            _backgroundColor.cgColor
         ] as CFArray
 
         guard let gradient = CGGradient(

@@ -160,14 +160,15 @@ final class KTextViewContainerView: NSView {
         guard let completionMenuView = _completionMenuView else { return }
 
         let showsLowerFade = completion.entriesCount > currentEntryIndex + 6
-        let font = _textView.textStorage.baseFont
         let lineHeight = _textView.layoutManager.lineHeight
 
         completionMenuView.update(
             entries: menuEntries,
             showsLowerFade: showsLowerFade,
-            font: font,
-            lineHeight: lineHeight
+            font: _textView.textStorage.baseFont,
+            lineHeight: lineHeight,
+            textColor: _textView.textStorage.parser.baseTextColor,
+            backgroundColor: _textView.textStorage.parser.backgroundColor
         )
 
         let preferredSize = completionMenuView.preferredSize()
