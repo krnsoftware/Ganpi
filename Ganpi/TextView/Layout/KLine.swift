@@ -458,6 +458,7 @@ final class KLines: CustomStringConvertible {
 
         let muAttrString = NSMutableAttributedString(attributedString: attrString)
 
+        
         // 挿入直前の文字色を引き継ぐ（従来の挙動）
         let inheritedColor = inheritedForegroundColorBeforeInsertion(replacementRange: replacementRange)
         muAttrString.addAttribute(.foregroundColor, value: inheritedColor, range: NSRange(location: 0, length: muAttrString.length))
@@ -466,6 +467,20 @@ final class KLines: CustomStringConvertible {
         let normalColor = NSColor.controlAccentColor.withAlphaComponent(0.65)
 
         let fullRange = NSRange(location: 0, length: muAttrString.length)
+        
+        guard let textStorageRef = _textStorageRef else {
+            log("_textStorageRef is nil.", from: self)
+            return
+        }
+
+        // 本文と同じ計測条件へ揃える
+        muAttrString.addAttributes([
+            .font: textStorageRef.baseFont,
+            .kern: 0.0,
+            .ligature: 0
+        ], range: fullRange)
+
+        muAttrString.removeAttribute(.paragraphStyle, range: fullRange)
 
         // thick は single|thick（thick単体だと太くならないnケースがある）
         let thickValue = NSUnderlineStyle.single.union(.thick).rawValue

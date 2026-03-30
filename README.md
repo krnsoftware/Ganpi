@@ -1,6 +1,6 @@
 # Ganpi
 
-**For You. Not for Everyone.**
+**For You. Not for Everyone.**<br>
 **No nags. No noise. Just text.**
 
 Ganpi is a macOS-native text editor built for one thing: making text do exactly what you intend.

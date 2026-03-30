@@ -323,55 +323,101 @@ final class KLayoutManager: KLayoutManagerReadable {
     }
     
     // Input methodで入力中の文字列を表示するためのKFakeLineを生成する。
-    func makeFakeLines(from attributedString: NSAttributedString,hardLineIndex: Int,
+    func makeFakeLines(from attributedString: NSAttributedString,
+                       hardLineIndex: Int,
                        width: CGFloat?) -> [KFakeLine] {
         guard attributedString.length > 0 else { return [] }
         guard let textWidth = width else {
-            return [KFakeLine(attributedString: attributedString, hardLineIndex: hardLineIndex, softLineIndex: 0, wordWrapOffset: 0.0, layoutManager: self, textStorageRef: _textStorageRef)]
+            return [KFakeLine(attributedString: attributedString,
+                              hardLineIndex: hardLineIndex,
+                              softLineIndex: 0,
+                              wordWrapOffset: 0.0,
+                              layoutManager: self,
+                              textStorageRef: _textStorageRef)]
         }
-        
-        var fakeLines: [KFakeLine] = []
-        
+
         let fullLine = CTLineCreateWithAttributedString(attributedString)
-        
-        
-        guard let hardLineRange = lines.hardLineRange(hardLineIndex: hardLineIndex) else { log("0"); return [] }
+
+        guard let hardLineRange = lines.hardLineRange(hardLineIndex: hardLineIndex) else {
+            log("hardLineRange(\(hardLineIndex)) not found", from: self)
+            return []
+        }
+
         let leadingLineOffset = leadingWhitespaceOffset(in: hardLineRange)
-        var isFirstLine = true
         let trailingLineWidth = textWidth - leadingLineOffset
-        
-        var baseOffset: CGFloat = 0
-        var baseIndex: Int = 0
-        var softLineIndex: Int = 0
-        for i in 0..<attributedString.length {
-            let offset = CTLineGetOffsetForStringIndex(fullLine, i, nil)
+
+        let string = attributedString.string
+
+        // 通常行(KLine.makeCTLine)と同じく Character 境界で offset を作る
+        var boundaryUTF16Indices: [Int] = [0]
+        var boundaryOffsets: [CGFloat] = [CTLineGetOffsetForStringIndex(fullLine, 0, nil)]
+
+        var utf16Position = 0
+        for ch in string {
+            utf16Position += ch.utf16.count
+            boundaryUTF16Indices.append(utf16Position)
+            boundaryOffsets.append(CTLineGetOffsetForStringIndex(fullLine, utf16Position, nil))
+        }
+
+        if boundaryOffsets.count <= 1 {
+            return [KFakeLine(attributedString: attributedString,
+                              hardLineIndex: hardLineIndex,
+                              softLineIndex: 0,
+                              wordWrapOffset: 0.0,
+                              layoutManager: self,
+                              textStorageRef: _textStorageRef)]
+        }
+
+        var fakeLines: [KFakeLine] = []
+
+        var baseBoundaryIndex = 0
+        var baseOffset: CGFloat = 0.0
+        var softLineIndex = 0
+        var isFirstLine = true
+
+        for boundaryIndex in 0..<boundaryOffsets.count {
+            let currentOffset = boundaryOffsets[boundaryIndex]
             let currentTextWidth = isFirstLine ? textWidth : trailingLineWidth
-            
-            if offset - baseOffset >= currentTextWidth {
-                
-                let subAttr = attributedString.attributedSubstring(from: NSRange(location: baseIndex, length: i - baseIndex))
-                let fakeLine = KFakeLine(attributedString: subAttr,
-                                         hardLineIndex: hardLineIndex,
-                                         softLineIndex: softLineIndex,
-                                         wordWrapOffset:isFirstLine ? 0.0 : leadingLineOffset,//0.0,
-                                         layoutManager: self,
-                                         textStorageRef: _textStorageRef)
-                fakeLines.append(fakeLine)
-                baseIndex = i
-                baseOffset = offset
+
+            // makeLines(...) と同じ条件に揃える
+            if currentOffset - baseOffset > currentTextWidth {
+                let startUTF16 = boundaryUTF16Indices[baseBoundaryIndex]
+                let endUTF16 = boundaryUTF16Indices[boundaryIndex]
+
+                let subAttr = attributedString.attributedSubstring(
+                    from: NSRange(location: startUTF16, length: endUTF16 - startUTF16)
+                )
+
+                fakeLines.append(
+                    KFakeLine(attributedString: subAttr,
+                              hardLineIndex: hardLineIndex,
+                              softLineIndex: softLineIndex,
+                              wordWrapOffset: isFirstLine ? 0.0 : leadingLineOffset,
+                              layoutManager: self,
+                              textStorageRef: _textStorageRef)
+                )
+
+                baseBoundaryIndex = boundaryIndex
+                baseOffset = currentOffset
                 softLineIndex += 1
                 isFirstLine = false
             }
         }
-        let subAttr = attributedString.attributedSubstring(from: NSRange(location: baseIndex, length: attributedString.length - baseIndex))
-        
-        fakeLines.append(KFakeLine(attributedString: subAttr,
-                                   hardLineIndex: hardLineIndex,
-                                   softLineIndex: softLineIndex,
-                                   wordWrapOffset: isFirstLine ? 0.0 : leadingLineOffset,//0.0,
-                                   layoutManager: self,
-                                   textStorageRef: _textStorageRef))
-        
+
+        let tailStartUTF16 = boundaryUTF16Indices[baseBoundaryIndex]
+        let tailAttr = attributedString.attributedSubstring(
+            from: NSRange(location: tailStartUTF16, length: attributedString.length - tailStartUTF16)
+        )
+
+        fakeLines.append(
+            KFakeLine(attributedString: tailAttr,
+                      hardLineIndex: hardLineIndex,
+                      softLineIndex: softLineIndex,
+                      wordWrapOffset: isFirstLine ? 0.0 : leadingLineOffset,
+                      layoutManager: self,
+                      textStorageRef: _textStorageRef)
+        )
+
         return fakeLines
     }
     
