@@ -24,6 +24,9 @@ enum KPostProcessingCaretPosition { case left; case right; case select }
 // コマンドが対象にした文字列の範囲
 enum KTextEditingTarget { case all; case selection; case auto }
 
+// コマンドのソース (string: 与えられた文字列そのもの, file: 文字列をファイルパスとして認識)
+enum KCommandSource { case string; case file }
+
 // コマンドの結果
 struct KCommandResult {
     let string: String
@@ -41,12 +44,11 @@ struct KCommandOptions {
 // コマンドの種類。それぞれ内容はテキストとして渡される。内容は実行の時点で解釈される。
 enum KUserCommand {
     case insert(String)          // insert[String] : insert String to the designated range.
-    case load(String)            // load[PATH] or [PATH] : insert string from the designated filePATH.
-    case execute(String)         // execute[PATH] : execute a file command represented with filePATH.
+    case execute(String)         // execute[String] : execute a command string or a file command.
     case tag(String)             // tag[pre="...", post="...", single="...", will_select=all|right|left]
     
     // 与えられたstorageと、現在の選択範囲rangeについて処理。allであればrangeは単に無視される。
-    func execute(for storage:KTextStorageReadable, in range:Range<Int>) -> KCommandResult? {
+    func execute(for storage: KTextStorageReadable, in range: Range<Int>) -> KCommandResult? {
         var options: KCommandOptions
         let resultString: String
         
@@ -58,17 +60,14 @@ enum KUserCommand {
             }
             options = result.options
             options.target = .selection // .insert always replace the selection.
-            resultString = result.command
-
-        case .load(let command):
-            guard let result = estimateCommand(command) else {
-                KLog.shared.log(id: "useraction", message: "Invalid load command: \(command)")
-                return nil
+            
+            switch result.source {
+            case .string:
+                resultString = result.payload
+            case .file:
+                guard let content = readFromTemplatesDirectory(result.payload) else { log("#01"); return nil }
+                resultString = content
             }
-            options = result.options
-            options.target = .selection // .load always replace the selection.
-            guard let content = readFromTemplatesDirectory(result.command) else { log("#01"); return nil }
-            resultString = content
 
         case .execute(let command):
             guard let result = estimateCommand(command) else {
@@ -89,10 +88,20 @@ enum KUserCommand {
                 options.target = range.isEmpty ? .all : .selection
             }
 
-            guard let content = readFromStream(from: result.command,
-                                               string: storage.string(in: targetRange),
-                                               timeout: options.timeout) else { log("#02"); return nil }
-            resultString = content
+            let inputString = storage.string(in: targetRange)
+
+            switch result.source {
+            case .string:
+                guard let content = readFromCommandString(result.payload,
+                                                          string: inputString,
+                                                          timeout: options.timeout) else { log("#02"); return nil }
+                resultString = content
+            case .file:
+                guard let content = readFromStream(from: result.payload,
+                                                   string: inputString,
+                                                   timeout: options.timeout) else { log("#03"); return nil }
+                resultString = content
+            }
             
         case .tag(let body):
             guard let spec = parseTagSpec(body) else {
@@ -117,7 +126,7 @@ enum KUserCommand {
         return .init(string: resultString, options: options)
     }
     
-    private func estimateCommand(_ command: String) -> (command: String, options: KCommandOptions)? {
+    private func estimateCommand(_ command: String) -> (payload: String, options: KCommandOptions, source: KCommandSource)? {
         func unescapePayload(_ raw: String) -> String {
             var result = ""
             var escape = false
@@ -146,7 +155,7 @@ enum KUserCommand {
             return result
         }
 
-        func commitOption(key: String, value: String, opts: inout KCommandOptions) {
+        func commitOption(key: String, value: String, opts: inout KCommandOptions, source: inout KCommandSource) {
             let k = key.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
             let v = value.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !k.isEmpty else { return }
@@ -169,13 +178,28 @@ enum KUserCommand {
                     opts.extras[k] = v
                 }
             case "timeout":
-                if let f = Float(v) { opts.timeout = f } else { opts.extras[k] = v }
+                if let f = Float(v) {
+                    opts.timeout = f
+                } else {
+                    opts.extras[k] = v
+                }
+            case "source":
+                switch v.lowercased() {
+                case "string":
+                    source = .string
+                case "file":
+                    source = .file
+                default:
+                    opts.extras[k] = v
+                }
             default:
                 opts.extras[k] = v
             }
         }
 
         var opts = KCommandOptions()
+        var source = KCommandSource.string
+
         let trimmed = command.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty {
             KLog.shared.log(id: "useraction", message: "Invalid command: empty payload")
@@ -258,7 +282,7 @@ enum KUserCommand {
 
             func commitPair() {
                 if !currentKey.isEmpty || !currentValue.isEmpty {
-                    commitOption(key: currentKey, value: currentValue, opts: &opts)
+                    commitOption(key: currentKey, value: currentValue, opts: &opts, source: &source)
                 }
                 currentKey = ""
                 currentValue = ""
@@ -359,7 +383,7 @@ enum KUserCommand {
         }
 
         let payload = unescapePayload(rawPayload)
-        return (payload, opts)
+        return (payload, opts, source)
     }
     
     
@@ -568,13 +592,6 @@ enum KUserCommand {
     /// Application Scripts/<bundle id>/scripts 以下の外部コマンドを実行し、
     /// UTF-8/LF 文字列を標準入出力でやり取りする。
     private func readFromStream(from relativePath: String, string: String, timeout: Float) -> String? {
-        func makeLogSnippet(from data: Data, limit: Int) -> String {
-            guard !data.isEmpty else { return "(no output)" }
-            let text = String(data: data, encoding: .utf8) ?? String(decoding: data, as: UTF8.self)
-            if text.count <= limit { return text }
-            return "\(text.prefix(limit))…"
-        }
-
         let trimmed = relativePath.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             KLog.shared.log(id: "execute", message: "Invalid path: empty")
@@ -617,9 +634,44 @@ enum KUserCommand {
             return nil
         }
 
+        return runProcess(executablePath: "/bin/bash",
+                          arguments: [fileURL.path],
+                          string: string,
+                          timeout: timeout,
+                          logName: trimmed)
+    }
+
+    /// コマンド文字列を /bin/bash -c で実行し、
+    /// UTF-8/LF 文字列を標準入出力でやり取りする。
+    private func readFromCommandString(_ commandString: String, string: String, timeout: Float) -> String? {
+        let trimmed = commandString.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            KLog.shared.log(id: "execute", message: "Invalid command string: empty")
+            return nil
+        }
+
+        return runProcess(executablePath: "/bin/bash",
+                          arguments: ["-c", trimmed],
+                          string: string,
+                          timeout: timeout,
+                          logName: trimmed)
+    }
+
+    private func runProcess(executablePath: String,
+                            arguments: [String],
+                            string: String,
+                            timeout: Float,
+                            logName: String) -> String? {
+        func makeLogSnippet(from data: Data, limit: Int) -> String {
+            guard !data.isEmpty else { return "(no output)" }
+            let text = String(data: data, encoding: .utf8) ?? String(decoding: data, as: UTF8.self)
+            if text.count <= limit { return text }
+            return "\(text.prefix(limit))…"
+        }
+
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/bash")
-        process.arguments = [fileURL.path]
+        process.executableURL = URL(fileURLWithPath: executablePath)
+        process.arguments = arguments
 
         let inputPipe = Pipe()
         let outputPipe = Pipe()
@@ -630,7 +682,7 @@ enum KUserCommand {
         do {
             try process.run()
         } catch {
-            KLog.shared.log(id: "execute", message: "Failed to launch process: \(trimmed) (\(error))")
+            KLog.shared.log(id: "execute", message: "Failed to launch process: \(logName) (\(error))")
             return nil
         }
 
@@ -685,7 +737,7 @@ enum KUserCommand {
             KLog.shared.log(
                 id: "execute",
                 message: """
-                Process timed out (\(timeoutSeconds)s) [\(action)] pid=\(pid) script="\(trimmed)"
+                Process timed out (\(timeoutSeconds)s) [\(action)] pid=\(pid) command="\(logName)"
                 Output (partial):
                 \(snippetBefore)
                 """
@@ -693,7 +745,7 @@ enum KUserCommand {
             return nil
         }
 
-        guard let result = String(data: resultData, encoding: .utf8) else { log("#03"); return nil }
+        guard let result = String(data: resultData, encoding: .utf8) else { log("#04"); return nil }
         let (convertedString, _) = result.normalizeNewlinesAndDetect()
         return convertedString
     }

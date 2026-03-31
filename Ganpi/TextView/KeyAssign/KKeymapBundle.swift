@@ -175,8 +175,6 @@ struct KKeymapLoader {
                     result.append(.command(.insert(body)))
                 case "execute":
                     result.append(.command(.execute(body)))
-                case "load":
-                    result.append(.command(.load(body)))
                 case "tag":
                     result.append(.command(.tag(body)))
                 default:

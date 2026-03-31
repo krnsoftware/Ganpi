@@ -394,7 +394,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                           baseURL: baseURL,
                           currentURL: baseURL,
                           makeCommand: { relativePath in
-                              "load[\"\(relativePath)\"]"
+                              "insert[{source:file} \"\(relativePath)\"]"
                           })
 
         if menu.items.count == 2 { // openItem + separator のみ
