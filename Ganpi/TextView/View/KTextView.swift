@@ -1204,7 +1204,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
             return insertDroppedWebURLs(urls, at: dropIndex, modifiers: NSEvent.modifierFlags)
         }
 
-        // ---- 3) 既存：文字列ドロップ ----
+        // ---- 3) 文字列ドロップ ----
         guard let items = pasteboard.readObjects(forClasses: [NSString.self], options: nil) as? [String],
               let rawDroppedString = items.first else {
             log("items is nil", from: self)
@@ -1227,6 +1227,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
                 if dropIndex < selectionRange.lowerBound {
                     textStorage.replaceCharacters(in: selectionRange, with: Array(""))
                     textStorage.replaceCharacters(in: dropIndex..<dropIndex, with: Array(droppedString))
+                    selectionRange = dropIndex..<dropIndex + droppedString.count
                 } else {
                     let selectionLengh = selectionRange.upperBound - selectionRange.lowerBound
                     textStorage.replaceCharacters(in: selectionRange, with: Array(""))
