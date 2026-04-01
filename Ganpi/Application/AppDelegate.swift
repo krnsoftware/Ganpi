@@ -18,6 +18,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // ファイル指定で起動中かどうかを検知するためのフラグ
     private var launchingWithFiles = false
     
+    // Editメニュー用のdelegate
+    private var _editMenuDelegate: KEditMenuDelegate?
+    
     // delete buffer
     var deleteBuffer: String = ""
     
@@ -162,6 +165,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return outLines.joined(separator: "\n") + "\n"
     }
     
+    private func setupEditMenuDelegate() {
+        guard let mainMenu = NSApp.mainMenu else {
+            return
+        }
+
+        guard let editMenuItem = mainMenu.items.first(where: { item in
+            item.submenu?.title == "Edit" || item.title == "Edit"
+        }) else {
+            return
+        }
+
+        guard let editMenu = editMenuItem.submenu else {
+            return
+        }
+
+        let editMenuDelegate = KEditMenuDelegate()
+        editMenu.delegate = editMenuDelegate
+        _editMenuDelegate = editMenuDelegate
+    }
+    
     // 起動直後に復元されるウインドウをすべて無効化
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { false }
     
@@ -186,6 +209,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         ])
 
         constructMenus()
+        setupEditMenuDelegate()
     }
     
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
