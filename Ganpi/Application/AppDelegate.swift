@@ -113,7 +113,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        let content = makeCommentedUserIni(from: templateString)
+        //let content = makeCommentedUserIni(from: templateString)
+        let localizedTemplate = makeLocalizedCommentTemplate(from: templateString)
+        let content = makeCommentedUserIni(from: localizedTemplate)
 
         do {
             try content.write(to: userIniURL, atomically: true, encoding: .utf8)
@@ -128,6 +130,40 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 KLog.shared.log(id: "preferences", message: "Failed to open user.ini: \(error)")
             }
         }
+    }
+    
+    // default.ini(template)を日本語環境の場合には日本語に、それ以外の場合は英語に適合させる。
+    // 環境の言語はapp localizationではなくuser preferred languagesで決定する。
+    private func makeLocalizedCommentTemplate(from template: String) -> String {
+        let preferredLanguage = Locale.preferredLanguages.first ?? "en"
+        let useJapanese = preferredLanguage.hasPrefix("ja")
+
+        let lines = template.components(separatedBy: "\n")
+
+        var outLines: [String] = []
+        outLines.reserveCapacity(lines.count)
+
+        for line in lines {
+            if line.hasPrefix("#ja:") {
+                if useJapanese {
+                    let commentBody = String(line.dropFirst(4))
+                    outLines.append("# " + commentBody.trimmingCharacters(in: .whitespaces))
+                }
+                continue
+            }
+
+            if line.hasPrefix("#en:") {
+                if !useJapanese {
+                    let commentBody = String(line.dropFirst(4))
+                    outLines.append("# " + commentBody.trimmingCharacters(in: .whitespaces))
+                }
+                continue
+            }
+
+            outLines.append(line)
+        }
+
+        return outLines.joined(separator: "\n")
     }
     
     private func makeCommentedUserIni(from template: String) -> String {
