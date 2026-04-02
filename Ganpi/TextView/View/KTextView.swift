@@ -2898,6 +2898,93 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         selectionRange = lowerRange.lowerBound..<upperRange.upperBound
     }
     
+    @IBAction func selectNextWord(_ sender: Any?) {
+        let currentRange: Range<Int>
+        let startIndex: Int
+        
+        if selectionRange.isEmpty {
+            guard let range = textStorage.wordRange(forCaretAt: selectionRange.lowerBound) else {
+                log("no current.", from: self)
+                return
+            }
+            currentRange = range
+            startIndex = range.upperBound
+        } else {
+            currentRange = selectionRange
+            startIndex = selectionRange.upperBound
+        }
+        
+        guard startIndex < textStorage.count else { return }
+        
+        var index = startIndex
+        while index < textStorage.count {
+            guard let range = textStorage.wordRange(at: index) else {
+                index += 1
+                continue
+            }
+            
+            if range == currentRange {
+                index = max(index + 1, range.upperBound)
+                continue
+            }
+            
+            let isSeparatorRange = range.allSatisfy {
+                textStorage.caretWordSeparators.contains(textStorage.skeletonString[$0])
+            }
+            if !isSeparatorRange {
+                selectionRange = range
+                return
+            }
+            
+            index = max(index + 1, range.upperBound)
+        }
+    }
+    
+    @IBAction func selectPreviousWord(_ sender: Any?) {
+        let currentRange: Range<Int>
+        let startIndex: Int
+        
+        if selectionRange.isEmpty {
+            guard let range = textStorage.wordRange(forCaretAt: selectionRange.lowerBound) else {
+                log("no current.", from: self)
+                return
+            }
+            currentRange = range
+            startIndex = range.lowerBound
+        } else {
+            currentRange = selectionRange
+            startIndex = selectionRange.lowerBound
+        }
+        
+        guard startIndex > 0 else { return }
+        
+        var index = startIndex - 1
+        while index >= 0 {
+            guard let range = textStorage.wordRange(at: index) else {
+                if index == 0 { break }
+                index -= 1
+                continue
+            }
+            
+            if range == currentRange {
+                if range.lowerBound == 0 { break }
+                index = range.lowerBound - 1
+                continue
+            }
+            
+            let isSeparatorRange = range.allSatisfy {
+                textStorage.caretWordSeparators.contains(textStorage.skeletonString[$0])
+            }
+            if !isSeparatorRange {
+                selectionRange = range
+                return
+            }
+            
+            if range.lowerBound == 0 { break }
+            index = range.lowerBound - 1
+        }
+    }
+    
     @IBAction override func selectLine(_ sender: Any?) {
         let lowerInfo = layoutManager.lines.lineInfo(at: selectionRange.lowerBound)
         let upperInfo = layoutManager.lines.lineInfo(at: selectionRange.upperBound)

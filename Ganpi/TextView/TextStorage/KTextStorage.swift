@@ -95,6 +95,7 @@ protocol KTextStorageReadable: KTextStorageCommon {
     var lineNumberCharacterMaxWidth: CGFloat { get }
     var lineNumberFont: NSFont { get }
     var lineNumberFontEmph: NSFont { get }
+    var caretWordSeparators: [UInt8] { get }
     
     func string(in range:Range<Int>) -> String
     func wordRange(at index: Int) -> Range<Int>?
@@ -167,6 +168,9 @@ final class KTextStorage: KTextStorageProtocol {
     private var _observers: [KObserverEntry] = []
     private lazy var _parser: KSyntaxParser = KSyntaxParserPlain(storage: self)
     private var _skeletonString: KSkeletonString = .init()
+    
+    // separators to estimate the word boundary.
+    var caretWordSeparators: [UInt8] = [FC.space, FC.tab, FC.lf, FC.period, FC.comma]
     
     // propaties for appearances.
     private var _baseFont: NSFont = .monospacedSystemFont(ofSize: 12, weight: .regular)
@@ -505,32 +509,27 @@ final class KTextStorage: KTextStorageProtocol {
     // caret位置から選択すべき単語範囲を返す。
     // ダブルクリック用の wordRange(at:) とは別に、境界 index を解決するための関数。
     func wordRange(forCaretAt index: Int) -> Range<Int>? {
-        let n = count
-        guard n > 0 else { return nil }
-        guard index >= 0 && index <= n else { return nil }
+        let textCount = count
+        guard textCount > 0 else { return nil }
+        guard index >= 0 && index <= textCount else { return nil }
         
         let leftRange = wordRange(containingCharacterAt: index - 1)
         let rightRange = wordRange(containingCharacterAt: index)
         
         if let leftRange, let rightRange {
-            if leftRange == rightRange { return leftRange }
+            if leftRange == rightRange {
+                return leftRange
+            }
             
             let leftByte = skeletonString[index - 1]
             let rightByte = skeletonString[index]
+            let leftIsSeparator = caretWordSeparators.contains(leftByte)
+            let rightIsSeparator = caretWordSeparators.contains(rightByte)
             
-            @inline(__always)
-            func isCaretSeparator(_ byte: UInt8) -> Bool {
-                byte == FC.space ||
-                byte == FC.tab ||
-                byte == FC.lf ||
-                byte == FC.period ||
-                byte == FC.comma
-            }
-            
-            if !isCaretSeparator(leftByte), isCaretSeparator(rightByte) {
+            if !leftIsSeparator, rightIsSeparator {
                 return leftRange
             }
-            if isCaretSeparator(leftByte), !isCaretSeparator(rightByte) {
+            if leftIsSeparator, !rightIsSeparator {
                 return rightRange
             }
             
