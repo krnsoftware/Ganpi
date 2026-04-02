@@ -98,6 +98,7 @@ protocol KTextStorageReadable: KTextStorageCommon {
     
     func string(in range:Range<Int>) -> String
     func wordRange(at index: Int) -> Range<Int>?
+    func wordRange(forCaretAt index: Int) -> Range<Int>?
     func attributedString(for range: Range<Int>, tabWidth: Int?, withoutColors: Bool) -> NSAttributedString?
     func lineRange(at index: Int) -> Range<Int>?
     func lineRange(in range: Range<Int>) -> Range<Int>?
@@ -499,6 +500,70 @@ final class KTextStorage: KTextStorageProtocol {
         if let parserRange = _parser.wordRange(at: index) { return parserRange }
         return asciiIdentifierRange(at: index)
         
+    }
+    
+    // caret位置から選択すべき単語範囲を返す。
+    // ダブルクリック用の wordRange(at:) とは別に、境界 index を解決するための関数。
+    func wordRange(forCaretAt index: Int) -> Range<Int>? {
+        let n = count
+        guard n > 0 else { return nil }
+        guard index >= 0 && index <= n else { return nil }
+        
+        let leftRange = wordRange(containingCharacterAt: index - 1)
+        let rightRange = wordRange(containingCharacterAt: index)
+        
+        if let leftRange, let rightRange {
+            if leftRange == rightRange { return leftRange }
+            
+            let leftByte = skeletonString[index - 1]
+            let rightByte = skeletonString[index]
+            
+            @inline(__always)
+            func isCaretSeparator(_ byte: UInt8) -> Bool {
+                byte == FC.space ||
+                byte == FC.tab ||
+                byte == FC.lf ||
+                byte == FC.period ||
+                byte == FC.comma
+            }
+            
+            if !isCaretSeparator(leftByte), isCaretSeparator(rightByte) {
+                return leftRange
+            }
+            if isCaretSeparator(leftByte), !isCaretSeparator(rightByte) {
+                return rightRange
+            }
+            
+            return rightRange
+        }
+        
+        if let leftRange { return leftRange }
+        if let rightRange { return rightRange }
+        return nil
+    }
+    
+    // 指定した「文字位置」そのものを含む範囲を返す。
+    // wordRange(at:) と違い、index-1 への後退補正は行わない。
+    private func wordRange(containingCharacterAt index: Int) -> Range<Int>? {
+        guard index >= 0 && index < count else { return nil }
+        
+        if let range = spaceOrTabRunRange(at: index), range.contains(index) {
+            return range
+        }
+        if skeletonString[index] == FC.lf {
+            return index..<(index + 1)
+        }
+        if let range = japaneseClusterRange(at: index), range.contains(index) {
+            return range
+        }
+        if let range = _parser.wordRange(at: index), range.contains(index) {
+            return range
+        }
+        if let range = asciiIdentifierRange(at: index), range.contains(index) {
+            return range
+        }
+        
+        return index..<(index + 1)
     }
     
     

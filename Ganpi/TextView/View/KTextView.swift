@@ -2877,9 +2877,24 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     //MARK: - Select.
     
     @IBAction override func selectWord(_ sender: Any?) {
+        if selectionRange.isEmpty {
+            guard let range = textStorage.wordRange(forCaretAt: selectionRange.lowerBound) else {
+                log("no current.", from: self)
+                return
+            }
+            selectionRange = range
+            return
+        }
+        
         let upper = max(selectionRange.upperBound - 1, selectionRange.lowerBound)
-        guard let lowerRange = textStorage.wordRange(at: selectionRange.lowerBound) else { log("no lower.",from:self); return }
-        guard let upperRange = textStorage.wordRange(at: upper) else { log("no upper.",from:self); return }
+        guard let lowerRange = textStorage.wordRange(at: selectionRange.lowerBound) else {
+            log("no lower.", from: self)
+            return
+        }
+        guard let upperRange = textStorage.wordRange(at: upper) else {
+            log("no upper.", from: self)
+            return
+        }
         selectionRange = lowerRange.lowerBound..<upperRange.upperBound
     }
     
