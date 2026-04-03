@@ -2445,117 +2445,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         case document
     }
 
-    private func horizontalMoveDestinationIndex(
-            for kind: KCaretHorizontalMoveKind,
-            to direction: KDirection,
-            selection: Range<Int>,
-            extendSelection: Bool,
-            remove: Bool,
-            ignoreLeadingSpaces: Bool = false) -> Int? {
-        
-        let count = textStorage.count
-        
-        switch kind {
-        case .document:
-            return direction == .forward ? count : 0
-            
-        case .paragraph:
-            if ignoreLeadingSpaces { // ignoring direction.
-                guard let range = textStorage.lineRange(at: selection.lowerBound) else {
-                    log("lineRange is nil.", from: self)
-                    return nil
-                }
-                var index = range.lowerBound
-                let paragraph = KTextParagraph(storage: textStorage, range: range)
-                let leadingSpacesRange = paragraph.leadingWhitespaceRange
-                if range.count >= leadingSpacesRange.count {
-                    index += leadingSpacesRange.count
-                }
-                return index
-            }
-            
-            if direction == .forward {
-                guard let range = textStorage.lineRange(at: selection.upperBound) else {
-                    log("lineRange is nil.", from: self)
-                    return nil
-                }
-                return range.upperBound
-            } else {
-                guard let range = textStorage.lineRange(at: selection.lowerBound) else {
-                    log("lineRange is nil.", from: self)
-                    return nil
-                }
-                return range.lowerBound
-            }
-            
-        case .line:
-            guard let line = layoutManager.lines[currentLineIndex] else {
-                log("line is nil.", from: self)
-                return nil
-            }
-            return direction == .forward ? line.range.upperBound : line.range.lowerBound
-            
-        case .word:
-            if direction == .forward {
-                if selection.upperBound != count,
-                   let upperRange = textStorage.wordRange(at: selection.upperBound),
-                   upperRange.upperBound != selection.upperBound {
-                    return upperRange.upperBound
-                } else {
-                    let upper = min(count, selection.upperBound + 1)
-                    return upper == selection.upperBound ? nil : upper
-                }
-            } else {
-                guard selection.lowerBound > 0 else { return nil }
-                let lowerCandidate = max(selection.lowerBound - 1, 0)
-                if let lowerRange = textStorage.wordRange(at: lowerCandidate) {
-                    return lowerRange.lowerBound
-                } else {
-                    return lowerCandidate == selection.lowerBound ? nil : lowerCandidate
-                }
-            }
-            
-        case .character:
-            if !selection.isEmpty {
-                if remove {
-                    return direction == .forward ? selection.upperBound : selection.lowerBound
-                }
-                
-                if extendSelection, let base = _horizontalSelectionBase {
-                    let movingIndex = (base == selection.lowerBound) ? selection.upperBound : selection.lowerBound
-                    let destination = movingIndex + direction.rawValue
-                    guard destination >= 0 && destination <= count else {
-                        log("character: out of range", from: self)
-                        return nil
-                    }
-                    return destination
-                }
-                
-                return direction == .forward ? selection.upperBound : selection.lowerBound
-            }
-            
-            let destination = selection.lowerBound + direction.rawValue
-            guard destination >= 0 && destination <= count else { return nil }
-            return destination
-        }
-    }
-
-    private func horizontalSelectionRange(anchor: Int, destination: Int) -> Range<Int> {
-        min(anchor, destination)..<max(anchor, destination)
-    }
-
-    private func horizontalDeletionRange(
-            from selection: Range<Int>,
-            to destination: Int,
-            direction: KDirection) -> Range<Int> {
-        
-        if !selection.isEmpty {
-            return selection
-        }
-        
-        let baseIndex = selection.lowerBound
-        return min(baseIndex, destination)..<max(baseIndex, destination)
-    }
 
     // キーアサイン用のキャレット移動をサポートする関数
     // 水平方向の移動をサポート
@@ -2571,10 +2460,18 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         let count = textStorage.count
         var newRange = selectionRange
         let shouldExtendSelection = !remove && (extendSelection || _setMarkedFlag)
-                
+        
+        if remove, !selection.isEmpty {
+            textStorage.deleteCharacters(in: selection)
+            selectionRange = selection.lowerBound..<selection.lowerBound
+            _verticalCaretX = nil
+            scrollCaretToVisible()
+            return true
+        }
+        
         if shouldExtendSelection {
             if _horizontalSelectionBase == nil || !wasHorizontalActionWithModifySelection {
-                _horizontalSelectionBase = selectionRange.lowerBound
+                _horizontalSelectionBase = selection.lowerBound
             }
         }
         
@@ -2587,69 +2484,54 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         }
         
         if kind == .document {
-            if direction == .forward {
-                if shouldExtendSelection {
-                    let base = _horizontalSelectionBase ?? selection.lowerBound
-                    newRange = min(base, count)..<max(base, count)
-                } else {
-                    newRange = count..<count
-                }
+            let destination = direction == .forward ? count : 0
+            
+            if remove {
+                newRange = min(selection.lowerBound, destination)..<max(selection.lowerBound, destination)
+            } else if shouldExtendSelection {
+                let base = _horizontalSelectionBase ?? selection.lowerBound
+                newRange = min(base, destination)..<max(base, destination)
             } else {
-                if shouldExtendSelection {
-                    let base = _horizontalSelectionBase ?? selection.lowerBound
-                    newRange = min(base, 0)..<max(base, 0)
-                } else {
-                    newRange = 0..<0
-                }
+                newRange = destination..<destination
             }
         }
         
         if kind == .paragraph {
-            if ignoreLeadingSpaces { // ignoring direction.
+            let destination: Int
+            
+            if ignoreLeadingSpaces {
                 guard let range = textStorage.lineRange(at: movingSelection.lowerBound) else {
                     log("lineRange is nil.", from: self)
                     return false
                 }
                 var index = range.lowerBound
-                let parag = KTextParagraph(storage: textStorage, range: range)
-                let leadingSpacesRange = parag.leadingWhitespaceRange
+                let paragraph = KTextParagraph(storage: textStorage, range: range)
+                let leadingSpacesRange = paragraph.leadingWhitespaceRange
                 if range.count >= leadingSpacesRange.count {
                     index += leadingSpacesRange.count
                 }
-                
-                if shouldExtendSelection {
-                    let base = _horizontalSelectionBase ?? selection.lowerBound
-                    newRange = min(base, index)..<max(base, index)
-                } else {
-                    newRange = index..<index
-                }
-                
+                destination = index
             } else if direction == .forward {
                 guard let range = textStorage.lineRange(at: movingSelection.upperBound) else {
                     log("lineRange is nil.", from: self)
                     return false
                 }
-                let destination = range.upperBound
-                
-                if shouldExtendSelection {
-                    let base = _horizontalSelectionBase ?? selection.lowerBound
-                    newRange = min(base, destination)..<max(base, destination)
-                } else {
-                    newRange = destination..<destination
-                }
+                destination = range.upperBound
             } else {
                 guard let range = textStorage.lineRange(at: movingSelection.lowerBound) else {
                     log("lineRange is nil.", from: self)
                     return false
                 }
-                let destination = range.lowerBound
-                
-                if shouldExtendSelection {
-                    let base = _horizontalSelectionBase ?? selection.lowerBound
-                    newRange = min(base, destination)..<max(base, destination)
-                } else {
-                    newRange = destination..<destination
-                }
+                destination = range.lowerBound
+            }
+            
+            if remove {
+                newRange = min(selection.lowerBound, destination)..<max(selection.lowerBound, destination)
+            } else if shouldExtendSelection {
+                let base = _horizontalSelectionBase ?? selection.lowerBound
+                newRange = min(base, destination)..<max(base, destination)
+            } else {
+                newRange = destination..<destination
             }
         }
         
@@ -2663,7 +2545,9 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
             
             let destination = direction == .forward ? line.range.upperBound : line.range.lowerBound
             
-            if shouldExtendSelection {
+            if remove {
+                newRange = min(selection.lowerBound, destination)..<max(selection.lowerBound, destination)
+            } else if shouldExtendSelection {
                 let base = _horizontalSelectionBase ?? selection.lowerBound
                 newRange = min(base, destination)..<max(base, destination)
             } else {
@@ -2686,7 +2570,9 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
                 destination = range.lowerBound
             }
             
-            if shouldExtendSelection {
+            if remove {
+                newRange = min(selection.lowerBound, destination)..<max(selection.lowerBound, destination)
+            } else if shouldExtendSelection {
                 let base = _horizontalSelectionBase ?? selection.lowerBound
                 newRange = min(base, destination)..<max(base, destination)
             } else {
@@ -2709,21 +2595,19 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
                 newRange = min(newBound, base)..<max(newBound, base)
             } else {
                 if !selection.isEmpty {
-                    if remove {
-                        // do nothing. if selection is not empty and remove==true, simply remove selection.
-                    } else {
-                        newRange = direction == .forward
-                        ? selection.upperBound..<selection.upperBound
-                        : selection.lowerBound..<selection.lowerBound
-                    }
+                    newRange = direction == .forward
+                    ? selection.upperBound..<selection.upperBound
+                    : selection.lowerBound..<selection.lowerBound
                 } else {
                     let newBound = selection.lowerBound + direction.rawValue
-                    if newBound >= 0 && newBound <= count {
-                        if remove { // if remove==true, remove characters in the range extended.
-                            newRange = min(newBound, selection.lowerBound)..<max(newBound, selection.lowerBound)
-                        } else {
-                            newRange = newBound..<newBound
-                        }
+                    guard newBound >= 0 && newBound <= count else {
+                        return false
+                    }
+                    
+                    if remove {
+                        newRange = min(newBound, selection.lowerBound)..<max(newBound, selection.lowerBound)
+                    } else {
+                        newRange = newBound..<newBound
                     }
                 }
             }
@@ -3640,6 +3524,18 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         } else {
             log("no selection buffer.", from:self)
         }
+    }
+    
+    @IBAction func setMarkedModeOn(_ sender: Any?) {
+        log("On")
+        _horizontalSelectionBase = caretIndex
+        _setMarkedFlag = true
+    }
+    
+    @IBAction func setMarkedModeOff(_ sender: Any?) {
+        log("Off")
+        _horizontalSelectionBase = nil
+        _setMarkedFlag = false
     }
     
     //MARK: - Mini Search Panel function.
