@@ -33,12 +33,39 @@ extension Selector {
         return self == #selector(KTextView.moveLeft(_:)) ||
         self == #selector(KTextView.moveRight(_:)) ||
         self == #selector(KTextView.moveLeftAndModifySelection(_:)) ||
-        self == #selector(KTextView.moveRightAndModifySelection(_:))
+        self == #selector(KTextView.moveRightAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveWordLeft(_:)) ||
+        self == #selector(KTextView.moveWordRight(_:)) ||
+        self == #selector(KTextView.moveWordLeftAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveWordRightAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveToBeginningOfLine(_:)) ||
+        self == #selector(KTextView.moveToEndOfLine(_:)) ||
+        self == #selector(KTextView.moveToBeginningOfLineAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveToEndOfLineAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveToBeginningOfParagraph(_:)) ||
+        self == #selector(KTextView.moveToEndOfParagraph(_:)) ||
+        self == #selector(KTextView.moveToBeginningOfParagraphAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveToEndOfParagraphAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveToBeginningOfDocument(_:)) ||
+        self == #selector(KTextView.moveToEndOfDocument(_:)) ||
+        self == #selector(KTextView.moveToBeginningOfDocumentAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveToEndOfDocumentAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveToFirstPrintableCharacterInParagraph(_:)) ||
+        self == #selector(KTextView.moveToFirstPrintableCharacterInParagraphAndModifySelection(_:))
     }
     
     var isHorizontalActionWithModifierSelection: Bool {
         return self == #selector(KTextView.moveLeftAndModifySelection(_:)) ||
-        self == #selector(KTextView.moveRightAndModifySelection(_:))
+        self == #selector(KTextView.moveRightAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveWordLeftAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveWordRightAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveToBeginningOfLineAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveToEndOfLineAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveToBeginningOfParagraphAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveToEndOfParagraphAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveToBeginningOfDocumentAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveToEndOfDocumentAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveToFirstPrintableCharacterInParagraphAndModifySelection(_:))
     }
     
     var isYankFamilyAction: Bool {
