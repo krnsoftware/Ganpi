@@ -2870,7 +2870,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     
     @IBAction func moveToEndOfSelection(_ sender: Any?) {
         caretIndex = selectionRange.upperBound
-        updateCaretPosition()
+        scrollCaretToVisible()
     }
     
     
@@ -2955,16 +2955,12 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
             currentRange = selectionRange
             startIndex = selectionRange.lowerBound
         }
-        
+                
         guard startIndex > 0 else { return }
         
         var index = startIndex - 1
         while index >= 0 {
-            guard let range = textStorage.wordRange(at: index) else {
-                if index == 0 { break }
-                index -= 1
-                continue
-            }
+            guard let range = textStorage.wordRange(at: index) else { index -= 1; continue }
             
             if range == currentRange {
                 if range.lowerBound == 0 { break }
@@ -3005,6 +3001,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         selectionRange = range
         centerSelectionInVisibleArea(self)
     }
+    
     
     //MARK: - Delete.
     
