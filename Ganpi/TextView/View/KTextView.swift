@@ -67,7 +67,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     private lazy var _completion: KCompletionController = .init(textView: self)
     
     // 簡易マーク
-    private var _markedCaretIndex: Int?
+    private var _jumpMarkedCaretIndex: Int?
     
     // スクロール関連
     private var _isSmoothScrollEnabled = true
@@ -240,9 +240,9 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         }
     }
     
-    var markedCaretIndex:Int? {
-        get { _markedCaretIndex }
-        set { _markedCaretIndex = newValue }
+    var jumpMarkedCaretIndex:Int? {
+        get { _jumpMarkedCaretIndex }
+        set { _jumpMarkedCaretIndex = newValue }
     }
     
     
@@ -2022,13 +2022,13 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
             }
             
             // 簡易マーク機能で設定したマーク部分のindexを編集内容に合わせて変更。
-            if let markedIndex = _markedCaretIndex {
+            if let markedIndex = _jumpMarkedCaretIndex {
                 if markedIndex < info.range.lowerBound {
                     // do nothing
                 } else if markedIndex > info.range.upperBound {
-                    _markedCaretIndex = markedIndex + delta
+                    _jumpMarkedCaretIndex = markedIndex + delta
                 } else {
-                    _markedCaretIndex = info.range.lowerBound
+                    _jumpMarkedCaretIndex = info.range.lowerBound
                 }
             }
             
@@ -2899,86 +2899,19 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     }
     
     @IBAction func selectNextWord(_ sender: Any?) {
-        let currentRange: Range<Int>
-        let startIndex: Int
-        
-        if selectionRange.isEmpty {
-            guard let range = textStorage.wordRange(forCaretAt: selectionRange.lowerBound) else {
-                log("no current.", from: self)
-                return
-            }
-            currentRange = range
-            startIndex = range.upperBound
-        } else {
-            currentRange = selectionRange
-            startIndex = selectionRange.upperBound
+        guard let range = nextWordRange(from: selectionRange) else {
+            log("no next.", from: self)
+            return
         }
-        
-        guard startIndex < textStorage.count else { return }
-        
-        var index = startIndex
-        while index < textStorage.count {
-            guard let range = textStorage.wordRange(at: index) else {
-                index += 1
-                continue
-            }
-            
-            if range == currentRange {
-                index = max(index + 1, range.upperBound)
-                continue
-            }
-            
-            let isSeparatorRange = range.allSatisfy {
-                textStorage.caretWordSeparators.contains(textStorage.skeletonString[$0])
-            }
-            if !isSeparatorRange {
-                selectionRange = range
-                return
-            }
-            
-            index = max(index + 1, range.upperBound)
-        }
+        self.selectionRange = range
     }
     
     @IBAction func selectPreviousWord(_ sender: Any?) {
-        let currentRange: Range<Int>
-        let startIndex: Int
-        
-        if selectionRange.isEmpty {
-            guard let range = textStorage.wordRange(forCaretAt: selectionRange.lowerBound) else {
-                log("no current.", from: self)
-                return
-            }
-            currentRange = range
-            startIndex = range.lowerBound
-        } else {
-            currentRange = selectionRange
-            startIndex = selectionRange.lowerBound
+        guard let range = previousWordRange(from: selectionRange) else {
+            log("no previous.", from: self)
+            return
         }
-                
-        guard startIndex > 0 else { return }
-        
-        var index = startIndex - 1
-        while index >= 0 {
-            guard let range = textStorage.wordRange(at: index) else { index -= 1; continue }
-            
-            if range == currentRange {
-                if range.lowerBound == 0 { break }
-                index = range.lowerBound - 1
-                continue
-            }
-            
-            let isSeparatorRange = range.allSatisfy {
-                textStorage.caretWordSeparators.contains(textStorage.skeletonString[$0])
-            }
-            if !isSeparatorRange {
-                selectionRange = range
-                return
-            }
-            
-            if range.lowerBound == 0 { break }
-            index = range.lowerBound - 1
-        }
+        self.selectionRange = range
     }
     
     @IBAction override func selectLine(_ sender: Any?) {
@@ -3000,6 +2933,92 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         guard let item = sender as? NSMenuItem, let range = item.representedObject as? Range<Int> else { return }
         selectionRange = range
         centerSelectionInVisibleArea(self)
+    }
+    
+    private func nextWordRange(from selectionRange: Range<Int>) -> Range<Int>? {
+        let currentRange: Range<Int>
+        let startIndex: Int
+        
+        if selectionRange.isEmpty {
+            guard let range = textStorage.wordRange(forCaretAt: selectionRange.lowerBound) else {
+                return nil
+            }
+            currentRange = range
+            startIndex = range.upperBound
+        } else {
+            currentRange = selectionRange
+            startIndex = selectionRange.upperBound
+        }
+        
+        guard startIndex < textStorage.count else { return nil }
+        
+        var index = startIndex
+        while index < textStorage.count {
+            guard let range = textStorage.wordRange(at: index) else {
+                index += 1
+                continue
+            }
+            
+            if range == currentRange {
+                index = max(index + 1, range.upperBound)
+                continue
+            }
+            
+            let isSeparatorRange = range.allSatisfy {
+                textStorage.caretWordSeparators.contains(textStorage.skeletonString[$0])
+            }
+            if !isSeparatorRange {
+                return range
+            }
+            
+            index = max(index + 1, range.upperBound)
+        }
+        
+        return nil
+    }
+
+    private func previousWordRange(from selectionRange: Range<Int>) -> Range<Int>? {
+        let currentRange: Range<Int>
+        let startIndex: Int
+        
+        if selectionRange.isEmpty {
+            guard let range = textStorage.wordRange(forCaretAt: selectionRange.lowerBound) else {
+                return nil
+            }
+            currentRange = range
+            startIndex = range.lowerBound
+        } else {
+            currentRange = selectionRange
+            startIndex = selectionRange.lowerBound
+        }
+        
+        guard startIndex > 0 else { return nil }
+        
+        var index = startIndex - 1
+        while index >= 0 {
+            guard let range = textStorage.wordRange(at: index) else {
+                index -= 1
+                continue
+            }
+            
+            if range == currentRange {
+                if range.lowerBound == 0 { return nil }
+                index = range.lowerBound - 1
+                continue
+            }
+            
+            let isSeparatorRange = range.allSatisfy {
+                textStorage.caretWordSeparators.contains(textStorage.skeletonString[$0])
+            }
+            if !isSeparatorRange {
+                return range
+            }
+            
+            if range.lowerBound == 0 { return nil }
+            index = range.lowerBound - 1
+        }
+        
+        return nil
     }
     
     
