@@ -3122,18 +3122,18 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     
     @IBAction func selectNextWord(_ sender: Any?) {
         guard let range = nextWordRange(from: selectionRange) else {
-            log("no next.", from: self)
+            log("no next word.", from: self)
             return
         }
-        self.selectionRange = range
+        selectionRange = range
     }
     
     @IBAction func selectPreviousWord(_ sender: Any?) {
         guard let range = previousWordRange(from: selectionRange) else {
-            log("no previous.", from: self)
+            log("no previous word.", from: self)
             return
         }
-        self.selectionRange = range
+        selectionRange = range
     }
     
     @IBAction override func selectLine(_ sender: Any?) {
@@ -3155,6 +3155,22 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         guard let item = sender as? NSMenuItem, let range = item.representedObject as? Range<Int> else { return }
         selectionRange = range
         centerSelectionInVisibleArea(self)
+    }
+    
+    @IBAction func selectNextToken(_ sender: Any?) {
+        guard let range = nextTokenRange(from: selectionRange) else {
+            log("no next token.", from: self)
+            return
+        }
+        selectionRange = range
+    }
+    
+    @IBAction func selectPreviousToken(_ sender: Any?) {
+        guard let range = previousTokenRange(from: selectionRange) else {
+            log("no next token.", from: self)
+            return
+        }
+        selectionRange = range
     }
     
     private func nextWordRange(from selectionRange: Range<Int>) -> Range<Int>? {
@@ -3284,42 +3300,116 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     }
 
     private func nextTokenRange(from selection: Range<Int>) -> Range<Int>? {
-        let skeletonString = textStorage.skeletonString
         let count = textStorage.count
-
-        var index = selection.upperBound
-        guard index < count else {
+        guard count > 0 else {
             return nil
         }
 
-        while index < count, isTokenDelimiter(skeletonString[index]) {
-            index += 1
+        let currentRange: Range<Int>?
+        let startIndex: Int
+
+        if selection.isEmpty {
+            currentRange = tokenRange(at: selection.lowerBound)
+            if let currentRange {
+                startIndex = currentRange.upperBound
+            } else {
+                startIndex = selection.lowerBound
+            }
+        } else {
+            currentRange = selection
+            startIndex = selection.upperBound
         }
 
-        guard index < count else {
+        guard startIndex < count else {
             return nil
         }
 
-        return tokenRange(at: index)
+        let skeletonString = textStorage.skeletonString
+        var index = startIndex
+
+        while index < count {
+            let byte = skeletonString[index]
+
+            if isTokenDelimiter(byte) {
+                index += 1
+                continue
+            }
+
+            guard let range = tokenRange(at: index) else {
+                index += 1
+                continue
+            }
+
+            if let currentRange, range == currentRange {
+                index = range.upperBound
+                continue
+            }
+
+            return range
+        }
+
+        return nil
     }
 
     private func previousTokenRange(from selection: Range<Int>) -> Range<Int>? {
-        let skeletonString = textStorage.skeletonString
-        var index = selection.lowerBound
-
-        guard index > 0 else {
+        let count = textStorage.count
+        guard count > 0 else {
             return nil
         }
 
-        index -= 1
-        while index >= 0, isTokenDelimiter(skeletonString[index]) {
-            if index == 0 {
-                return nil
+        let currentRange: Range<Int>?
+        let startIndex: Int
+
+        if selection.isEmpty {
+            currentRange = tokenRange(at: selection.lowerBound)
+            if let currentRange {
+                startIndex = currentRange.lowerBound
+            } else {
+                startIndex = selection.lowerBound
             }
-            index -= 1
+        } else {
+            currentRange = selection
+            startIndex = selection.lowerBound
         }
 
-        return tokenRange(at: index)
+        guard startIndex > 0 else {
+            return nil
+        }
+
+        let skeletonString = textStorage.skeletonString
+        var index = startIndex - 1
+
+        while index >= 0 {
+            let byte = skeletonString[index]
+
+            if isTokenDelimiter(byte) {
+                if index == 0 {
+                    return nil
+                }
+                index -= 1
+                continue
+            }
+
+            guard let range = tokenRange(at: index) else {
+                if index == 0 {
+                    return nil
+                }
+                index -= 1
+                continue
+            }
+
+            if let currentRange, range == currentRange {
+                if range.lowerBound == 0 {
+                    return nil
+                }
+                index = range.lowerBound - 1
+                continue
+            }
+
+            return range
+        }
+
+        return nil
     }
 
     private func isTokenDelimiter(_ byte: UInt8) -> Bool {
