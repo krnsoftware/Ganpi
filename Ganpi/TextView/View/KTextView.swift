@@ -2627,92 +2627,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         }
     }
     
-    private func tokenRange(at index: Int) -> Range<Int>?
-    {
-        let skeletonString = textStorage.skeletonString
-        let count = textStorage.count
-
-        guard count > 0 else {
-            return nil
-        }
-
-        var tokenIndex = index
-
-        if tokenIndex == count {
-            tokenIndex -= 1
-        }
-
-        guard tokenIndex >= 0 && tokenIndex < count else {
-            return nil
-        }
-
-        if isTokenDelimiter(skeletonString[tokenIndex]) {
-            if tokenIndex > 0, !isTokenDelimiter(skeletonString[tokenIndex - 1]) {
-                tokenIndex -= 1
-            } else {
-                return nil
-            }
-        }
-
-        var lowerBound = tokenIndex
-        while lowerBound > 0, !isTokenDelimiter(skeletonString[lowerBound - 1]) {
-            lowerBound -= 1
-        }
-
-        var upperBound = tokenIndex + 1
-        while upperBound < count, !isTokenDelimiter(skeletonString[upperBound]) {
-            upperBound += 1
-        }
-
-        return lowerBound..<upperBound
-    }
-
-    private func nextTokenRange(from selection: Range<Int>) -> Range<Int>?
-    {
-        let skeletonString = textStorage.skeletonString
-        let count = textStorage.count
-
-        var index = selection.upperBound
-        guard index < count else {
-            return nil
-        }
-
-        while index < count, isTokenDelimiter(skeletonString[index]) {
-            index += 1
-        }
-
-        guard index < count else {
-            return nil
-        }
-
-        return tokenRange(at: index)
-    }
-
-    private func previousTokenRange(from selection: Range<Int>) -> Range<Int>?
-    {
-        let skeletonString = textStorage.skeletonString
-        var index = selection.lowerBound
-
-        guard index > 0 else {
-            return nil
-        }
-
-        index -= 1
-        while index >= 0, isTokenDelimiter(skeletonString[index]) {
-            if index == 0 {
-                return nil
-            }
-            index -= 1
-        }
-
-        return tokenRange(at: index)
-    }
-
-    private func isTokenDelimiter(_ byte: UInt8) -> Bool
-    {
-        byte == FC.space || byte == FC.tab || byte == FC.lf
-    }
-    
     
     private func horizontalDeleteCaretIndex(for direction: KDirection) -> Int
     {
@@ -2795,6 +2709,87 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         return min(caretIndex, destination)..<max(caretIndex, destination)
     }
     
+    private func firstPrintableCharacterIndexInParagraph(at index: Int) -> Int?
+    {
+        guard let range = textStorage.lineRange(at: index) else {
+            log("lineRange is nil.", from: self)
+            return nil
+        }
+
+        let skeletonString = textStorage.skeletonString
+        var currentIndex = range.lowerBound
+
+        while currentIndex < range.upperBound {
+            let byte = skeletonString[currentIndex]
+            if byte != FC.space && byte != FC.tab {
+                break
+            }
+            currentIndex += 1
+        }
+
+        return currentIndex
+    }
+    
+    @discardableResult
+    private func moveSelectionToFirstPrintableCharacterInParagraph(extendSelection: Bool) -> Bool
+    {
+        let selection = selectionRange
+        let shouldExtendSelection = extendSelection || _setMarkedFlag
+
+        if shouldExtendSelection {
+            if _horizontalSelectionBase == nil || !wasHorizontalActionWithModifySelection {
+                _horizontalSelectionBase = selection.lowerBound
+            }
+        }
+
+        let movingIndex: Int
+        if shouldExtendSelection, let base = _horizontalSelectionBase, !selection.isEmpty {
+            movingIndex = (base == selection.lowerBound) ? selection.upperBound : selection.lowerBound
+        } else {
+            movingIndex = selection.lowerBound
+        }
+
+        guard let destination = firstPrintableCharacterIndexInParagraph(at: movingIndex) else {
+            return false
+        }
+
+        let newRange: Range<Int>
+        if shouldExtendSelection {
+            let base = _horizontalSelectionBase ?? selection.lowerBound
+            newRange = min(base, destination)..<max(base, destination)
+        } else {
+            newRange = destination..<destination
+        }
+
+        selectionRange = newRange
+        _verticalCaretX = nil
+        scrollCaretToVisible()
+
+        return true
+    }
+    
+    @discardableResult
+    private func deleteToBeginningOfParagraphWithoutLeadingSpaces() -> Bool
+    {
+        let selection = selectionRange
+        let caretIndex = selection.isEmpty ? selection.lowerBound : selection.lowerBound
+
+        guard let destination = firstPrintableCharacterIndexInParagraph(at: caretIndex) else {
+            return false
+        }
+
+        let deleteRange = min(caretIndex, destination)..<max(caretIndex, destination)
+        guard !deleteRange.isEmpty else {
+            return false
+        }
+
+        textStorage.deleteCharacters(in: deleteRange)
+        selectionRange = deleteRange.lowerBound..<deleteRange.lowerBound
+        _verticalCaretX = nil
+        scrollCaretToVisible()
+
+        return true
+    }
     
     
     enum KPageVerticalMoveKind {
@@ -3080,11 +3075,11 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     
     // Paragraph without leading white spaces.
     @IBAction func moveToFirstPrintableCharacterInParagraph(_ sender: Any?) {
-        //moveSelectionHorizontally(for: .paragraph, to: .backward, extendSelection: false, remove: false, ignoreLeadingSpaces: true)
+        moveSelectionToFirstPrintableCharacterInParagraph(extendSelection: false)
     }
     
     @IBAction func moveToFirstPrintableCharacterInParagraphAndModifySelection(_ sender: Any?) {
-        //moveSelectionHorizontally(for: .paragraph, to: .backward, extendSelection: true, remove: false, ignoreLeadingSpaces: true) 
+        moveSelectionToFirstPrintableCharacterInParagraph(extendSelection: true)
     }
     
     
@@ -3248,6 +3243,89 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         return nil
     }
     
+    // for token.
+    private func tokenRange(at index: Int) -> Range<Int>? {
+        let skeletonString = textStorage.skeletonString
+        let count = textStorage.count
+
+        guard count > 0 else {
+            return nil
+        }
+
+        var tokenIndex = index
+
+        if tokenIndex == count {
+            tokenIndex -= 1
+        }
+
+        guard tokenIndex >= 0 && tokenIndex < count else {
+            return nil
+        }
+
+        if isTokenDelimiter(skeletonString[tokenIndex]) {
+            if tokenIndex > 0, !isTokenDelimiter(skeletonString[tokenIndex - 1]) {
+                tokenIndex -= 1
+            } else {
+                return nil
+            }
+        }
+
+        var lowerBound = tokenIndex
+        while lowerBound > 0, !isTokenDelimiter(skeletonString[lowerBound - 1]) {
+            lowerBound -= 1
+        }
+
+        var upperBound = tokenIndex + 1
+        while upperBound < count, !isTokenDelimiter(skeletonString[upperBound]) {
+            upperBound += 1
+        }
+
+        return lowerBound..<upperBound
+    }
+
+    private func nextTokenRange(from selection: Range<Int>) -> Range<Int>? {
+        let skeletonString = textStorage.skeletonString
+        let count = textStorage.count
+
+        var index = selection.upperBound
+        guard index < count else {
+            return nil
+        }
+
+        while index < count, isTokenDelimiter(skeletonString[index]) {
+            index += 1
+        }
+
+        guard index < count else {
+            return nil
+        }
+
+        return tokenRange(at: index)
+    }
+
+    private func previousTokenRange(from selection: Range<Int>) -> Range<Int>? {
+        let skeletonString = textStorage.skeletonString
+        var index = selection.lowerBound
+
+        guard index > 0 else {
+            return nil
+        }
+
+        index -= 1
+        while index >= 0, isTokenDelimiter(skeletonString[index]) {
+            if index == 0 {
+                return nil
+            }
+            index -= 1
+        }
+
+        return tokenRange(at: index)
+    }
+
+    private func isTokenDelimiter(_ byte: UInt8) -> Bool {
+        byte == FC.space || byte == FC.tab || byte == FC.lf
+    }
+    
     
     //MARK: - Delete.
     
@@ -3284,7 +3362,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     }
     
     @IBAction func deleteToBeginningOfParagraphWithoutLeadingSpaces(_ sender: Any?) {
-        //moveSelectionHorizontally(for: .paragraph, to: .forward, extendSelection: true, remove: true, ignoreLeadingSpaces: true)
+        deleteToBeginningOfParagraphWithoutLeadingSpaces()
     }
     
     
