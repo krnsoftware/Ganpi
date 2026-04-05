@@ -2440,6 +2440,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     enum KCaretHorizontalMoveKind {
         case character
         case word
+        case token // whitespace-delimited token (big word)
         case line
         case paragraph
         case document
@@ -2448,33 +2449,32 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
 
     // キーアサイン用のキャレット移動をサポートする関数
     // 水平方向の移動をサポート
+    // 既存の moveSelectionHorizontally(for:to:extendSelection:remove:ignoreLeadingSpaces:) を置換
     @discardableResult
     private func moveSelectionHorizontally(
-            for kind: KCaretHorizontalMoveKind,
-            to direction: KDirection,
-            extendSelection: Bool,
-            remove: Bool = false,
-            ignoreLeadingSpaces: Bool = false) -> Bool {
-        
+        for kind: KCaretHorizontalMoveKind,
+        to direction: KDirection,
+        extendSelection: Bool) -> Bool
+    {
         let selection = selectionRange
-        let count = textStorage.count
-        var newRange = selectionRange
-        let shouldExtendSelection = !remove && (extendSelection || _setMarkedFlag)
-        
-        if remove, !selection.isEmpty {
-            textStorage.deleteCharacters(in: selection)
-            selectionRange = selection.lowerBound..<selection.lowerBound
-            _verticalCaretX = nil
-            scrollCaretToVisible()
-            return true
-        }
-        
+        let shouldExtendSelection = extendSelection || _setMarkedFlag
+
         if shouldExtendSelection {
             if _horizontalSelectionBase == nil || !wasHorizontalActionWithModifySelection {
                 _horizontalSelectionBase = selection.lowerBound
             }
         }
-        
+
+        if kind == .character && !shouldExtendSelection && !selection.isEmpty {
+            selectionRange = direction == .forward
+            ? selection.upperBound..<selection.upperBound
+            : selection.lowerBound..<selection.lowerBound
+
+            _verticalCaretX = nil
+            scrollCaretToVisible()
+            return true
+        }
+
         let movingSelection: Range<Int>
         if shouldExtendSelection, let base = _horizontalSelectionBase, !selection.isEmpty {
             let movingIndex = (base == selection.lowerBound) ? selection.upperBound : selection.lowerBound
@@ -2482,160 +2482,325 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         } else {
             movingSelection = selection
         }
-        
-        if kind == .document {
-            let destination = direction == .forward ? count : 0
-            
-            if remove {
-                newRange = min(selection.lowerBound, destination)..<max(selection.lowerBound, destination)
-            } else if shouldExtendSelection {
-                let base = _horizontalSelectionBase ?? selection.lowerBound
-                newRange = min(base, destination)..<max(base, destination)
-            } else {
-                newRange = destination..<destination
-            }
+
+        guard let destination = horizontalMoveDestination(
+            for: kind,
+            movingSelection: movingSelection,
+            direction: direction)
+        else {
+            return false
         }
-        
-        if kind == .paragraph {
-            let destination: Int
-            
-            if ignoreLeadingSpaces {
-                guard let range = textStorage.lineRange(at: movingSelection.lowerBound) else {
-                    log("lineRange is nil.", from: self)
-                    return false
-                }
-                var index = range.lowerBound
-                let paragraph = KTextParagraph(storage: textStorage, range: range)
-                let leadingSpacesRange = paragraph.leadingWhitespaceRange
-                if range.count >= leadingSpacesRange.count {
-                    index += leadingSpacesRange.count
-                }
-                destination = index
-            } else if direction == .forward {
-                guard let range = textStorage.lineRange(at: movingSelection.upperBound) else {
-                    log("lineRange is nil.", from: self)
-                    return false
-                }
-                destination = range.upperBound
-            } else {
-                guard let range = textStorage.lineRange(at: movingSelection.lowerBound) else {
-                    log("lineRange is nil.", from: self)
-                    return false
-                }
-                destination = range.lowerBound
-            }
-            
-            if remove {
-                newRange = min(selection.lowerBound, destination)..<max(selection.lowerBound, destination)
-            } else if shouldExtendSelection {
-                let base = _horizontalSelectionBase ?? selection.lowerBound
-                newRange = min(base, destination)..<max(base, destination)
-            } else {
-                newRange = destination..<destination
-            }
-        }
-        
-        if kind == .line {
-            let targetIndex = direction == .forward ? movingSelection.upperBound : movingSelection.lowerBound
-            let lineInfo = layoutManager.lines.lineInfo(at: targetIndex)
-            guard let line = lineInfo.line else {
-                log("line is nil.", from: self)
-                return false
-            }
-            
-            let destination = direction == .forward ? line.range.upperBound : line.range.lowerBound
-            
-            if remove {
-                newRange = min(selection.lowerBound, destination)..<max(selection.lowerBound, destination)
-            } else if shouldExtendSelection {
-                let base = _horizontalSelectionBase ?? selection.lowerBound
-                newRange = min(base, destination)..<max(base, destination)
-            } else {
-                newRange = destination..<destination
-            }
-        }
-        
-        if kind == .word {
-            let destination: Int
-            
-            if direction == .forward {
-                guard let range = nextWordRange(from: movingSelection) else {
-                    return false
-                }
-                destination = range.upperBound
-            } else {
-                guard let range = previousWordRange(from: movingSelection) else {
-                    return false
-                }
-                destination = range.lowerBound
-            }
-            
-            if remove {
-                newRange = min(selection.lowerBound, destination)..<max(selection.lowerBound, destination)
-            } else if shouldExtendSelection {
-                let base = _horizontalSelectionBase ?? selection.lowerBound
-                newRange = min(base, destination)..<max(base, destination)
-            } else {
-                newRange = destination..<destination
-            }
-        }
-        
-        if kind == .character {
-            if _setMarkedFlag && _horizontalSelectionBase == nil {
-                _horizontalSelectionBase = selection.lowerBound
-            }
-            
-            if shouldExtendSelection, let base = _horizontalSelectionBase {
-                let movingIndex = selection.isEmpty ? base : ((base == selection.lowerBound) ? selection.upperBound : selection.lowerBound)
-                let newBound = direction.rawValue + movingIndex
-                guard newBound <= count && newBound >= 0 else {
-                    log("character: out of range", from: self)
-                    return false
-                }
-                newRange = min(newBound, base)..<max(newBound, base)
-            } else {
-                if !selection.isEmpty {
-                    newRange = direction == .forward
-                    ? selection.upperBound..<selection.upperBound
-                    : selection.lowerBound..<selection.lowerBound
-                } else {
-                    let newBound = selection.lowerBound + direction.rawValue
-                    guard newBound >= 0 && newBound <= count else {
-                        return false
-                    }
-                    
-                    if remove {
-                        newRange = min(newBound, selection.lowerBound)..<max(newBound, selection.lowerBound)
-                    } else {
-                        newRange = newBound..<newBound
-                    }
-                }
-            }
-        }
-        
-        if remove {
-            textStorage.deleteCharacters(in: newRange)
-            selectionRange = newRange.lowerBound..<newRange.lowerBound
+
+        let newRange: Range<Int>
+        if shouldExtendSelection {
+            let base = _horizontalSelectionBase ?? selection.lowerBound
+            newRange = min(base, destination)..<max(base, destination)
         } else {
-            selectionRange = newRange
+            newRange = destination..<destination
         }
-        
+
+        selectionRange = newRange
         _verticalCaretX = nil
         scrollCaretToVisible()
-        
+
         return true
     }
     
-    /*
-    enum KPageVerticalMoveKind {
-        case page
-        case line
-    }*/
+    @discardableResult
+    private func deleteHorizontally(
+        for kind: KCaretHorizontalMoveKind,
+        to direction: KDirection) -> Bool
+    {
+        let selection = selectionRange
+        let deleteRange: Range<Int>
+
+        if kind == .character {
+            if !selection.isEmpty {
+                deleteRange = selection
+            } else {
+                let caretIndex = selection.lowerBound
+                let destination = caretIndex + direction.rawValue
+                guard destination >= 0 && destination <= textStorage.count else {
+                    return false
+                }
+                deleteRange = min(caretIndex, destination)..<max(caretIndex, destination)
+            }
+        } else {
+            let caretIndex = horizontalDeleteCaretIndex(for: direction)
+
+            guard let range = horizontalDeleteRange(
+                for: kind,
+                caretIndex: caretIndex,
+                direction: direction)
+            else {
+                return false
+            }
+
+            deleteRange = range
+        }
+
+        guard !deleteRange.isEmpty else {
+            return false
+        }
+
+        textStorage.deleteCharacters(in: deleteRange)
+        selectionRange = deleteRange.lowerBound..<deleteRange.lowerBound
+        _verticalCaretX = nil
+        scrollCaretToVisible()
+
+        return true
+    }
+    
+
+    private func horizontalMoveDestination(
+        for kind: KCaretHorizontalMoveKind,
+        movingSelection: Range<Int>,
+        direction: KDirection) -> Int?
+    {
+        let count = textStorage.count
+
+        switch kind {
+        case .character:
+            let index = movingSelection.lowerBound
+            let destination = index + direction.rawValue
+            guard destination >= 0 && destination <= count else {
+                return nil
+            }
+            return destination
+
+        case .word:
+            if direction == .forward {
+                guard let range = nextWordRange(from: movingSelection) else {
+                    return nil
+                }
+                return range.upperBound
+            } else {
+                guard let range = previousWordRange(from: movingSelection) else {
+                    return nil
+                }
+                return range.lowerBound
+            }
+
+        case .token:
+            if direction == .forward {
+                guard let range = nextTokenRange(from: movingSelection) else {
+                    return nil
+                }
+                return range.upperBound
+            } else {
+                guard let range = previousTokenRange(from: movingSelection) else {
+                    return nil
+                }
+                return range.lowerBound
+            }
+
+        case .line:
+            let targetIndex = direction == .forward
+            ? movingSelection.upperBound
+            : movingSelection.lowerBound
+
+            let lineInfo = layoutManager.lines.lineInfo(at: targetIndex)
+            guard let line = lineInfo.line else {
+                log("line is nil.", from: self)
+                return nil
+            }
+
+            return direction == .forward ? line.range.upperBound : line.range.lowerBound
+
+        case .paragraph:
+            if direction == .forward {
+                guard let range = textStorage.lineRange(at: movingSelection.upperBound) else {
+                    log("lineRange is nil.", from: self)
+                    return nil
+                }
+                return range.upperBound
+            } else {
+                guard let range = textStorage.lineRange(at: movingSelection.lowerBound) else {
+                    log("lineRange is nil.", from: self)
+                    return nil
+                }
+                return range.lowerBound
+            }
+
+        case .document:
+            return direction == .forward ? count : 0
+        }
+    }
+    
+    private func tokenRange(at index: Int) -> Range<Int>?
+    {
+        let skeletonString = textStorage.skeletonString
+        let count = textStorage.count
+
+        guard count > 0 else {
+            return nil
+        }
+
+        var tokenIndex = index
+
+        if tokenIndex == count {
+            tokenIndex -= 1
+        }
+
+        guard tokenIndex >= 0 && tokenIndex < count else {
+            return nil
+        }
+
+        if isTokenDelimiter(skeletonString[tokenIndex]) {
+            if tokenIndex > 0, !isTokenDelimiter(skeletonString[tokenIndex - 1]) {
+                tokenIndex -= 1
+            } else {
+                return nil
+            }
+        }
+
+        var lowerBound = tokenIndex
+        while lowerBound > 0, !isTokenDelimiter(skeletonString[lowerBound - 1]) {
+            lowerBound -= 1
+        }
+
+        var upperBound = tokenIndex + 1
+        while upperBound < count, !isTokenDelimiter(skeletonString[upperBound]) {
+            upperBound += 1
+        }
+
+        return lowerBound..<upperBound
+    }
+
+    private func nextTokenRange(from selection: Range<Int>) -> Range<Int>?
+    {
+        let skeletonString = textStorage.skeletonString
+        let count = textStorage.count
+
+        var index = selection.upperBound
+        guard index < count else {
+            return nil
+        }
+
+        while index < count, isTokenDelimiter(skeletonString[index]) {
+            index += 1
+        }
+
+        guard index < count else {
+            return nil
+        }
+
+        return tokenRange(at: index)
+    }
+
+    private func previousTokenRange(from selection: Range<Int>) -> Range<Int>?
+    {
+        let skeletonString = textStorage.skeletonString
+        var index = selection.lowerBound
+
+        guard index > 0 else {
+            return nil
+        }
+
+        index -= 1
+        while index >= 0, isTokenDelimiter(skeletonString[index]) {
+            if index == 0 {
+                return nil
+            }
+            index -= 1
+        }
+
+        return tokenRange(at: index)
+    }
+
+    private func isTokenDelimiter(_ byte: UInt8) -> Bool
+    {
+        byte == FC.space || byte == FC.tab || byte == FC.lf
+    }
+    
+    
+    private func horizontalDeleteCaretIndex(for direction: KDirection) -> Int
+    {
+        let selection = selectionRange
+
+        if selection.isEmpty {
+            return selection.lowerBound
+        }
+
+        return direction == .forward ? selection.upperBound : selection.lowerBound
+    }
+    
+    private func horizontalDeleteRange(
+        for kind: KCaretHorizontalMoveKind,
+        caretIndex: Int,
+        direction: KDirection) -> Range<Int>?
+    {
+        let caretSelection = caretIndex..<caretIndex
+
+        let destination: Int?
+        switch kind {
+        case .character:
+            let index = caretIndex + direction.rawValue
+            guard index >= 0 && index <= textStorage.count else {
+                return nil
+            }
+            destination = index
+
+        case .word:
+            if direction == .forward {
+                guard let range = nextWordRange(from: caretSelection) else {
+                    return nil
+                }
+                destination = range.upperBound
+            } else {
+                guard let range = previousWordRange(from: caretSelection) else {
+                    return nil
+                }
+                destination = range.lowerBound
+            }
+
+        case .token:
+            if direction == .forward {
+                guard let range = nextTokenRange(from: caretSelection) else {
+                    return nil
+                }
+                destination = range.upperBound
+            } else {
+                guard let range = previousTokenRange(from: caretSelection) else {
+                    return nil
+                }
+                destination = range.lowerBound
+            }
+
+        case .line:
+            let lineInfo = layoutManager.lines.lineInfo(at: caretIndex)
+            guard let line = lineInfo.line else {
+                log("line is nil.", from: self)
+                return nil
+            }
+
+            destination = direction == .forward ? line.range.upperBound : line.range.lowerBound
+
+        case .paragraph:
+            guard let range = textStorage.lineRange(at: caretIndex) else {
+                log("lineRange is nil.", from: self)
+                return nil
+            }
+
+            destination = direction == .forward ? range.upperBound : range.lowerBound
+
+        case .document:
+            destination = direction == .forward ? textStorage.count : 0
+        }
+
+        guard let destination else {
+            return nil
+        }
+
+        return min(caretIndex, destination)..<max(caretIndex, destination)
+    }
+    
+    
+    
     enum KPageVerticalMoveKind {
         case fullPage
         case halfPage
     }
-    
     
     // 縦方向のキャレット移動のうちページ単位で動作するもの。移動を半分にもできる。
     // キャレットはNSTextViewの挙動のようにキャレットのページ内での位置を再現しない。
@@ -2843,6 +3008,24 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     }
     
     
+    // Token. (whitespace-delimited)
+    @IBAction func moveTokenLeft(_ sender: Any?) {
+        moveSelectionHorizontally(for: .token, to: .backward, extendSelection: false)
+    }
+    
+    @IBAction func moveTokenRight(_ sender: Any?) {
+        moveSelectionHorizontally(for: .token, to: .forward, extendSelection: false)
+    }
+    
+    @IBAction func moveTokenLeftAndModifySelection(_ sender: Any?) {
+        moveSelectionHorizontally(for: .token, to: .backward, extendSelection: true)
+    }
+    
+    @IBAction func moveTokenRightAndModifySelection(_ sender: Any?) {
+        moveSelectionHorizontally(for: .token, to: .forward, extendSelection: true)
+    }
+    
+    
     // Line.
     @IBAction override func moveToBeginningOfLine(_ sender: Any?) {
         moveSelectionHorizontally(for: .line, to: .backward, extendSelection: false)
@@ -2897,11 +3080,11 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     
     // Paragraph without leading white spaces.
     @IBAction func moveToFirstPrintableCharacterInParagraph(_ sender: Any?) {
-        moveSelectionHorizontally(for: .paragraph, to: .backward, extendSelection: false, remove: false, ignoreLeadingSpaces: true)
+        //moveSelectionHorizontally(for: .paragraph, to: .backward, extendSelection: false, remove: false, ignoreLeadingSpaces: true)
     }
     
     @IBAction func moveToFirstPrintableCharacterInParagraphAndModifySelection(_ sender: Any?) {
-        moveSelectionHorizontally(for: .paragraph, to: .backward, extendSelection: true, remove: false, ignoreLeadingSpaces: true)
+        //moveSelectionHorizontally(for: .paragraph, to: .backward, extendSelection: true, remove: false, ignoreLeadingSpaces: true) 
     }
     
     
@@ -3069,39 +3252,39 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     //MARK: - Delete.
     
     @IBAction override func deleteBackward(_ sender: Any?) {
-        moveSelectionHorizontally(for: .character, to: .backward, extendSelection: false, remove: true)
+        deleteHorizontally(for: .character, to: .backward)
     }
     
     @IBAction override func deleteForward(_ sender: Any?) {
-        moveSelectionHorizontally(for: .character, to: .forward, extendSelection: false, remove: true)
+        deleteHorizontally(for: .character, to: .forward)
     }
     
     @IBAction override func deleteWordBackward(_ sender: Any?) {
-        moveSelectionHorizontally(for: .word, to: .backward, extendSelection: true, remove: true)
+        deleteHorizontally(for: .word, to: .backward)
     }
     
     @IBAction override func deleteWordForward(_ sender: Any?) {
-        moveSelectionHorizontally(for: .word, to: .forward, extendSelection: true, remove: true)
+        deleteHorizontally(for: .word, to: .forward)
     }
     
     @IBAction override func deleteToBeginningOfLine(_ sender: Any?) {
-        moveSelectionHorizontally(for: .line, to: .backward, extendSelection: true, remove: true)
+        deleteHorizontally(for: .line, to: .backward)
     }
     
     @IBAction override func deleteToEndOfLine(_ sender: Any?) {
-        moveSelectionHorizontally(for: .line, to: .forward, extendSelection: true, remove: true)
+        deleteHorizontally(for: .line, to: .forward)
     }
     
     @IBAction override func deleteToBeginningOfParagraph(_ sender: Any?) {
-        moveSelectionHorizontally(for: .paragraph, to: .backward, extendSelection: true, remove: true)
+        deleteHorizontally(for: .paragraph, to: .backward)
     }
     
     @IBAction override func deleteToEndOfParagraph(_ sender: Any?) {
-        moveSelectionHorizontally(for: .paragraph, to: .forward, extendSelection: true, remove: true)
+        deleteHorizontally(for: .paragraph, to: .forward)
     }
     
     @IBAction func deleteToBeginningOfParagraphWithoutLeadingSpaces(_ sender: Any?) {
-        moveSelectionHorizontally(for: .paragraph, to: .forward, extendSelection: true, remove: true, ignoreLeadingSpaces: true)
+        //moveSelectionHorizontally(for: .paragraph, to: .forward, extendSelection: true, remove: true, ignoreLeadingSpaces: true)
     }
     
     
