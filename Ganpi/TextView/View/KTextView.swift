@@ -823,6 +823,10 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     override func doCommand(by selector: Selector) {
         _currentActionSelector = selector
         
+        if !selector.isHorizontalAction {
+            _setMarkedFlag = false
+        }
+        
         if !isYankFamilyAction {
             KClipBoardBuffer.shared.endCycle()
             _yankSelection = nil
@@ -2241,13 +2245,10 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     }
 
 
-
-
-    
-    
-    
-    // mouseDown()などのセレクター履歴を残すためのダミー。
-    @objc func clearCaretContext(_ sender: Any?) { }
+    // mouseDown()などのSelector履歴を残す目的のSelector。
+    @objc func clearCaretContext(_ sender: Any?) {
+        _setMarkedFlag = false
+    }
     
     // キーアサインを無効にするためのダミー。
     @objc func disableKeyBinding(_ sender: Any?) { }
