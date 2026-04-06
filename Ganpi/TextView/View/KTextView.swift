@@ -3216,46 +3216,53 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     }
 
     private func previousWordRange(from selectionRange: Range<Int>) -> Range<Int>? {
-        let currentRange: Range<Int>
         let startIndex: Int
-        
+        let caretIndex: Int
+        let currentRange: Range<Int>?
+
         if selectionRange.isEmpty {
-            guard let range = textStorage.wordRange(forCaretAt: selectionRange.lowerBound) else {
-                return nil
-            }
-            currentRange = range
-            startIndex = range.lowerBound
+            caretIndex = selectionRange.lowerBound
+            startIndex = caretIndex - 1
+            currentRange = nil
         } else {
+            caretIndex = selectionRange.lowerBound
+            startIndex = selectionRange.lowerBound - 1
             currentRange = selectionRange
-            startIndex = selectionRange.lowerBound
         }
-        
-        guard startIndex > 0 else { return nil }
-        
-        var index = startIndex - 1
+
+        guard startIndex >= 0 else { return nil }
+
+        var index = startIndex
         while index >= 0 {
             guard let range = textStorage.wordRange(at: index) else {
                 index -= 1
                 continue
             }
-            
-            if range == currentRange {
+
+            if let currentRange, range == currentRange {
                 if range.lowerBound == 0 { return nil }
                 index = range.lowerBound - 1
                 continue
             }
-            
+
             let isSeparatorRange = range.allSatisfy {
                 textStorage.caretWordSeparators.contains(textStorage.skeletonString[$0])
             }
-            if !isSeparatorRange {
-                return range
+            if isSeparatorRange {
+                if range.lowerBound == 0 { return nil }
+                index = range.lowerBound - 1
+                continue
             }
-            
-            if range.lowerBound == 0 { return nil }
-            index = range.lowerBound - 1
+
+            if selectionRange.isEmpty, range.upperBound >= caretIndex {
+                if range.lowerBound == 0 { return nil }
+                index = range.lowerBound - 1
+                continue
+            }
+
+            return range
         }
-        
+
         return nil
     }
     
