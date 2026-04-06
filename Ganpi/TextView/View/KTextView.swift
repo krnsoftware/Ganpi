@@ -2460,8 +2460,14 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         let shouldExtendSelection = extendSelection || _setMarkedFlag
 
         if shouldExtendSelection {
-            if _horizontalSelectionBase == nil || !wasHorizontalActionWithModifySelection {
-                _horizontalSelectionBase = selection.lowerBound
+            if _setMarkedFlag {
+                if _horizontalSelectionBase == nil {
+                    _horizontalSelectionBase = caretIndex
+                }
+            } else {
+                if _horizontalSelectionBase == nil || !wasHorizontalActionWithModifySelection {
+                    _horizontalSelectionBase = selection.lowerBound
+                }
             }
         }
 
@@ -2737,8 +2743,14 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         let shouldExtendSelection = extendSelection || _setMarkedFlag
 
         if shouldExtendSelection {
-            if _horizontalSelectionBase == nil || !wasHorizontalActionWithModifySelection {
-                _horizontalSelectionBase = selection.lowerBound
+            if _setMarkedFlag {
+                if _horizontalSelectionBase == nil {
+                    _horizontalSelectionBase = caretIndex
+                }
+            } else {
+                if _horizontalSelectionBase == nil || !wasHorizontalActionWithModifySelection {
+                    _horizontalSelectionBase = selection.lowerBound
+                }
             }
         }
 
