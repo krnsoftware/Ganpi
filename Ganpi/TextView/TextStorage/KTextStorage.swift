@@ -454,40 +454,32 @@ final class KTextStorage: KTextStorageProtocol {
     // MARK: - Utilities
     
     // index文字目のある場所を含む行のRangeを返す。改行は含まない。
+    // index文字目のある場所を含む行のRangeを返す。改行は含まない。
     func lineRange(at index: Int) -> Range<Int>? {
-        guard index >= 0 && index <= _characters.count else { log("index out of range.",from:self); return nil }
+        guard index >= 0 && index <= count else {
+            log("index out of range.", from: self)
+            return nil
+        }
         
-        
-        var lower = index
-        while lower > 0 {
-            if skeletonString.bytes[lower - 1] == FC.lf { break }
-            lower -= 1
-        }
-        var upper = index
-        while upper < count {
-            if skeletonString.bytes[upper] == FC.lf { break }
-            upper += 1
-        }
-        return lower..<upper
-    }
-    
-    // rangeを内包する最初の行の行頭から最後の行の行末までの範囲を返す。最後の改行は含まない。
-    func lineRange(in range:Range<Int>) -> Range<Int>? {
-        guard range.lowerBound >= 0 && range.upperBound <= count else { log("range is out of range.",from:self); return nil }
-        
-        var lower = range.lowerBound
-        while lower > 0 {
-            if skeletonString.bytes[lower - 1] == FC.lf { break }
-            lower -= 1
-        }
-        var upper = range.upperBound
-        while upper < count {
-            if skeletonString.bytes[upper] == FC.lf { break }
-            upper += 1
-        }
-        return lower..<upper
+        let lineIndex = skeletonString.lineIndex(at: index)
+        return skeletonString.lineRange(at: lineIndex)
     }
 
+    // rangeを内包する最初の行の行頭から最後の行の行末までの範囲を返す。最後の改行は含まない。
+    func lineRange(in range: Range<Int>) -> Range<Int>? {
+        guard range.lowerBound >= 0 && range.upperBound <= count else {
+            log("range is out of range.", from: self)
+            return nil
+        }
+        
+        if range.isEmpty {
+            let lineIndex = skeletonString.lineIndex(at: range.lowerBound)
+            return skeletonString.lineRange(at: lineIndex)
+        }
+        
+        return skeletonString.lineRange(contains: range)
+    }
+    
     
     // attributeの変更についてはテキストの変更時に自動ではなくattributeの変更の際に手動で送信する。
     func notifyColoringChanged(in range: Range<Int>) {
