@@ -137,21 +137,18 @@ class KTextParagraphs {
         _storage = storage
     }
 
-    // 段落（=行）数。"" は 1 行、"\n" は 2 行。
+    // 段落（=行）数。"" は 1行、"\n" は 2行。
     var count: Int {
         _storage.skeletonString.newlineIndices.count + 1
     }
 
     // i行目(0始まり)のKTextParagraphをオンデマンド生成して返す（LFは含まない）
+    // i行目(0始まり)のKTextParagraphをオンデマンド生成して返す（LFは含まない）
     subscript(_ index: Int) -> KTextParagraph {
-        let newlines = _storage.skeletonString.newlineIndices
-        let totalCount = newlines.count + 1
-
-        precondition(index >= 0 && index < totalCount)
-
-        let start: Int = (index == 0) ? 0 : (newlines[index - 1] + 1)
-        let end: Int = (index < newlines.count) ? newlines[index] : _storage.count
-        return KTextParagraph(storage: _storage, range: start..<end)
+        precondition(index >= 0 && index < count)
+        
+        let lineRange = _storage.skeletonString.lineRange(at: index)
+        return KTextParagraph(storage: _storage, range: lineRange)
     }
 
     func paragraphIndex(containing index: Int) -> Int? {
@@ -159,27 +156,8 @@ class KTextParagraphs {
             log("out of range.", from: self)
             return nil
         }
-
-        let newlines = _storage.skeletonString.newlineIndices
-
-        // 文末（index == count）は最後の段落
-        if index == _storage.count {
-            return newlines.count // = (newlines.count + 1) - 1
-        }
-
-        // lowerBound: first newlineIndex >= index
-        var lo = 0
-        var hi = newlines.count
-        while lo < hi {
-            let mid = (lo + hi) >> 1
-            if newlines[mid] < index {
-                lo = mid + 1
-            } else {
-                hi = mid
-            }
-        }
-        // index が LF 上の場合も lo はその LF の位置を指すため、結果は直前の段落（従来挙動）
-        return lo
+        
+        return _storage.skeletonString.lineIndex(at: index)
     }
 
     // rangeを含むparagraphのindexの範囲を返す。
