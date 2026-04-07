@@ -656,19 +656,12 @@ final class KTextStorage: KTextStorageProtocol {
     
     // 指定したindexが論理行の何行目で、行頭から何文字目かを返す。いずれも1スタート。
     func lineAndColumnNumber(at index: Int) -> (line: Int, column: Int) {
-        let lfIndices = _skeletonString.newlineIndices
-        guard index >= 0, index <= _skeletonString.bytes.count else { return (0, 0) }
-
-        // 行番号は改行数 +1
-        var lo = 0, hi = lfIndices.count
-        while lo < hi {
-            let mid = (lo + hi) >> 1
-            if lfIndices[mid] < index { lo = mid + 1 } else { hi = mid }
-        }
-        let lineNo = lo + 1
-        let colStart = (lo == 0) ? 0 : (lfIndices[lo - 1] + 1)
-        let columnNo = index - colStart + 1
-        return (lineNo, columnNo)
+        guard index >= 0 && index <= _skeletonString.count else { return (0, 0) }
+        
+        let lineIndex = _skeletonString.lineIndex(at: index)
+        let lineRange = _skeletonString.lineRange(at: lineIndex)
+        
+        return (lineIndex + 1, index - lineRange.lowerBound + 1)
     }
 
     

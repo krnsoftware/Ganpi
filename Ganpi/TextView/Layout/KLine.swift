@@ -700,26 +700,21 @@ final class KLines: CustomStringConvertible {
             let endIndex = lastHardLineStartIndex + softCount
             removedSoftLineRange = startHardLineArrayIndex..<endIndex
             
-            var lower = info.range.lowerBound
-            var upper = info.range.lowerBound + info.insertedCount
-            
-            // 前方：行頭まで戻る
-            while lower > 0 {
-                if skeleton.bytes[lower - 1] == FC.lf { break }
-                lower -= 1
+            let editedRange = (info.insertedCount == 0)
+                ? info.range.lowerBound..<info.range.lowerBound
+                : info.range.lowerBound..<(info.range.lowerBound + info.insertedCount)
+
+            let coveringLineRange = skeleton.lineRange(contains: editedRange)
+            let lastHardLineIndexOfAddedRange = skeleton.lineIndex(at: coveringLineRange.upperBound)
+
+            let upper: Int
+            if let newlineIndex = skeleton.newlineIndex(after: lastHardLineIndexOfAddedRange) {
+                upper = newlineIndex + 1
+            } else {
+                upper = coveringLineRange.upperBound
             }
-            
-            // 後方：行末（改行を含めた直後）まで進む
-            while upper < skeleton.bytes.count {
-                //if characters[upper] == newLineCharacter {
-                if skeleton.bytes[upper] == FC.lf {
-                    upper += 1 // 改行そのものも範囲に含める
-                    break
-                }
-                upper += 1
-            }
-            
-            addedCharacterRange = lower..<upper
+
+            addedCharacterRange = coveringLineRange.lowerBound..<upper
             
             DispatchQueue.concurrentPerform(iterations: _lines.count - removedSoftLineRange.upperBound) { i in
                 let line = _lines[removedSoftLineRange.upperBound + i]
