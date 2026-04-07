@@ -280,7 +280,22 @@
                             </menuItem>
                             <menuItem title="Mark" id="Ecb-wz-YcK">
                                 <modifierMask key="keyEquivalentModifierMask"/>
-                                <menu key="submenu" id="tzT-fL-liE"/>
+                                <menu key="submenu" id="tzT-fL-liE">
+                                    <items>
+                                        <menuItem title="Jump Backward in History" id="b71-RH-atf">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="jumpBackwardInHistory:" target="-1" id="Nfe-L2-CNR"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Jump Forward in History" id="znZ-HJ-TBo">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="jumpForwardInHistory:" target="-1" id="rnZ-1G-w0P"/>
+                                            </connections>
+                                        </menuItem>
+                                    </items>
+                                </menu>
                             </menuItem>
                             <menuItem title="Jump to Line..." keyEquivalent="u" id="FEa-wC-1Gp">
                                 <connections>

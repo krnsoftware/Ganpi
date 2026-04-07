@@ -63,6 +63,10 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     // Delete Buffer関連
     private var _selectionBuffer: Range<Int>? // Action control only.
     
+    // jump history
+    private lazy var _jumpHistory: KJumpHistory = .init(textStorageRef: _textStorageRef)
+    private var _suppressJumpHistoryRecording: Bool = false
+    
     // Edit mode.
     private var _editMode: KEditMode = .normal
     
@@ -129,7 +133,12 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     var selectionRange: Range<Int> {
         get { _selectionRange }
         set {
+            let oldRange = _selectionRange
             _selectionRange = newValue
+
+            if !_suppressJumpHistoryRecording {
+                _jumpHistory.recordJumpIfNeeded(from: oldRange.upperBound, to: newValue.upperBound)
+            }
 
             endYankCycle()
 
@@ -1989,13 +1998,18 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
 
     // MARK: - KTextView methods (helpers)
     
+    
+    
     func textStorageDidModify(_ modification: KStorageModified) {
         switch modification {
         case let .textChanged(info):
+            _suppressJumpHistoryRecording = true
+            defer { _suppressJumpHistoryRecording = false }
+            
             let delta = info.insertedCount - info.range.count
             
-            if info.range.lowerBound == selectionRange.lowerBound /*(削除+)追記*/ ||
-                info.range.upperBound == selectionRange.lowerBound /*1文字削除*/ {
+            if info.range.lowerBound == selectionRange.lowerBound ||
+                info.range.upperBound == selectionRange.lowerBound {
                 // このtextviewによる編集。
                 caretIndex = info.range.lowerBound + info.insertedCount
                 scrollSelectionToVisible()
@@ -2008,7 +2022,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
                 //2. 後方にある場合: 選択範囲は挿入された文字列の増減の分だけシフト
                 //3. 挿入部分を完全に包含する場合: 選択部分の終端を文字列の増減分だけシフト
                 //4. 前後に重なっている場合: 挿入部分の末尾にcaretを移動
-                
                 if selectionRange.upperBound < info.range.lowerBound {
                     // no arrangement of selection
                 } else if selectionRange.lowerBound > info.range.upperBound {
@@ -2020,7 +2033,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
                 }
             }
             
-            
+            _jumpHistory.adjust(for: info)
             
             sendEditedToDocument()
             updateFrameSizeToFitContent()
@@ -2028,15 +2041,14 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
             needsDisplay = true
             
         case .colorChanged(_):
-            //log("カラー変更: range = \(range)",from:self)
             updateFrameSizeToFitContent()
             updateCaretPosition()
             scrollCaretToVisible()
             needsDisplay = true
+            
         case .parserChanged:
             log("parserChanged:",from:self)
         }
-        
     }
     
     private func resetCaretControllProperties() {
@@ -3788,6 +3800,30 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         } else {
             containerView.hideCompletionMenu()
         }
+    }
+    
+    //MARK: - Jump History
+    
+    @IBAction func jumpBackwardInHistory(_ sender: Any?) {
+        guard let targetIndex = _jumpHistory.jumpBackward(from: caretIndex) else {
+            NSSound.beep()
+            return
+        }
+        
+        caretIndex = targetIndex
+        scrollCaretToVisible()
+        _jumpHistory.finishNavigation()
+    }
+    
+    @IBAction func jumpForwardInHistory(_ sender: Any?) {
+        guard let targetIndex = _jumpHistory.jumpForward(from: caretIndex) else {
+            NSSound.beep()
+            return
+        }
+        
+        caretIndex = targetIndex
+        scrollCaretToVisible()
+        _jumpHistory.finishNavigation()
     }
     
     // MARK: - COPY and Paste (NSResponder method)
