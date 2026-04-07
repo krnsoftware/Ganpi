@@ -69,9 +69,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     // completion.
     private lazy var _completion: KCompletionController = .init(textView: self)
     
-    // 簡易マーク
-    private var _jumpMarkedCaretIndex: Int?
-    
     // スクロール関連
     private var _isSmoothScrollEnabled = true
     
@@ -241,11 +238,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
             updateCaretPosition()
             needsDisplay = true
         }
-    }
-    
-    var jumpMarkedCaretIndex:Int? {
-        get { _jumpMarkedCaretIndex }
-        set { _jumpMarkedCaretIndex = newValue }
     }
     
     
@@ -2028,16 +2020,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
                 }
             }
             
-            // 簡易マーク機能で設定したマーク部分のindexを編集内容に合わせて変更。
-            if let markedIndex = _jumpMarkedCaretIndex {
-                if markedIndex < info.range.lowerBound {
-                    // do nothing
-                } else if markedIndex > info.range.upperBound {
-                    _jumpMarkedCaretIndex = markedIndex + delta
-                } else {
-                    _jumpMarkedCaretIndex = info.range.lowerBound
-                }
-            }
+            
             
             sendEditedToDocument()
             updateFrameSizeToFitContent()

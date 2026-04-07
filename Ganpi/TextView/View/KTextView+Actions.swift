@@ -1523,21 +1523,7 @@ extension KTextView {
     }
     
     
-    //MARK: - Mark
     
-    @IBAction func setMarkedCaretIndex(_ sender: Any?) {
-        jumpMarkedCaretIndex = caretIndex
-    }
-    
-    @IBAction func jumpToMarkedCaretIndexAndReset(_ sender: Any?) {
-        let currentCaretIndex = caretIndex
-        
-        if let index = jumpMarkedCaretIndex {
-            caretIndex = index
-            centerSelectionInVisibleArea(self)
-        }
-        jumpMarkedCaretIndex = currentCaretIndex
-    }
     
     //MARK: - Test function
     
