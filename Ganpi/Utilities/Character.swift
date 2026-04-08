@@ -85,6 +85,13 @@ extension Character {
         
         return bytes.first
     }
+    
+    // Ascii characterの場合、Caseを反転して返す。
+    @inline(__always)
+    var toggledAsciiCase: Character? {
+        guard let ascii = asciiValue?.toggledAsciiCase else { return nil }
+        return Character(UnicodeScalar(Int(ascii))!)
+    }
 }
 
 

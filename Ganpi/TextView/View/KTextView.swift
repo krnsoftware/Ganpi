@@ -3670,6 +3670,26 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         caretIndex = replace.lowerBound + 1
     }
     
+    @IBAction func toggleCase(_ sender: Any?) {
+        let targetRange: Range<Int>
+        
+        if selectionRange.isEmpty {
+            let caret = caretIndex
+            guard caret < textStorage.count else { return }
+            targetRange = caret..<caret + 1
+        } else {
+            targetRange = selectionRange
+        }
+        
+        let originalString = textStorage.string(in: targetRange)
+        let newString = String(originalString.map { $0.toggledAsciiCase ?? $0 })
+        
+        if newString == originalString { return }
+        
+        textStorage.replaceString(in: targetRange, with: newString)
+        selectionRange = targetRange.lowerBound..<targetRange.lowerBound + newString.count
+    }
+    
     @IBAction override func capitalizeWord(_ sender: Any?) {
         convertCaseOfWord(for: .capitalized)
     }
@@ -3682,18 +3702,33 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         convertCaseOfWord(for: .uppercased)
     }
     
+    @IBAction func capitalizeWordToEndOfWord(_ sender: Any?) {
+        convertCaseOfWord(for: .capitalized, wholeWord: false)
+    }
+    
+    @IBAction func lowercaseWordToEndOfWord(_ sender: Any?) {
+        convertCaseOfWord(for: .lowercased, wholeWord: false)
+    }
+    
+    @IBAction func uppercaseWordToEndOfWord(_ sender: Any?) {
+        convertCaseOfWord(for: .uppercased, wholeWord: false)
+    }
+    
     enum KCaseCoversionType {
         case lowercased
         case uppercased
         case capitalized
     }
     
-    private func convertCaseOfWord(for type:KCaseCoversionType) {
+    // 現在のcaret位置から変換範囲を計算し、大文字小文字変換を行う。
+    // 単語全体に拡張する場合はwholeWord==true、caretより右にのみ拡張する場合にはfalseをセットする。
+    private func convertCaseOfWord(for type:KCaseCoversionType, wholeWord: Bool = true) {
         let upper = max(selectionRange.upperBound - 1, selectionRange.lowerBound)
         guard let lowerRange = textStorage.wordRange(at: selectionRange.lowerBound) else { log("no lower.",from:self); return }
         guard let upperRange = textStorage.wordRange(at: upper) else { log("no upper.",from:self); return }
         
-        let newSelection = lowerRange.lowerBound..<upperRange.upperBound
+        let lowerBound = lowerRange.lowerBound
+        let newSelection = wholeWord ? lowerBound..<upperRange.upperBound : selectionRange.lowerBound..<upperRange.upperBound
         if newSelection.isEmpty { return }
         
         let string = textStorage.string[newSelection]

@@ -20,4 +20,10 @@ extension UInt8 {
     var isIdentStartAZ_: Bool { self.isAsciiAlpha || self == KFuncChar.underscore }
     var isIdentPartAZ09_: Bool { self.isIdentStartAZ_ || self.isAsciiDigit }
     
+    var toggledAsciiCase: UInt8? {
+        if self.isAsciiUpper { return self + 0x20 }
+        if self.isAsciiLower { return self - 0x20 }
+        return nil
+    }
+    
 }
