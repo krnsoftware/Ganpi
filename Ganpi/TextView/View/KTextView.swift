@@ -2436,7 +2436,9 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     enum KCaretHorizontalMoveKind {
         case character
         case word
-        case token // whitespace-delimited token (big word)
+        case wordProximal
+        case token
+        case tokenProximal
         case line
         case paragraph
         case document
@@ -2572,17 +2574,14 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
 
         case .word:
             guard let currentWordRange = textStorage.wordRange(forCaretAt: movingIndex) else {
-                log("currentWordRange:nil",from:self)
                 return nil
             }
-            log("here",from:self)
             if direction == .forward {
                 if movingIndex != currentWordRange.upperBound {
                     return currentWordRange.upperBound
                 }
                 
                 guard let range = nextWordRange(from: movingIndex..<movingIndex) else {
-                    log("range:nil",from:self)
                     return nil
                 }
                 return range.upperBound
@@ -2598,6 +2597,37 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
                 }
                 return range.lowerBound
             }
+            
+        case .wordProximal:
+            guard let currentWordRange = textStorage.wordRange(forCaretAt: movingIndex) else {
+                return nil
+            }
+            if direction == .forward {
+                if movingIndex != currentWordRange.upperBound {
+                    guard let range = nextWordRange(from: currentWordRange.upperBound..<currentWordRange.upperBound) else {
+                        return nil
+                    }
+                    return range.lowerBound
+                }
+                
+                guard let range = nextWordRange(from: movingIndex..<movingIndex) else {
+                    return nil
+                }
+                return range.lowerBound
+                
+            } else {
+                if movingIndex != currentWordRange.lowerBound {
+                    guard let range = previousWordRange(from: currentWordRange.lowerBound..<currentWordRange.lowerBound) else {
+                        return nil
+                    }
+                    return range.upperBound
+                }
+                
+                guard let range = previousWordRange(from: movingIndex..<movingIndex) else {
+                    return nil
+                }
+                return range.upperBound
+            }
 
         case .token:
             if direction == .forward {
@@ -2610,6 +2640,38 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
                     return nil
                 }
                 return range.lowerBound
+            }
+        
+        case .tokenProximal:
+            guard let currentTokenRange = tokenRange(at: movingIndex) else {
+                return nil
+            }
+
+            if direction == .forward {
+                if movingIndex != currentTokenRange.upperBound {
+                    guard let range = nextTokenRange(from: currentTokenRange.upperBound..<currentTokenRange.upperBound) else {
+                        return nil
+                    }
+                    return range.lowerBound
+                }
+
+                guard let range = nextTokenRange(from: movingIndex..<movingIndex) else {
+                    return nil
+                }
+                return range.lowerBound
+
+            } else {
+                if movingIndex != currentTokenRange.lowerBound {
+                    guard let range = previousTokenRange(from: currentTokenRange.lowerBound..<currentTokenRange.lowerBound) else {
+                        return nil
+                    }
+                    return range.upperBound
+                }
+
+                guard let range = previousTokenRange(from: movingIndex..<movingIndex) else {
+                    return nil
+                }
+                return range.upperBound
             }
 
         case .line:
@@ -2682,6 +2744,38 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
                 }
                 destination = range.lowerBound
             }
+            
+        case .wordProximal:
+            guard let currentWordRange = textStorage.wordRange(forCaretAt: caretIndex) else {
+                return nil
+            }
+
+            if direction == .forward {
+                if caretIndex != currentWordRange.upperBound {
+                    guard let range = nextWordRange(from: currentWordRange.upperBound..<currentWordRange.upperBound) else {
+                        return nil
+                    }
+                    destination = range.lowerBound
+                } else {
+                    guard let range = nextWordRange(from: caretIndex..<caretIndex) else {
+                        return nil
+                    }
+                    destination = range.lowerBound
+                }
+
+            } else {
+                if caretIndex != currentWordRange.lowerBound {
+                    guard let range = previousWordRange(from: currentWordRange.lowerBound..<currentWordRange.lowerBound) else {
+                        return nil
+                    }
+                    destination = range.upperBound
+                } else {
+                    guard let range = previousWordRange(from: caretIndex..<caretIndex) else {
+                        return nil
+                    }
+                    destination = range.upperBound
+                }
+            }
 
         case .token:
             if direction == .forward {
@@ -2694,6 +2788,38 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
                     return nil
                 }
                 destination = range.lowerBound
+            }
+            
+        case .tokenProximal:
+            guard let currentTokenRange = tokenRange(at: caretIndex) else {
+                return nil
+            }
+
+            if direction == .forward {
+                if caretIndex != currentTokenRange.upperBound {
+                    guard let range = nextTokenRange(from: currentTokenRange.upperBound..<currentTokenRange.upperBound) else {
+                        return nil
+                    }
+                    destination = range.lowerBound
+                } else {
+                    guard let range = nextTokenRange(from: caretIndex..<caretIndex) else {
+                        return nil
+                    }
+                    destination = range.lowerBound
+                }
+
+            } else {
+                if caretIndex != currentTokenRange.lowerBound {
+                    guard let range = previousTokenRange(from: currentTokenRange.lowerBound..<currentTokenRange.lowerBound) else {
+                        return nil
+                    }
+                    destination = range.upperBound
+                } else {
+                    guard let range = previousTokenRange(from: caretIndex..<caretIndex) else {
+                        return nil
+                    }
+                    destination = range.upperBound
+                }
             }
 
         case .line:
@@ -3023,6 +3149,22 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         moveSelectionHorizontally(for: .word, to: .forward, extendSelection: true)
     }
     
+    @IBAction func moveWordProximalLeft(_ sender: Any?) {
+        moveSelectionHorizontally(for: .wordProximal, to: .backward, extendSelection: false)
+    }
+    
+    @IBAction func moveWordProximalRight(_ sender: Any?) {
+        moveSelectionHorizontally(for: .wordProximal, to: .forward, extendSelection: false)
+    }
+    
+    @IBAction func moveWordProximalLeftAndModifySelection(_ sender: Any?) {
+        moveSelectionHorizontally(for: .wordProximal, to: .backward, extendSelection: true)
+    }
+    
+    @IBAction func moveWordProximalRightAndModifySelection(_ sender: Any?) {
+        moveSelectionHorizontally(for: .wordProximal, to: .forward, extendSelection: true)
+    }
+    
     
     // Token. (whitespace-delimited)
     @IBAction func moveTokenLeft(_ sender: Any?) {
@@ -3039,6 +3181,22 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     
     @IBAction func moveTokenRightAndModifySelection(_ sender: Any?) {
         moveSelectionHorizontally(for: .token, to: .forward, extendSelection: true)
+    }
+    
+    @IBAction func moveTokenProximalLeft(_ sender: Any?) {
+        moveSelectionHorizontally(for: .tokenProximal, to: .backward, extendSelection: false)
+    }
+
+    @IBAction func moveTokenProximalRight(_ sender: Any?) {
+        moveSelectionHorizontally(for: .tokenProximal, to: .forward, extendSelection: false)
+    }
+
+    @IBAction func moveTokenProximalLeftAndModifySelection(_ sender: Any?) {
+        moveSelectionHorizontally(for: .tokenProximal, to: .backward, extendSelection: true)
+    }
+
+    @IBAction func moveTokenProximalRightAndModifySelection(_ sender: Any?) {
+        moveSelectionHorizontally(for: .tokenProximal, to: .forward, extendSelection: true)
     }
     
     
