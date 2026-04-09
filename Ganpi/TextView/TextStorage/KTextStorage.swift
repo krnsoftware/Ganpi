@@ -170,7 +170,21 @@ final class KTextStorage: KTextStorageProtocol {
     private var _skeletonString: KSkeletonString = .init()
     
     // separators to estimate the word boundary.
-    var caretWordSeparators: [UInt8] = [FC.space, FC.tab, FC.lf, FC.period, FC.comma]
+    var caretWordSeparators: [UInt8] = [
+        FC.space,
+        FC.tab,
+        FC.lf,
+        FC.period,
+        FC.comma,
+        FC.colon,
+        FC.semicolon,
+        FC.leftParen,
+        FC.rightParen,
+        FC.leftBracket,
+        FC.rightBracket,
+        FC.leftBrace,
+        FC.rightBrace
+    ]
     
     // propaties for appearances.
     private var _baseFont: NSFont = .monospacedSystemFont(ofSize: 12, weight: .regular)

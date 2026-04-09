@@ -2487,7 +2487,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
 
         guard let destination = horizontalMoveDestination(
             for: kind,
-            movingSelection: movingSelection,
+            movingIndex: movingSelection.lowerBound,
             direction: direction)
         else {
             return false
@@ -2556,28 +2556,44 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
 
     private func horizontalMoveDestination(
         for kind: KCaretHorizontalMoveKind,
-        movingSelection: Range<Int>,
+        movingIndex: Int,
         direction: KDirection) -> Int?
     {
         let count = textStorage.count
+        
 
         switch kind {
         case .character:
-            let index = movingSelection.lowerBound
-            let destination = index + direction.rawValue
+            let destination = movingIndex + direction.rawValue
             guard destination >= 0 && destination <= count else {
                 return nil
             }
             return destination
 
         case .word:
+            guard let currentWordRange = textStorage.wordRange(forCaretAt: movingIndex) else {
+                log("currentWordRange:nil",from:self)
+                return nil
+            }
+            log("here",from:self)
             if direction == .forward {
-                guard let range = nextWordRange(from: movingSelection) else {
+                if movingIndex != currentWordRange.upperBound {
+                    return currentWordRange.upperBound
+                }
+                
+                guard let range = nextWordRange(from: movingIndex..<movingIndex) else {
+                    log("range:nil",from:self)
                     return nil
                 }
                 return range.upperBound
+                
+                
             } else {
-                guard let range = previousWordRange(from: movingSelection) else {
+                if movingIndex != currentWordRange.lowerBound {
+                    return currentWordRange.lowerBound
+                }
+                
+                guard let range = previousWordRange(from: movingIndex..<movingIndex) else {
                     return nil
                 }
                 return range.lowerBound
@@ -2585,23 +2601,20 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
 
         case .token:
             if direction == .forward {
-                guard let range = nextTokenRange(from: movingSelection) else {
+                guard let range = nextTokenRange(from: movingIndex..<movingIndex) else {
                     return nil
                 }
                 return range.upperBound
             } else {
-                guard let range = previousTokenRange(from: movingSelection) else {
+                guard let range = previousTokenRange(from: movingIndex..<movingIndex) else {
                     return nil
                 }
                 return range.lowerBound
             }
 
         case .line:
-            let targetIndex = direction == .forward
-            ? movingSelection.upperBound
-            : movingSelection.lowerBound
 
-            let lineInfo = layoutManager.lines.lineInfo(at: targetIndex)
+            let lineInfo = layoutManager.lines.lineInfo(at: movingIndex)
             guard let line = lineInfo.line else {
                 log("line is nil.", from: self)
                 return nil
@@ -2611,13 +2624,13 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
 
         case .paragraph:
             if direction == .forward {
-                guard let range = textStorage.lineRange(at: movingSelection.upperBound) else {
+                guard let range = textStorage.lineRange(at: movingIndex) else {
                     log("lineRange is nil.", from: self)
                     return nil
                 }
                 return range.upperBound
             } else {
-                guard let range = textStorage.lineRange(at: movingSelection.lowerBound) else {
+                guard let range = textStorage.lineRange(at: movingIndex) else {
                     log("lineRange is nil.", from: self)
                     return nil
                 }
