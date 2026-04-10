@@ -508,8 +508,8 @@ final class KTextStorage: KTextStorageProtocol {
         if let spaceTabRange = spaceOrTabRunRange(at: index) { return spaceTabRange }
         if let japaneseRange = japaneseClusterRange(at: index) { return japaneseRange }
         if let parserRange = _parser.wordRange(at: index) { return parserRange }
-        return asciiIdentifierRange(at: index)
-        
+        if let asciiIdentifierRange = asciiIdentifierRange(at: index) { return asciiIdentifierRange }
+        return asciiSymbolClusterRange(at: index)
     }
     
     // caret位置から選択すべき単語範囲を返す。
@@ -565,6 +565,9 @@ final class KTextStorage: KTextStorageProtocol {
             return range
         }
         if let range = asciiIdentifierRange(at: index), range.contains(index) {
+            return range
+        }
+        if let range = asciiSymbolClusterRange(at: index), range.contains(index) {
             return range
         }
         
@@ -867,6 +870,76 @@ final class KTextStorage: KTextStorageProtocol {
         while hi < n, isAsciiIdent(chars[base + hi]) { hi += 1 }
 
         return lo..<hi
+    }
+    
+    // ASCII 記号の連続を返す。
+    // 空白・タブ・改行・ASCII識別子以外の ASCII 文字を、記号クラスタとして扱う。
+    @inline(__always)
+    func asciiSymbolClusterRange(at index: Int) -> Range<Int>? {
+        let n = count
+        if n == 0 { return nil }
+        if index < 0 || index > n { return nil }
+
+        let chars = characterSlice
+        let base = chars.startIndex
+
+        @inline(__always)
+        func isAsciiIdentifier(_ ch: Character) -> Bool {
+            guard ch.unicodeScalars.count == 1,
+                  let scalar = ch.unicodeScalars.first,
+                  scalar.value <= 0x7F else {
+                return false
+            }
+
+            let value = scalar.value
+            return (0x30...0x39).contains(value) ||
+                   (0x41...0x5A).contains(value) ||
+                   (0x61...0x7A).contains(value) ||
+                   value == 0x5F
+        }
+
+        @inline(__always)
+        func isAsciiSymbol(_ ch: Character) -> Bool {
+            guard ch.unicodeScalars.count == 1,
+                  let scalar = ch.unicodeScalars.first,
+                  scalar.value <= 0x7F else {
+                return false
+            }
+
+            let value = UInt8(scalar.value)
+
+            if value == FC.space || value == FC.tab || value == FC.lf {
+                return false
+            }
+
+            if isAsciiIdentifier(ch) {
+                return false
+            }
+
+            return true
+        }
+
+        var pivotIndex: Int? = nil
+
+        if index < n, isAsciiSymbol(chars[base + index]) {
+            pivotIndex = index
+        } else if index > 0, isAsciiSymbol(chars[base + index - 1]) {
+            pivotIndex = index - 1
+        }
+
+        guard let pivotIndex else { return nil }
+
+        var lowerBound = pivotIndex
+        while lowerBound > 0, isAsciiSymbol(chars[base + lowerBound - 1]) {
+            lowerBound -= 1
+        }
+
+        var upperBound = pivotIndex + 1
+        while upperBound < n, isAsciiSymbol(chars[base + upperBound]) {
+            upperBound += 1
+        }
+
+        return lowerBound..<upperBound
     }
     
 }
