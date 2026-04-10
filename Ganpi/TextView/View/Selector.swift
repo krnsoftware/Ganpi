@@ -36,12 +36,20 @@ extension Selector {
         self == #selector(KTextView.moveRightAndModifySelection(_:)) ||
         self == #selector(KTextView.moveWordLeft(_:)) ||
         self == #selector(KTextView.moveWordRight(_:)) ||
+        self == #selector(KTextView.moveWordProximalLeft(_:)) ||
+        self == #selector(KTextView.moveWordProximalRight(_:)) ||
+        self == #selector(KTextView.moveWordProximalLeftAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveWordProximalRightAndModifySelection(_:)) ||
         self == #selector(KTextView.moveTokenLeft(_:)) ||
         self == #selector(KTextView.moveTokenRight(_:)) ||
         self == #selector(KTextView.moveTokenLeft(_:)) ||
         self == #selector(KTextView.moveTokenRight(_:)) ||
         self == #selector(KTextView.moveTokenLeftAndModifySelection(_:)) ||
         self == #selector(KTextView.moveTokenRightAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveTokenProximalLeft(_:)) ||
+        self == #selector(KTextView.moveTokenProximalRight(_:)) ||
+        self == #selector(KTextView.moveTokenProximalLeftAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveTokenProximalRightAndModifySelection(_:)) ||
         self == #selector(KTextView.moveToBeginningOfLine(_:)) ||
         self == #selector(KTextView.moveToEndOfLine(_:)) ||
         self == #selector(KTextView.moveToBeginningOfLineAndModifySelection(_:)) ||
@@ -62,9 +70,13 @@ extension Selector {
         return self == #selector(KTextView.moveLeftAndModifySelection(_:)) ||
         self == #selector(KTextView.moveRightAndModifySelection(_:)) ||
         self == #selector(KTextView.moveWordLeftAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveWordProximalLeftAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveWordProximalRightAndModifySelection(_:)) ||
         self == #selector(KTextView.moveWordRightAndModifySelection(_:)) ||
         self == #selector(KTextView.moveTokenLeftAndModifySelection(_:)) ||
         self == #selector(KTextView.moveTokenRightAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveTokenProximalLeftAndModifySelection(_:)) ||
+        self == #selector(KTextView.moveTokenProximalRightAndModifySelection(_:)) ||
         self == #selector(KTextView.moveToBeginningOfLineAndModifySelection(_:)) ||
         self == #selector(KTextView.moveToEndOfLineAndModifySelection(_:)) ||
         self == #selector(KTextView.moveToBeginningOfParagraphAndModifySelection(_:)) ||
