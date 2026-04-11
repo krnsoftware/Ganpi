@@ -173,17 +173,7 @@ final class KTextStorage: KTextStorageProtocol {
     var caretWordSeparators: [UInt8] = [
         FC.space,
         FC.tab,
-        FC.lf,
-        FC.period,
-        FC.comma,
-        FC.colon,
-        FC.semicolon,
-        FC.leftParen,
-        FC.rightParen,
-        FC.leftBracket,
-        FC.rightBracket,
-        FC.leftBrace,
-        FC.rightBrace
+        FC.lf
     ]
     
     // propaties for appearances.
