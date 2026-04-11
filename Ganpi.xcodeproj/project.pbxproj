@@ -67,6 +67,7 @@
 			buildPhases = (
 				8680A5052E65DF8F00243FE8 /* Sources */,
 				8680A5062E65DF8F00243FE8 /* Frameworks */,
+				86CE1C6E2F8A8F300029D6B3 /* ShellScript */,
 				8680A5072E65DF8F00243FE8 /* Resources */,
 			);
 			buildRules = (
@@ -126,6 +127,29 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		86CE1C6E2F8A8F300029D6B3 /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(PROJECT_DIR)/Scripts/generate_available_selectors.swift",
+				"$(PROJECT_DIR)/ResourcesSrc/available_selectors.json",
+			);
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/available_selectors.html",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -eu\n\nswift \"${PROJECT_DIR}/Scripts/generate_available_selectors.swift\" \\\n  \"${PROJECT_DIR}/ResourcesSrc/available_selectors.json\" \\\n  \"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/available_selectors.html\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		8680A5052E65DF8F00243FE8 /* Sources */ = {

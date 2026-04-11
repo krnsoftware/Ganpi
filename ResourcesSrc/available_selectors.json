@@ -1,0 +1,1049 @@
+{
+  "selectors": [
+    {
+      "selector": "openApplicationSupportFolder",
+      "scope": "Application",
+      "summary": "Application Supportフォルダを開く。"
+    },
+    {
+      "selector": "openHelp",
+      "scope": "Application",
+      "summary": "Helpファイルを開く。"
+    },
+    {
+      "selector": "openPreferences",
+      "scope": "Application",
+      "summary": "初期設定ファイルを開く。"
+    },
+    {
+      "selector": "openScriptsFolder",
+      "scope": "Application",
+      "summary": "Scriptフォルダを開く。"
+    },
+    {
+      "selector": "openTemplatesFolder",
+      "scope": "Application",
+      "summary": "templatesフォルダを開く。"
+    },
+    {
+      "selector": "reloadPreferences",
+      "scope": "Application",
+      "summary": "初期設定をリロードする。"
+    },
+    {
+      "selector": "showLogPanel",
+      "scope": "Application",
+      "summary": "Logパネルを開く。"
+    },
+    {
+      "selector": "showSearchPanel",
+      "scope": "Application",
+      "summary": "検索パネルを開く。"
+    },
+    {
+      "selector": "terminateWithoutStore",
+      "scope": "Application",
+      "summary": "編集されたドキュメントを保存せずに終了する。"
+    },
+    {
+      "selector": "performCloseWithoutStore",
+      "scope": "Document",
+      "summary": "編集されたドキュメントを保存せずに閉じる。"
+    },
+    {
+      "selector": "decreaseFontSize",
+      "scope": "ViewController",
+      "summary": "フォントサイズを小さくする。"
+    },
+    {
+      "selector": "decreaseLineSpacing",
+      "scope": "ViewController",
+      "summary": "行間を狭める。"
+    },
+    {
+      "selector": "focusBackwardTextView",
+      "scope": "ViewController",
+      "summary": "「前の」テキストビューをフォーカスする。"
+    },
+    {
+      "selector": "focusForwardTextView",
+      "scope": "ViewController",
+      "summary": "「次の」テキストビューをフォーカスする。"
+    },
+    {
+      "selector": "increaseFontSize",
+      "scope": "ViewController",
+      "summary": "フォントサイズを大きくする。"
+    },
+    {
+      "selector": "increaseLineSpacing",
+      "scope": "ViewController",
+      "summary": "行間を広げる。"
+    },
+    {
+      "selector": "openEncodingMenu",
+      "scope": "ViewController",
+      "summary": "文字コードメニューを開く。"
+    },
+    {
+      "selector": "openEndOfLineMenu",
+      "scope": "ViewController",
+      "summary": "改行コードメニューを開く。"
+    },
+    {
+      "selector": "openFunctionMenu",
+      "scope": "ViewController",
+      "summary": "アウトラインメニューを開く。"
+    },
+    {
+      "selector": "openSortedFunctionMenu",
+      "scope": "ViewController",
+      "summary": "ソートされたアウトラインメニューを開く。"
+    },
+    {
+      "selector": "openSyntaxMenu",
+      "scope": "ViewController",
+      "summary": "シンタックスメニューを開く。"
+    },
+    {
+      "selector": "removeSplit",
+      "scope": "ViewController",
+      "summary": "テキストビューのスプリットを削除する。"
+    },
+    {
+      "selector": "setBaseFontToMonoSpaceSystemFont",
+      "scope": "ViewController",
+      "summary": "表示フォントを等幅システムフォントにする。"
+    },
+    {
+      "selector": "setDividerBackward",
+      "scope": "ViewController",
+      "summary": "テキストビューのディバイダーを後方に移動する。"
+    },
+    {
+      "selector": "setDividerCenter",
+      "scope": "ViewController",
+      "summary": "テキストビューのディバイダーを中央に移動する。"
+    },
+    {
+      "selector": "setDividerForward",
+      "scope": "ViewController",
+      "summary": "テキストビューのディバイダーを前方に移動する。"
+    },
+    {
+      "selector": "setEditModeToEdit",
+      "scope": "ViewController",
+      "summary": "エディットモードをEditにする。"
+    },
+    {
+      "selector": "setEditModeToNormal",
+      "scope": "ViewController",
+      "summary": "エディットモードをNormalにする。"
+    },
+    {
+      "selector": "showCaretJumpPopoverFromMenu",
+      "scope": "ViewController",
+      "summary": "行ジャンプ用のポップオーバーを表示する。"
+    },
+    {
+      "selector": "showFontPanel",
+      "scope": "ViewController",
+      "summary": "フォントパネルを表示する。"
+    },
+    {
+      "selector": "showFontSizePopoverFromMenu",
+      "scope": "ViewController",
+      "summary": "フォントサイズ変更のためのポップオーバーを表示する。"
+    },
+    {
+      "selector": "showLineSpacingPopoverFromMenu",
+      "scope": "ViewController",
+      "summary": "行間変更のためのポップオーバーを表示する。"
+    },
+    {
+      "selector": "splitHorizontally",
+      "scope": "ViewController",
+      "summary": "テキストビューを水平方向に分割する。"
+    },
+    {
+      "selector": "splitVertically",
+      "scope": "ViewController",
+      "summary": "テキストビューを鉛直方向に分割する。"
+    },
+    {
+      "selector": "toggleAutoIndent",
+      "scope": "ViewController",
+      "summary": "オートインデントを行なうか否かをトグルする。"
+    },
+    {
+      "selector": "toggleShowInvisibleCharacters",
+      "scope": "ViewController",
+      "summary": "不可視文字を表示するか否かをトグルする。"
+    },
+    {
+      "selector": "toggleShowLineNumbers",
+      "scope": "ViewController",
+      "summary": "行番号表示を行なうか否かをトグルする。"
+    },
+    {
+      "selector": "toggleSyncOptions",
+      "scope": "ViewController",
+      "summary": "シンクオプション(設定項目の同期)のオンオフをトグルする。"
+    },
+    {
+      "selector": "toggleWordWrap",
+      "scope": "ViewController",
+      "summary": "行の折り返し表示をするか否かトグルする。"
+    },
+    {
+      "selector": "alignAssignmentColons",
+      "scope": "TextView",
+      "summary": "コロン(:)で行を揃える。"
+    },
+    {
+      "selector": "alignAssignmentEquals",
+      "scope": "TextView",
+      "summary": "イコール(=)で行を揃える。"
+    },
+    {
+      "selector": "base64Decode",
+      "scope": "TextView",
+      "summary": "Base64からデコードする。"
+    },
+    {
+      "selector": "base64Encode",
+      "scope": "TextView",
+      "summary": "Base64にエンコードする。"
+    },
+    {
+      "selector": "capitalizeWord",
+      "scope": "TextView",
+      "summary": "単語をキャピタライズする。"
+    },
+    {
+      "selector": "centerSelectionInVisibleArea",
+      "scope": "TextView",
+      "summary": "選択範囲を表示領域の中央に移動する。"
+    },
+    {
+      "selector": "collapseEmptyLines",
+      "scope": "TextView",
+      "summary": "連続した空行を1つにまとめる。"
+    },
+    {
+      "selector": "copy",
+      "scope": "TextView",
+      "summary": "コピーする。"
+    },
+    {
+      "selector": "cut",
+      "scope": "TextView",
+      "summary": "カットする。"
+    },
+    {
+      "selector": "deleteBackward",
+      "scope": "TextView",
+      "summary": "文頭方向に1文字削除する。"
+    },
+    {
+      "selector": "deleteForward",
+      "scope": "TextView",
+      "summary": "文末方向に1文字削除する。"
+    },
+    {
+      "selector": "deleteLines",
+      "scope": "TextView",
+      "summary": "選択範囲を含むParagraphを全て削除する。"
+    },
+    {
+      "selector": "deleteToBeginningOfLine",
+      "scope": "TextView",
+      "summary": "Lineの冒頭までを削除する。"
+    },
+    {
+      "selector": "deleteToBeginningOfParagraph",
+      "scope": "TextView",
+      "summary": "Paragraphの冒頭までを削除する。"
+    },
+    {
+      "selector": "deleteToBeginningOfParagraphWithoutLeadingSpaces",
+      "scope": "TextView",
+      "summary": "行頭の空白文字を除く先頭部分までを削除する。"
+    },
+    {
+      "selector": "deleteToEndOfLine",
+      "scope": "TextView",
+      "summary": "Lineの末尾まで削除する。"
+    },
+    {
+      "selector": "deleteToEndOfParagraph",
+      "scope": "TextView",
+      "summary": "Paragraphの末尾まで削除する。"
+    },
+    {
+      "selector": "deleteWordBackward",
+      "scope": "TextView",
+      "summary": "単語の冒頭までを削除する。"
+    },
+    {
+      "selector": "deleteWordForward",
+      "scope": "TextView",
+      "summary": "単語の末尾までを削除する。"
+    },
+    {
+      "selector": "doNFC",
+      "scope": "TextView",
+      "summary": "NFCに変換する。"
+    },
+    {
+      "selector": "doNFKC",
+      "scope": "TextView",
+      "summary": "NFKCに変換する。"
+    },
+    {
+      "selector": "duplicateLines",
+      "scope": "TextView",
+      "summary": "Paragraphを複製する。"
+    },
+    {
+      "selector": "exchangePaste",
+      "scope": "TextView",
+      "summary": "エクスチェンジペーストを実行する。"
+    },
+    {
+      "selector": "fullWidthToHalfWidth",
+      "scope": "TextView",
+      "summary": "全角カナを半角カナに変換する。"
+    },
+    {
+      "selector": "halfWidthToFullWidth",
+      "scope": "TextView",
+      "summary": "半角カナを全角カナに変換する。"
+    },
+    {
+      "selector": "hiraganaToKatakana",
+      "scope": "TextView",
+      "summary": "ひらがなをカタカナに変換する。"
+    },
+    {
+      "selector": "insertBacktab",
+      "scope": "TextView",
+      "summary": "バックタブの動作。"
+    },
+    {
+      "selector": "insertCurrentDateTime",
+      "scope": "TextView",
+      "summary": "現在の日時を挿入する。"
+    },
+    {
+      "selector": "insertDeleteBuffer",
+      "scope": "TextView",
+      "summary": "デリートバッファーを挿入する。"
+    },
+    {
+      "selector": "insertLiteralTabCharacter",
+      "scope": "TextView",
+      "summary": "タブ文字を挿入する。"
+    },
+    {
+      "selector": "insertNewline",
+      "scope": "TextView",
+      "summary": "改行文字を挿入する。"
+    },
+    {
+      "selector": "insertTab",
+      "scope": "TextView",
+      "summary": "タブを入力する。(タブキー押下の際の動作)"
+    },
+    {
+      "selector": "insertUUID",
+      "scope": "TextView",
+      "summary": "UUIDを挿入する。"
+    },
+    {
+      "selector": "joinLines",
+      "scope": "TextView",
+      "summary": "選択範囲を含むParagraphを1行に繋げる。"
+    },
+    {
+      "selector": "jumpToMarkedCaretIndexAndReset",
+      "scope": "TextView",
+      "summary": "現在のキャレット位置をマークし、前回のマークされたキャレット位置にジャンプする。"
+    },
+    {
+      "selector": "katakanaToHiragana",
+      "scope": "TextView",
+      "summary": "カタカナをひらがなに変換する。"
+    },
+    {
+      "selector": "lowercaseWord",
+      "scope": "TextView",
+      "summary": "単語を小文字に変換する。"
+    },
+    {
+      "selector": "md5Base64",
+      "scope": "TextView",
+      "summary": "MD5 Base64変換。"
+    },
+    {
+      "selector": "md5Hex",
+      "scope": "TextView",
+      "summary": "MD5 Hex変換。"
+    },
+    {
+      "selector": "moveDown",
+      "scope": "TextView",
+      "summary": "下に移動する。"
+    },
+    {
+      "selector": "moveDownAndModifySelection",
+      "scope": "TextView",
+      "summary": "下の行まで選択範囲を広げる。"
+    },
+    {
+      "selector": "moveLeft",
+      "scope": "TextView",
+      "summary": "左に移動する。"
+    },
+    {
+      "selector": "moveLeftAndModifySelection",
+      "scope": "TextView",
+      "summary": "1文字左まで選択範囲を広げる。"
+    },
+    {
+      "selector": "moveLineDown",
+      "scope": "TextView",
+      "summary": "Paragraph全体を下に移動する。"
+    },
+    {
+      "selector": "moveLineUp",
+      "scope": "TextView",
+      "summary": "Paragraph全体を上に移動する。"
+    },
+    {
+      "selector": "moveRight",
+      "scope": "TextView",
+      "summary": "右に移動する。"
+    },
+    {
+      "selector": "moveRightAndModifySelection",
+      "scope": "TextView",
+      "summary": "1文字右まで選択範囲を広げる。"
+    },
+    {
+      "selector": "moveToBeginningOfDocument",
+      "scope": "TextView",
+      "summary": "文頭に移動する。"
+    },
+    {
+      "selector": "moveToBeginningOfDocumentAndModifySelection",
+      "scope": "TextView",
+      "summary": "文頭まで選択範囲を広げる。"
+    },
+    {
+      "selector": "moveToBeginningOfLine",
+      "scope": "TextView",
+      "summary": "Lineの冒頭に移動する。"
+    },
+    {
+      "selector": "moveToBeginningOfLineAndModifySelection",
+      "scope": "TextView",
+      "summary": "Lineの冒頭まで選択範囲を広げる。"
+    },
+    {
+      "selector": "moveToBeginningOfParagraph",
+      "scope": "TextView",
+      "summary": "Paragraphの冒頭に移動する。"
+    },
+    {
+      "selector": "moveToBeginningOfParagraphAndModifySelection",
+      "scope": "TextView",
+      "summary": "Paragraphの冒頭まで選択範囲を広げる。"
+    },
+    {
+      "selector": "moveToBeginningOfSelection",
+      "scope": "TextView",
+      "summary": "選択範囲の冒頭にキャレットを移動する。"
+    },
+    {
+      "selector": "moveToEndOfDocument",
+      "scope": "TextView",
+      "summary": "文末に移動する。"
+    },
+    {
+      "selector": "moveToEndOfDocumentAndModifySelection",
+      "scope": "TextView",
+      "summary": "文末まで選択範囲を広げる。"
+    },
+    {
+      "selector": "moveToEndOfLine",
+      "scope": "TextView",
+      "summary": "Lineの末尾に移動する。"
+    },
+    {
+      "selector": "moveToEndOfLineAndModifySelection",
+      "scope": "TextView",
+      "summary": "Lineの末尾まで選択範囲を広げる。"
+    },
+    {
+      "selector": "moveToEndOfParagraph",
+      "scope": "TextView",
+      "summary": "Paragraphの末尾に移動する。"
+    },
+    {
+      "selector": "moveToEndOfParagraphAndModifySelection",
+      "scope": "TextView",
+      "summary": "Paragraphの末尾まで選択範囲を広げる。"
+    },
+    {
+      "selector": "moveToEndOfSelection",
+      "scope": "TextView",
+      "summary": "選択範囲の末尾に移動する。"
+    },
+    {
+      "selector": "moveToFirstPrintableCharacterInParagraph",
+      "scope": "TextView",
+      "summary": "そのParagraphの最初の印字可能な文字に移動する。"
+    },
+    {
+      "selector": "moveToFirstPrintableCharacterInParagraphAndModifySelection",
+      "scope": "TextView",
+      "summary": "そのParagraphの最初の印字可能な文字まで選択範囲を広げる。"
+    },
+    {
+      "selector": "moveUp",
+      "scope": "TextView",
+      "summary": "上に移動する。"
+    },
+    {
+      "selector": "moveUpAndModifySelection",
+      "scope": "TextView",
+      "summary": "上の行まで選択範囲を広げる。"
+    },
+    {
+      "selector": "moveWordLeft",
+      "scope": "TextView",
+      "summary": "単語の冒頭に移動。"
+    },
+    {
+      "selector": "moveWordLeftAndModifySelection",
+      "scope": "TextView",
+      "summary": "単語の冒頭まで選択範囲を広げる。"
+    },
+    {
+      "selector": "moveWordRight",
+      "scope": "TextView",
+      "summary": "単語の末尾に移動。"
+    },
+    {
+      "selector": "moveWordRightAndModifySelection",
+      "scope": "TextView",
+      "summary": "単語の末尾まで選択範囲を広げる。"
+    },
+    {
+      "selector": "pageDown",
+      "scope": "TextView",
+      "summary": "下方向に1ページ分スクロールする。キャレット追従あり。"
+    },
+    {
+      "selector": "pageDownHalf",
+      "scope": "TextView",
+      "summary": "下方向に半ページ分スクロールする。キャレット追従あり。"
+    },
+    {
+      "selector": "pageUp",
+      "scope": "TextView",
+      "summary": "上方向に1ページ分スクロールする。キャレット追従あり。"
+    },
+    {
+      "selector": "pageUpAndModifySelection",
+      "scope": "TextView",
+      "summary": "上方向に半ページ分スクロールする。キャレット追従あり。"
+    },
+    {
+      "selector": "pageUpHalf",
+      "scope": "TextView",
+      "summary": "上方向に半ページ分スクロールする。キャレット追従あり。"
+    },
+    {
+      "selector": "paste",
+      "scope": "TextView",
+      "summary": "ペーストする。"
+    },
+    {
+      "selector": "performGridJump",
+      "scope": "TextView",
+      "summary": "グリッドジャンプ機能を起動する。"
+    },
+    {
+      "selector": "redo",
+      "scope": "TextView",
+      "summary": "Redoする。"
+    },
+    {
+      "selector": "reflowParagraph100",
+      "scope": "TextView",
+      "summary": "100文字相当で折り返す。"
+    },
+    {
+      "selector": "reflowParagraph72",
+      "scope": "TextView",
+      "summary": "72文字相当で折り返す。"
+    },
+    {
+      "selector": "reflowParagraph80",
+      "scope": "TextView",
+      "summary": "80文字相当で折り返す。"
+    },
+    {
+      "selector": "removeEmptyLines",
+      "scope": "TextView",
+      "summary": "空行を削除する。"
+    },
+    {
+      "selector": "replaceAction",
+      "scope": "TextView",
+      "summary": "選択された文字列を置換文字列に入れ替える。"
+    },
+    {
+      "selector": "replaceAllAction",
+      "scope": "TextView",
+      "summary": "全置換を実行する。"
+    },
+    {
+      "selector": "replaceAndFindeAgainAction",
+      "scope": "TextView",
+      "summary": "選択範囲を置換してから更に検索する。"
+    },
+    {
+      "selector": "restoreSelectionRange",
+      "scope": "TextView",
+      "summary": "現在の選択範囲をストアされていたものに入れ替える。"
+    },
+    {
+      "selector": "rot13",
+      "scope": "TextView",
+      "summary": "ROT13で変換する。"
+    },
+    {
+      "selector": "scrollPageDown",
+      "scope": "TextView",
+      "summary": "下方向に1ページ分スクロールする。キャレット追従なし。"
+    },
+    {
+      "selector": "scrollPageUp",
+      "scope": "TextView",
+      "summary": "上方向に1ページ分スクロールする。キャレット追従なし。"
+    },
+    {
+      "selector": "searchAlternateAction",
+      "scope": "TextView",
+      "summary": "既定の検索方向に準じて検索する。"
+    },
+    {
+      "selector": "searchAlternateActionReverse",
+      "scope": "TextView",
+      "summary": "既定の検索方向の逆方向に検索する。"
+    },
+    {
+      "selector": "searchNextAction",
+      "scope": "TextView",
+      "summary": "次を検索する。"
+    },
+    {
+      "selector": "searchPrevAction",
+      "scope": "TextView",
+      "summary": "前を検索する。"
+    },
+    {
+      "selector": "selectAll",
+      "scope": "TextView",
+      "summary": "全て選択する。"
+    },
+    {
+      "selector": "selectInnerPair",
+      "scope": "TextView",
+      "summary": "次の括弧の内側を選択する。"
+    },
+    {
+      "selector": "selectInnerPairReverse",
+      "scope": "TextView",
+      "summary": "前の括弧の内側を選択する。"
+    },
+    {
+      "selector": "selectLine",
+      "scope": "TextView",
+      "summary": "Lineを選択する。"
+    },
+    {
+      "selector": "selectOuterPair",
+      "scope": "TextView",
+      "summary": "次の括弧の外側を選択する。"
+    },
+    {
+      "selector": "selectOuterPairReverse",
+      "scope": "TextView",
+      "summary": "前の括弧の外側を選択する。"
+    },
+    {
+      "selector": "selectParagraph",
+      "scope": "TextView",
+      "summary": "Paragraphを選択する。"
+    },
+    {
+      "selector": "selectWord",
+      "scope": "TextView",
+      "summary": "単語を選択する。"
+    },
+    {
+      "selector": "setCompletionModeOff",
+      "scope": "TextView",
+      "summary": "語彙補完モードをオフにする。"
+    },
+    {
+      "selector": "setCompletionModeOn",
+      "scope": "TextView",
+      "summary": "語彙補完モードをオンにする。"
+    },
+    {
+      "selector": "setMarkedCaretIndex",
+      "scope": "TextView",
+      "summary": "現在の位置をマークする。"
+    },
+    {
+      "selector": "setSearchDirectionToBackward",
+      "scope": "TextView",
+      "summary": "既定の検索方向を文頭方向にする。"
+    },
+    {
+      "selector": "setSearchDirectionToForward",
+      "scope": "TextView",
+      "summary": "既定の検索方向を文末方向にする。"
+    },
+    {
+      "selector": "setSearchStringWithSelectedString",
+      "scope": "TextView",
+      "summary": "選択されている文字列を検索文字列にする。"
+    },
+    {
+      "selector": "sha256",
+      "scope": "TextView",
+      "summary": "SHA-256のハッシュを出力する。"
+    },
+    {
+      "selector": "shiftLeft",
+      "scope": "TextView",
+      "summary": "左にシフトする。"
+    },
+    {
+      "selector": "shiftRight",
+      "scope": "TextView",
+      "summary": "右にシフトする。"
+    },
+    {
+      "selector": "showColorPanel",
+      "scope": "TextView",
+      "summary": "カラーパネルを表示する。"
+    },
+    {
+      "selector": "showInfomation",
+      "scope": "TextView",
+      "summary": "情報ウインドウを表示する。"
+    },
+    {
+      "selector": "showMiniSearchPanel",
+      "scope": "TextView",
+      "summary": "ミニ検索ウインドウを表示する。"
+    },
+    {
+      "selector": "sortLines",
+      "scope": "TextView",
+      "summary": "Paragraphをソートする。"
+    },
+    {
+      "selector": "sortSelectedLines_AscN_CaseN_NumN",
+      "scope": "TextView",
+      "summary": "Sort selected lines asc n case n num n."
+    },
+    {
+      "selector": "sortSelectedLines_AscN_CaseN_NumT",
+      "scope": "TextView",
+      "summary": "Sort selected lines asc n case n num t."
+    },
+    {
+      "selector": "sortSelectedLines_AscN_CaseT_NumN",
+      "scope": "TextView",
+      "summary": "Sort selected lines asc n case t num n."
+    },
+    {
+      "selector": "sortSelectedLines_AscN_CaseT_NumT",
+      "scope": "TextView",
+      "summary": "Sort selected lines asc n case t num t."
+    },
+    {
+      "selector": "sortSelectedLines_AscT_CaseN_NumN",
+      "scope": "TextView",
+      "summary": "Sort selected lines asc t case n num n."
+    },
+    {
+      "selector": "sortSelectedLines_AscT_CaseN_NumT",
+      "scope": "TextView",
+      "summary": "Sort selected lines asc t case n num t."
+    },
+    {
+      "selector": "sortSelectedLines_AscT_CaseT_NumN",
+      "scope": "TextView",
+      "summary": "Sort selected lines asc t case t num n."
+    },
+    {
+      "selector": "sortSelectedLines_AscT_CaseT_NumT",
+      "scope": "TextView",
+      "summary": "Sort selected lines asc t case t num t."
+    },
+    {
+      "selector": "storeSelectionRange",
+      "scope": "TextView",
+      "summary": "現在の選択範囲をストアする。"
+    },
+    {
+      "selector": "surroundSelectionWithBlacket",
+      "scope": "TextView",
+      "summary": "[]で囲う。"
+    },
+    {
+      "selector": "surroundSelectionWithBrace",
+      "scope": "TextView",
+      "summary": "{}で囲う。"
+    },
+    {
+      "selector": "surroundSelectionWithDoubleQuote",
+      "scope": "TextView",
+      "summary": "\"\"で囲う。"
+    },
+    {
+      "selector": "surroundSelectionWithParen",
+      "scope": "TextView",
+      "summary": "()で囲う。"
+    },
+    {
+      "selector": "surroundSelectionWithSingleQuote",
+      "scope": "TextView",
+      "summary": "''で囲う。"
+    },
+    {
+      "selector": "toggleCompletionMode",
+      "scope": "TextView",
+      "summary": "語彙補完モードのオンオフをトグルする。"
+    },
+    {
+      "selector": "toggleLineComment",
+      "scope": "TextView",
+      "summary": "単行のコメントを付け外しする。"
+    },
+    {
+      "selector": "transpose",
+      "scope": "TextView",
+      "summary": "キャレットの前後の文字を入れ替える。"
+    },
+    {
+      "selector": "trimTrailingSpaces",
+      "scope": "TextView",
+      "summary": "行末の空白文字を削除する。"
+    },
+    {
+      "selector": "undo",
+      "scope": "TextView",
+      "summary": "Undoする。"
+    },
+    {
+      "selector": "uniqueLinesKeepFirst",
+      "scope": "TextView",
+      "summary": "重複行を削除。先に出現したものを残す。"
+    },
+    {
+      "selector": "uniqueLinesKeepLast",
+      "scope": "TextView",
+      "summary": "重複行を削除。後に出現したものを残す。"
+    },
+    {
+      "selector": "uppercaseWord",
+      "scope": "TextView",
+      "summary": "単語を大文字に変換する。"
+    },
+    {
+      "selector": "urlDecode",
+      "scope": "TextView",
+      "summary": "URLデコードを行う。"
+    },
+    {
+      "selector": "urlEncode",
+      "scope": "TextView",
+      "summary": "URLエンコードを行う。"
+    },
+    {
+      "selector": "yank",
+      "scope": "TextView",
+      "summary": "Yank(=ペースト)する。"
+    },
+    {
+      "selector": "yankPop",
+      "scope": "TextView",
+      "summary": "YankをPopする。"
+    },
+    {
+      "selector": "yankPopReverse",
+      "scope": "TextView",
+      "summary": "Yankを逆方向にPopする。"
+    },
+    {
+      "selector": "capitalizeWordToEndOfWord",
+      "scope": "TextView",
+      "summary": "キャレット位置から単語末尾までをキャピタライズする。"
+    },
+    {
+      "selector": "jumpBackwardInHistory",
+      "scope": "TextView",
+      "summary": "ジャンプ履歴を1つ前に戻る。"
+    },
+    {
+      "selector": "jumpForwardInHistory",
+      "scope": "TextView",
+      "summary": "ジャンプ履歴を1つ先に進む。"
+    },
+    {
+      "selector": "lowercaseWordToEndOfWord",
+      "scope": "TextView",
+      "summary": "キャレット位置から単語末尾までを小文字に変換する。"
+    },
+    {
+      "selector": "moveTokenLeft",
+      "scope": "TextView",
+      "summary": "トークンの冒頭に移動する。"
+    },
+    {
+      "selector": "moveTokenLeftAndModifySelection",
+      "scope": "TextView",
+      "summary": "トークンの冒頭まで選択範囲を広げる。"
+    },
+    {
+      "selector": "moveTokenProximalLeft",
+      "scope": "TextView",
+      "summary": "前のトークンの末尾に移動する。"
+    },
+    {
+      "selector": "moveTokenProximalLeftAndModifySelection",
+      "scope": "TextView",
+      "summary": "前のトークンの末尾まで選択範囲を広げる。"
+    },
+    {
+      "selector": "moveTokenProximalRight",
+      "scope": "TextView",
+      "summary": "次のトークンの冒頭に移動する。"
+    },
+    {
+      "selector": "moveTokenProximalRightAndModifySelection",
+      "scope": "TextView",
+      "summary": "次のトークンの冒頭まで選択範囲を広げる。"
+    },
+    {
+      "selector": "moveTokenRight",
+      "scope": "TextView",
+      "summary": "トークンの末尾に移動する。"
+    },
+    {
+      "selector": "moveTokenRightAndModifySelection",
+      "scope": "TextView",
+      "summary": "トークンの末尾まで選択範囲を広げる。"
+    },
+    {
+      "selector": "moveWordProximalLeft",
+      "scope": "TextView",
+      "summary": "前の単語の末尾に移動する。"
+    },
+    {
+      "selector": "moveWordProximalLeftAndModifySelection",
+      "scope": "TextView",
+      "summary": "前の単語の末尾まで選択範囲を広げる。"
+    },
+    {
+      "selector": "moveWordProximalRight",
+      "scope": "TextView",
+      "summary": "次の単語の冒頭に移動する。"
+    },
+    {
+      "selector": "moveWordProximalRightAndModifySelection",
+      "scope": "TextView",
+      "summary": "次の単語の冒頭まで選択範囲を広げる。"
+    },
+    {
+      "selector": "selectNextToken",
+      "scope": "TextView",
+      "summary": "次のトークンを選択する。"
+    },
+    {
+      "selector": "selectNextWord",
+      "scope": "TextView",
+      "summary": "次の単語を選択する。"
+    },
+    {
+      "selector": "selectPreviousToken",
+      "scope": "TextView",
+      "summary": "前のトークンを選択する。"
+    },
+    {
+      "selector": "selectPreviousWord",
+      "scope": "TextView",
+      "summary": "前の単語を選択する。"
+    },
+    {
+      "selector": "selectRange",
+      "scope": "TextView",
+      "summary": "指定された範囲を選択する。"
+    },
+    {
+      "selector": "setMarkedModeOff",
+      "scope": "TextView",
+      "summary": "set-markモードをオフにする。"
+    },
+    {
+      "selector": "setMarkedModeOn",
+      "scope": "TextView",
+      "summary": "set-markモードをオンにする。"
+    },
+    {
+      "selector": "showGlobalFilterCommandLineAction",
+      "scope": "TextView",
+      "summary": "グローバルフィルタ用のコマンドラインを表示する。"
+    },
+    {
+      "selector": "showInverseGlobalFilterCommandLineAction",
+      "scope": "TextView",
+      "summary": "逆グローバルフィルタ用のコマンドラインを表示する。"
+    },
+    {
+      "selector": "showSelectionSubstituteCommandLineAction",
+      "scope": "TextView",
+      "summary": "選択範囲置換用のコマンドラインを表示する。"
+    },
+    {
+      "selector": "showSubstituteCommandLineAction",
+      "scope": "TextView",
+      "summary": "置換用のコマンドラインを表示する。"
+    },
+    {
+      "selector": "showWholeDocumentSubstituteCommandLineAction",
+      "scope": "TextView",
+      "summary": "文書全体置換用のコマンドラインを表示する。"
+    },
+    {
+      "selector": "toggleCase",
+      "scope": "TextView",
+      "summary": "選択範囲または現在文字の大文字小文字を反転する。"
+    },
+    {
+      "selector": "uppercaseWordToEndOfWord",
+      "scope": "TextView",
+      "summary": "キャレット位置から単語末尾までを大文字に変換する。"
+    }
+  ]
+}
