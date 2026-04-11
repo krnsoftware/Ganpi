@@ -607,7 +607,7 @@ final class KSyntaxParserCisco: KSyntaxParser {
             let lr = skeleton.lineRange(at: line)
             if lr.isEmpty { continue }
 
-            var head = skeleton.skipSpaces(from: lr.lowerBound, to: lr.upperBound)
+            let head = skeleton.skipSpaces(from: lr.lowerBound, to: lr.upperBound)
             if head >= lr.upperBound { continue }
 
             if bytes[head] == FC.exclamation {

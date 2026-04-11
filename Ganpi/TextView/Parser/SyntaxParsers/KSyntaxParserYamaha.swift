@@ -184,7 +184,7 @@ final class KSyntaxParserYamaha: KSyntaxParser {
         }
 
         // ---- 1) 行頭空白をスキップ
-        var head = skeleton.skipSpaces(from: lineRange.lowerBound, to: lineRange.upperBound)
+        let head = skeleton.skipSpaces(from: lineRange.lowerBound, to: lineRange.upperBound)
         if head >= lineRange.upperBound { return [] }
 
         // ---- 2) 行頭コメント（# ; !）
