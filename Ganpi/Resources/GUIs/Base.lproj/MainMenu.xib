@@ -665,62 +665,68 @@
                                                 <action selector="sortLines:" target="-1" id="zJ1-kU-mCE"/>
                                             </connections>
                                         </menuItem>
-                                        <menuItem isSeparatorItem="YES" id="FUl-27-qOp"/>
-                                        <menuItem title="Sort  Asc:Y  CaseIns:Y  Num:Y" id="8vV-nv-kRv">
-                                            <attributedString key="attributedTitle"/>
+                                        <menuItem title="Sort Lines As..." id="JIy-6Z-qlA">
                                             <modifierMask key="keyEquivalentModifierMask"/>
-                                            <connections>
-                                                <action selector="sortSelectedLines_AscT_CaseT_NumT:" target="-1" id="WTh-De-cov"/>
-                                            </connections>
-                                        </menuItem>
-                                        <menuItem title="Sort  Asc:Y  CaseIns:Y  Num:N" id="rMG-kQ-rMs">
-                                            <attributedString key="attributedTitle"/>
-                                            <modifierMask key="keyEquivalentModifierMask"/>
-                                            <connections>
-                                                <action selector="sortSelectedLines_AscT_CaseT_NumN:" target="-1" id="Arj-oc-y4y"/>
-                                            </connections>
-                                        </menuItem>
-                                        <menuItem title="Sort  Asc:Y  CaseIns:N  Num:Y" id="nGh-4b-1i4">
-                                            <attributedString key="attributedTitle"/>
-                                            <modifierMask key="keyEquivalentModifierMask"/>
-                                            <connections>
-                                                <action selector="sortSelectedLines_AscT_CaseN_NumT:" target="-1" id="DHX-mM-sgN"/>
-                                            </connections>
-                                        </menuItem>
-                                        <menuItem title="Sort  Asc:Y  CaseIns:N  Num:N" id="rix-jJ-RIb">
-                                            <attributedString key="attributedTitle"/>
-                                            <modifierMask key="keyEquivalentModifierMask"/>
-                                            <connections>
-                                                <action selector="sortSelectedLines_AscT_CaseN_NumN:" target="-1" id="yUs-Zp-2TR"/>
-                                            </connections>
-                                        </menuItem>
-                                        <menuItem title="Sort  Asc:N  CaseIns:Y  Num:Y" id="JQK-xo-yXS">
-                                            <attributedString key="attributedTitle"/>
-                                            <modifierMask key="keyEquivalentModifierMask"/>
-                                            <connections>
-                                                <action selector="sortSelectedLines_AscN_CaseT_NumT:" target="-1" id="GtX-0o-3W3"/>
-                                            </connections>
-                                        </menuItem>
-                                        <menuItem title="Sort  Asc:N  CaseIns:Y  Num:N" id="d9p-rZ-b5W">
-                                            <attributedString key="attributedTitle"/>
-                                            <modifierMask key="keyEquivalentModifierMask"/>
-                                            <connections>
-                                                <action selector="sortSelectedLines_AscN_CaseT_NumN:" target="-1" id="pA1-YJ-DtH"/>
-                                            </connections>
-                                        </menuItem>
-                                        <menuItem title="Sort  Asc:N  CaseIns:N  Num:Y" id="Czy-kY-gfr">
-                                            <attributedString key="attributedTitle"/>
-                                            <modifierMask key="keyEquivalentModifierMask"/>
-                                            <connections>
-                                                <action selector="sortSelectedLines_AscN_CaseN_NumT:" target="-1" id="kbk-e2-8Zm"/>
-                                            </connections>
-                                        </menuItem>
-                                        <menuItem title="Sort  Asc:N  CaseIns:N  Num:N" id="iyx-hs-3oK">
-                                            <attributedString key="attributedTitle"/>
-                                            <modifierMask key="keyEquivalentModifierMask"/>
-                                            <connections>
-                                                <action selector="sortSelectedLines_AscN_CaseN_NumN:" target="-1" id="EBr-Gu-4JN"/>
-                                            </connections>
+                                            <menu key="submenu" id="bMw-4v-9FJ">
+                                                <items>
+                                                    <menuItem title="Ascending, Case Sensitive, Numeric" id="8vV-nv-kRv">
+                                                        <attributedString key="attributedTitle"/>
+                                                        <modifierMask key="keyEquivalentModifierMask"/>
+                                                        <connections>
+                                                            <action selector="sortSelectedLines_AscT_CaseT_NumT:" target="-1" id="WTh-De-cov"/>
+                                                        </connections>
+                                                    </menuItem>
+                                                    <menuItem title="Ascending, Case Sensitive, Lexical" id="rMG-kQ-rMs">
+                                                        <attributedString key="attributedTitle"/>
+                                                        <modifierMask key="keyEquivalentModifierMask"/>
+                                                        <connections>
+                                                            <action selector="sortSelectedLines_AscT_CaseT_NumN:" target="-1" id="Arj-oc-y4y"/>
+                                                        </connections>
+                                                    </menuItem>
+                                                    <menuItem title="Ascending, Case Insensitive, Numeric" id="nGh-4b-1i4">
+                                                        <attributedString key="attributedTitle"/>
+                                                        <modifierMask key="keyEquivalentModifierMask"/>
+                                                        <connections>
+                                                            <action selector="sortSelectedLines_AscT_CaseN_NumT:" target="-1" id="DHX-mM-sgN"/>
+                                                        </connections>
+                                                    </menuItem>
+                                                    <menuItem title="Ascending, Case Insensitive, Lexical" id="rix-jJ-RIb">
+                                                        <attributedString key="attributedTitle"/>
+                                                        <modifierMask key="keyEquivalentModifierMask"/>
+                                                        <connections>
+                                                            <action selector="sortSelectedLines_AscT_CaseN_NumN:" target="-1" id="yUs-Zp-2TR"/>
+                                                        </connections>
+                                                    </menuItem>
+                                                    <menuItem title="Descending, Case Sensitive, Numeric" id="JQK-xo-yXS">
+                                                        <attributedString key="attributedTitle"/>
+                                                        <modifierMask key="keyEquivalentModifierMask"/>
+                                                        <connections>
+                                                            <action selector="sortSelectedLines_AscN_CaseT_NumT:" target="-1" id="GtX-0o-3W3"/>
+                                                        </connections>
+                                                    </menuItem>
+                                                    <menuItem title="Descending, Case Sensitive, Lexical" id="d9p-rZ-b5W">
+                                                        <attributedString key="attributedTitle"/>
+                                                        <modifierMask key="keyEquivalentModifierMask"/>
+                                                        <connections>
+                                                            <action selector="sortSelectedLines_AscN_CaseT_NumN:" target="-1" id="pA1-YJ-DtH"/>
+                                                        </connections>
+                                                    </menuItem>
+                                                    <menuItem title="Descending, Case Insensitive, Numeric" id="Czy-kY-gfr">
+                                                        <attributedString key="attributedTitle"/>
+                                                        <modifierMask key="keyEquivalentModifierMask"/>
+                                                        <connections>
+                                                            <action selector="sortSelectedLines_AscN_CaseN_NumT:" target="-1" id="kbk-e2-8Zm"/>
+                                                        </connections>
+                                                    </menuItem>
+                                                    <menuItem title="Descending, Case Insensitive, Lexical" id="iyx-hs-3oK">
+                                                        <attributedString key="attributedTitle"/>
+                                                        <modifierMask key="keyEquivalentModifierMask"/>
+                                                        <connections>
+                                                            <action selector="sortSelectedLines_AscN_CaseN_NumN:" target="-1" id="EBr-Gu-4JN"/>
+                                                        </connections>
+                                                    </menuItem>
+                                                </items>
+                                            </menu>
                                         </menuItem>
                                     </items>
                                 </menu>

@@ -48,6 +48,10 @@ enum KPrefKey {
     case editorUseYankPop
     case editorUseWordCompletion
     case editorShowCompletionMenu
+    
+    case editorSortLinesAscending
+    case editorSortLinesCasesensitive
+    case editorSortLinesNumeric
 
 
     // ============================
@@ -172,6 +176,12 @@ enum KPrefKey {
             return "editor.use_word_completion"
         case .editorShowCompletionMenu:
             return "editor.show_completion_menu"
+        case .editorSortLinesAscending:
+            return "editor.sort_lines_ascending"
+        case .editorSortLinesCasesensitive:
+            return "editor.sort_lines_casesensitive"
+        case .editorSortLinesNumeric:
+            return "editor.sort_lines_numeric"
 
         // ---- search window ----
         case .searchFieldFontSize:

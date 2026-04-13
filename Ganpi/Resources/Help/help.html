@@ -230,7 +230,7 @@ Ganpiはなるべくマウスを使わずに編集する方針のため、キャ
 <li>ブラッケトペア選択<br />
 1行の範囲内で、対になる括弧を選択します。括弧の外側(括弧を含む)と内側(括弧を含まない)の2通りの選択方法があります。selectOuterPair(Ganpi標準ではctrl+L)を呼び出すと、選択範囲が含まれるか、含まれるものがなければより右の対になる括弧の外側を選択します。selectInnerPair(Ganpi標準ではctrl+K)を呼び出すと、同様に内側を選択します。逆方向の動作も可能(selectOuterPairReverse - ctrl+shift+L, selectInnerPairReverse - ctrl+shift+K)です。対応する括弧は '...', &quot;...&quot;, (...), {...}, [...] です。&lt;...&gt;には対応していません。</li>
 <li>履歴ジャンプ機能<br />
-キャレットの位置が大きく移動した場合に移動元の位置が自動的に記録され、任意のタイミングでその履歴を辿ってキャレットを移動する機能ですundo機能やyank pop機能同様、履歴を前後して指定することができます。Edit/Markメニュー、またはjumpBackwardInHistory(Ganpi: ctrl+9, edit: ctrl+o), jumpForwardInHistory(Ganpi: ctrl+0, edit: ctrl+i)で動作します。履歴を表示する機能は実装されていません。</li>
+キャレットの位置が大きく移動した場合に移動元の位置が自動的に記録され、任意のタイミングでその履歴を辿ってキャレットを移動する機能です。undo機能やyank pop機能同様、履歴を前後して指定することができます。Edit/Markメニュー、またはjumpBackwardInHistory(Ganpi: ctrl+9, edit: ctrl+o), jumpForwardInHistory(Ganpi: ctrl+0, edit: ctrl+i)で動作します。履歴を表示する機能は実装されていません。</li>
 </ul>
 <p>
 この他、検索パネル・ミニ検索パネルもキャレットの移動に利用できます。

@@ -277,6 +277,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @IBAction func reloadPreferences(_ sender: Any?) {
         KPreference.shared.load()
         KKeyAssign.shared.load()
+        KApplicationState.shared.loadFromPreference()
 
         for doc in NSDocumentController.shared.documents {
             if let document = doc as? Document {

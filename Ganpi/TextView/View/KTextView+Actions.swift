@@ -369,38 +369,58 @@ extension KTextView {
     
     
     @IBAction func sortLines(_ sender: Any?) {
-        //sortSelectedLines(caseInsensitive: false, numeric: false, descending: false)
         sortSelectedLines()
     }
     
     @IBAction func sortSelectedLines_AscT_CaseT_NumT(_ sender: Any?) {
-        sortSelectedLines(options: [.caseInsensitive, .numeric], ascending: true)
+        setSortOptions(ascending: true, caseSensitive: true, numeric: true)
+        sortSelectedLines()
     }
     @IBAction func sortSelectedLines_AscT_CaseT_NumN(_ sender: Any?) {
-        sortSelectedLines(options: [.caseInsensitive], ascending: true)
+        setSortOptions(ascending: true, caseSensitive: true, numeric: false)
+        sortSelectedLines()
     }
     @IBAction func sortSelectedLines_AscT_CaseN_NumT(_ sender: Any?) {
-        sortSelectedLines(options: [.numeric], ascending: true)
+        setSortOptions(ascending: true, caseSensitive: false, numeric: true)
+        sortSelectedLines()
     }
     @IBAction func sortSelectedLines_AscT_CaseN_NumN(_ sender: Any?) {
-        sortSelectedLines(options: [], ascending: true)
+        setSortOptions(ascending: true, caseSensitive: false, numeric: false)
+        sortSelectedLines()
     }
     @IBAction func sortSelectedLines_AscN_CaseT_NumT(_ sender: Any?) {
-        sortSelectedLines(options: [.caseInsensitive, .numeric], ascending: false)
+        setSortOptions(ascending: false, caseSensitive: true, numeric: true)
+        sortSelectedLines()
     }
     @IBAction func sortSelectedLines_AscN_CaseT_NumN(_ sender: Any?) {
-        sortSelectedLines(options: [.caseInsensitive], ascending: false)
+        setSortOptions(ascending: false, caseSensitive: true, numeric: false)
+        sortSelectedLines()
     }
     @IBAction func sortSelectedLines_AscN_CaseN_NumT(_ sender: Any?) {
-        sortSelectedLines(options: [.numeric], ascending: false)
+        setSortOptions(ascending: false, caseSensitive: false, numeric: true)
+        sortSelectedLines()
     }
     @IBAction func sortSelectedLines_AscN_CaseN_NumN(_ sender: Any?) {
-        sortSelectedLines(options: [], ascending: false)
+        setSortOptions(ascending: false, caseSensitive: false, numeric: false)
+        sortSelectedLines()
     }
     
-    func sortSelectedLines(options: String.CompareOptions = [], ascending: Bool = true) {
+    private func setSortOptions(ascending: Bool, caseSensitive: Bool, numeric: Bool) {
+        let state = KApplicationState.shared
+        state.sortLinesAscending = ascending
+        state.sortLinesCaseSensitive = caseSensitive
+        state.sortLinesNumeric = numeric
+    }
+    
+    func sortSelectedLines() {
         let parags = textStorage.paragraphs
         let sel = selectionRange
+        let state = KApplicationState.shared
+        
+        let ascending = state.sortLinesAscending
+        var options: String.CompareOptions = []
+        if !state.sortLinesCaseSensitive { options.insert(.caseInsensitive) }
+        if state.sortLinesNumeric { options.insert(.numeric) }
 
         guard var paraRange = parags.paragraphIndexRange(containing: sel),
               !paraRange.isEmpty else { return }

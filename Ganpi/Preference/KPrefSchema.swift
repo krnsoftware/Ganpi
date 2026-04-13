@@ -64,6 +64,10 @@ struct KPrefSchema {
         "editor.use_word_completion"            : .init(type: .bool),
         "editor.show_completion_menu"           : .init(type: .bool),
         
+        "editor.sort_lines_ascending"           : .init(type: .bool),
+        "editor.sort_lines_casesensitive"       : .init(type: .bool),
+        "editor.sort_lines_numeric"             : .init(type: .bool),
+        
         
         // -----------------------------
         // search window
