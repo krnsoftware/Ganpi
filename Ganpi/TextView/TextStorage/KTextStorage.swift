@@ -249,7 +249,7 @@ final class KTextStorage: KTextStorageProtocol {
     
     // 行番号表示に使用するフォント。強調表示用。
     var lineNumberFontEmph: NSFont {
-        get { _lineNumberFont }
+        get { _lineNumberFontEmph }
         set {
             _lineNumberFontEmph = newValue
             _lineNumberCharacterMaxWidth = nil
