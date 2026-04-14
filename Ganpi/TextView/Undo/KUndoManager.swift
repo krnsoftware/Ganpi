@@ -111,13 +111,18 @@ final class KUndoManager {
         if _isPerformingUndoRedo { return }
         
         // delegateのdeleteBufferに削除される文字列を詰める。
-        
         if oldString.count >= 2, let delegate = (NSApp.delegate as? AppDelegate) {
             delegate.deleteBuffer = oldString
         }
 
-        // 新規編集が入る時点で Redo は無効
-        if !_redoStack.isEmpty { _redoStack.removeAll(keepingCapacity: true) }
+        // 新規編集が入る時点で Redo は無効。
+        // Redo側にぶら下がる blob もここで明示的に破棄する。
+        if !_redoStack.isEmpty {
+            for group in _redoStack {
+                cleanupBlobs(in: group)
+            }
+            _redoStack.removeAll(keepingCapacity: true)
+        }
 
         // ペイロードの格納方針を決める（大差分はblob）
         let now = CACurrentMediaTime()
@@ -166,12 +171,19 @@ final class KUndoManager {
 
     // MARK: - Undo / Redo
 
-    func undo() {
-        guard let storage = _storage else { NSSound.beep(); return }
+    @discardableResult
+    func undo() -> Bool {
+        guard let storage = _storage else {
+            NSSound.beep()
+            return false
+        }
 
         // 未確定グループも対象に含める（確定してから扱う）
         finalizePendingGroupIfNeeded()
-        guard !_undoStack.isEmpty else { NSSound.beep(); return }
+        guard !_undoStack.isEmpty else {
+            NSSound.beep()
+            return false
+        }
 
         _isPerformingUndoRedo = true
         defer { _isPerformingUndoRedo = false }
@@ -180,22 +192,32 @@ final class KUndoManager {
 
         // 取り消しは逆順で適用（rangeは編集前基準）
         for unit in group.units.reversed() {
-            // new の実際の文字列を解決
             let newStr = unit.newPayload.resolvedString(using: _blobStore)
             let oldStr = unit.oldPayload.resolvedString(using: _blobStore)
 
-            // 「編集後に存在している長さ」分を削って old に戻す
+            // KTextStorage の index は Character 単位で管理されている。
+            // そのため、undo 時に「現在そこに入っている new 側の長さ」を求めるには
+            // UTF-8 byteCount ではなく String.count を使う必要がある。
             let replaced = unit.range.lowerBound ..< (unit.range.lowerBound + newStr.count)
             _ = storage.replaceString(in: replaced, with: oldStr)
         }
 
         // Redo用に積み替え
         _redoStack.append(group)
+        return true
     }
+    
 
-    func redo() {
-        guard let storage = _storage else { NSSound.beep(); return }
-        guard !_redoStack.isEmpty else { NSSound.beep(); return }
+    @discardableResult
+    func redo() -> Bool {
+        guard let storage = _storage else {
+            NSSound.beep()
+            return false
+        }
+        guard !_redoStack.isEmpty else {
+            NSSound.beep()
+            return false
+        }
 
         _isPerformingUndoRedo = true
         defer { _isPerformingUndoRedo = false }
@@ -209,6 +231,7 @@ final class KUndoManager {
         }
 
         _undoStack.append(group)
+        return true
     }
 
     // MARK: - 内部：グルーピング
@@ -315,14 +338,4 @@ private extension String {
     }
 }
 
-// newPayloadの「文字数」に基づく置換長が必要な場合の補助（Character数でやるならStorage仕様に合わせて調整）
-private extension KUndoPayload {
-    func byteCountComputedAsCharactersCount(using store: KBlobStore) -> Int {
-        switch self {
-        case .inline(let s): return s.count
-        case .blob(let ref):
-            if let s = store.readString(ref: ref) { return s.count }
-            return 0
-        }
-    }
-}
+

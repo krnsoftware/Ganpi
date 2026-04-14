@@ -72,7 +72,6 @@ protocol KTextStorageCommon: AnyObject {
     
     // propaties.
     var baseFont: NSFont { get }
-    //var parser: KSyntaxParserProtocol { get }
     var parser: KSyntaxParser { get }
 
     // observers.
@@ -80,8 +79,11 @@ protocol KTextStorageCommon: AnyObject {
     func removeObserver(_ owner: AnyObject)
     
     // undo.
-    func undo()
-    func redo()
+    @discardableResult
+    func undo() -> Bool
+
+    @discardableResult
+    func redo() -> Bool
 }
 
 // 読み取り専用プロトコル
@@ -448,8 +450,12 @@ final class KTextStorage: KTextStorageProtocol {
     
     // MARK: - Undo functions
     
-    func undo() { _undoManager.undo() }
-    func redo() { _undoManager.redo() }
+    @discardableResult
+    func undo() -> Bool { _undoManager.undo() }
+
+    @discardableResult
+    func redo() -> Bool { _undoManager.redo() }
+
     func canUndo() -> Bool { return _undoManager.canUndo() }
     func canRedo() -> Bool { return _undoManager.canRedo() }
     func resetUndoHistory() { _undoManager.resetUndoHistory() }

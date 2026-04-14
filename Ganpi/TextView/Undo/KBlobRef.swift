@@ -14,8 +14,6 @@ import Foundation
 
 struct KBlobRef: Hashable {
     let path: String
-    let offset: Int
-    let length: Int
     let byteCount: Int
 }
 
@@ -42,9 +40,8 @@ final class KBlobStore {
         let name = UUID().uuidString + ".txtblob"
         let url = _baseURL.appendingPathComponent(name, isDirectory: false)
         do {
-            // 書き込み
             try data.write(to: url, options: [.atomic])
-            return KBlobRef(path: url.path, offset: 0, length: data.count, byteCount: data.count)
+            return KBlobRef(path: url.path, byteCount: data.count)
         } catch {
             NSLog("KBlobStore write failed: \(error.localizedDescription)")
             return nil
@@ -56,7 +53,6 @@ final class KBlobStore {
         let url = URL(fileURLWithPath: ref.path)
         do {
             let mapped = try Data(contentsOf: url, options: [.mappedIfSafe, .uncached])
-            // 範囲がファイル全体想定だが、将来オフセット/長さに対応可能
             return String(decoding: mapped, as: UTF8.self)
         } catch {
             NSLog("KBlobStore read failed: \(error.localizedDescription)")
