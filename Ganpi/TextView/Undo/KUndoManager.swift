@@ -109,11 +109,6 @@ final class KUndoManager {
     func register(range: Range<Int>, oldString: String, newString: String) {
         // Undo/Redo実行中は履歴を積まない
         if _isPerformingUndoRedo { return }
-        
-        // delegateのdeleteBufferに削除される文字列を詰める。
-        if oldString.count >= 2, let delegate = (NSApp.delegate as? AppDelegate) {
-            delegate.deleteBuffer = oldString
-        }
 
         // 新規編集が入る時点で Redo は無効。
         // Redo側にぶら下がる blob もここで明示的に破棄する。
@@ -134,7 +129,7 @@ final class KUndoManager {
         let unit = KUndoUnit(range: range, oldPayload: oldPayload, newPayload: newPayload, timeStamp: now)
         group.units.append(unit)
 
-        // メモリ使用量の更新（pending中も反映：上限超を早めに検知）
+        // ペイロード総量の更新（pending中も反映：上限超を早めに検知）
         _currentBytes &+= (oldPayload.byteCount + newPayload.byteCount)
 
         // 上限管理（最低1回Undo保証）
@@ -162,6 +157,10 @@ final class KUndoManager {
 
     func canRedo() -> Bool {
         return !_redoStack.isEmpty
+    }
+    
+    var isPerformingUndoRedo: Bool {
+        _isPerformingUndoRedo
     }
 
     func setByteLimitMB(_ mb: Int) {

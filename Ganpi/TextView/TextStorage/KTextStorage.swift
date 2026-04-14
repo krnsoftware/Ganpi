@@ -366,11 +366,26 @@ final class KTextStorage: KTextStorageProtocol {
             return false
         }
         
-        // undo. registering.
-        _undoManager.register(range: range, oldString: String(_characters[range]), newString: String(newCharacters))
+        let oldCharacters = Array(_characters[range])
         
-        // 改行の数が旧テキストと新テキストで異なれば_hardLineCountが変化する。
-        let oldReturnCount = _characters[range].filter { $0 == "\n" }.count
+        // 通常編集時の削除文字列を deleteBuffer に保存する。
+        // Undo/Redo 実行中の置換では保存しない。
+        if !_undoManager.isPerformingUndoRedo,
+           !range.isEmpty,
+           oldCharacters.count >= 2,
+           let delegate = (NSApp.delegate as? AppDelegate) {
+            delegate.deleteBuffer = String(oldCharacters)
+        }
+        
+        // undo registering.
+        _undoManager.register(
+            range: range,
+            oldString: String(oldCharacters),
+            newString: String(newCharacters)
+        )
+        
+        // 改行の数が旧テキストと新テキストで異なれば _hardLineCount が変化する。
+        let oldReturnCount = oldCharacters.filter { $0 == "\n" }.count
         let newReturnCount = newCharacters.filter { $0 == "\n" }.count
         if oldReturnCount != newReturnCount {
             _hardLineCount = nil
@@ -386,8 +401,8 @@ final class KTextStorage: KTextStorageProtocol {
         _parser.noteEdit(oldRange: range, newCount: newCharacters.count)
         
         // notification.
-        // let timer = KTimeChecker("observer")
-        notifyObservers(.textChanged(
+        notifyObservers(
+            .textChanged(
                 info: .init(
                     range: range,
                     insertedCount: newCharacters.count,
@@ -396,7 +411,6 @@ final class KTextStorage: KTextStorageProtocol {
                 )
             )
         )
-        //timer.stop()
         
         return true
     }
