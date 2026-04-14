@@ -64,6 +64,9 @@ final class KSyntaxParserRuby: KSyntaxParser {
 
     // “percent literal 全般”をスキップするための集合（誤検出防止に使う）
     private let _percentAllTypeBytes: [UInt8] = Array("qQwWiIsSxXrR".utf8)
+    
+    
+    override var lineCommentPrefix: String? { return "#" }
 
 
 
@@ -758,6 +761,7 @@ final class KSyntaxParserRuby: KSyntaxParser {
         return (outer: outer, inner: inner)
     }
 
+    
 
     
     // MARK: - Line scan
