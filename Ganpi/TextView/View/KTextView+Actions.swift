@@ -132,8 +132,10 @@ extension KTextView {
             return
         }
 
+        guard let engine = makePanelSearchEngine() else { log("searchEngine:nil", from: self); return }
         let anchor = targetRange.lowerBound ..< targetRange.lowerBound
-        guard let hit = search(for: .forward, anchorRange: anchor) else {
+
+        guard let hit = engine.search(in: textStorage.string, anchorRange: anchor, direction: .forward) else {
             defaults.set(prevUseRegex, forKey: KDefaultSearchKey.useRegex)
             NSSound.beep()
             return
@@ -145,10 +147,10 @@ extension KTextView {
             return
         }
 
-        let (_, replacedLength) = replaceAll(for: hit)
+        textStorage.replaceString(in: hit, with: cmd.replacement)
         defaults.set(prevUseRegex, forKey: KDefaultSearchKey.useRegex)
 
-        let caret = hit.lowerBound + replacedLength
+        let caret = hit.lowerBound + cmd.replacement.count
         selectionRange = caret ..< caret
     }
     

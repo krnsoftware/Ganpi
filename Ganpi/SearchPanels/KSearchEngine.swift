@@ -57,70 +57,74 @@ final class KSearchEngine {
         }
     }
     
+    // 与えられたtargetString内において、anchorRangeを起点として、direction方向に検索した結果を返す。
+    // anchorRangeと戻り値が一致していても気にせず返す。
+    // 正規表現検索などで^や$など長さ0の範囲の一致を連続で検索したい場合、searchAdvancingIfNeeded()を利用すること。
     func search(in targetString: String, anchorRange: Range<Int>, direction: KDirection) -> Range<Int>? {
         guard anchorRange.lowerBound >= 0, anchorRange.upperBound <= targetString.count else {
             return nil
         }
-
+        
         let searchRange: Range<Int>
-        let anchorPosition: Int
-
         switch direction {
         case .forward:
             searchRange = anchorRange.upperBound..<targetString.count
-            anchorPosition = anchorRange.upperBound
-
+            
         case .backward:
             searchRange = 0..<anchorRange.lowerBound
-            anchorPosition = anchorRange.lowerBound
         }
-
+        
         guard let nsSearchRange = nsRange(from: searchRange, in: targetString) else {
             return nil
         }
-
+        
         switch direction {
         case .forward:
-            var foundRange: Range<Int>?
-
-            _regex.enumerateMatches(in: targetString, options: [], range: nsSearchRange) { result, _, stop in
-                guard let result,
-                      let range = Range(result.range, in: targetString),
-                      let intRange = targetString.integerRange(from: range) else {
-                    return
-                }
-
-                // 0幅一致が現在位置そのものにある場合は飛ばす。
-                if intRange.isEmpty, intRange.lowerBound == anchorPosition {
-                    return
-                }
-
-                foundRange = intRange
-                stop.pointee = true
+            guard let match = _regex.firstMatch(in: targetString, options: [.withoutAnchoringBounds], range: nsSearchRange),
+                  let range = Range(match.range, in: targetString) else {
+                return nil
             }
-
-            return foundRange
-
+            return targetString.integerRange(from: range)
+            
         case .backward:
             var lastMatchRange: Range<Int>?
-
-            _regex.enumerateMatches(in: targetString, options: [], range: nsSearchRange) { result, _, _ in
+            _regex.enumerateMatches(in: targetString, options: [.withoutAnchoringBounds], range: nsSearchRange) { result, _, _ in
                 guard let result,
                       let range = Range(result.range, in: targetString),
                       let intRange = targetString.integerRange(from: range) else {
                     return
                 }
-
-                // 0幅一致が現在位置そのものにある場合は飛ばす。
-                if intRange.isEmpty, intRange.lowerBound == anchorPosition {
-                    return
-                }
-
                 lastMatchRange = intRange
             }
-
             return lastMatchRange
         }
+    }
+    
+    // searchとほぼ同じ仕様だが、戻り値がanchorそのもの(幅0)の場合に「次」を探す。
+    func searchAdvancingIfNeeded(in targetString: String, anchorRange: Range<Int>, direction: KDirection) -> Range<Int>? {
+        guard let firstHit = search(in: targetString, anchorRange: anchorRange, direction: direction) else {
+            return nil
+        }
+        
+        let anchorPosition: Int
+        switch direction {
+        case .forward:
+            anchorPosition = anchorRange.upperBound
+            
+        case .backward:
+            anchorPosition = anchorRange.lowerBound
+        }
+        
+        // 現在位置そのものの0幅一致でなければ、そのまま返す。
+        if !firstHit.isEmpty || firstHit.lowerBound != anchorPosition {
+            return firstHit
+        }
+        
+        guard let movedAnchorRange = advancedAnchorRange(in: targetString, anchorRange: anchorRange, direction: direction) else {
+            return nil
+        }
+        
+        return search(in: targetString, anchorRange: movedAnchorRange, direction: direction)
     }
     
     func containsMatch(in targetString: String, range: Range<Int>) -> Bool {
@@ -157,5 +161,23 @@ final class KSearchEngine {
             return nil
         }
         return NSRange(stringRange, in: targetString)
+    }
+    
+    private func advancedAnchorRange(in targetString: String, anchorRange: Range<Int>, direction: KDirection) -> Range<Int>? {
+        switch direction {
+        case .forward:
+            guard anchorRange.upperBound < targetString.count else {
+                return nil
+            }
+            let nextPosition = anchorRange.upperBound + 1
+            return nextPosition..<nextPosition
+            
+        case .backward:
+            guard anchorRange.lowerBound > 0 else {
+                return nil
+            }
+            let previousPosition = anchorRange.lowerBound - 1
+            return previousPosition..<previousPosition
+        }
     }
 }

@@ -1502,7 +1502,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
             NSSound.beep()
             return false
         }
-        guard let result = engine.search(in: textStorage.string, anchorRange: selectionRange, direction: direction) else {
+        guard let result = engine.searchAdvancingIfNeeded(in: textStorage.string, anchorRange: selectionRange, direction: direction) else {
             log("no result.", from: self)
             return false
         }
@@ -1517,7 +1517,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         guard let engine = makePanelSearchEngine() else {
             return nil
         }
-        return engine.search(in: textStorage.string, anchorRange: anchorRange, direction: direction)
+        return engine.searchAdvancingIfNeeded(in: textStorage.string, anchorRange: anchorRange, direction: direction)
     }
     
     @discardableResult
@@ -1628,7 +1628,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         return entry
     }
     
-    private func makePanelSearchEngine() -> KSearchEngine? {
+    func makePanelSearchEngine() -> KSearchEngine? {
         guard let entry = makePanelSearchEntry() else {
             return nil
         }
