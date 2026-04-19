@@ -116,7 +116,19 @@ extension KTextView {
 
             if count == 0 { return }
 
-            selectionRange = targetRange.lowerBound ..< (targetRange.lowerBound + length)
+            let caret: Int
+            switch cmd.target {
+            case "wholeDocument":
+                caret = 0
+
+            case "currentLine", "selection":
+                caret = targetRange.lowerBound + length
+
+            default:
+                caret = targetRange.lowerBound + length
+            }
+
+            selectionRange = caret ..< caret
             return
         }
 
@@ -136,9 +148,8 @@ extension KTextView {
         let (_, replacedLength) = replaceAll(for: hit)
         defaults.set(prevUseRegex, forKey: KDefaultSearchKey.useRegex)
 
-        if replacedLength == 0 { return }
-
-        selectionRange = hit.lowerBound ..< (hit.lowerBound + replacedLength)
+        let caret = hit.lowerBound + replacedLength
+        selectionRange = caret ..< caret
     }
     
     // MARK: - Command line (:g / :v) action
