@@ -103,17 +103,24 @@ extension KTextView {
             return
         }
 
-        let defaults = UserDefaults.standard
-        let prevUseRegex = defaults.bool(forKey: KDefaultSearchKey.useRegex)
-        defaults.set(true, forKey: KDefaultSearchKey.useRegex)
+        let entry = KSearchEntry(
+            searchString: cmd.pattern,
+            replaceString: cmd.replacement,
+            useRegex: true,
+            ignoreCase: UserDefaults.standard.bool(forKey: KDefaultSearchKey.ignoreCase)
+        )
 
-        KSearchPanel.shared.searchString = cmd.pattern
-        KSearchPanel.shared.replaceString = cmd.replacement
+        let engine: KSearchEngine
+        do {
+            engine = try KSearchEngine(entry: entry)
+        } catch {
+            log("searchString is invalid.", from: self)
+            NSSound.beep()
+            return
+        }
 
         if cmd.isGlobal {
-            let (count, length) = replaceAll(for: targetRange)
-            defaults.set(prevUseRegex, forKey: KDefaultSearchKey.useRegex)
-
+            let (count, length) = replaceAll(for: targetRange, entry: entry)
             if count == 0 { return }
 
             let caret: Int
@@ -132,23 +139,18 @@ extension KTextView {
             return
         }
 
-        guard let engine = makePanelSearchEngine() else { log("searchEngine:nil", from: self); return }
         let anchor = targetRange.lowerBound ..< targetRange.lowerBound
-
         guard let hit = engine.search(in: textStorage.string, anchorRange: anchor, direction: .forward) else {
-            defaults.set(prevUseRegex, forKey: KDefaultSearchKey.useRegex)
             NSSound.beep()
             return
         }
 
         guard hit.lowerBound >= targetRange.lowerBound, hit.upperBound <= targetRange.upperBound else {
-            defaults.set(prevUseRegex, forKey: KDefaultSearchKey.useRegex)
             NSSound.beep()
             return
         }
 
         textStorage.replaceString(in: hit, with: cmd.replacement)
-        defaults.set(prevUseRegex, forKey: KDefaultSearchKey.useRegex)
 
         let caret = hit.lowerBound + cmd.replacement.count
         selectionRange = caret ..< caret
