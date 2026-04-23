@@ -2256,7 +2256,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     // キーボードショートカットやメニューから機能を実行するためのメソッド。
     @objc func performUserActions(_ sender: Any?) {
         let actions: [KUserAction]?
-
+        
         if let menuItem = sender as? NSMenuItem {
             actions = menuItem.representedObject as? [KUserAction]
         } else if let actionsArg = sender as? [KUserAction] {
@@ -2264,13 +2264,25 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         } else {
             actions = nil
         }
-
+        
         guard let actions else { log("#01"); return }
-
+        
+        let shouldDisableSmoothScroll = KKeyAssign.shared.isRepeating
+        let savedIsSmoothScrollEnabled = _isSmoothScrollEnabled
+        
+        if shouldDisableSmoothScroll {
+            _isSmoothScrollEnabled = false
+        }
+        
+        defer {
+            if shouldDisableSmoothScroll {
+                _isSmoothScrollEnabled = savedIsSmoothScrollEnabled
+            }
+        }
+        
         for action in actions {
             switch action {
             case .selector(let name):
-                //log("SELECTOR: \(name)")
                 doCommand(by: Selector(name + ":"))
             case .command(let cmd):
                 guard let result = cmd.execute(for: textStorage, in: selectionRange) else { log("#02"); return }
@@ -2282,7 +2294,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
                 case .left: caretIndex = targetRange.lowerBound
                 case .right: caretIndex = targetRange.lowerBound + stringCount
                 case .select: selectionRange = targetRange.lowerBound..<targetRange.lowerBound + stringCount
-                    
                 }
             }
         }
