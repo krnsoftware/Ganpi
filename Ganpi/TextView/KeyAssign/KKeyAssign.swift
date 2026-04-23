@@ -81,6 +81,9 @@ class KKeyAssign {
     private weak var _pendingOwner: NSResponder? = nil
     private var _pendingOwnerID: ObjectIdentifier? = nil
     
+    private var _isRepeating: Bool = false
+    private var _repeatCountString: String = ""
+    
     private var mode: KEditMode {
         get { _mode }
         set {
@@ -96,11 +99,17 @@ class KKeyAssign {
     var hasStoredKeyStrokes: Bool { !_storedKeyStrokes.isEmpty }
     
     init() {
-        // Load bundled keymap on launch if present
-        /*if let path = Bundle.main.path(forResource: "keymap_ganpi", ofType: "ini") {
-            loadUserKeymap(at: URL(fileURLWithPath: path))
-        }*/
         load()
+    }
+    
+    var isRepeating: Bool {
+        get { _isRepeating }
+        set {
+            _isRepeating = newValue
+            if !newValue {
+                _repeatCountString = ""
+            }
+        }
     }
     
     func load() {
@@ -133,6 +142,7 @@ class KKeyAssign {
     
     func reset() {
         resetSequence()
+        resetRepeatCount()
         _pendingOwner = nil
         _pendingOwnerID = nil
     }
@@ -146,11 +156,17 @@ class KKeyAssign {
             resetPending()
             //log("Sequence buffer reset due to owner change")
         }
-        _pendingOwner   = requester
+        _pendingOwner = requester
         _pendingOwnerID = ObjectIdentifier(requester)
         self.mode = mode
         
-        // append
+        if _isRepeating, let numericValue = KKeyCode.numericRepresentation(of: key.keyCode) {
+            if _repeatCountString.count < 4 {
+                _repeatCountString.append(String(numericValue))
+            }
+            return .preserve
+        }
+        
         _storedKeyStrokes.append(key)
         
         var hasPrefix = false
@@ -158,8 +174,17 @@ class KKeyAssign {
         for shortcut in shortcuts {
             if shortcut.keys.starts(with: _storedKeyStrokes) {
                 if shortcut.keys.count == _storedKeyStrokes.count {
-                    executeActions(shortcut.actions)
+                    let wasRepeating = _isRepeating
+                    let repeatCount = currentRepeatCount
+                    
+                    executeActions(shortcut.actions, repeatCount: repeatCount)
                     resetSequence()
+                    
+                    // beginRepeatCountInput によって repeating が新規にオンになった場合は保持する。
+                    if wasRepeating {
+                        resetRepeatCount()
+                    }
+                    
                     return .execute
                 } else {
                     hasPrefix = true
@@ -171,9 +196,9 @@ class KKeyAssign {
             return .preserve
         }
         
-       resetSequence()
-       return (mode == .edit) ? .block : .passthrough
-        
+        resetSequence()
+        resetRepeatCount()
+        return (mode == .edit) ? .block : .passthrough
     }
     
     // MARK: - Helpers
@@ -182,18 +207,34 @@ class KKeyAssign {
         _pendingOwner = nil
         _pendingOwnerID = nil
         resetSequence()
+        resetRepeatCount()
     }
     
     private func resetSequence() {
         _storedKeyStrokes.removeAll()
     }
     
-    private func executeActions(_ actions: [KUserAction]) {
+    private func resetRepeatCount() {
+        _isRepeating = false
+        _repeatCountString = ""
+    }
+    
+    private var currentRepeatCount: Int {
+        guard let count = Int(_repeatCountString), (1...9999).contains(count) else {
+            return 1
+        }
+        return count
+    }
+    
+    private func executeActions(_ actions: [KUserAction], repeatCount: Int) {
         guard let owner = _pendingOwner else {
             log("No owner to receive actions")
             return
         }
-        owner.perform(#selector(KTextView.performUserActions(_:)), with: actions)
+        
+        for _ in 0..<repeatCount {
+            owner.perform(#selector(KTextView.performUserActions(_:)), with: actions)
+        }
     }
     
     

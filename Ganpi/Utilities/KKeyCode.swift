@@ -189,3 +189,23 @@ extension KKeyCode {
         "<semicolon>": KC.semicolon, "<comma>": KC.comma
     ]
 }
+
+
+extension KKeyCode {
+    
+    static func numericRepresentation(of keyCode: UInt16) -> Int? {
+        switch keyCode {
+        case n0, keypad0: return 0
+        case n1, keypad1: return 1
+        case n2, keypad2: return 2
+        case n3, keypad3: return 3
+        case n4, keypad4: return 4
+        case n5, keypad5: return 5
+        case n6, keypad6: return 6
+        case n7, keypad7: return 7
+        case n8, keypad8: return 8
+        case n9, keypad9: return 9
+        default: return nil
+        }
+    }
+}

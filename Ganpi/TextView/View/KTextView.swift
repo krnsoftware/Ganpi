@@ -2248,6 +2248,11 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     // キーアサインを無効にするためのダミー。
     @objc func disableKeyBinding(_ sender: Any?) { }
     
+    // 繰り返し実行開始のトリガー
+    @objc func beginRepeatCountInput(_ sender: Any?) {
+        KKeyAssign.shared.isRepeating = true
+    }
+    
     // キーボードショートカットやメニューから機能を実行するためのメソッド。
     @objc func performUserActions(_ sender: Any?) {
         let actions: [KUserAction]?
