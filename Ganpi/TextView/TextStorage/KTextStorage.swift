@@ -162,9 +162,9 @@ final class KTextStorage: KTextStorageProtocol {
         let handler: (KStorageModified) -> Void
     }
     
-
+    
     // MARK: - Properties
-
+    
     // data.
     private(set) var _characters: [Character] = []
     private var _observers: [KObserverEntry] = []
@@ -181,7 +181,7 @@ final class KTextStorage: KTextStorageProtocol {
     // propaties for appearances.
     private var _baseFont: NSFont = .monospacedSystemFont(ofSize: 12, weight: .regular)
     private var _lineNumberFont: NSFont =
-        NSFont(name: "Menlo-Regular", size: 11) ??
+    NSFont(name: "Menlo-Regular", size: 11) ??
         .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
     private var _lineNumberFontEmph: NSFont = NSFont(name: "Menlo-Bold", size: 11) ??
         .monospacedDigitSystemFont(ofSize: 11, weight: .bold)
@@ -196,9 +196,9 @@ final class KTextStorage: KTextStorageProtocol {
     
     // for undo.
     private lazy var _undoManager: KUndoManager = .init(with: self)
-
+    
     // MARK: - Public API
-
+    
     var count: Int { _characters.count }
     
     var string: String {
@@ -221,7 +221,7 @@ final class KTextStorage: KTextStorageProtocol {
     var skeletonString: KSkeletonString {
         get { _skeletonString }
     }
-
+    
     var baseFont: NSFont {
         get { _baseFont }
         set {
@@ -230,7 +230,7 @@ final class KTextStorage: KTextStorageProtocol {
             notifyColoringChanged(in: 0..<_characters.count)
         }
     }
-
+    
     var fontSize: CGFloat {
         get { _baseFont.pointSize }
         set {
@@ -271,7 +271,7 @@ final class KTextStorage: KTextStorageProtocol {
         if let cachedWidth = _lineNumberCharacterMaxWidth {
             return cachedWidth
         }
-
+        
         func maxDigitAdvance(for font: NSFont) -> CGFloat {
             let ctFont = font as CTFont
             var maxAdvanceWidth: CGFloat = 0
@@ -287,12 +287,12 @@ final class KTextStorage: KTextStorageProtocol {
             }
             return maxAdvanceWidth
         }
-
+        
         // 通常フォントと強調フォントの両方で確認し、最大値を採用
         let normalWidth = maxDigitAdvance(for: _lineNumberFont)
         let emphasizedWidth = maxDigitAdvance(for: _lineNumberFontEmph)
         let maxWidth = ceil(max(normalWidth, emphasizedWidth))
-
+        
         _lineNumberCharacterMaxWidth = maxWidth
         return maxWidth
     }
@@ -354,9 +354,9 @@ final class KTextStorage: KTextStorageProtocol {
     
     
     init() {
-                
+        
     }
-
+    
     // 最終的に全ての文字列の変更はこのメソッドを通じて行う。
     @discardableResult
     func replaceCharacters(in range: Range<Int>, with newCharacters: [Character]) -> Bool {
@@ -396,7 +396,7 @@ final class KTextStorage: KTextStorageProtocol {
         // replacement.
         _characters.replaceSubrange(range, with: newCharacters)
         _skeletonString.replaceCharacters(range, with: newCharacters)
-
+        
         // 構文カラーリングのパーサーに通す。
         _parser.noteEdit(oldRange: range, newCount: newCharacters.count)
         
@@ -419,22 +419,22 @@ final class KTextStorage: KTextStorageProtocol {
     func replaceString(in range: Range<Int>, with newString: String) -> Bool {
         replaceCharacters(in: range, with: Array(newString))
     }
-
+    
     @discardableResult
     func insertCharacters(_ newCharacters: [Character], at index: Int) -> Bool {
         replaceCharacters(in: index..<index, with: newCharacters)
     }
-
+    
     @discardableResult
     func insertCharacter(_ newCharacter: Character, at index: Int) -> Bool {
         insertCharacters([newCharacter], at: index)
     }
-
+    
     @discardableResult
     func insertString(_ newString: String, at index: Int) -> Bool {
         insertCharacters(Array(newString), at: index)
     }
-
+    
     @discardableResult
     func deleteCharacters(in range: Range<Int>) -> Bool {
         replaceCharacters(in: range, with: [])
@@ -466,10 +466,10 @@ final class KTextStorage: KTextStorageProtocol {
     
     @discardableResult
     func undo() -> Bool { _undoManager.undo() }
-
+    
     @discardableResult
     func redo() -> Bool { _undoManager.redo() }
-
+    
     func canUndo() -> Bool { return _undoManager.canUndo() }
     func canRedo() -> Bool { return _undoManager.canRedo() }
     func resetUndoHistory() { _undoManager.resetUndoHistory() }
@@ -488,7 +488,7 @@ final class KTextStorage: KTextStorageProtocol {
         let lineIndex = skeletonString.lineIndex(at: index)
         return skeletonString.lineRange(at: lineIndex)
     }
-
+    
     // rangeを内包する最初の行の行頭から最後の行の行末までの範囲を返す。最後の改行は含まない。
     func lineRange(in range: Range<Int>) -> Range<Int>? {
         guard range.lowerBound >= 0 && range.upperBound <= count else {
@@ -510,7 +510,7 @@ final class KTextStorage: KTextStorageProtocol {
         //_attributeVersion &+= 1
         notifyObservers(.colorChanged(range: range))
     }
-
+    
     
     // TextStorageのindexを含む単語を返す。
     // scape/tabの連続、日本語文字のクラスタ、パーサ毎の単語抽出、ASCII文字列境界の順に検証される。
@@ -592,12 +592,12 @@ final class KTextStorage: KTextStorageProtocol {
                           withoutColors: Bool = false) -> NSAttributedString? {
         // 1) Character slice (indices are character-based and match skeleton indices)
         guard let slice = self[range] else { return nil }
-
+        
         // 2) Detect tabs on skeleton and build output buffer with tab->space (except leading tabs)
         let skel = skeletonString.bytes(in: range) // 1 char == 1 byte ('a' for non-ASCII)
         var buffer: [Character] = []
         buffer.reserveCapacity(slice.count)
-
+        
         var leadingTabsDone = false
         var iSkel = skel.startIndex
         var iChar = slice.startIndex
@@ -617,7 +617,7 @@ final class KTextStorage: KTextStorageProtocol {
             slice.formIndex(after: &iChar)
             iSkel &+= 1
         }
-
+        
         // 3) Base attributes (font + default color + optional paragraph style)
         // カーニング等が有効だと、約物（例：「。」）の直後境界が後続文字で揺れることがあるため、
         // caret/offset の安定性を優先して明示的に無効化する。
@@ -632,21 +632,21 @@ final class KTextStorage: KTextStorageProtocol {
             ps.defaultTabInterval = CGFloat(tabWidth) * spaceAdvance
             baseAttrs[.paragraphStyle] = ps
         }
-
+        
         // 4) Build attributed string with base attributes
         let fullString = String(buffer)
         let mas = NSMutableAttributedString(string: fullString, attributes: baseAttrs)
-
+        
         // 5) Fast path: skip coloring entirely when requested (CTLine bootstrap, etc.)
         if withoutColors { return mas }
         
         // 5.5) Ensure parser state is up-to-date before applying colors
         _parser.ensureUpToDate(for: range)
-
+        
         // 6) Apply syntax spans (character-offset based)
         let spans = _parser.attributes(in: range, tabWidth: tabWidth ?? 0)
         guard !spans.isEmpty else { return mas }
-
+        
         @inline(__always)
         func nsRangeClipped(_ span: Range<Int>) -> NSRange? {
             let localLower = max(span.lowerBound - range.lowerBound, 0)
@@ -656,7 +656,7 @@ final class KTextStorage: KTextStorageProtocol {
             let e = fullString.index(fullString.startIndex, offsetBy: localUpper)
             return NSRange(s..<e, in: fullString)
         }
-
+        
         var applied = 0
         for s in spans {
             if let r = nsRangeClipped(s.range) {
@@ -664,7 +664,7 @@ final class KTextStorage: KTextStorageProtocol {
                 applied &+= 1
             }
         }
-
+        
         return mas
     }
     
@@ -675,7 +675,7 @@ final class KTextStorage: KTextStorageProtocol {
         _observers.removeAll { $0.owner === owner || $0.owner == nil }
         _observers.append(KObserverEntry(owner: owner, handler: handler))
     }
-
+    
     // 解除：owner 一致だけ除去
     func removeObserver(_ owner: AnyObject) {
         _observers.removeAll { $0.owner === owner || $0.owner == nil }
@@ -690,7 +690,7 @@ final class KTextStorage: KTextStorageProtocol {
         
         return (lineIndex + 1, index - lineRange.lowerBound + 1)
     }
-
+    
     
     func replaceParser(for type: KSyntaxType) {
         parser = type.makeParser(storage: self)
@@ -698,6 +698,10 @@ final class KTextStorage: KTextStorageProtocol {
     
     func resetInvisibleCharacters() {
         _invisibleCharacters = nil
+    }
+    
+    func loadPreferences() {
+        baseFont = KPreference.shared.font(.parserFont)
     }
     
     // MARK: - Range Comparison

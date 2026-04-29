@@ -1044,6 +1044,12 @@
       "selector": "uppercaseWordToEndOfWord",
       "scope": "TextView",
       "summary": "キャレット位置から単語末尾までを大文字に変換する。"
+    },
+    {
+      "selector": "beginRepeatCountInput",
+      "scope": "TextView",
+      "summary": "キーアサインの繰り返し機能を開始する。"
     }
+    
   ]
 }

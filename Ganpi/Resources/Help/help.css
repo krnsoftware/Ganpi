@@ -93,6 +93,21 @@ h1 {
   margin: 28px 0 34px;
 }
 
+.keylist {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 4px 12px;
+}
+
+.keylist dt {
+  margin: 0;
+  font-weight: bold;
+}
+
+.keylist dd {
+  margin: 0;
+}
+
 h2 {
   font-size: 1.35rem;
   margin: 0 0 12px;

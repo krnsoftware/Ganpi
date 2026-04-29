@@ -281,9 +281,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         for doc in NSDocumentController.shared.documents {
             if let document = doc as? Document {
-                // パーサを新しいものに入れ替える。
-                document.textStorage.replaceParser(for: document.syntaxType)
-                document.textStorage.resetInvisibleCharacters()
+                let storage = document.textStorage
+                storage.replaceParser(for: document.syntaxType)
+                storage.resetInvisibleCharacters()
+                storage.loadPreferences()
             }
         }
         
