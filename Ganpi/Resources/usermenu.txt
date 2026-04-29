@@ -1,9 +1,237 @@
 menu "User Menu"
-item "Paragraph"
-key "cmd+opt+p"
-command: tag[pre="<p>\n", post="\n</p>\n", will_select=right]
+  menu "HTML"
 
-item "Line Break"
-key "cmd+opt+b"
-command: tag[single="<br />\n", will_select=right]
+    menu "Entities"
+      item "Escape HTML/XML Entities"
+        command: escapeXmlEntityReferences
+
+      item "Unescape HTML/XML Entities"
+        command: unescapeXmlEntityReferences
+    end
+
+    menu "Inline"
+      item "Emphasis <em>"
+        command: tag[pre="<em>", post="</em>", will_select=all]
+
+      item "Strong <strong>"
+        command: tag[pre="<strong>", post="</strong>", will_select=all]
+
+      item "Code <code>"
+        command: tag[pre="<code>", post="</code>", will_select=all]
+
+      item "Link <a href=\"\">"
+        command: tag[pre="<a href=\"\">", post="</a>", will_select=right]
+    end
+
+    menu "Blocks"
+      item "Paragraph <p>"
+        command: tag[pre="<p>\n", post="\n</p>\n", single="<p>\n\n</p>\n", will_select=right]
+
+      item "Line Break <br />"
+        command: tag[single="<br />\n", will_select=right]
+
+      item "Block Quote <blockquote>"
+        command: tag[pre="<blockquote>\n", post="\n</blockquote>\n", will_select=all]
+
+      item "Preformatted <pre>"
+        command: tag[pre="<pre>\n", post="\n</pre>\n", will_select=all]
+
+      item "Comment Out <!-- -->"
+        command: tag[pre="<!--\n", post="\n-->\n", will_select=right]
+    end
+
+    menu "Lists"
+      item "Lines to <li>"
+        command: execute["sed 's|^|<li>|; s|$|</li>|'"]
+
+      item "Lines to <ul><li>...</li></ul>"
+        command: execute["awk 'BEGIN{print \"<ul>\"} {print \"<li>\" $0 \"</li>\"} END{print \"</ul>\"}'"]
+
+      item "Lines to <p>...</p>"
+        command: execute["sed 's|^|<p>|; s|$|</p>|'"]
+    end
+
+    menu "Structure"
+      item "HTML Skeleton"
+        command: insert["<!doctype html>\n<html lang=\"\">\n<head>\n  <meta charset=\"utf-8\">\n  <title></title>\n</head>\n<body>\n\n</body>\n</html>\n"]
+
+      item "Section Template"
+        command: insert["<section id=\"\">\n  <h2></h2>\n  <p>\n\n  </p>\n</section>\n"]
+
+      item "Image <img ... />"
+        command: insert["<img src=\"\" alt=\"\" />"]
+
+      item "Stylesheet Link"
+        command: insert["<link rel=\"stylesheet\" href=\"\" type=\"text/css\" />\n"]
+    end
+
+  end
+
+  menu "Markdown"
+
+    menu "Inline"
+      item "Emphasis *...*"
+        command: tag[pre="*", post="*", will_select=all]
+
+      item "Strong **...**"
+        command: tag[pre="**", post="**", will_select=all]
+
+      item "Inline Code `...`"
+        command: tag[pre="`", post="`", will_select=all]
+
+      item "Link [text](url)"
+        command: tag[pre="[", post="](url)", will_select=all]
+    end
+
+    menu "Blocks"
+      item "Heading #"
+        command: tag[pre="# ", single="# ", will_select=right]
+
+      item "Heading ##"
+        command: tag[pre="## ", single="## ", will_select=right]
+
+      item "Block Quote"
+        command: execute["sed 's|^|> |'"]
+
+      item "Code Fence"
+        command: tag[pre="```\n", post="\n```", single="```\n\n```", will_select=right]
+    end
+
+    menu "Lists"
+      item "Lines to Bullet List"
+        command: execute["sed 's|^|- |'"]
+
+      item "Lines to Numbered List"
+        command: execute["awk '{print NR \". \" $0}'"]
+
+      item "Task List"
+        command: execute["sed 's|^|- [ ] |'"]
+    end
+
+    menu "Structure"
+      item "Table Skeleton"
+        command: insert["| Column 1 | Column 2 |\n| --- | --- |\n|  |  |\n"]
+
+      item "Section Template"
+        command: insert["## Section\n\nParagraph.\n"]
+    end
+
+  end
+
+  menu "Ruby"
+
+    menu "Blocks"
+      item "if ... end"
+        command: tag[pre="if ", post="\nend", single="if condition\n\nend", will_select=right]
+
+      item "unless ... end"
+        command: tag[pre="unless ", post="\nend", single="unless condition\n\nend", will_select=right]
+
+      item "do ... end"
+        command: tag[pre="do\n", post="\nend", single="do\n\nend", will_select=right]
+
+      item "begin ... end"
+        command: tag[pre="begin\n", post="\nend", will_select=all]
+
+      item "class ... end"
+        command: insert["class ClassName\n\nend\n"]
+
+      item "module ... end"
+        command: insert["module ModuleName\n\nend\n"]
+
+      item "def ... end"
+        command: insert["def method_name\n\nend\n"]
+    end
+
+    menu "Strings"
+      item "Double Quote"
+        command: tag[pre="\"", post="\"", will_select=all]
+
+      item "Single Quote"
+        command: tag[pre="'", post="'", will_select=all]
+
+      item "Interpolation #{...}"
+        command: tag[pre="#{", post="}", will_select=all]
+
+      item "Percent String %Q()"
+        command: tag[pre="%Q(", post=")", will_select=all]
+
+      item "Array Literal %w()"
+        command: tag[pre="%w(", post=")", will_select=all]
+    end
+
+    menu "Comments"
+      item "Comment Out Lines"
+        command: execute["sed 's|^|# |'"]
+
+      item "Begin/End Comment Block"
+        command: tag[pre="=begin\n", post="\n=end", will_select=all]
+    end
+
+    menu "Templates"
+      item "each do |item|"
+        command: insert["each do |item|\n\nend\n"]
+
+      item "times do |i|"
+        command: insert["times do |i|\n\nend\n"]
+
+      item "RSpec describe"
+        command: insert["RSpec.describe \"\" do\n\nend\n"]
+    end
+
+  end
+
+  menu "Shell"
+
+    menu "Quotes"
+      item "Single Quote"
+        command: tag[pre="'", post="'", will_select=all]
+
+      item "Double Quote"
+        command: tag[pre="\"", post="\"", will_select=all]
+
+      item "Command Substitution \$(...)"
+        command: tag[pre="$(", post=")", will_select=all]
+
+      item "Variable \${...}"
+        command: tag[pre="${", post="}", will_select=all]
+    end
+
+    menu "Blocks"
+      item "if ... fi"
+        command: insert["if [ condition ]; then\n\nfi\n"]
+
+      item "for ... do ... done"
+        command: insert["for item in ; do\n\ndone\n"]
+
+      item "while ... do ... done"
+        command: insert["while condition; do\n\ndone\n"]
+
+      item "case ... esac"
+        command: insert["case \"$1\" in\n  *)\n    ;;\nesac\n"]
+    end
+
+    menu "Lines"
+      item "Comment Out Lines"
+        command: execute["sed 's|^|# |'"]
+
+      item "Prefix with sudo "
+        command: execute["sed 's|^|sudo |'"]
+
+      item "Append ;"
+        command: execute["sed 's|$|;|'"]
+    end
+
+    menu "Templates"
+      item "Shell Script Skeleton"
+        command: insert["#!/bin/sh\n\n"]
+
+      item "Shell Script with Strict Mode"
+        command: insert["#!/bin/sh\nset -eu\n\n"]
+
+      item "printf '%s\\n'"
+        command: insert["printf '%s\\n' \"\"\n"]
+    end
+
+  end
 end
