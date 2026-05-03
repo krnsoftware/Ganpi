@@ -35,7 +35,7 @@ struct KCommandResult {
 
 struct KCommandOptions {    
     var caret: KPostProcessingCaretPosition = .right
-    var target: KTextEditingTarget = .auto
+    var target: KTextEditingTarget = .selection
     var timeout: Float = 5.0
     var extras: [String: String] = [:]
 }
