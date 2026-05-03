@@ -366,11 +366,6 @@
       "summary": "選択範囲を含むParagraphを1行に繋げる。"
     },
     {
-      "selector": "jumpToMarkedCaretIndexAndReset",
-      "scope": "TextView",
-      "summary": "現在のキャレット位置をマークし、前回のマークされたキャレット位置にジャンプする。"
-    },
-    {
       "selector": "katakanaToHiragana",
       "scope": "TextView",
       "summary": "カタカナをひらがなに変換する。"
@@ -704,11 +699,6 @@
       "selector": "setCompletionModeOn",
       "scope": "TextView",
       "summary": "語彙補完モードをオンにする。"
-    },
-    {
-      "selector": "setMarkedCaretIndex",
-      "scope": "TextView",
-      "summary": "現在の位置をマークする。"
     },
     {
       "selector": "setSearchDirectionToBackward",
@@ -1049,6 +1039,16 @@
       "selector": "beginRepeatCountInput",
       "scope": "TextView",
       "summary": "キーアサインの繰り返し機能を開始する。"
+    },
+    {
+      "selector": "escapeXmlEntityReferences",
+      "scope": "TextView",
+      "summary": "XMLの特殊文字を実体参照に変換する。"
+    },
+    {
+      "selector": "unescapeXmlEntityReferences",
+      "scope": "TextView",
+      "summary": "XML実体参照を元の文字に戻す。"
     }
     
   ]

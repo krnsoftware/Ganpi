@@ -221,8 +221,81 @@
     <key>NSDocumentClass</key>
     <string>$(PRODUCT_MODULE_NAME).Document</string>
   </dict>
-        
-  <!-- 10) INI -->
+  
+  <!-- 10) Ruby -->
+  <dict>
+    <key>CFBundleTypeName</key>
+    <string>Ruby</string>
+    <key>CFBundleTypeRole</key>
+    <string>Editor</string>
+    <key>LSHandlerRank</key>
+    <string>Default</string>
+    <key>CFBundleTypeExtensions</key>
+    <array>
+      <string>rb</string>
+      <string>rake</string>
+      <string>ru</string>
+      <string>erb</string>
+      <string>gemspec</string>
+    </array>
+    <key>LSItemContentTypes</key>
+    <array>
+      <string>public.ruby-script</string>
+      <string>public.script</string>
+      <string>public.source-code</string>
+      <string>public.text</string>
+    </array>
+    <key>NSDocumentClass</key>
+    <string>$(PRODUCT_MODULE_NAME).Document</string>
+  </dict>
+
+  <!-- 11) Python -->
+  <dict>
+    <key>CFBundleTypeName</key>
+    <string>Python</string>
+    <key>CFBundleTypeRole</key>
+    <string>Editor</string>
+    <key>LSHandlerRank</key>
+    <string>Default</string>
+    <key>CFBundleTypeExtensions</key>
+    <array>
+      <string>py</string>
+      <string>pyw</string>
+    </array>
+    <key>LSItemContentTypes</key>
+    <array>
+      <string>public.python-script</string>
+      <string>public.script</string>
+      <string>public.source-code</string>
+      <string>public.text</string>
+    </array>
+    <key>NSDocumentClass</key>
+    <string>$(PRODUCT_MODULE_NAME).Document</string>
+  </dict>
+
+  <!-- 12) CSS -->
+  <dict>
+    <key>CFBundleTypeName</key>
+    <string>CSS</string>
+    <key>CFBundleTypeRole</key>
+    <string>Editor</string>
+    <key>LSHandlerRank</key>
+    <string>Default</string>
+    <key>CFBundleTypeExtensions</key>
+    <array>
+      <string>css</string>
+    </array>
+    <key>LSItemContentTypes</key>
+    <array>
+      <string>public.css</string>
+      <string>public.source-code</string>
+      <string>public.text</string>
+    </array>
+    <key>NSDocumentClass</key>
+    <string>$(PRODUCT_MODULE_NAME).Document</string>
+  </dict>
+  
+  <!-- 13) INI -->
   <dict>
     <key>CFBundleTypeName</key>
     <string>INI Configuration File</string>

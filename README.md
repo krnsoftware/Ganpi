@@ -23,7 +23,7 @@ Ganpi also provides several distinctive editing features: **Grid Jump**, which m
 
 Alongside these, Ganpi includes the core capabilities expected of a modern plain-text editor: automatic detection of text encoding, line endings, and document type; unlimited undo/redo; syntax coloring and outline menus for supported languages; and word completion.
 
-**Supported macOS:** 14+ (Sonoma)
+**Supported macOS:** 14.6 or later
 **Web Site:** https://drycarbon.com/ganpi/index.html
 
 Ganpi is a macOS-only application written in Swift. It is structured as a Cocoa document-based application, but uses custom TextView and TextStorage components designed specifically for text editing.
