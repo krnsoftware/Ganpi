@@ -36,7 +36,7 @@ extension KTextView {
         replace()
     }
     
-    @IBAction func replaceAndFindeAgainAction(_ sender: Any?) {
+    @IBAction func replaceAndFindAgainAction(_ sender: Any?) {
         replace()
         search(for: .forward)
     }
@@ -1505,7 +1505,7 @@ extension KTextView {
     
     //MARK: - Show Information (insert to Log Window)
     
-    @IBAction func showInfomation(_ sender: Any?) {
+    @IBAction func showInformation(_ sender: Any?) {
         let klog = KLog.shared
         
         let totalChars = textStorage.count.formatted(.number.locale(.init(identifier: "en_US")))

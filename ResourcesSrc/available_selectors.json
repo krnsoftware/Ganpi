@@ -611,7 +611,7 @@
       "summary": "全置換を実行する。"
     },
     {
-      "selector": "replaceAndFindeAgainAction",
+      "selector": "replaceAndFindAgainAction",
       "scope": "TextView",
       "summary": "選択範囲を置換してから更に検索する。"
     },
@@ -746,7 +746,7 @@
       "summary": "カラーパネルを表示する。"
     },
     {
-      "selector": "showInfomation",
+      "selector": "showInformation",
       "scope": "TextView",
       "summary": "情報ウインドウを表示する。"
     },
@@ -763,42 +763,42 @@
     {
       "selector": "sortSelectedLines_AscN_CaseN_NumN",
       "scope": "TextView",
-      "summary": "Sort selected lines asc n case n num n."
+      "summary": "Sort selected lines: Descending, Case Insensitive, Lexical"
     },
     {
       "selector": "sortSelectedLines_AscN_CaseN_NumT",
       "scope": "TextView",
-      "summary": "Sort selected lines asc n case n num t."
+      "summary": "Sort selected lines: Descending, Case Insensitive, Numeric"
     },
     {
       "selector": "sortSelectedLines_AscN_CaseT_NumN",
       "scope": "TextView",
-      "summary": "Sort selected lines asc n case t num n."
+      "summary": "Sort selected lines: Descending, Case Sensitive, Lexical"
     },
     {
       "selector": "sortSelectedLines_AscN_CaseT_NumT",
       "scope": "TextView",
-      "summary": "Sort selected lines asc n case t num t."
+      "summary": "Sort selected lines: Descending, Case Sensitive, Numeric"
     },
     {
       "selector": "sortSelectedLines_AscT_CaseN_NumN",
       "scope": "TextView",
-      "summary": "Sort selected lines asc t case n num n."
+      "summary": "Sort selected lines: Ascending, Case Insensitive, Lexical"
     },
     {
       "selector": "sortSelectedLines_AscT_CaseN_NumT",
       "scope": "TextView",
-      "summary": "Sort selected lines asc t case n num t."
+      "summary": "Sort selected lines: Ascending, Case Insensitive, Numeric"
     },
     {
       "selector": "sortSelectedLines_AscT_CaseT_NumN",
       "scope": "TextView",
-      "summary": "Sort selected lines asc t case t num n."
+      "summary": "Sort selected lines: Ascending, Case Sensitive, Lexical"
     },
     {
       "selector": "sortSelectedLines_AscT_CaseT_NumT",
       "scope": "TextView",
-      "summary": "Sort selected lines asc t case t num t."
+      "summary": "Sort selected lines: Ascending, Case Sensitive, Numeric"
     },
     {
       "selector": "storeSelectionRange",

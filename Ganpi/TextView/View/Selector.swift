@@ -17,16 +17,16 @@ extension Selector {
         self == #selector(KTextView.moveUpAndModifySelection(_:)) ||
         self == #selector(KTextView.moveDownAndModifySelection(_:)) ||
         self == #selector(KTextView.pageUp(_:)) ||
-        self == #selector(KTextView.pageDown(_:)) ||
-        self == #selector(KTextView.pageUpAndModifySelection(_:)) ||
-        self == #selector(KTextView.pageDownAndModifySelection(_:))
+        self == #selector(KTextView.pageDown(_:))// ||
+        //self == #selector(KTextView.pageUpAndModifySelection(_:)) ||
+        //self == #selector(KTextView.pageDownAndModifySelection(_:))
     }
     
     var isVerticalActionWithModifierSelection: Bool {
         return self == #selector(KTextView.moveUpAndModifySelection(_:)) ||
-        self == #selector(KTextView.moveDownAndModifySelection(_:)) ||
-        self == #selector(KTextView.pageUpAndModifySelection(_:)) ||
-        self == #selector(KTextView.pageDownAndModifySelection(_:)) 
+        self == #selector(KTextView.moveDownAndModifySelection(_:))// ||
+        //self == #selector(KTextView.pageUpAndModifySelection(_:)) ||
+        //self == #selector(KTextView.pageDownAndModifySelection(_:))
     }
     
     var isHorizontalAction: Bool {
@@ -107,8 +107,8 @@ extension Selector {
     var isModifySelectionAction: Bool {
         return self == #selector(KTextView.moveUpAndModifySelection(_:)) ||
         self == #selector(KTextView.moveDownAndModifySelection(_:)) ||
-        self == #selector(KTextView.pageUpAndModifySelection(_:)) ||
-        self == #selector(KTextView.pageDownAndModifySelection(_:)) ||
+        //self == #selector(KTextView.pageUpAndModifySelection(_:)) ||
+        //self == #selector(KTextView.pageDownAndModifySelection(_:)) ||
         self == #selector(KTextView.moveLeftAndModifySelection(_:)) ||
         self == #selector(KTextView.moveRightAndModifySelection(_:)) ||
         self == #selector(KTextView.moveWordLeftAndModifySelection(_:)) ||
