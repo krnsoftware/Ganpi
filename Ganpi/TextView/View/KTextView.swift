@@ -4041,7 +4041,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         }
         
         caretIndex = targetIndex
-        scrollCaretToVisible()
+        centerSelectionInVisibleArea(self)
         _jumpHistory.finishNavigation()
     }
     
@@ -4052,7 +4052,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         }
         
         caretIndex = targetIndex
-        scrollCaretToVisible()
+        centerSelectionInVisibleArea(self)
         _jumpHistory.finishNavigation()
     }
     
