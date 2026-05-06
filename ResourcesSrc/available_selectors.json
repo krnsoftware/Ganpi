@@ -226,7 +226,7 @@
       "summary": "選択範囲を表示領域の中央に移動する。"
     },
     {
-      "selector": "collapseEmptyLines",
+      "selector": "collapseEmptyParagraphs",
       "scope": "TextView",
       "summary": "連続した空行を1つにまとめる。"
     },
@@ -251,7 +251,7 @@
       "summary": "文末方向に1文字削除する。"
     },
     {
-      "selector": "deleteLines",
+      "selector": "deleteParagraphs",
       "scope": "TextView",
       "summary": "選択範囲を含むParagraphを全て削除する。"
     },
@@ -301,7 +301,7 @@
       "summary": "NFKCに変換する。"
     },
     {
-      "selector": "duplicateLines",
+      "selector": "duplicateParagraphs",
       "scope": "TextView",
       "summary": "Paragraphを複製する。"
     },
@@ -361,7 +361,7 @@
       "summary": "UUIDを挿入する。"
     },
     {
-      "selector": "joinLines",
+      "selector": "joinParagraphs",
       "scope": "TextView",
       "summary": "選択範囲を含むParagraphを1行に繋げる。"
     },
@@ -406,12 +406,12 @@
       "summary": "1文字左まで選択範囲を広げる。"
     },
     {
-      "selector": "moveLineDown",
+      "selector": "moveParagraphDown",
       "scope": "TextView",
       "summary": "Paragraph全体を下に移動する。"
     },
     {
-      "selector": "moveLineUp",
+      "selector": "moveParagraphUp",
       "scope": "TextView",
       "summary": "Paragraph全体を上に移動する。"
     },
@@ -746,47 +746,47 @@
       "summary": "ミニ検索ウインドウを表示する。"
     },
     {
-      "selector": "sortLines",
+      "selector": "sortParagraphs",
       "scope": "TextView",
       "summary": "Paragraphをソートする。"
     },
     {
-      "selector": "sortSelectedLines_AscN_CaseN_NumN",
+      "selector": "sortSelectedParagraphs_AscN_CaseN_NumN",
       "scope": "TextView",
       "summary": "Sort selected lines: Descending, Case Insensitive, Lexical"
     },
     {
-      "selector": "sortSelectedLines_AscN_CaseN_NumT",
+      "selector": "sortSelectedParagraphs_AscN_CaseN_NumT",
       "scope": "TextView",
       "summary": "Sort selected lines: Descending, Case Insensitive, Numeric"
     },
     {
-      "selector": "sortSelectedLines_AscN_CaseT_NumN",
+      "selector": "sortSelectedParagraphs_AscN_CaseT_NumN",
       "scope": "TextView",
       "summary": "Sort selected lines: Descending, Case Sensitive, Lexical"
     },
     {
-      "selector": "sortSelectedLines_AscN_CaseT_NumT",
+      "selector": "sortSelectedParagraphs_AscN_CaseT_NumT",
       "scope": "TextView",
       "summary": "Sort selected lines: Descending, Case Sensitive, Numeric"
     },
     {
-      "selector": "sortSelectedLines_AscT_CaseN_NumN",
+      "selector": "sortSelectedParagraphs_AscT_CaseN_NumN",
       "scope": "TextView",
       "summary": "Sort selected lines: Ascending, Case Insensitive, Lexical"
     },
     {
-      "selector": "sortSelectedLines_AscT_CaseN_NumT",
+      "selector": "sortSelectedParagraphs_AscT_CaseN_NumT",
       "scope": "TextView",
       "summary": "Sort selected lines: Ascending, Case Insensitive, Numeric"
     },
     {
-      "selector": "sortSelectedLines_AscT_CaseT_NumN",
+      "selector": "sortSelectedParagraphs_AscT_CaseT_NumN",
       "scope": "TextView",
       "summary": "Sort selected lines: Ascending, Case Sensitive, Lexical"
     },
     {
-      "selector": "sortSelectedLines_AscT_CaseT_NumT",
+      "selector": "sortSelectedParagraphs_AscT_CaseT_NumT",
       "scope": "TextView",
       "summary": "Sort selected lines: Ascending, Case Sensitive, Numeric"
     },
@@ -846,12 +846,12 @@
       "summary": "Undoする。"
     },
     {
-      "selector": "uniqueLinesKeepFirst",
+      "selector": "uniqueParagraphsKeepFirst",
       "scope": "TextView",
       "summary": "重複行を削除。先に出現したものを残す。"
     },
     {
-      "selector": "uniqueLinesKeepLast",
+      "selector": "uniqueParagraphsKeepLast",
       "scope": "TextView",
       "summary": "重複行を削除。後に出現したものを残す。"
     },

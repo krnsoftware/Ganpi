@@ -301,15 +301,15 @@ extension KTextView {
     
     // MARK: - Move Line Up / Down
     
-    @IBAction func moveLineUp(_ sender: Any?) {
-        moveLineVertically(direction: .backward)
+    @IBAction func moveParagraphUp(_ sender: Any?) {
+        moveParagraphVertically(direction: .backward)
     }
     
-    @IBAction func moveLineDown(_ sender: Any?) {
-        moveLineVertically(direction: .forward)
+    @IBAction func moveParagraphDown(_ sender: Any?) {
+        moveParagraphVertically(direction: .forward)
     }
     
-    private func moveLineVertically(direction: KDirection) {
+    private func moveParagraphVertically(direction: KDirection) {
         guard let range = textStorage.lineRange(in: selectionRange) else { log("out of range.", from: self); return }
         if range.isEmpty { return }
         if direction == .backward && range.lowerBound == 0 { return }
@@ -338,7 +338,7 @@ extension KTextView {
     
     // MARK: - Delete Lines / Duplicate Lines
     
-    @IBAction func deleteLines(_ sender: Any?) {
+    @IBAction func deleteParagraphs(_ sender: Any?) {
         let parags = textStorage.paragraphs
         guard let indexRange = parags.paragraphIndexRange(containing: selectionRange),
               !indexRange.isEmpty else { log("1", from: self); return }
@@ -358,7 +358,7 @@ extension KTextView {
         selectionRange = deleteRange.lowerBound ..< deleteRange.lowerBound
     }
     
-    @IBAction func duplicateLines(_ sender: Any?) {
+    @IBAction func duplicateParagraphs(_ sender: Any?) {
         let parags = textStorage.paragraphs
         guard let indexRange = parags.paragraphIndexRange(containing: selectionRange),
               !indexRange.isEmpty else { log("1", from: self); return }
@@ -383,41 +383,41 @@ extension KTextView {
     // MARK: - Sort Lines
     
     
-    @IBAction func sortLines(_ sender: Any?) {
-        sortSelectedLines()
+    @IBAction func sortParagraphs(_ sender: Any?) {
+        sortSelectedParagraphs()
     }
     
-    @IBAction func sortSelectedLines_AscT_CaseT_NumT(_ sender: Any?) {
+    @IBAction func sortSelectedParagraphs_AscT_CaseT_NumT(_ sender: Any?) {
         setSortOptions(ascending: true, caseSensitive: true, numeric: true)
-        sortSelectedLines()
+        sortSelectedParagraphs()
     }
-    @IBAction func sortSelectedLines_AscT_CaseT_NumN(_ sender: Any?) {
+    @IBAction func sortSelectedParagraphs_AscT_CaseT_NumN(_ sender: Any?) {
         setSortOptions(ascending: true, caseSensitive: true, numeric: false)
-        sortSelectedLines()
+        sortSelectedParagraphs()
     }
-    @IBAction func sortSelectedLines_AscT_CaseN_NumT(_ sender: Any?) {
+    @IBAction func sortSelectedParagraphs_AscT_CaseN_NumT(_ sender: Any?) {
         setSortOptions(ascending: true, caseSensitive: false, numeric: true)
-        sortSelectedLines()
+        sortSelectedParagraphs()
     }
-    @IBAction func sortSelectedLines_AscT_CaseN_NumN(_ sender: Any?) {
+    @IBAction func sortSelectedParagraphs_AscT_CaseN_NumN(_ sender: Any?) {
         setSortOptions(ascending: true, caseSensitive: false, numeric: false)
-        sortSelectedLines()
+        sortSelectedParagraphs()
     }
-    @IBAction func sortSelectedLines_AscN_CaseT_NumT(_ sender: Any?) {
+    @IBAction func sortSelectedParagraphs_AscN_CaseT_NumT(_ sender: Any?) {
         setSortOptions(ascending: false, caseSensitive: true, numeric: true)
-        sortSelectedLines()
+        sortSelectedParagraphs()
     }
-    @IBAction func sortSelectedLines_AscN_CaseT_NumN(_ sender: Any?) {
+    @IBAction func sortSelectedParagraphs_AscN_CaseT_NumN(_ sender: Any?) {
         setSortOptions(ascending: false, caseSensitive: true, numeric: false)
-        sortSelectedLines()
+        sortSelectedParagraphs()
     }
-    @IBAction func sortSelectedLines_AscN_CaseN_NumT(_ sender: Any?) {
+    @IBAction func sortSelectedParagraphs_AscN_CaseN_NumT(_ sender: Any?) {
         setSortOptions(ascending: false, caseSensitive: false, numeric: true)
-        sortSelectedLines()
+        sortSelectedParagraphs()
     }
-    @IBAction func sortSelectedLines_AscN_CaseN_NumN(_ sender: Any?) {
+    @IBAction func sortSelectedParagraphs_AscN_CaseN_NumN(_ sender: Any?) {
         setSortOptions(ascending: false, caseSensitive: false, numeric: false)
-        sortSelectedLines()
+        sortSelectedParagraphs()
     }
     
     private func setSortOptions(ascending: Bool, caseSensitive: Bool, numeric: Bool) {
@@ -427,7 +427,7 @@ extension KTextView {
         state.sortLinesNumeric = numeric
     }
     
-    func sortSelectedLines() {
+    func sortSelectedParagraphs() {
         let parags = textStorage.paragraphs
         let sel = selectionRange
         let state = KApplicationState.shared
@@ -472,18 +472,18 @@ extension KTextView {
     // MARK: - Unique Lines
     
     // 先勝ち：最初の出現を残して重複行を削除
-    @IBAction func uniqueLinesKeepFirst(_ sender: Any?) {
-        uniqueSelectedLines(keepLast: false)
+    @IBAction func uniqueParagraphsKeepFirst(_ sender: Any?) {
+        uniqueSelectedParagraphs(keepLast: false)
     }
     
     // 後勝ち：最後の出現を残して重複行を削除
-    @IBAction func uniqueLinesKeepLast(_ sender: Any?) {
-        uniqueSelectedLines(keepLast: true)
+    @IBAction func uniqueParagraphsKeepLast(_ sender: Any?) {
+        uniqueSelectedParagraphs(keepLast: true)
     }
     
     // 選択範囲にかかる段落の重複を削除する（順序は維持）
     // - Parameter keepLast: true で最後の出現を残す（後勝ち）、false で最初（先勝ち）
-    func uniqueSelectedLines(keepLast: Bool) {
+    func uniqueSelectedParagraphs(keepLast: Bool) {
         let parags = textStorage.paragraphs
         let sel = selectionRange
         
@@ -541,7 +541,7 @@ extension KTextView {
     
     // MARK: - Join Lines
     
-    @IBAction func joinLines(_ sender: Any?) {
+    @IBAction func joinParagraphs(_ sender: Any?) {
         let parags = textStorage.paragraphs
         let idxRange: Range<Int>
         
@@ -611,7 +611,7 @@ extension KTextView {
     
     // MARK: - Collapse Empty Lines / Remove Empty Lines
     
-    @IBAction func collapseEmptyLines(_ sender: Any?) {
+    @IBAction func collapseEmptyParagraphs(_ sender: Any?) {
         let parags = textStorage.paragraphs
         guard let idxRange = parags.paragraphIndexRange(containing: selectionRange),
               !idxRange.isEmpty else { return }
