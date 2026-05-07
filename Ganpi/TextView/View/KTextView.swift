@@ -2182,8 +2182,22 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     // 文字番号CはL行目の文字数を越えても問題ない。単にL行目の1文字目から数えてC文字目を表す。
     // 2つの指定子を並べた場合、1つ目と2つ目の示す領域全体を表す。
     // L1:C1 L2:C2 は、L1:C1 から L2:C2までを表す。L1 L2はL1行目からL2行目まで。L1:C1 L2 はL1のC1文字目から行L2の行末まで。
-    // 3つ目以降の指定子、数値(0-9)・コロンを除く文字は全てスペーサーと見做される。
+    // +を挟んだ場合、2つ目の指定子は1つ目からの相対指定と見做す。相対指定では省略値を0とする。
+    // 例: 10 +2 は 10 12、10:5 +2:3 は 10:5 12:8 と同じ。
+    // 3つ目以降の指定子、数値(0-9)・コロン・プラスを除く文字は全てスペーサーと見做される。
     func selectString(with spec: String) -> Range<Int>? {
+        struct SpecToken {
+            let text: String
+            let hasLeadingPlus: Bool
+        }
+
+        struct PositionSpec {
+            let line: Int
+            let column: Int
+            let hasColon: Bool
+            let isPureLine: Bool
+        }
+
         let skeleton = textStorage.skeletonString
         let newlines = skeleton.newlineIndices
         let docLen = textStorage.count
@@ -2200,51 +2214,135 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
             newlines.first(where: { $0 >= start }) ?? docLen
         }
 
-        let tokens = spec
-            .split(whereSeparator: { !$0.isNumber && $0 != ":" })
-            .map(String.init)
-            .prefix(2)
+        func tokenize(_ spec: String) -> [SpecToken]? {
+            var tokens: [SpecToken] = []
+            var buffer = ""
+            var hasLeadingPlus = false
+            var sawPlus = false
 
-        guard !tokens.isEmpty else { return nil }
+            func flush() {
+                guard !buffer.isEmpty else { return }
+                tokens.append(SpecToken(text: buffer, hasLeadingPlus: hasLeadingPlus))
+                buffer = ""
+                hasLeadingPlus = false
+            }
 
-        func parseToken(_ t: String, isRightEdge: Bool) -> (start: Int, end: Int)? {
-            // 純粋な行番号
-            if let line = Int(t), !t.contains(":") {
-                guard let start = startOfLine(line) else { return nil }
+            for char in spec {
+                if char.isNumber || char == ":" {
+                    buffer.append(char)
+                    continue
+                }
+
+                if char == "+" {
+                    flush()
+
+                    if sawPlus { return nil }
+                    sawPlus = true
+                    hasLeadingPlus = true
+                    continue
+                }
+
+                flush()
+            }
+
+            flush()
+
+            guard tokens.count <= 2 else { return nil }
+            return tokens
+        }
+
+        func parseAbsoluteSpec(_ text: String) -> PositionSpec? {
+            if let line = Int(text), !text.contains(":") {
+                guard line >= 1 else { return nil }
+                return PositionSpec(line: line, column: 1, hasColon: false, isPureLine: true)
+            }
+
+            let parts = text.split(separator: ":", omittingEmptySubsequences: false)
+            guard parts.count <= 2 else { return nil }
+
+            let lineText = parts.first.map(String.init) ?? ""
+            let columnText = parts.count > 1 ? String(parts[1]) : ""
+
+            let line = lineText.isEmpty ? 1 : Int(lineText) ?? 1
+            let column = columnText.isEmpty ? 1 : Int(columnText) ?? 1
+
+            guard line >= 1, column >= 1 else { return nil }
+
+            return PositionSpec(line: line, column: column, hasColon: true, isPureLine: false)
+        }
+
+        func parseRelativeSpec(_ text: String) -> PositionSpec? {
+            if let line = Int(text), !text.contains(":") {
+                guard line >= 0 else { return nil }
+                return PositionSpec(line: line, column: 0, hasColon: false, isPureLine: true)
+            }
+
+            let parts = text.split(separator: ":", omittingEmptySubsequences: false)
+            guard parts.count <= 2 else { return nil }
+
+            let lineText = parts.first.map(String.init) ?? ""
+            let columnText = parts.count > 1 ? String(parts[1]) : ""
+
+            let line = lineText.isEmpty ? 0 : Int(lineText) ?? 0
+            let column = columnText.isEmpty ? 0 : Int(columnText) ?? 0
+
+            guard line >= 0, column >= 0 else { return nil }
+
+            return PositionSpec(line: line, column: column, hasColon: true, isPureLine: false)
+        }
+
+        func rangeForSpec(_ spec: PositionSpec, isRightEdge: Bool) -> (start: Int, end: Int)? {
+            if spec.isPureLine {
+                guard let start = startOfLine(spec.line) else { return nil }
                 let endEx = lineEndExclusive(from: start)
                 guard endEx < docLen else { return nil }
                 let end = endEx + 1
                 return isRightEdge ? (end, end) : (start, end)
             }
 
-            // L:C / L: / :C / :
-            let parts = t.split(separator: ":", omittingEmptySubsequences: false)
-            let line = Int(parts.first ?? "1") ?? 1
-            let col  = Int(parts.count > 1 ? parts[1] : "1") ?? 1
-            guard line >= 1, col >= 1 else { return nil }
-            guard let lineStart = startOfLine(line) else { return nil }
+            guard let lineStart = startOfLine(spec.line) else { return nil }
 
-            let pos = lineStart + (col - 1)
+            let pos = lineStart + (spec.column - 1)
             return (pos, pos)
         }
 
-        let parsed = tokens.enumerated().compactMap {
-            parseToken($0.element, isRightEdge: $0.offset == 1)
+        guard let tokens = tokenize(spec), !tokens.isEmpty else { return nil }
+
+        guard !tokens[0].hasLeadingPlus else { return nil }
+
+        guard let firstSpec = parseAbsoluteSpec(tokens[0].text) else { return nil }
+        guard let firstRange = rangeForSpec(firstSpec, isRightEdge: false) else { return nil }
+
+        if tokens.count == 1 {
+            return firstRange.start..<firstRange.end
         }
 
-        guard parsed.count == tokens.count else { return nil }
+        let secondToken = tokens[1]
 
-        if parsed.count == 1 {
-            let p = parsed[0]
-            return p.start..<p.end
+        let secondSpec: PositionSpec
+        if secondToken.hasLeadingPlus {
+            guard let relativeSpec = parseRelativeSpec(secondToken.text) else { return nil }
+
+            let line = firstSpec.line + relativeSpec.line
+            let column = firstSpec.column + relativeSpec.column
+
+            guard line >= 1, column >= 1 else { return nil }
+
+            secondSpec = PositionSpec(
+                line: line,
+                column: column,
+                hasColon: firstSpec.hasColon || relativeSpec.hasColon,
+                isPureLine: firstSpec.isPureLine && relativeSpec.isPureLine
+            )
+        } else {
+            guard let absoluteSpec = parseAbsoluteSpec(secondToken.text) else { return nil }
+            secondSpec = absoluteSpec
         }
 
-        let a = parsed[0]
-        let b = parsed[1]
+        guard let secondRange = rangeForSpec(secondSpec, isRightEdge: true) else { return nil }
 
-        guard a.start <= b.start else { return nil }
-        return a.start < b.end ? a.start..<b.end : nil
-
+        guard firstRange.start <= secondRange.start else { return nil }
+        return firstRange.start < secondRange.end ? firstRange.start..<secondRange.end : nil
     }
 
 
