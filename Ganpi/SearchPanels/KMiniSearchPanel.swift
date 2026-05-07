@@ -20,6 +20,7 @@ final class KMiniSearchPanel: NSWindowController {
         case wholeDocumentSubstitute
         case globalFilter
         case inverseGlobalFilter
+        case selectionSpecifier
     }
     
     @IBOutlet private weak var _findField: NSTextField!
@@ -87,6 +88,10 @@ final class KMiniSearchPanel: NSWindowController {
         case .globalFilter, .inverseGlobalFilter:
             _findField.stringValue = ""
             _findField.placeholderString = "pattern"
+            
+        case .selectionSpecifier:
+            _findField.stringValue = ""
+            _findField.placeholderString = "line[:column] [line[:column]]"
         }
 
         DispatchQueue.main.async {
@@ -187,6 +192,22 @@ final class KMiniSearchPanel: NSWindowController {
             _pendingGlobal = pending
 
             let status = NSApp.sendAction(#selector(KTextView.executeGlobalCommandLineAction),
+                                          to: nil,
+                                          from: self)
+            if status {
+                _findField.stringValue = ""
+                window?.orderOut(nil)
+            } else {
+                NSSound.beep()
+            }
+            
+        case .selectionSpecifier:
+            let spec = input.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !spec.isEmpty else { return }
+
+            _pendingSelectionSpecifier = spec
+
+            let status = NSApp.sendAction(#selector(KViewController.executeSelectionSpecifierFromMiniPanel(_:)),
                                           to: nil,
                                           from: self)
             if status {
@@ -375,5 +396,15 @@ final class KMiniSearchPanel: NSWindowController {
     private func reportCommandLineParseError(_ message: String, input: String) {
         KLog.shared.log(id: "commandline", message: "\(message) (\(input))")
         KLogPanel.shared.present()
+    }
+    
+    // MARK: - Selection Specifier support
+    
+    private var _pendingSelectionSpecifier: String? = nil
+
+    func takePendingSelectionSpecifier() -> String? {
+        guard let spec = _pendingSelectionSpecifier else { return nil }
+        _pendingSelectionSpecifier = nil
+        return spec
     }
 }

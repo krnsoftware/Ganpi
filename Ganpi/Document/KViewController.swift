@@ -206,6 +206,15 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         _caretButton.performClick(nil)
     }
     
+    @IBAction func executeSelectionSpecifierFromMiniPanel(_ sender: Any?) {
+        guard let spec = KMiniSearchPanel.shared.takePendingSelectionSpecifier() else {
+            NSSound.beep()
+            return
+        }
+
+        performSelectionSpecifier(spec)
+    }
+    
     @IBAction func showFontPanel(_ sender: Any?) {
         let panel = NSFontPanel.shared
         guard let font = document?.textStorage.baseFont else { log("document is nil.",from:self); return }
@@ -748,30 +757,33 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
     }
 
     // MARK: - 右側 Popover（Caret / FS / LS）
+    
+    private func performSelectionSpecifier(_ spec: String) {
+        guard let activeTextView = activeTextView() else {
+            log("#01")
+            NSSound.beep()
+            return
+        }
+
+        guard let selection = activeTextView.selectString(with: spec) else {
+            log("#02")
+            NSSound.beep()
+            return
+        }
+
+        activeTextView.selectionRange = selection
+        activeTextView.centerSelectionInVisibleArea(nil)
+
+        updateStatusBar()
+        view.window?.makeFirstResponder(activeTextView)
+        dismissPopovers()
+    }
 
     @objc private func showCaretPopover(_ sender: NSButton) {
         if _jumpPopover == nil {
             let vc = KJumpPopoverViewController()
             vc.onConfirm = { [weak self] spec in
-                guard let self = self else { return }
-                guard let activeTextView = activeTextView() else { log("#01"); NSSound.beep(); return }
-
-                // spec を KTextView のパーサへ
-                guard let selection = activeTextView.selectString(with: spec) else {
-                    log("#02"); NSSound.beep()
-                    return
-                }
-
-                // 選択を反映（NSRange に変換）
-                activeTextView.selectionRange = selection
-                activeTextView.centerSelectionInVisibleArea(nil)
-
-                // ステータス更新 & フォーカス復帰
-                self.updateStatusBar()
-                self.view.window?.makeFirstResponder(activeTextView)
-
-                // ジャンプは一発で閉じる方が自然（連続調整したいUIではないため）
-                self.dismissPopovers()
+                self?.performSelectionSpecifier(spec)
             }
             let pop = NSPopover()
             pop.behavior = .transient
@@ -839,6 +851,8 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         
         TISSelectInputSource(source)
     }
+    
+    
 
 
 

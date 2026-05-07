@@ -4200,5 +4200,10 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         KMiniSearchPanel.shared.show(at: point, font: textStorage.baseFont, mode: .inverseGlobalFilter)
     }
     
+    @IBAction func showSelectionSpecifierPanelAction(_ sender: Any?) {
+        let point = miniSearchPanelOrigin()
+        KMiniSearchPanel.shared.show(at: point, font: textStorage.baseFont, mode: .selectionSpecifier)
+    }
+    
 }
 

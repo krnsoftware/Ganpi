@@ -1049,6 +1049,11 @@
       "selector": "unescapeXmlEntityReferences",
       "scope": "TextView",
       "summary": "XML実体参照を元の文字に戻す。"
+    },
+    {
+      "selector": "showSelectionSpecifierPanelAction",
+      "scope": "TextView",
+      "summary": "行ジャンプ用のミニパネルを表示する。"
     }
     
   ]
