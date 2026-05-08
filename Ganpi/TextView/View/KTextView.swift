@@ -913,11 +913,11 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
                 _horizontalSelectionBase = selectionRange.lowerBound
                 _mouseSelectionMode = .word
                 
-                // コマンドキーを押下している場合は、選択範囲を検索語に指定した上で検索を実行する。
+                // コマンドキーを押下している場合は、選択範囲を検索語に設定する。
                 let flags = event.modifierFlags
                 if !selectionRange.isEmpty, flags.contains(.command) {
                     KSearchPanel.shared.searchString = textStorage.string(in: selectionRange)
-                    search()
+                    //search()
                 }
                 
             case 3: // トリプルクリック - クリックした部分の行全体を選択。
