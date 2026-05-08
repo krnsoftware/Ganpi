@@ -3451,6 +3451,14 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         selectionRange = lowerRange.lowerBound..<upperRange.upperBound
     }
     
+    @IBAction func selectParagraphWithEOL(_ sender: Any?) {
+        guard let range = textStorage.lineRangeWithEOL(in: selectionRange) else {
+            log("line range is nil.",from:self)
+            return
+        }
+        selectionRange = range
+    }
+    
     @IBAction func selectRange(_ sender: Any?) {
         
         guard let item = sender as? NSMenuItem, let range = item.representedObject as? Range<Int> else { return }

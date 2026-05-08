@@ -105,6 +105,7 @@ protocol KTextStorageReadable: KTextStorageCommon {
     func attributedString(for range: Range<Int>, tabWidth: Int?, withoutColors: Bool) -> NSAttributedString?
     func lineRange(at index: Int) -> Range<Int>?
     func lineRange(in range: Range<Int>) -> Range<Int>?
+    func lineRangeWithEOL(in range: Range<Int>) -> Range<Int>?
     func lineAndColumnNumber(at index:Int) -> (line:Int, column:Int) // index(0..), line(1..), column(1..)
     
     // comparing characters using ranges.
@@ -502,6 +503,15 @@ final class KTextStorage: KTextStorageProtocol {
         }
         
         return skeletonString.lineRange(contains: range)
+    }
+    
+    // rangeを内包する最初の行の行頭から最後の行の行末までの範囲を返す。最後の改行を含む。
+    func lineRangeWithEOL(in range: Range<Int>) -> Range<Int>? {
+        guard let lineRange = lineRange(in: range) else { return nil }
+        if lineRange.upperBound < count, skeletonString[lineRange.upperBound] == FC.lf {
+            return lineRange.lowerBound..<(lineRange.upperBound + 1)
+        }
+        return lineRange
     }
     
     
