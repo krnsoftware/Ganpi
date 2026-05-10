@@ -157,7 +157,7 @@ final class KTextViewContainerView: NSView {
 
         installCompletionMenuIfNeeded()
 
-        guard let completionMenuView = _completionMenuView else { return }
+        guard let completionMenuView = _completionMenuView else { log("#01",from:self); return }
 
         let showsLowerFade = completion.entriesCount > currentEntryIndex + 6
         let lineHeight = _textView.layoutManager.lineHeight
@@ -172,7 +172,7 @@ final class KTextViewContainerView: NSView {
         )
 
         let preferredSize = completionMenuView.preferredSize()
-        let caretOrigin = _textView.characterPosition(at: _textView.caretIndex)
+        guard let caretOrigin = _textView.characterPosition(at: _textView.caretIndex) else { log("#02",from:self); return }
 
         var origin = NSPoint(
             x: caretOrigin.x - 1.0,

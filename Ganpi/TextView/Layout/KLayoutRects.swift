@@ -137,7 +137,6 @@ struct KLayoutRects {
                 if relativePoint.y < textEdgeInsets.top {
                     return .text(index: 0, lineIndex: 0)
                 } else if relativePoint.y >= (CGFloat(lineCount) * lineHeight - textEdgeInsets.bottom) {
-                    //return .text(index: textStorageRef.count, lineIndex: lines.count - 1)
                     return .text(index: _textStorageRef.count, lineIndex: lines.count - 1)
                 }
                 
@@ -155,15 +154,18 @@ struct KLayoutRects {
     }
     
     // lineIndex行に於ける文頭からcharacterIndexの文字の位置を返す。textRegion左上原点。
-    func characterPosition(lineIndex: Int, characterIndex: Int) -> CGPoint {
-        guard let line = _layoutManagerRef.lines[lineIndex] else { log("line is nil."); return .zero }
+    // characterIndexのみから計算しようとすると、行の最後にキャレットがある場合を検出できない。
+    // このためlineIndexを併用して算出する。
+    func characterPosition(lineIndex: Int, characterIndex: Int) -> CGPoint? {
+        guard let line = _layoutManagerRef.lines[lineIndex] else { log("KLayoutRects.characterPosition: #01"); return nil }
         let range = line.range
         if characterIndex >= range.lowerBound, characterIndex <= range.upperBound {
             let offset = line.characterOffset(at: characterIndex - range.lowerBound)
             let linePosition = linePosition(at: lineIndex)
             return CGPoint(x: linePosition.x + offset, y: linePosition.y)
         }
-        return .zero
+        log("KLayoutRects.characterPosition: #02")
+        return nil
     }
     
 }

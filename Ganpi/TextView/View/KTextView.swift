@@ -530,7 +530,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     
     private func updateCaretPosition() {
         guard let layoutRects = layoutManager.makeLayoutRects() else { log("layoutRects is nil.", from:self); return }
-        let caretPosition:CGPoint = layoutRects.characterPosition(lineIndex: currentLineIndex, characterIndex: caretIndex)
+        guard let caretPosition = layoutRects.characterPosition(lineIndex: currentLineIndex, characterIndex: caretIndex) else { log("caretPosition is nil.", from:self); return }
         
         _caretView.updateFrame(x: caretPosition.x, y: caretPosition.y, height: layoutManager.fontHeight)
         
@@ -559,14 +559,14 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     }
     
     func scrollSelectionToVisible() {
-        guard window?.isKeyWindow == true else { return }
-        guard window?.firstResponder === self else { return }
+        guard window?.isKeyWindow == true else { log("#01",from:self); return }
+        guard window?.firstResponder === self else { log("#02",from:self); return }
         
-        guard let scrollView = self.enclosingScrollView else { return }
-        guard let layoutRects = layoutManager.makeLayoutRects() else { return }
+        guard let scrollView = self.enclosingScrollView else { log("#03",from:self); return }
+        guard let layoutRects = layoutManager.makeLayoutRects() else { log("#04",from:self); return }
         
-        let startPosition = characterPosition(at: selectionRange.lowerBound)
-        let endPosition = characterPosition(at: selectionRange.upperBound)
+        guard let startPosition = characterPosition(at: selectionRange.lowerBound) else { log("#05",from:self); return }
+        guard let endPosition = characterPosition(at: selectionRange.upperBound) else { log("#06",from:self); return }
         // 選択範囲の上下1行分・左右に10ptだけ表示領域を増やす。
         // 行番号表示の横幅分だけ左のinsetを増やしておく。
         let rect = CGRect(
@@ -989,10 +989,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     override func mouseDragged(with event: NSEvent) {
         endYankCycle()
         
-        guard let layoutRects = _layoutManager.makeLayoutRects() else {
-            print("\(#function): layoutRects is nil")
-            return
-        }
+        guard let layoutRects = _layoutManager.makeLayoutRects() else { log("#01",from:self); return }
         //キャレット移動のセレクタ記録に残すためのダミーセレクタ。
         doCommand(by: #selector(clearCaretContext(_:)))
         
@@ -1055,8 +1052,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
             
             // スクロールがcaretの位置で行なわれるため上方向の領域拡大で上スクロールが生じないためコードを追加する。
             if index < anchor {
-                guard let scrollView = self.enclosingScrollView else { return }
-                let point = characterPosition(at: index)
+                guard let scrollView = self.enclosingScrollView else { log("#02",from:self); return }
+                guard let point = characterPosition(at: index) else { log("#03",from:self); return }
                 DispatchQueue.main.async {
                     scrollView.contentView.scrollToVisible(NSRect(x:point.x, y:point.y, width: 1, height: 1))
                 }
@@ -1168,7 +1165,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     }
     
     func draggingSession(_ session: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation) {
-        log("Dragging session ended", from: self)
+        //log("Dragging session ended", from: self)
         
         terminateDraggingOperation()
         updateCaretPosition()
@@ -1285,11 +1282,11 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     
     // ドロップ用のキャレット位置へ移動（通常の updateCaretPosition を使わない）
     private func moveDropCaret(to index: Int) {
-        let point = characterPosition(at: index)
+        guard let point = characterPosition(at: index) else { log("#01",from:self); return }
         _caretView.updateFrame(x: point.x, y: point.y, height: _layoutManager.lineHeight)
         _caretView.isHidden = false
         
-        guard let scrollView = self.enclosingScrollView else { return }
+        guard let scrollView = self.enclosingScrollView else { log("#02",from:self); return }
         DispatchQueue.main.async {
             scrollView.contentView.scrollToVisible(NSRect(x:point.x, y:point.y, width: 1, height: 1))
         }
@@ -1670,7 +1667,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
             if contentBounds.origin.x != _prevContentViewBounds.origin.x {
                 if let layoutRects = _layoutManager.makeLayoutRects(),
                    let contentView = enclosingScrollView?.contentView {
-                    let pos = characterPosition(at: caretIndex)
+                    guard let pos = characterPosition(at: caretIndex) else { log("#01",from:self); return }
                     let currentX = pos.x - layoutRects.horizontalInsets - contentView.bounds.minX
 
                     // 選択が空のときだけ表示可。行番号領域に隠れたら消す。
@@ -1689,7 +1686,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         if contentBounds.origin.x != _prevContentViewBounds.origin.x {
             if let layoutRects = _layoutManager.makeLayoutRects(),
                let contentView = enclosingScrollView?.contentView {
-                let pos = characterPosition(at: caretIndex)
+                guard let pos = characterPosition(at: caretIndex) else { log("#02",from:self); return }
                 let currentX = pos.x - layoutRects.horizontalInsets - contentView.bounds.minX
 
                 // 選択が空のときだけ表示可。行番号領域に隠れたら消す。
@@ -2122,9 +2119,10 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     
     // characterIndex文字目の文字の位置。textRegion左上原点。
     // 元々privateだがinternalに変更。
-    func characterPosition(at characterIndex:Int) -> CGPoint {
-        guard let layoutRects = layoutManager.makeLayoutRects() else { log("#0"); return .zero }
-        guard let lineIndex = layoutManager.lines.lineIndex(at: characterIndex) else { log("#1"); return .zero }
+    func characterPosition(at characterIndex:Int) -> CGPoint? {
+        guard let layoutRects = layoutManager.makeLayoutRects() else { log("#0"); return nil }
+        guard let lineIndex = layoutManager.lines.lineIndex(at: characterIndex) else { log("#1"); return nil }
+        
         return layoutRects.characterPosition(lineIndex: lineIndex, characterIndex: characterIndex)
     }
     
@@ -3794,10 +3792,10 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     }
     
     @IBAction override func centerSelectionInVisibleArea(_ sender: Any?) {
-        guard let scrollView = enclosingScrollView else { return }
+        guard let scrollView = enclosingScrollView else { log("#01",from:self); return }
         let clipView = scrollView.contentView
 
-        let caretPosition = characterPosition(at: caretIndex)
+        guard let caretPosition = characterPosition(at: caretIndex) else { log("#02",from:self); return }
         let lineHeight = layoutManager.lineHeight
         let caretRect = NSRect(x: caretPosition.x,
                                y: caretPosition.y - lineHeight * 0.7,
@@ -4266,8 +4264,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     
     //MARK: - Mini Search Panel function.
     
-    private func miniSearchPanelOrigin() -> CGPoint {
-        var point = characterPosition(at: caretIndex)
+    private func miniSearchPanelOrigin() -> CGPoint? {
+        guard var point = characterPosition(at: caretIndex) else { log("#01",from:self); return nil }
         point.y = point.y + layoutManager.lineHeight
         if let window = self.window {
             point = convert(point, to: nil)
@@ -4277,37 +4275,37 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     }
 
     @IBAction func showMiniSearchPanel(_ sender: Any?) {
-        let point = miniSearchPanelOrigin()
+        guard let point = miniSearchPanelOrigin() else { log("#01",from:self); return }
         KMiniSearchPanel.shared.show(at: point, font: textStorage.baseFont, mode: .search)
     }
 
     @IBAction func showSubstituteCommandLineAction(_ sender: Any?) {
-        let point = miniSearchPanelOrigin()
+        guard let point = miniSearchPanelOrigin() else { log("#01",from:self); return }
         KMiniSearchPanel.shared.show(at: point, font: textStorage.baseFont, mode: .substitute)
     }
     
     @IBAction func showSelectionSubstituteCommandLineAction(_ sender: Any?) {
-        let point = miniSearchPanelOrigin()
+        guard let point = miniSearchPanelOrigin() else { log("#01",from:self); return }
         KMiniSearchPanel.shared.show(at: point, font: textStorage.baseFont, mode: .selectionSubstitute)
     }
 
     @IBAction func showWholeDocumentSubstituteCommandLineAction(_ sender: Any?) {
-        let point = miniSearchPanelOrigin()
+        guard let point = miniSearchPanelOrigin() else { log("#01",from:self); return }
         KMiniSearchPanel.shared.show(at: point, font: textStorage.baseFont, mode: .wholeDocumentSubstitute)
     }
 
     @IBAction func showGlobalFilterCommandLineAction(_ sender: Any?) {
-        let point = miniSearchPanelOrigin()
+        guard let point = miniSearchPanelOrigin() else { log("#01",from:self); return }
         KMiniSearchPanel.shared.show(at: point, font: textStorage.baseFont, mode: .globalFilter)
     }
 
     @IBAction func showInverseGlobalFilterCommandLineAction(_ sender: Any?) {
-        let point = miniSearchPanelOrigin()
+        guard let point = miniSearchPanelOrigin() else { log("#01",from:self); return }
         KMiniSearchPanel.shared.show(at: point, font: textStorage.baseFont, mode: .inverseGlobalFilter)
     }
     
     @IBAction func showSelectionSpecifierPanelAction(_ sender: Any?) {
-        let point = miniSearchPanelOrigin()
+        guard let point = miniSearchPanelOrigin() else { log("#01",from:self); return }
         KMiniSearchPanel.shared.show(at: point, font: textStorage.baseFont, mode: .selectionSpecifier)
     }
     
