@@ -932,17 +932,18 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
                 break
             }
         case .lineNumber(let line):
+            let selection = selectionRange
+            guard let line = layoutManager.lines[line] else { log("line is nil", from:self); return }
+            guard let hardLineRange = textStorage.lineRangeWithEOL(in: line.range) else { log("hardLineRange is nil", from:self); return }
             
-            guard let line = _layoutManager.lines[line] else { log("line is nil", from:self); return }
-            //selectionRange = lineInfo.range
-            guard let hardLineRange = textStorage.lineRange(at: line.range.lowerBound) else { log("lineRange is nil", from:self); return }
-            let isLastLine = hardLineRange.upperBound == textStorage.count
-            selectionRange = hardLineRange.lowerBound..<hardLineRange.upperBound + (isLastLine ? 0 : 1)
-            _horizontalSelectionBase = hardLineRange.lowerBound
-            log("hardLineRange:\(hardLineRange), isLastLine: \(isLastLine)",from:self)
-            log("  selectionRange: \(selectionRange)",from:self)
+            // shiftキーを押下している場合は選択領域を拡張する。
+            if !event.modifierFlags.contains(.shift) {
+                selectionRange = hardLineRange
+            } else {
+                selectionRange = min(selection.lowerBound, hardLineRange.lowerBound)..<max(selection.upperBound, hardLineRange.upperBound)
+            }
+            _horizontalSelectionBase = selectionRange.lowerBound
             
-            //_horizontalSelectionBase = lineInfo.range.lowerBound
         case .outside:
             break
         }
