@@ -4224,6 +4224,54 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         pasteboard.setString(removedString, forType: .string)
     }
     
+    // MARK: - Look Up
+
+    @IBAction func lookUpAction(_ sender: Any?) {
+        guard let targetRange = lookUpTargetRange() else {
+            NSSound.beep()
+            return
+        }
+
+        let targetString = textStorage.string(in: targetRange)
+        if targetString.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            NSSound.beep()
+            return
+        }
+
+        guard let point = lookUpPresentationPoint(for: targetRange) else {
+            NSSound.beep()
+            return
+        }
+
+        let attributedString = NSAttributedString(
+            string: targetString,
+            attributes: [
+                .font: textStorage.baseFont
+            ]
+        )
+
+        showDefinition(for: attributedString, at: point)
+    }
+
+    private func lookUpTargetRange() -> Range<Int>? {
+        if !selectionRange.isEmpty {
+            return selectionRange
+        }
+
+        return textStorage.wordRange(forCaretAt: caretIndex)
+    }
+
+    private func lookUpPresentationPoint(for range: Range<Int>) -> CGPoint? {
+        guard let position = characterPosition(at: range.lowerBound) else {
+            return nil
+        }
+
+        return CGPoint(
+            x: position.x,
+            y: position.y + textStorage.baseFont.ascender
+        )
+    }
+    
     // MARK: - Others.
     
     @IBAction func insertDeleteBuffer(_ sender: Any?) {
