@@ -105,8 +105,13 @@ struct KLayoutRects {
         let lineCount = lines.count
 
         // LineNumberRegionの場合
-        if let lnRect = lineNumberRegion?.rect, lnRect.contains(point) {
-            let lineIndex = min(Int((point.y - textEdgeInsets.top ) / lineHeight), lineCount - 1)
+        // Y方向にはみ出していても、X座標が行番号領域内なら行番号ドラッグとして扱う。
+        if let lnRect = lineNumberRegion?.rect,
+           point.x >= lnRect.minX,
+           point.x < lnRect.maxX {
+
+            let rawLineIndex = Int((point.y - textEdgeInsets.top) / lineHeight)
+            let lineIndex = min(max(rawLineIndex, 0), lineCount - 1)
             return .lineNumber(line: lineIndex)
         }
 
