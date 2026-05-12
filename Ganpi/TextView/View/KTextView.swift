@@ -73,8 +73,14 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     // completion.
     private lazy var _completion: KCompletionController = .init(textView: self)
     
+    // 検索折り返し表示
+    private var _searchWrapIndicatorView: KSearchWrapIndicatorView?
+    
     // スクロール関連
     private var _isSmoothScrollEnabled = true
+    
+    private let _smoothScrollDuration: TimeInterval = 0.2
+    private let _searchWrapIndicatorDelayMargin: TimeInterval = 0.02
     
     // マウスによる領域選択に関するプロパティ
     private var _latestClickedCharacterIndex: Int?
@@ -1538,13 +1544,40 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
             NSSound.beep()
             return false
         }
-        guard let result = engine.searchAdvancingIfNeeded(in: textStorage.string, anchorRange: selectionRange, direction: direction) else {
-            log("no result.", from: self)
+
+        let targetString = textStorage.string
+
+        if let result = engine.searchAdvancingIfNeeded(
+            in: targetString,
+            anchorRange: selectionRange,
+            direction: direction
+        ) {
+            selectionRange = result
+            centerSelectionInVisibleArea(nil)
+            return true
+        }
+
+        let wrappedAnchorRange = wrappedSearchAnchorRange(for: direction)
+
+        guard let wrappedResult = engine.searchAdvancingIfNeeded(
+            in: targetString,
+            anchorRange: wrappedAnchorRange,
+            direction: direction
+        ) else {
+            NSSound.beep()
             return false
         }
-        
-        selectionRange = result
+
+        selectionRange = wrappedResult
         centerSelectionInVisibleArea(nil)
+        
+        let delay = _isSmoothScrollEnabled ? _smoothScrollDuration + _searchWrapIndicatorDelayMargin  : 0.0
+
+        // smooth scrollの後にSearchWrapIndicatorを表示する。
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            self?.showSearchWrapIndicator(for: direction)
+        }
+
         return true
     }
     
@@ -1674,6 +1707,50 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         } catch {
             log("searchString is invalid.", from: self)
             return nil
+        }
+    }
+    
+    private func wrappedSearchAnchorRange(for direction: KDirection) -> Range<Int> {
+        switch direction {
+        case .forward:
+            return 0..<0
+
+        case .backward:
+            return textStorage.count..<textStorage.count
+        }
+    }
+
+    private func showSearchWrapIndicator(for direction: KDirection) {
+        _searchWrapIndicatorView?.removeFromSuperview()
+
+        let symbol: String
+        switch direction {
+        case .forward:
+            symbol = "↻"
+
+        case .backward:
+            symbol = "↺"
+        }
+
+        let indicatorView = KSearchWrapIndicatorView(symbol: symbol)
+        _searchWrapIndicatorView = indicatorView
+
+        addSubview(indicatorView)
+
+        let visible = visibleRect
+        indicatorView.frame.origin = CGPoint(
+            x: visible.midX - indicatorView.frame.width / 2,
+            y: visible.midY - indicatorView.frame.height / 2
+        )
+
+        indicatorView.showAndFadeOut { [weak self, weak indicatorView] in
+            guard let self, let indicatorView else { return }
+
+            if self._searchWrapIndicatorView === indicatorView {
+                self._searchWrapIndicatorView = nil
+            }
+
+            indicatorView.removeFromSuperview()
         }
     }
     
@@ -2504,7 +2581,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
 
         if _isSmoothScrollEnabled {
             NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.2
+                context.duration = _smoothScrollDuration
                 context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
                 clipView.animator().setBoundsOrigin(point)
             }

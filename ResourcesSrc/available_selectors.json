@@ -1054,6 +1054,11 @@
       "selector": "showSelectionSpecifierPanelAction",
       "scope": "TextView",
       "summary": "行ジャンプ用のミニパネルを表示する。"
+    },
+    {
+      "selector": "lookUpAction",
+      "scope": "TextView",
+      "summary": "Look Up (調べる) を実行する。"
     }
     
   ]
