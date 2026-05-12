@@ -79,6 +79,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     // マウスによる領域選択に関するプロパティ
     private var _latestClickedCharacterIndex: Int?
     private var _mouseSelectionMode: KMouseSelectionMode = .character
+    private var _isDraggingFromLineNumber = false
     
     // マウスによる領域選択でvisibleRectを越えた場合のオートスクロールに関するプロパティ
     private var _dragTimer: Timer?
@@ -852,6 +853,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     
     override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
+        _isDraggingFromLineNumber = false
         
         endYankCycle()
         
@@ -932,6 +934,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
                 break
             }
         case .lineNumber(let line):
+            _isDraggingFromLineNumber = true
             let selection = selectionRange
             guard let line = layoutManager.lines[line] else { log("line is nil", from:self); return }
             guard let hardLineRange = textStorage.lineRangeWithEOL(in: line.range) else { log("hardLineRange is nil", from:self); return }
@@ -1029,6 +1032,19 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
             return
         }
         
+        if _isDraggingFromLineNumber {
+            guard let lineNumber = lineNumberForDraggingLocation(location, layoutRects: layoutRects) else {
+                return
+            }
+
+            updateLineNumberDraggingSelection(to: lineNumber)
+
+            _ = self.autoscroll(with: event)
+
+            updateCaretPosition()
+            return
+        }
+        
         switch layoutRects.regionType(for: location){
         case .text(let index, _):
             guard let anchor = _latestClickedCharacterIndex else { log("_latestClickedCharacterIndex is nil", from:self); return }
@@ -1063,20 +1079,8 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
                 return
             }
             
-            
         case .lineNumber(let lineNumber):
-            //現在の選択範囲から、指定れた行の最後(改行含む)までを選択する。
-            //horizontalSelectionBaseより前であれば、行頭までを選択する。
-            guard let line = _layoutManager.lines[lineNumber] else { log(".lineNumber. line = nil.", from:self); return }
-            let lineRange = line.range
-            let base = _horizontalSelectionBase ?? caretIndex
-            if lineRange.upperBound > base {
-                let endsWithLF:Bool = lineRange.upperBound < textStorage.count
-                        && textStorage.skeletonString[lineRange.upperBound] == FC.lf
-                selectionRange = base..<lineRange.upperBound + (endsWithLF ? 1 : 0) // if the line ends with LF, include it.
-            } else {
-                selectionRange = lineRange.lowerBound..<base
-            }
+            updateLineNumberDraggingSelection(to: lineNumber)
             
         case .outside:
             // textRegionより上なら文頭まで、下なら文末まで選択する。
@@ -1145,7 +1149,33 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         return image
     }
 
+    private func updateLineNumberDraggingSelection(to lineNumber: Int) {
+        // 現在の選択範囲から、指定された行の最後(改行含む)までを選択する。
+        // horizontalSelectionBaseより前であれば、行頭までを選択する。
+        guard let line = _layoutManager.lines[lineNumber] else {
+            log(".lineNumber. line = nil.", from:self)
+            return
+        }
 
+        let lineRange = line.range
+        let base = _horizontalSelectionBase ?? caretIndex
+
+        if lineRange.upperBound > base {
+            let endsWithLF: Bool = lineRange.upperBound < textStorage.count
+                && textStorage.skeletonString[lineRange.upperBound] == FC.lf
+
+            selectionRange = base..<lineRange.upperBound + (endsWithLF ? 1 : 0)
+        } else {
+            selectionRange = lineRange.lowerBound..<base
+        }
+    }
+
+    private func lineNumberForDraggingLocation(_ location: CGPoint, layoutRects: KLayoutRects) -> Int? {
+        guard layoutManager.lineCount > 0 else { return nil }
+
+        let rawLineNumber = Int((location.y - layoutRects.textEdgeInsets.top) / layoutManager.lineHeight)
+        return min(max(rawLineNumber, 0), layoutManager.lineCount - 1)
+    }
 
 
 
@@ -2158,6 +2188,7 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         _latestClickedCharacterIndex = nil
         _dragStartPoint = nil
         _prepareDraggingText = false
+        _isDraggingFromLineNumber = false
         updateCaretActiveStatus()
     }
     
