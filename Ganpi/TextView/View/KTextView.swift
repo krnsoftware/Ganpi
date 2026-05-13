@@ -1156,23 +1156,17 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     }
 
     private func updateLineNumberDraggingSelection(to lineNumber: Int) {
-        // 現在の選択範囲から、指定された行の最後(改行含む)までを選択する。
-        // horizontalSelectionBaseより前であれば、行頭までを選択する。
-        guard let line = _layoutManager.lines[lineNumber] else {
-            log(".lineNumber. line = nil.", from:self)
-            return
-        }
-
-        let lineRange = line.range
-        let base = _horizontalSelectionBase ?? caretIndex
-
-        if lineRange.upperBound > base {
-            let endsWithLF: Bool = lineRange.upperBound < textStorage.count
-                && textStorage.skeletonString[lineRange.upperBound] == FC.lf
-
-            selectionRange = base..<lineRange.upperBound + (endsWithLF ? 1 : 0)
+        // 指定された表示行を含む物理行全体を対象に、
+        // horizontalSelectionBaseを固定端として行単位の選択範囲を更新する。
+        guard let line = _layoutManager.lines[lineNumber] else { log("#01",from:self); return }
+        guard let hardLineRange = textStorage.lineRangeWithEOL(in: line.range) else { log("#02",from:self); return }
+        
+        let baseIndex = _horizontalSelectionBase ?? caretIndex
+        
+        if hardLineRange.upperBound > baseIndex {
+            selectionRange = baseIndex..<hardLineRange.upperBound
         } else {
-            selectionRange = lineRange.lowerBound..<base
+            selectionRange = hardLineRange.lowerBound..<baseIndex
         }
     }
 
