@@ -2316,8 +2316,12 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     }
     
     private func sendEditedToDocument() {
-        NSApp.sendAction(#selector(KTextStorageAction.textStorageDidEdit(_:)),
-                                         to: nil, from: self)
+        guard let document = window?.windowController?.document as? Document else {
+            log("#01", from: self)
+            return
+        }
+        
+        document.updateChangeCount(.changeDone)
     }
     
     
