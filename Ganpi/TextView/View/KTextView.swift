@@ -1068,18 +1068,27 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
             }
             
         case .outside:
-            // textRegionより上なら文頭まで、下なら文末まで選択する。
-            let textRect = layoutRects.textRegion.rect
+            let clampedLocation = clampedDraggingLocation(location, layoutRects: layoutRects)
             
-            //log(".outside", from:self)
-            
-            if location.y < textRect.minY {
-                //selectionRange = 0..<(_horizontalSelectionBase ?? caretIndex)
-                selectionRange = 0..<selectionRange.upperBound
-            } else if location.y > (_layoutManager.lineHeight * CGFloat(_layoutManager.lineCount) + layoutRects.textEdgeInsets.top)  {
-                selectionRange = (_horizontalSelectionBase ?? caretIndex)..<textStorage.count
+            switch layoutRects.regionType(for: clampedLocation) {
+            case .text(let index, _):
+                if updateMouseDraggingSelection(to: index) {
+                    return
+                }
+                
+            case .lineNumber(let lineNumber):
+                guard let line = _layoutManager.lines[lineNumber] else {
+                    log("#04", from:self)
+                    return
+                }
+                
+                if updateMouseDraggingSelection(to: line.range.lowerBound) {
+                    return
+                }
+                
+            case .outside:
+                return
             }
-            return
         }
         
         _ = self.autoscroll(with: event)
@@ -1202,6 +1211,19 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         return min(max(rawLineNumber, 0), layoutManager.lineCount - 1)
     }
 
+    private func clampedDraggingLocation(_ location: CGPoint, layoutRects: KLayoutRects) -> CGPoint {
+        let textRect = layoutRects.textRegion.rect
+        
+        let minX = textRect.minX + layoutRects.horizontalInsets
+        let maxX = textRect.maxX - layoutRects.textEdgeInsets.right
+        let minY = textRect.minY + layoutRects.textEdgeInsets.top
+        let maxY = textRect.minY + CGFloat(_layoutManager.lineCount) * _layoutManager.lineHeight + layoutRects.textEdgeInsets.top
+        
+        return CGPoint(
+            x: min(max(location.x, minX), maxX),
+            y: min(max(location.y, minY), maxY)
+        )
+    }
 
 
 
