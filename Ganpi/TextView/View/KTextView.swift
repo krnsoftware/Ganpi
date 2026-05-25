@@ -1053,40 +1053,19 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         
         switch layoutRects.regionType(for: location){
         case .text(let index, _):
-            guard let anchor = _latestClickedCharacterIndex else { log("_latestClickedCharacterIndex is nil", from:self); return }
-            
-            switch _mouseSelectionMode {
-            case .character:
-                selectionRange = min(anchor, index)..<max(anchor, index)
-            case .word:
-                if let wordRange1 = textStorage.wordRange(at: index),
-                   let wordRange2 = textStorage.wordRange(at: anchor) {
-                    selectionRange = min(wordRange1.lowerBound, wordRange2.lowerBound)..<max(wordRange1.upperBound, wordRange2.upperBound)
-                }
-            case .line:
-                if let lineRangeForIndex = textStorage.lineRange(at: index),
-                   let lineRangeForAnchor = textStorage.lineRange(at: anchor) {
-                    let lower = min(lineRangeForIndex.lowerBound, lineRangeForAnchor.lowerBound)
-                    let upper = max(lineRangeForIndex.upperBound, lineRangeForAnchor.upperBound)
-                    let isLastLine = (textStorage.count == upper)
-                    selectionRange = lower..<(isLastLine ? upper : upper + 1)
-                }
-            }
-            
-            // スクロールがcaretの位置で行なわれるため上方向の領域拡大で上スクロールが生じないためコードを追加する。
-            if index < anchor {
-                guard let scrollView = self.enclosingScrollView else { log("#02",from:self); return }
-                guard let point = characterPosition(at: index) else { log("#03",from:self); return }
-                DispatchQueue.main.async {
-                    scrollView.contentView.scrollToVisible(NSRect(x:point.x, y:point.y, width: 1, height: 1))
-                }
-                //log("selectionRange: \(selectionRange)", from:self)
-                //updateCaretPosition()
+            if updateMouseDraggingSelection(to: index) {
                 return
             }
             
         case .lineNumber(let lineNumber):
-            updateLineNumberDraggingSelection(to: lineNumber)
+            guard let line = _layoutManager.lines[lineNumber] else {
+                log("#02", from:self)
+                return
+            }
+            
+            if updateMouseDraggingSelection(to: line.range.lowerBound) {
+                return
+            }
             
         case .outside:
             // textRegionより上なら文頭まで、下なら文末まで選択する。
@@ -1153,6 +1132,52 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
         
         image.unlockFocus()
         return image
+    }
+    
+    private func updateMouseDraggingSelection(to index: Int) -> Bool {
+        guard let anchor = _latestClickedCharacterIndex else {
+            log("_latestClickedCharacterIndex is nil", from:self)
+            return false
+        }
+        
+        switch _mouseSelectionMode {
+        case .character:
+            selectionRange = min(anchor, index)..<max(anchor, index)
+            
+        case .word:
+            if let wordRangeForIndex = textStorage.wordRange(at: index),
+               let wordRangeForAnchor = textStorage.wordRange(at: anchor) {
+                selectionRange = min(wordRangeForIndex.lowerBound, wordRangeForAnchor.lowerBound)..<max(wordRangeForIndex.upperBound, wordRangeForAnchor.upperBound)
+            }
+            
+        case .line:
+            if let lineRangeForIndex = textStorage.lineRange(at: index),
+               let lineRangeForAnchor = textStorage.lineRange(at: anchor) {
+                let lower = min(lineRangeForIndex.lowerBound, lineRangeForAnchor.lowerBound)
+                let upper = max(lineRangeForIndex.upperBound, lineRangeForAnchor.upperBound)
+                let isLastLine = (textStorage.count == upper)
+                selectionRange = lower..<(isLastLine ? upper : upper + 1)
+            }
+        }
+        
+        // スクロールがcaretの位置で行なわれるため上方向の領域拡大で上スクロールが生じないためコードを追加する。
+        if index < anchor {
+            guard let scrollView = enclosingScrollView else {
+                log("#01", from:self)
+                return false
+            }
+            guard let point = characterPosition(at: index) else {
+                log("#02", from:self)
+                return false
+            }
+            
+            DispatchQueue.main.async {
+                scrollView.contentView.scrollToVisible(NSRect(x: point.x, y: point.y, width: 1, height: 1))
+            }
+            return true
+        }
+        
+        return false
     }
 
     private func updateLineNumberDraggingSelection(to lineNumber: Int) {
