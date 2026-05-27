@@ -20,6 +20,7 @@ class KClipBoardBuffer {
     private var _fixDuringCycle = true
     private var _isInCycle = false
     private var _pasteboardSnap: String?
+    private var _pasteboardSnapChangeCount: Int?
     
     // その時点でのpasteboardの中身を返す。
     private var _livePasteboard: String {
@@ -31,11 +32,25 @@ class KClipBoardBuffer {
     // yank中の初期バッファーを返す。_fixDuringCycle==trueでは開始時のバッファー、falseでは現在のバッファーを返す。
     private var _currentPasteboard: String {
         if _isInCycle, _fixDuringCycle {
-            if let snap = _pasteboardSnap { return snap }
-            let snap = _livePasteboard
+            let pasteboard = NSPasteboard.general
+            let changeCount = pasteboard.changeCount
+            
+            if let snap = _pasteboardSnap,
+               _pasteboardSnapChangeCount == changeCount {
+                return snap
+            }
+            
+            guard let string = pasteboard.string(forType: .string) else {
+                log("pastebord.string is nil.", from: self)
+                return ""
+            }
+            
+            let snap = string.normalizedString
             _pasteboardSnap = snap
+            _pasteboardSnapChangeCount = changeCount
             return snap
         }
+        
         return _livePasteboard
     }
     
@@ -65,6 +80,7 @@ class KClipBoardBuffer {
         
         _cursor = 0
         _pasteboardSnap = nil
+        _pasteboardSnapChangeCount = nil
     }
     
     
