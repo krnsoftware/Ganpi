@@ -2189,7 +2189,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
             
             _jumpHistory.adjust(for: info)
             
-            sendEditedToDocument()
             updateFrameSizeToFitContent()
             resetCaretControllProperties()
             needsDisplay = true
@@ -2313,15 +2312,6 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     private func sendStatusBarUpdateAction() {
         NSApp.sendAction(#selector(KStatusBarUpdateAction.statusBarNeedsUpdate(_:)),
                                          to: nil, from: self)
-    }
-    
-    private func sendEditedToDocument() {
-        guard let document = window?.windowController?.document as? Document else {
-            log("#01", from: self)
-            return
-        }
-        
-        document.updateChangeCount(.changeDone)
     }
     
     

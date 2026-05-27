@@ -49,10 +49,18 @@ class Document: NSDocument {
         textStorage.loadPreferences()
         textStorage.replaceParser(for: syntaxType)
         
+        textStorage.addObserver(self) { [weak self] modification in
+            self?.textStorageDidModify(modification)
+        }
+        
     }
     
     override class var autosavesInPlace: Bool {
         return false
+    }
+    
+    deinit {
+        textStorage.removeObserver(self)
     }
     
     override var windowNibName: NSNib.Name? {
@@ -340,6 +348,15 @@ extension Document {
 extension Document: KTextStorageAction {
     @IBAction func textStorageDidEdit(_ sender: Any?) {
         updateChangeCount(.changeDone)
+    }
+    
+    func textStorageDidModify(_ modification: KStorageModified) {
+        switch modification {
+        case .textChanged(_):
+            updateChangeCount(.changeDone)
+        case .colorChanged(_), .parserChanged:
+            break
+        }
     }
 }
 
