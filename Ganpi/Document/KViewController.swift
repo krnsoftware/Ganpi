@@ -748,12 +748,9 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
 
     @objc private func didChooseSyntax(_ item: NSMenuItem) {
         guard let ty = item.representedObject as? KSyntaxType, let doc = _document else { return }
-        if doc.syntaxType != ty {
-            doc.syntaxType = ty
-            let textStorage = doc.textStorage
-            textStorage.replaceParser(for: ty)
-            updateStatusBar()
-        }
+        
+        doc.syntaxType = ty
+        updateStatusBar()
     }
 
     // MARK: - 右側 Popover（Caret / FS / LS）

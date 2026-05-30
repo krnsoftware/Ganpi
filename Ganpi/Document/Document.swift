@@ -33,7 +33,16 @@ class Document: NSDocument {
     
     var syntaxType: KSyntaxType {
         get { _syntaxType }
-        set { _syntaxType = newValue; notifyStatusBarNeedsUpdate()  }
+        set {
+            guard _syntaxType != newValue else {
+                notifyStatusBarNeedsUpdate()
+                return
+            }
+            
+            _syntaxType = newValue
+            textStorage.replaceParser(for: newValue)
+            notifyStatusBarNeedsUpdate()
+        }
     }
     
     var textStorage: KTextStorage {
@@ -192,7 +201,6 @@ class Document: NSDocument {
             // シンタックスタイプを推定
             let fileExt = fileURL?.pathExtension
             syntaxType = KSyntaxType.detect(fromTypeName: typeName, orExtension: fileExt, content: normalizedString)
-            textStorage.replaceParser(for: syntaxType)
         }
         
         // 読み込み完了（未変更状態へ）
@@ -300,7 +308,6 @@ extension Document {
 
             if let st = syntaxType {
                 doc.syntaxType = st
-                doc.textStorage.replaceParser(for: st)
             }
 
             // 重要：未編集状態へ（閉じるとき保存確認を出さない）
