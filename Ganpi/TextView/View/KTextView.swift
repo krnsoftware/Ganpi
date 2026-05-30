@@ -2551,15 +2551,30 @@ final class KTextView: NSView, NSTextInputClient, NSDraggingSource, NSUserInterf
     
     // scrollviewの水平スクローラーのオンオフを設定に追従させる。
     private func applyWordWrapToEnclosingScrollView() {
-        guard let scrollView = self.enclosingScrollView else { return }
+        guard let scrollView = enclosingScrollView else { return }
+
+        var didChangeScroller = false
 
         if _wordWrap {
-            if scrollView.hasHorizontalScroller { scrollView.hasHorizontalScroller = false }
+            if scrollView.hasHorizontalScroller {
+                scrollView.hasHorizontalScroller = false
+                didChangeScroller = true
+            }
         } else {
-            if !scrollView.hasHorizontalScroller { scrollView.hasHorizontalScroller = true }
+            if !scrollView.hasHorizontalScroller {
+                scrollView.hasHorizontalScroller = true
+                didChangeScroller = true
+            }
         }
 
         scrollView.tile()
+
+        if didChangeScroller {
+            _layoutManager.textViewFrameInvalidated()
+            updateFrameSizeToFitContent()
+            updateCaretPosition()
+            needsDisplay = true
+        }
     }
     
     // textviewの周囲にフォーカスリングを表示する必要があるか返す。
