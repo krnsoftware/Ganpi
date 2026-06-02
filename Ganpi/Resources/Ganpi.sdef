@@ -22,6 +22,11 @@
 
         <class-extension extends="document" description="A Ganpi document.">
             <cocoa class="Ganpi.Document"/>
+            
+            <property name="syntax types" code="Gsts" access="r" description="The available syntax types for the document.">
+                <cocoa key="scriptSyntaxTypes"/>
+                <type type="text" list="yes"/>
+            </property>
 
             <property name="text" code="ctxt" type="text" access="rw" description="The plain text contents of the document.">
                 <cocoa key="scriptText"/>
@@ -34,6 +39,11 @@
             <property name="return code" code="Grtc" type="return code" access="rw" description="The line ending used when saving the document.">
                 <cocoa key="scriptReturnCode"/>
             </property>
+            
+            <property name="syntax type" code="Gsyt" type="text" access="rw" description="The syntax type of the document.">
+                <cocoa key="scriptSyntaxType"/>
+            </property>
+            
         </class-extension>
     </suite>
 </dictionary>

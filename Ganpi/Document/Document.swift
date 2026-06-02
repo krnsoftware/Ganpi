@@ -268,6 +268,11 @@ class Document: NSDocument {
 // MARK: - AppleScript
 
 extension Document {
+    
+    @objc dynamic var scriptSyntaxTypes: NSArray {
+        KSyntaxType.allCases.map { $0.settingName } as NSArray
+    }
+    
     @objc dynamic var scriptText: String {
         get {
             textStorage.string
@@ -299,6 +304,19 @@ extension Document {
             guard returnCode != newReturnCode else { return }
             
             returnCode = newReturnCode
+            updateChangeCount(.changeDone)
+        }
+    }
+    
+    @objc dynamic var scriptSyntaxType: String {
+        get {
+            syntaxType.settingName
+        }
+        set {
+            guard let newSyntaxType = KSyntaxType.fromSetting(newValue) else { return }
+            guard syntaxType != newSyntaxType else { return }
+            
+            syntaxType = newSyntaxType
             updateChangeCount(.changeDone)
         }
     }
