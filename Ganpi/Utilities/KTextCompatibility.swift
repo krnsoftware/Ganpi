@@ -8,6 +8,8 @@
 //  All rights reserved.
 //
 
+import Foundation
+
 enum KTextEncoding: String, CaseIterable, CustomStringConvertible {
     case utf8  = "utf8"
     case utf16 = "utf16"
@@ -61,6 +63,9 @@ enum KTextEncoding: String, CaseIterable, CustomStringConvertible {
     
 }
 
+
+//MARK: - Return Character
+
 extension String {
     enum ReturnCharacter : String, CaseIterable, CustomStringConvertible {
         case lf = "\n"
@@ -87,6 +92,75 @@ extension String {
             case .cr: return "CR"
             case .crlf: return "CRLF"
             }
+        }
+    }
+}
+
+
+//MARK: - AppleScript
+
+extension KTextEncoding {
+    
+    var appleScriptCode: FourCharCode {
+        switch self {
+        case .utf8:
+            return "Guf8".fourCharCode
+        case .utf16:
+            return "Gu16".fourCharCode
+        case .utf32:
+            return "Gu32".fourCharCode
+        case .jis:
+            return "Gjis".fourCharCode
+        case .sjis:
+            return "Gsjs".fourCharCode
+        case .euc:
+            return "Geuc".fourCharCode
+        }
+    }
+    
+    init?(appleScriptCode: FourCharCode) {
+        switch appleScriptCode {
+        case "Guf8".fourCharCode:
+            self = .utf8
+        case "Gu16".fourCharCode:
+            self = .utf16
+        case "Gu32".fourCharCode:
+            self = .utf32
+        case "Gjis".fourCharCode:
+            self = .jis
+        case "Gsjs".fourCharCode:
+            self = .sjis
+        case "Geuc".fourCharCode:
+            self = .euc
+        default:
+            return nil
+        }
+    }
+}
+
+extension String.ReturnCharacter {
+    
+    var appleScriptCode: FourCharCode {
+        switch self {
+        case .lf:
+            return "Grlf".fourCharCode
+        case .cr:
+            return "Grcr".fourCharCode
+        case .crlf:
+            return "Gcrl".fourCharCode
+        }
+    }
+    
+    init?(appleScriptCode: FourCharCode) {
+        switch appleScriptCode {
+        case "Grlf".fourCharCode:
+            self = .lf
+        case "Grcr".fourCharCode:
+            self = .cr
+        case "Gcrl".fourCharCode:
+            self = .crlf
+        default:
+            return nil
         }
     }
 }

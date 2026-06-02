@@ -265,6 +265,45 @@ class Document: NSDocument {
     
 }
 
+// MARK: - AppleScript
+
+extension Document {
+    @objc dynamic var scriptText: String {
+        get {
+            textStorage.string
+        }
+        set {
+            textStorage.string = newValue
+        }
+    }
+    
+    @objc dynamic var scriptCharacterCode: FourCharCode {
+        get {
+            characterCode.appleScriptCode
+        }
+        set {
+            guard let newCharacterCode = KTextEncoding(appleScriptCode: newValue) else { return }
+            guard characterCode != newCharacterCode else { return }
+            
+            characterCode = newCharacterCode
+            updateChangeCount(.changeDone)
+        }
+    }
+
+    @objc dynamic var scriptReturnCode: FourCharCode {
+        get {
+            returnCode.appleScriptCode
+        }
+        set {
+            guard let newReturnCode = String.ReturnCharacter(appleScriptCode: newValue) else { return }
+            guard returnCode != newReturnCode else { return }
+            
+            returnCode = newReturnCode
+            updateChangeCount(.changeDone)
+        }
+    }
+}
+
 
 // MARK: - Document extension and others.
 extension Document {

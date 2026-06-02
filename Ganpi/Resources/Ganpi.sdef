@@ -5,8 +5,35 @@
     <xi:include href="file:///System/Library/ScriptingDefinitions/CocoaStandard.sdef" xpointer="xpointer(/dictionary/suite)"/>
 
     <suite name="Ganpi Suite" code="Ganp" description="Ganpi-specific classes.">
+        <enumeration name="character code" code="Genc">
+            <enumerator name="UTF8" code="Guf8" description="UTF-8"/>
+            <enumerator name="UTF16" code="Gu16" description="UTF-16"/>
+            <enumerator name="UTF32" code="Gu32" description="UTF-32"/>
+            <enumerator name="JIS" code="Gjis" description="ISO-2022-JP"/>
+            <enumerator name="SJIS" code="Gsjs" description="Shift JIS"/>
+            <enumerator name="EUC" code="Geuc" description="EUC-JP"/>
+        </enumeration>
+
+        <enumeration name="return code" code="Gret">
+            <enumerator name="LF" code="Grlf" description="LF"/>
+            <enumerator name="CR" code="Grcr" description="CR"/>
+            <enumerator name="CRLF" code="Gcrl" description="CRLF"/>
+        </enumeration>
+
         <class-extension extends="document" description="A Ganpi document.">
             <cocoa class="Ganpi.Document"/>
+
+            <property name="text" code="ctxt" type="text" access="rw" description="The plain text contents of the document.">
+                <cocoa key="scriptText"/>
+            </property>
+
+            <property name="character code" code="Gcoc" type="character code" access="rw" description="The character encoding used when saving the document.">
+                <cocoa key="scriptCharacterCode"/>
+            </property>
+
+            <property name="return code" code="Grtc" type="return code" access="rw" description="The line ending used when saving the document.">
+                <cocoa key="scriptReturnCode"/>
+            </property>
         </class-extension>
     </suite>
 </dictionary>

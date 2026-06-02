@@ -213,6 +213,22 @@ extension StringProtocol {
     
 }
 
+
+//MARK: - AppleScript extension.
+
+extension StringProtocol {
+    
+    var fourCharCode: FourCharCode {
+        var code: FourCharCode = 0
+        
+        for byte in utf8.prefix(4) {
+            code = (code << 8) + FourCharCode(byte)
+        }
+        
+        return code
+    }
+}
+
 //MARK: - Normalizing, Treat Return Codes.
 
 extension String {
