@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE dictionary SYSTEM "file://localhost/System/Library/DTDs/sdef.dtd">
+
+<dictionary title="Ganpi" xmlns:xi="http://www.w3.org/2003/XInclude">
+    <xi:include href="file:///System/Library/ScriptingDefinitions/CocoaStandard.sdef" xpointer="xpointer(/dictionary/suite)"/>
+
+    <suite name="Ganpi Suite" code="Ganp" description="Ganpi-specific classes.">
+        <class-extension extends="document" description="A Ganpi document.">
+            <cocoa class="Ganpi.Document"/>
+        </class-extension>
+    </suite>
+</dictionary>
