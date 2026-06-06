@@ -5,6 +5,13 @@
     <xi:include href="file:///System/Library/ScriptingDefinitions/CocoaStandard.sdef" xpointer="xpointer(/dictionary/suite)"/>
 
     <suite name="Ganpi Suite" code="Ganp" description="Ganpi-specific classes.">
+        
+        <enumeration name="saveable file format" code="savf">
+            <enumerator name="Text" code="TXT " description="The plain text.">
+                <cocoa string-value="public.data"/>
+            </enumerator>
+        </enumeration>
+        
         <enumeration name="character code" code="Genc">
             <enumerator name="UTF8" code="Guf8" description="UTF-8"/>
             <enumerator name="UTF16" code="Gu16" description="UTF-16"/>
