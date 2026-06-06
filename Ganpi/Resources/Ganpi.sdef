@@ -19,9 +19,48 @@
             <enumerator name="CR" code="Grcr" description="CR"/>
             <enumerator name="CRLF" code="Gcrl" description="CRLF"/>
         </enumeration>
+        
+        <command name="search" code="GanpSrch" description="Searches text in a document and returns all matched ranges.">
+            <direct-parameter type="document" description="The document to search."/>
+            <parameter name="for" code="Gfor" type="text" description="The search string.">
+                <cocoa key="targetString"/>
+            </parameter>
+            <parameter name="case sensitive" code="Gcas" type="boolean" optional="yes" description="Whether the search is case-sensitive.">
+                <cocoa key="caseSensitive"/>
+            </parameter>
+            <parameter name="regular expression" code="Greg" type="boolean" optional="yes" description="Whether the search string is a regular expression.">
+                <cocoa key="regularExpression"/>
+            </parameter>
+            <result type="any" description="A list of {location, length} pairs."/>
+        </command>
+
+        <command name="replace" code="GanpRplc" description="Replaces all matched text in a document.">
+            <direct-parameter type="document" description="The document to modify."/>
+            <parameter name="for" code="Gfor" type="text" description="The search string.">
+                <cocoa key="targetString"/>
+            </parameter>
+            <parameter name="with" code="Gwth" type="text" description="The replacement string.">
+                <cocoa key="replacementString"/>
+            </parameter>
+            <parameter name="case sensitive" code="Gcas" type="boolean" optional="yes" description="Whether the search is case-sensitive.">
+                <cocoa key="caseSensitive"/>
+            </parameter>
+            <parameter name="regular expression" code="Greg" type="boolean" optional="yes" description="Whether the search string is a regular expression.">
+                <cocoa key="regularExpression"/>
+            </parameter>
+            <result type="integer" description="The number of replacements."/>
+        </command>
 
         <class-extension extends="document" description="A Ganpi document.">
             <cocoa class="Ganpi.Document"/>
+            
+            <responds-to command="search">
+                <cocoa method="handleSearchScriptCommand:"/>
+            </responds-to>
+
+            <responds-to command="replace">
+                <cocoa method="handleReplaceScriptCommand:"/>
+            </responds-to>
             
             <property name="syntax types" code="Gsts" access="r" description="The available syntax types for the document.">
                 <cocoa key="scriptSyntaxTypes"/>

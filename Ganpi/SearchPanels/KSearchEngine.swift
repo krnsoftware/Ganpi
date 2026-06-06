@@ -127,12 +127,38 @@ final class KSearchEngine {
         return search(in: targetString, anchorRange: movedAnchorRange, direction: direction)
     }
     
+    
     func containsMatch(in targetString: String, range: Range<Int>) -> Bool {
         guard let nsRange = nsRange(from: range, in: targetString) else {
             return false
         }
         return _regex.firstMatch(in: targetString, options: [], range: nsRange) != nil
     }
+    
+    
+    func allMatches(in targetString: String, range: Range<Int>) -> [Range<Int>]? {
+        guard range.lowerBound >= 0, range.upperBound <= targetString.count else {
+            return nil
+        }
+        guard let nsRange = nsRange(from: range, in: targetString) else {
+            return nil
+        }
+        
+        var matches: [Range<Int>] = []
+        
+        _regex.enumerateMatches(in: targetString, options: [], range: nsRange) { result, _, _ in
+            guard let result,
+                  let stringRange = Range(result.range, in: targetString),
+                  let intRange = targetString.integerRange(from: stringRange) else {
+                return
+            }
+            
+            matches.append(intRange)
+        }
+        
+        return matches
+    }
+    
     
     func replaceAll(in targetString: String, range: Range<Int>) -> (count: Int, string: String)? {
         guard range.lowerBound >= 0, range.upperBound <= targetString.count else {

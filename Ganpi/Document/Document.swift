@@ -273,6 +273,141 @@ extension Document {
         KSyntaxType.allCases.map { $0.settingName } as NSArray
     }
     
+    @objc func handleSearchScriptCommand(_ command: NSScriptCommand) -> NSAppleEventDescriptor {
+        guard let targetString = scriptStringArgument("targetString", in: command) else {
+            setScriptError("Missing search string.", in: command)
+            return NSAppleEventDescriptor.list()
+        }
+        
+        let caseSensitive = scriptBoolArgument("caseSensitive", in: command, defaultValue: true)
+        let regularExpression = scriptBoolArgument("regularExpression", in: command, defaultValue: false)
+        
+        let entry = KSearchEntry(
+            searchString: targetString,
+            replaceString: nil,
+            useRegex: regularExpression,
+            ignoreCase: !caseSensitive
+        )
+        
+        do {
+            let engine = try KSearchEngine(entry: entry)
+            guard let ranges = engine.allMatches(in: textStorage.string, range: 0..<textStorage.count) else {
+                setScriptError("Invalid search range.", in: command)
+                return NSAppleEventDescriptor.list()
+            }
+            
+            let resultDescriptor = NSAppleEventDescriptor.list()
+            
+            for range in ranges {
+                let pairDescriptor = NSAppleEventDescriptor.list()
+                pairDescriptor.insert(NSAppleEventDescriptor(int32: Int32(range.lowerBound + 1)), at: 0)
+                pairDescriptor.insert(NSAppleEventDescriptor(int32: Int32(range.count)), at: 0)
+                resultDescriptor.insert(pairDescriptor, at: 0)
+            }
+            
+            return resultDescriptor
+        } catch KSearchEngineError.emptySearchString {
+            setScriptError("The search string is empty.", in: command)
+            return NSAppleEventDescriptor.list()
+        } catch {
+            setScriptError("Invalid regular expression.", in: command)
+            return NSAppleEventDescriptor.list()
+        }
+    }
+    
+    @objc func handleReplaceScriptCommand(_ command: NSScriptCommand) -> NSNumber {
+        guard let targetString = scriptStringArgument("targetString", in: command) else {
+            setScriptError("Missing search string.", in: command)
+            return 0
+        }
+        guard let replacementString = scriptStringArgument("replacementString", in: command) else {
+            setScriptError("Missing replacement string.", in: command)
+            return 0
+        }
+        
+        let caseSensitive = scriptBoolArgument("caseSensitive", in: command, defaultValue: true)
+        let regularExpression = scriptBoolArgument("regularExpression", in: command, defaultValue: false)
+        
+        let entry = KSearchEntry(
+            searchString: targetString,
+            replaceString: replacementString,
+            useRegex: regularExpression,
+            ignoreCase: !caseSensitive
+        )
+        
+        do {
+            let engine = try KSearchEngine(entry: entry)
+            guard let result = engine.replaceAll(in: textStorage.string, range: 0..<textStorage.count) else {
+                setScriptError("Invalid replacement range.", in: command)
+                return 0
+            }
+            
+            if result.count > 0 {
+                textStorage.replaceString(in: 0..<textStorage.count, with: result.string)
+            }
+            
+            return NSNumber(value: result.count)
+        } catch KSearchEngineError.emptySearchString {
+            setScriptError("The search string is empty.", in: command)
+            return 0
+        } catch {
+            setScriptError("Invalid regular expression.", in: command)
+            return 0
+        }
+    }
+    
+    private func scriptStringArgument(_ name: String, in command: NSScriptCommand) -> String? {
+        guard let arguments = command.evaluatedArguments else { return nil }
+        
+        if let value = arguments[name] as? String {
+            return value
+        }
+        
+        switch name {
+        case "targetString":
+            return arguments["for"] as? String ?? arguments["Gfor"] as? String
+            
+        case "replacementString":
+            return arguments["with"] as? String ?? arguments["Gwth"] as? String
+            
+        default:
+            return nil
+        }
+    }
+    
+    private func scriptBoolArgument(_ name: String, in command: NSScriptCommand, defaultValue: Bool) -> Bool {
+        guard let arguments = command.evaluatedArguments else {
+            return defaultValue
+        }
+        
+        let value: Any?
+        switch name {
+        case "caseSensitive":
+            value = arguments[name] ?? arguments["case sensitive"] ?? arguments["Gcas"]
+            
+        case "regularExpression":
+            value = arguments[name] ?? arguments["regular expression"] ?? arguments["Greg"]
+            
+        default:
+            value = arguments[name]
+        }
+        
+        if let boolValue = value as? Bool {
+            return boolValue
+        }
+        
+        if let numberValue = value as? NSNumber {
+            return numberValue.boolValue
+        }
+        
+        return defaultValue
+    }
+    
+    private func setScriptError(_ message: String, in command: NSScriptCommand) {
+        command.scriptErrorNumber = -1701
+        command.scriptErrorString = message
+    }
+    
     @objc dynamic var scriptText: String {
         get {
             textStorage.string
