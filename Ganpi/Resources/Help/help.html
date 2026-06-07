@@ -464,6 +464,7 @@ parser.base.show.invisibles.tab : true
 <li><a href="#ganpi_keys">Ganpiオリジナルのキーアサイン</a></li>
 <li><a href="#user_menu">ユーザーメニュー</a></li>
 <li><a href="#user_macro">ユーザーマクロ</a></li>
+<li><a href="#applescript">AppleScript</a></li>
 </ul>
 </nav>
 <section id="keyassign">
@@ -735,6 +736,126 @@ source=fileの場合、~/Library/Application Scripts/com.drycarbon.Ganpi/scripts
 尚、insertに使用できるテンプレートファイルはText/Insert Templatesメニューに、executeで使用できる実行ファイルはText/Execute Scriptsメニューに表示され、それぞれ挿入・実行が可能です。
 </section>
 
+<section id="applescript">
+<h3>AppleScript</h3>
+<p>
+Ganpiは限定的にAppleScriptに対応しています。標準的なNSDocumentベースの操作に加え、Ganpi固有のいくつかのプロパティとコマンドを利用できます。
+</p>
+<p>
+現在のAppleScript対応は、主にドキュメント全体を対象とする操作です。テキストビュー上の選択範囲、キャレット位置、表示状態などはAppleScriptの対象として公開していません。
+</p>
+
+<h4>ドキュメントの取得</h4>
+<p>
+標準的なAppleScriptのdocument指定を利用できます。
+</p>
+<div class="example">
+<p class="example-title">
+AppleScript: Documents
+</p>
+<pre><code>
+tell application &quot;Ganpi&quot;
+    get documents
+    name of document 1
+end tell
+</code></pre>
+</div>
+
+<h4>ドキュメントプロパティ</h4>
+<p>
+ドキュメントのテキスト、文字コード、改行コード、ドキュメントタイプを取得・変更できます。
+</p>
+<div class="example">
+<p class="example-title">
+AppleScript: Document Properties
+</p>
+<pre><code>
+tell application &quot;Ganpi&quot;
+    tell document 1
+        get text
+        set text to &quot;Hello&quot;
+        get character code
+        get return code
+        get syntax type
+    end tell
+end tell
+</code></pre>
+</div>
+<p class="note">
+※ 文字コード・改行コード・ドキュメントタイプの変更は、Ganpi上の設定を変更します。実際のファイル内容に反映されるのは保存時です。
+</p>
+
+<h4>検索</h4>
+<p>
+searchコマンドは、ドキュメント全体から一致箇所をすべて検索し、<code>{{location, length}, ...}</code> の形式で返します。locationはAppleScript向けに1始まりです。一致しない場合は空リストを返します。
+</p>
+<div class="example">
+<p class="example-title">
+AppleScript: Search
+</p>
+<pre><code>
+tell application &quot;Ganpi&quot;
+    tell document 1
+        search for &quot;require&quot;
+        search for &quot;REQUIRE&quot; without case sensitive
+        search for &quot;\\d+&quot; with regular expression
+    end tell
+end tell
+</code></pre>
+</div>
+<p>
+次のように、documentを直接指定することもできます。
+</p>
+<div class="example">
+<p class="example-title">
+AppleScript: Search with Direct Document
+</p>
+<pre><code>
+tell application &quot;Ganpi&quot;
+    search document 1 for &quot;require&quot;
+end tell
+</code></pre>
+</div>
+
+<h4>置換</h4>
+<p>
+replaceコマンドは、ドキュメント全体の一致箇所をすべて置換し、置換した件数を返します。
+</p>
+<div class="example">
+<p class="example-title">
+AppleScript: Replace
+</p>
+<pre><code>
+tell application &quot;Ganpi&quot;
+    tell document 1
+        replace for &quot;foo&quot; with &quot;bar&quot;
+        replace for &quot;\\d+&quot; with &quot;N&quot; with regular expression
+    end tell
+end tell
+</code></pre>
+</div>
+
+<h4>ユーザーマクロの実行</h4>
+<p>
+perform user macroコマンドを使うと、AppleScriptからGanpiのユーザーマクロを実行できます。対象はGanpi内の最前面ドキュメントウインドウにあるアクティブなテキストビューです。
+</p>
+<div class="example">
+<p class="example-title">
+AppleScript: Perform User Macro
+</p>
+<pre><code>
+tell application &quot;Ganpi&quot;
+    perform user macro &quot;moveRight&quot;
+    perform user macro &quot;insert[\&quot;Hello\&quot;]&quot;
+    perform user macro &quot;moveToEndOfLine, insert[\&quot;;\&quot;]&quot;
+end tell
+</code></pre>
+</div>
+<p class="note">
+※ perform user macroは現在のアクティブなテキストビューに対して動作します。最前面にドキュメントウインドウがない場合や、アクティブなテキストビューが取得できない場合はエラーになります。
+</p>
+</section>
+
 <section id="acknowledgements">
 <h2>謝辞</h2>
 <p>
@@ -797,7 +918,7 @@ SOFTWARE.
 
 <footer class="footer">
 author : Karino, Masatsugu<br>
-status : created 2026-02-17, last-modified 2026-05-08<br>
+status : created 2026-02-17, last-modified 2026-06-08<br>
 </footer>
 </body>
 </html>
