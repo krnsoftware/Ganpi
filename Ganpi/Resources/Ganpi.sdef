@@ -57,6 +57,12 @@
             </parameter>
             <result type="integer" description="The number of replacements."/>
         </command>
+        
+        <command name="perform user macro" code="GanpPUMc" description="Performs a user macro on the active text view.">
+            <cocoa class="GanpiPerformUserMacroCommand"/>
+            <direct-parameter type="text" description="The user macro sequence to perform."/>
+            <result type="boolean" description="Did the user macro run?"/>
+        </command>
 
         <class-extension extends="document" description="A Ganpi document.">
             <cocoa class="Ganpi.Document"/>

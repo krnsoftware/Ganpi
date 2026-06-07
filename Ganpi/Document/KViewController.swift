@@ -1012,7 +1012,7 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         
     }
 
-    private func activeTextView() -> KTextView? {
+    func activeTextView() -> KTextView? {
         guard let window = view.window else { return nil }
         for view in textViews {
             if window.firstResponder === view { return view }
