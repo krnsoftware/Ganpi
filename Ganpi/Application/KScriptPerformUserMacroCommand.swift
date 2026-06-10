@@ -41,9 +41,52 @@ final class KScriptPerformUserMacroCommand: NSScriptCommand {
             return NSNumber(value: false)
         }
         
-        textView.performUserActions(actions)
+        performUserActions(actions, textView: textView, viewController: viewController)
         
         return NSNumber(value: true)
+    }
+    
+    private func performUserActions(_ actions: [KUserAction], textView: KTextView, viewController: KViewController) {
+        for action in actions {
+            switch action {
+            case .selector(let name):
+                performSelectorAction(name, textView: textView, viewController: viewController)
+                
+            case .command:
+                textView.performUserActions([action])
+            }
+        }
+    }
+    
+    private func performSelectorAction(_ name: String, textView: KTextView, viewController: KViewController) {
+        let selector = Selector(name + ":")
+        
+        if textView.responds(to: selector) {
+            textView.doCommand(by: selector)
+            return
+        }
+        
+        if viewController.responds(to: selector) {
+            NSApp.sendAction(selector, to: viewController, from: textView)
+            return
+        }
+        
+        if let document = viewController.document, document.responds(to: selector) {
+            NSApp.sendAction(selector, to: document, from: textView)
+            return
+        }
+        
+        if let appDelegate = NSApp.delegate, appDelegate.responds(to: selector) {
+            NSApp.sendAction(selector, to: appDelegate, from: textView)
+            return
+        }
+        
+        if NSApp.responds(to: selector) {
+            NSApp.sendAction(selector, to: NSApp, from: textView)
+            return
+        }
+        
+        NSApp.sendAction(selector, to: nil, from: textView)
     }
     
     private func setScriptError(_ message: String, number: Int) {
