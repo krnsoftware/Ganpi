@@ -408,6 +408,25 @@ extension Document {
         command.scriptErrorString = message
     }
     
+    private func setCurrentScriptError(_ message: String) {
+        guard let command = NSScriptCommand.current() else { return }
+        command.scriptErrorNumber = -1701
+        command.scriptErrorString = message
+    }
+
+    private var scriptViewControllers: [KViewController] {
+        windowControllers.compactMap { $0.contentViewController as? KViewController }
+    }
+
+    private func scriptActiveViewController() -> KViewController? {
+        if let keyWindow = NSApp.keyWindow,
+           let viewController = windowControllers.first(where: { $0.window === keyWindow })?.contentViewController as? KViewController {
+            return viewController
+        }
+        
+        return scriptViewControllers.first
+    }
+    
     @objc dynamic var scriptText: String {
         get {
             textStorage.string
@@ -453,6 +472,69 @@ extension Document {
             
             syntaxType = newSyntaxType
             updateChangeCount(.changeDone)
+        }
+    }
+    
+    @objc dynamic var scriptFontName: String {
+        get {
+            textStorage.baseFont.fontName
+        }
+        set {
+            guard !newValue.isEmpty else {
+                setCurrentScriptError("The font name is empty.")
+                return
+            }
+            
+            guard let font = NSFont(name: newValue, size: textStorage.fontSize) else {
+                setCurrentScriptError("The specified font is not available.")
+                return
+            }
+            
+            textStorage.baseFont = font
+            notifyStatusBarNeedsUpdate()
+        }
+    }
+
+    @objc dynamic var scriptFontSize: Double {
+        get {
+            Double(textStorage.fontSize)
+        }
+        set {
+            guard newValue >= 5 else {
+                setCurrentScriptError("The font size must be 5 or greater.")
+                return
+            }
+            
+            textStorage.fontSize = CGFloat(newValue)
+            notifyStatusBarNeedsUpdate()
+        }
+    }
+
+    @objc dynamic var scriptLineSpacing: Double {
+        get {
+            guard let lineSpacing = scriptActiveViewController()?.lineSpacingForScripting() else {
+                setCurrentScriptError("Cannot get line spacing because the document has no visible view.")
+                return 0
+            }
+            
+            return Double(lineSpacing)
+        }
+        set {
+            guard newValue >= 0 else {
+                setCurrentScriptError("The line spacing must be 0 or greater.")
+                return
+            }
+            
+            let viewControllers = scriptViewControllers
+            guard !viewControllers.isEmpty else {
+                setCurrentScriptError("Cannot set line spacing because the document has no visible view.")
+                return
+            }
+            
+            // syncOptionに関わらず全てのKTextViewについてLineSpacingを変更する。
+            for viewController in viewControllers {
+                viewController.setLineSpacingForScripting(CGFloat(newValue))
+            }
         }
     }
 }

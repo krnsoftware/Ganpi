@@ -79,6 +79,18 @@
                 <cocoa key="scriptSyntaxTypes"/>
                 <type type="text" list="yes"/>
             </property>
+            
+            <property name="font name" code="Gfnm" type="text" access="rw" description="The font name used to display the document.">
+                <cocoa key="scriptFontName"/>
+            </property>
+
+            <property name="font size" code="Gfsz" type="real" access="rw" description="The font size used to display the document.">
+                <cocoa key="scriptFontSize"/>
+            </property>
+
+            <property name="line spacing" code="Glns" type="real" access="rw" description="The line spacing of the visible document view.">
+                <cocoa key="scriptLineSpacing"/>
+            </property>
 
             <property name="text" code="ctxt" type="text" access="rw" description="The plain text contents of the document.">
                 <cocoa key="scriptText"/>

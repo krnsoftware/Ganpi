@@ -1011,6 +1011,7 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
         _editModeButton.attributedAlternateTitle = _editModeButton.attributedTitle
         
     }
+    
 
     func activeTextView() -> KTextView? {
         guard let window = view.window else { return nil }
@@ -1018,6 +1019,19 @@ final class KViewController: NSViewController, NSUserInterfaceValidations, NSSpl
             if window.firstResponder === view { return view }
         }
         return _panes.first?.textView
+    }
+    
+    // MARK: - AppleScript support
+
+    func lineSpacingForScripting() -> CGFloat? {
+        activeTextView()?.layoutManager.lineSpacing
+    }
+
+    func setLineSpacingForScripting(_ value: CGFloat) {
+        for textView in textViews {
+            textView.layoutManager.lineSpacing = value
+        }
+        updateStatusBar()
     }
     
 }
