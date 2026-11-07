@@ -268,46 +268,62 @@ final class KLayoutManager: KLayoutManagerReadable {
         guard let textWidth = width, wordWrap == true else {
             return [hardLine]
         }
-        
+
+        // 初期表示中など、表示幅がまだ確定していない場合は折返ししない。
+        // 負の幅で計算すると、長大行が1文字ずつ分割されてしまう。
+        guard textWidth.isFinite, textWidth > 0 else { return [hardLine] }
+
         let leadingLineOffset = leadingWhitespaceOffset(in: range)
         let trailingLineWidth = textWidth - leadingLineOffset
+        // 継続行のインデントが全幅を占める場合も異常な分割を回避する。
+        guard trailingLineWidth.isFinite, trailingLineWidth > 0 else { return [hardLine] }
         
-        // オフセットリストを取得
-        let offsets = hardLine.characterOffsets
+        let breakIndices: [Int]
+        if range.count >= 4_096,
+           let longLineBreakIndices = hardLine.wrapBreakIndices(firstWidth: textWidth, followingWidth: trailingLineWidth) {
+            breakIndices = longLineBreakIndices
+        } else {
+            // 通常行は従来どおり全文字のオフセットを使用する。
+            let offsets = hardLine.characterOffsets
+            if offsets.count == 0 {
+                return [hardLine]
+            }
+            var indices: [Int] = []
+            var lastOffset: CGFloat = 0.0
+            var isFirstLine = true
 
-        if offsets.count == 0 {
-            return [hardLine]
+            for i in 0..<offsets.count {
+                let currentOffset = offsets[i]
+                let currentTextWidth = isFirstLine ? textWidth : trailingLineWidth
+                if currentOffset - lastOffset > currentTextWidth {
+                    indices.append(i)
+                    lastOffset = currentOffset
+                    isFirstLine = false
+                }
+            }
+            breakIndices = indices
         }
-        var softLines: [KLine] = []
 
+        var softLines: [KLine] = []
         var startIndex = range.lowerBound
-        var lastOffset: CGFloat = 0.0
         var softLineIndex = 0
         var isFirstLine = true
-       
-        for i in 0..<offsets.count {
-            let currentOffset = offsets[i]
-            let currentTextWidth = isFirstLine ? textWidth : trailingLineWidth
-            
-            if currentOffset - lastOffset > currentTextWidth {
-                let endIndex = range.lowerBound + i
-                let softRange = startIndex..<endIndex
-                let softLine = KLine(range: softRange,
-                                     hardLineIndex: hardLineIndex,
-                                     softLineIndex: softLineIndex,
-                                     wordWrapOffset: isFirstLine ? 0.0 : leadingLineOffset,
-                                     layoutManager: self,
-                                     textStorageRef: _textStorageRef)
-                softLines.append(softLine)
-                softLineIndex += 1
-                startIndex = endIndex
-                lastOffset = currentOffset
-                isFirstLine = false
-            }
-            
-            
+
+        for relativeIndex in breakIndices {
+            let endIndex = range.lowerBound + relativeIndex
+            let softRange = startIndex..<endIndex
+            let softLine = KLine(range: softRange,
+                                 hardLineIndex: hardLineIndex,
+                                 softLineIndex: softLineIndex,
+                                 wordWrapOffset: isFirstLine ? 0.0 : leadingLineOffset,
+                                 layoutManager: self,
+                                 textStorageRef: _textStorageRef)
+            softLines.append(softLine)
+            softLineIndex += 1
+            startIndex = endIndex
+            isFirstLine = false
         }
-        
+
         // 残りを追加
         if startIndex < range.upperBound {
             let softLine = KLine(range: startIndex..<range.upperBound,

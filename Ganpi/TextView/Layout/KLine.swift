@@ -186,6 +186,116 @@ class KLine: CustomStringConvertible {
         context.restoreGState()
     }
     
+    // 長大行は全文字の位置を計算せず、折返し境界だけを二分探索する。
+    // 各境界は従来どおり Character 単位とし、Core Text で位置を求める。
+    // 左から右への横書きを前提とする。
+    func wrapBreakIndices(firstWidth: CGFloat, followingWidth: CGFloat) -> [Int]? {
+        guard let textStorageRef = _textStorageRef, let layoutManager = _layoutManager else { return nil }
+
+        guard let attrString = textStorageRef.attributedString(for: range, tabWidth: layoutManager.tabWidth, withoutColors: true) else {
+            return nil
+        }
+
+        let ctLine = CTLineCreateWithAttributedString(attrString)
+
+        var utf16Boundaries: [Int] = [0]
+        utf16Boundaries.reserveCapacity(range.count + 1)
+        var utf16Position = 0
+        for ch in attrString.string {
+            utf16Position &+= ch.utf16.count
+            utf16Boundaries.append(utf16Position)
+        }
+
+        // Character 数が変化した場合は旧方式に戻す。
+        guard utf16Boundaries.count == range.count + 1 else {
+            return nil
+        }
+
+        let lastBoundaryIndex = utf16Boundaries.count - 1
+        var nextSearchIndex = 0
+        var lastOffset: CGFloat = 0.0
+        var isFirstLine = true
+        var breakIndices: [Int] = []
+
+        // 前の折返しで得た文字数を、次の境界の推定に使う。
+        // 推定位置から両方向に探索し、必ず最初の幅超過境界を特定する。
+        let initialEstimate = firstWidth / max(textStorageRef.spaceAdvance, 1.0)
+        var estimatedSpan = max(1, Int(min(CGFloat(lastBoundaryIndex), initialEstimate)))
+
+        while nextSearchIndex <= lastBoundaryIndex {
+            let availableWidth = isFirstLine ? firstWidth : followingWidth
+            let startIndex = nextSearchIndex
+            let candidate = min(lastBoundaryIndex, nextSearchIndex + estimatedSpan)
+            let candidateOffset = CTLineGetOffsetForStringIndex(ctLine, utf16Boundaries[candidate], nil)
+
+            // lower: 必ず収まる最後の境界（-1 の場合は範囲外）。
+            // upper: 必ず幅を超過する最初の候補（末尾+1 は未発見）。
+            var lower = nextSearchIndex - 1
+            var upper = lastBoundaryIndex + 1
+            var foundOffset: CGFloat = 0.0
+
+            if candidateOffset - lastOffset > availableWidth {
+                upper = candidate
+                foundOffset = candidateOffset
+
+                // 推定が行末を越えていたら左方向へ指数探索する。
+                var step = 1
+                while upper > nextSearchIndex {
+                    let probe = max(nextSearchIndex, upper - step)
+                    let probeOffset = CTLineGetOffsetForStringIndex(ctLine, utf16Boundaries[probe], nil)
+                    if probeOffset - lastOffset > availableWidth {
+                        upper = probe
+                        foundOffset = probeOffset
+                        step = min(lastBoundaryIndex, step * 2)
+                    } else {
+                        lower = probe
+                        break
+                    }
+                }
+            } else {
+                lower = candidate
+
+                // 推定が短過ぎた場合は右方向へ指数探索する。
+                var probe = candidate + 1
+                var step = 1
+                while probe <= lastBoundaryIndex {
+                    let probeOffset = CTLineGetOffsetForStringIndex(ctLine, utf16Boundaries[probe], nil)
+                    if probeOffset - lastOffset > availableWidth {
+                        upper = probe
+                        foundOffset = probeOffset
+                        break
+                    }
+                    lower = probe
+                    if probe == lastBoundaryIndex { break }
+                    probe = min(lastBoundaryIndex, probe + step)
+                    step = min(lastBoundaryIndex, step * 2)
+                }
+            }
+
+            if upper > lastBoundaryIndex { break }
+
+            // 推定と異なる位置でも、境界を正確に二分探索する。
+            while lower + 1 < upper {
+                let middle = lower + (upper - lower) / 2
+                let currentOffset = CTLineGetOffsetForStringIndex(ctLine, utf16Boundaries[middle], nil)
+                if currentOffset - lastOffset > availableWidth {
+                    upper = middle
+                    foundOffset = currentOffset
+                } else {
+                    lower = middle
+                }
+            }
+
+            breakIndices.append(upper)
+            lastOffset = foundOffset
+            estimatedSpan = max(1, upper - startIndex)
+            nextSearchIndex = upper + 1
+            isFirstLine = false
+        }
+
+        return breakIndices
+    }
+
     // この行のCTLineを作成する。
     // 作成時にCTLineから文字のoffsetを取得して格納する。
     private func makeCTLine(withoutColors:Bool = false) -> CTLine? {
